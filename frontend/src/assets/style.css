@@ -1,0 +1,321 @@
+/* =========================================================================
+   Arcodesign Theme Overrides & Premium Utility Classes
+   ========================================================================= */
+
+/* -----------------------------------------------------------------------
+   Arco Design Responsive Breakpoints Reference
+   -----------------------------------------------------------------------
+   xs: < 576px        (Mobile phones)
+   sm: >= 576px       (Large phones)
+   md: >= 768px       (Tablets)
+   lg: >= 992px       (Small laptops)
+   xl: >= 1200px      (Desktops)
+   xxl: >= 1600px     (Large screens)
+
+   Usage in Vue templates:
+   <a-col :xs="24" :sm="12" :md="8" :lg="6" :xl="4" :xxl="3">
+
+   Usage in CSS:
+   @media (max-width: 768px) { ... }  // md breakpoint
+   ----------------------------------------------------------------------- */
+
+:root {
+  /* -----------------------------------------------------------------------
+     1. Color Palette (Deeper dark mode, vibrant accents)
+     ----------------------------------------------------------------------- */
+  /* Primary brand colors - Vibrant Blue gradient feel */
+  --color-primary-light-1: #e8f5ff;
+  --color-primary-light-2: #b5e3ff;
+  --color-primary-light-3: #82ccff;
+  --color-primary-light-4: #4fb3ff;
+  --color-primary-6: #1a9fff; /* Main primary */
+  --arcoblue-6: var(--color-primary-6);
+  --color-primary-7: #0084f0;
+  
+  /* Accent colors */
+  --accent-color: #6200EE;
+  --accent-color-hover: #7b2cbf;
+  --color-danger-6: #ff4d4f;
+  --color-success-6: #00b42a;
+  
+  /* -----------------------------------------------------------------------
+     2. Shadows and Glows
+     ----------------------------------------------------------------------- */
+  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.05);
+  --shadow-hover: 0 10px 30px rgba(0, 0, 0, 0.15);
+  --shadow-float: 0 20px 40px rgba(0, 0, 0, 0.2);
+  --glow-primary: 0 0 15px rgba(26, 159, 255, 0.4);
+
+  /* -----------------------------------------------------------------------
+     3. Border Radius
+     ----------------------------------------------------------------------- */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 9999px;
+  
+  /* Override default arco radii */
+  --border-radius-small: var(--radius-sm);
+  --border-radius-medium: var(--radius-md);
+  --border-radius-large: var(--radius-lg);
+
+  /* -----------------------------------------------------------------------
+     4. Animations
+     ----------------------------------------------------------------------- */
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* -----------------------------------------------------------------------
+   Dark Mode Specific Overrides
+   ----------------------------------------------------------------------- */
+body[arco-theme='dark'] {
+  /* Richer, deeper dark colors instead of flat grays */
+  --color-bg-1: #0f1219; /* App background */
+  --color-bg-2: #161a25; /* Content/card background */
+  --color-bg-3: #1c2230; /* Component background */
+  --color-bg-4: #242b3d; /* Hover background */
+  --color-fill-1: #1c2230;
+  --color-fill-2: #242b3d;
+  --color-fill-3: #2d364d;
+  --color-fill-4: #37425e;
+  
+  --color-border-1: rgba(255, 255, 255, 0.04);
+  --color-border-2: rgba(255, 255, 255, 0.08);
+  --color-border-3: rgba(255, 255, 255, 0.12);
+  --color-border-4: rgba(255, 255, 255, 0.16);
+
+  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.2);
+  --shadow-hover: 0 12px 30px rgba(0, 0, 0, 0.4);
+  --shadow-float: 0 20px 40px rgba(0, 0, 0, 0.6);
+}
+
+/* -----------------------------------------------------------------------
+   Global Body Adjustments
+   ----------------------------------------------------------------------- */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-bg-1);
+  color: var(--color-text-1);
+}
+
+/* Add a very subtle gradient background to the entire app to make cards pop */
+body[arco-theme='dark'] {
+  background-color: var(--color-bg-1);
+}
+
+body[arco-theme='dark'] #app {
+  background: radial-gradient(circle at top right, rgba(26, 159, 255, 0.05), transparent 40%),
+              radial-gradient(circle at bottom left, rgba(98, 0, 238, 0.05), transparent 40%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* -----------------------------------------------------------------------
+   Utility Classes (Glassmorphism & Layouts)
+   ----------------------------------------------------------------------- */
+.glass-panel {
+  background: rgba(22, 26, 37, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+body[arco-theme='light'] .glass-panel {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.glass-header {
+  background: rgba(15, 18, 25, 0.85) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+body[arco-theme='light'] .glass-header {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+/* -----------------------------------------------------------------------
+   Utility Classes (Animations)
+   ----------------------------------------------------------------------- */
+.hover-lift {
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
+}
+
+.hover-glow {
+  transition: filter var(--transition-normal);
+}
+
+.hover-glow:hover {
+  filter: drop-shadow(0 0 10px rgba(26, 159, 255, 0.7));
+}
+
+/* Fade in animation for page routing */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+/* -----------------------------------------------------------------------
+   Arco Component Overrides for Premium Feel
+   ----------------------------------------------------------------------- */
+/* Cards */
+.arco-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-1);
+  box-shadow: var(--shadow-soft);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.arco-card:hover {
+  border-color: var(--color-border-2);
+}
+
+/* Buttons */
+.arco-btn {
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.arco-btn-primary {
+  background: linear-gradient(135deg, var(--color-primary-6), #007aff);
+  border: none;
+  box-shadow: 0 4px 12px rgba(26, 159, 255, 0.3);
+}
+
+.arco-btn-primary:hover {
+  background: linear-gradient(135deg, var(--color-primary-5), #3395ff);
+  box-shadow: 0 6px 16px rgba(26, 159, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.arco-btn-secondary {
+  background: var(--color-fill-2);
+}
+
+.arco-btn-secondary:hover {
+  background: var(--color-fill-3);
+}
+
+/* Inputs / Selects */
+.arco-input-wrapper,
+.arco-select-view {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-2);
+  background-color: var(--color-bg-2);
+  transition: all var(--transition-fast);
+}
+
+.arco-input-wrapper:hover,
+.arco-select-view:hover {
+  border-color: var(--color-primary-6);
+  background-color: var(--color-bg-3);
+}
+
+.arco-input-wrapper.arco-input-focus,
+.arco-select-view.arco-select-view-focus {
+  border-color: var(--color-primary-6);
+  box-shadow: 0 0 0 2px rgba(26, 159, 255, 0.2);
+  background-color: var(--color-bg-1);
+}
+
+/* Tags */
+.arco-tag {
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+}
+
+/* -----------------------------------------------------------------------
+   Mobile Adaptation & Touch Optimization
+   ----------------------------------------------------------------------- */
+
+/* Mobile viewport optimization */
+@supports (-webkit-touch-callout: none) {
+  /* iOS specific fixes */
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  /* Remove hover effects on touch devices */
+  .hover-lift:hover {
+    transform: none;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .hover-glow:hover {
+    filter: none;
+  }
+
+  /* Increase touch targets */
+  .arco-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .arco-menu-item,
+  .arco-menu-inline-header {
+    min-height: 48px;
+  }
+
+  /* Better scrolling on mobile */
+  .app-layout {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Mobile-specific adjustments (xs breakpoint) */
+@media (max-width: 576px) {
+  /* Reduce padding on mobile */
+  .content {
+    padding: 12px !important;
+  }
+
+  /* Smaller header on mobile */
+  .pro-header {
+    height: 56px !important;
+    line-height: 56px !important;
+  }
+
+  /* Adjust sidebar for mobile */
+  .arco-layout-sider {
+    position: fixed !important;
+    z-index: 100;
+    height: 100vh;
+  }
+
+  /* Full-width cards on mobile */
+  .arco-card {
+    margin-left: -12px;
+    margin-right: -12px;
+    border-radius: 0;
+  }
+
+  /* Better form inputs on mobile */
+  .arco-input-wrapper,
+  .arco-select-view {
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+}
