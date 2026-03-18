@@ -1,7 +1,7 @@
 <template>
   <div
     :class="['game-card hover-lift', { 'game-card--list': isList }]"
-    @click="$emit('click', String(game.id))"
+    @click="$emit('view', String(game.id))"
   >
     <!-- Cover Image -->
     <div class="game-card__image-wrapper">
@@ -103,7 +103,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 defineEmits<{
-  click: [id: string]
+  view: [id: string]
   'toggle-favorite': [id: string]
   delete: [id: string]
 }>()

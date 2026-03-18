@@ -2268,18 +2268,20 @@ const confirmBannerSelection = async () => {
 
 // 当封面选择器打开时，自动使用英文名搜索
 watch(showCoverSelector, (isOpen) => {
-  if (isOpen && form.value.title_alt && form.value.title_alt.trim()) {
-    steamCoverSearchQuery.value = form.value.title_alt.trim()
-    searchSteamForCover()
-  }
+  if (!isOpen) return
+  const query = pickSteamSearchQuery()
+  if (!query) return
+  steamCoverSearchQuery.value = query
+  searchSteamForCover()
 })
 
 // 当横幅选择器打开时，自动使用英文名搜索
 watch(showBannerSelector, (isOpen) => {
-  if (isOpen && form.value.title_alt && form.value.title_alt.trim()) {
-    steamBannerSearchQuery.value = form.value.title_alt.trim()
-    searchSteamForBanner()
-  }
+  if (!isOpen) return
+  const query = pickSteamSearchQuery()
+  if (!query) return
+  steamBannerSearchQuery.value = query
+  searchSteamForBanner()
 })
 
 const selectSteamCoverGame = async (game: any) => {
@@ -2353,10 +2355,11 @@ const searchSteamForScreenshots = async () => {
 
 // 当截图选择器打开时，自动使用英文名搜索
 watch(showScreenshotSelector, (isOpen) => {
-  if (isOpen && form.value.title_alt && form.value.title_alt.trim()) {
-    steamScreenshotSearchQuery.value = form.value.title_alt.trim()
-    searchSteamForScreenshots()
-  }
+  if (!isOpen) return
+  const query = pickSteamSearchQuery()
+  if (!query) return
+  steamScreenshotSearchQuery.value = query
+  searchSteamForScreenshots()
 })
 
 const selectSteamScreenshotGame = async (game: any) => {

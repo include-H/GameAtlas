@@ -165,27 +165,6 @@
                 已忽略 {{ getPendingIssueDetailLabel(detail) }}
               </a-tag>
             </a-space>
-
-            <div class="pending-game__actions">
-              <a-button size="small" @click.stop="openEdit(game)">
-                <template #icon>
-                  <icon-edit />
-                </template>
-                编辑资料
-              </a-button>
-              <a-button size="small" @click.stop="openWiki(game)">
-                <template #icon>
-                  <icon-book />
-                </template>
-                编辑 Wiki
-              </a-button>
-              <a-button size="small" @click.stop="viewGame(game)">
-                <template #icon>
-                  <icon-right />
-                </template>
-                查看详情
-              </a-button>
-            </div>
           </div>
         </div>
 
@@ -802,7 +781,7 @@ onMounted(async () => {
 
 .pending-center__content {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr);
+  grid-template-columns: minmax(0, 1fr) clamp(360px, 28vw, 460px);
   gap: 16px;
   align-items: start;
 }
@@ -883,15 +862,12 @@ onMounted(async () => {
   display: flex;
 }
 
-.pending-game__actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .pending-center__detail {
   position: sticky;
   top: 12px;
+  width: 100%;
+  max-width: 460px;
+  justify-self: end;
   border-radius: 18px;
 }
 
@@ -915,6 +891,7 @@ onMounted(async () => {
 .detail-panel__hero {
   width: 100%;
   aspect-ratio: 16 / 9;
+  max-height: 300px;
   border-radius: 16px;
   overflow: hidden;
   background: var(--color-fill-2);
@@ -1025,6 +1002,8 @@ onMounted(async () => {
 
   .pending-center__detail {
     position: static;
+    max-width: none;
+    justify-self: stretch;
   }
 }
 

@@ -162,7 +162,7 @@
         >
           <game-card
             :game="game"
-            @click="viewGame(game.id)"
+            @view="viewGame"
             @toggle-favorite="toggleFavorite(game.id)"
             @delete="handleDelete(game.id, game.title)"
           />
@@ -179,7 +179,7 @@
           <game-card
             :game="game"
             is-list
-            @click="viewGame(game.id)"
+            @view="viewGame"
             @toggle-favorite="toggleFavorite(game.id)"
             @delete="handleDelete(game.id, game.title)"
           />
@@ -378,8 +378,8 @@ watch(() => route.query, () => {
   loadGames()
 })
 
-const viewGame = (id: number) => {
-  router.push({ name: 'game-detail', params: { id: id.toString() } })
+const viewGame = (id: string | number) => {
+  router.push({ name: 'game-detail', params: { id: String(id) } })
 }
 
 const handleAddGame = () => {

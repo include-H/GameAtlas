@@ -45,7 +45,7 @@
 
 	      <!-- Main Content -->
 	      <div class="game-detail__content">
-	        <div class="game-detail__main">
+	        <div class="game-detail__main" ref="mainContentRef">
 	        <!-- Screenshot Carousel -->
 	        <screenshot-carousel
 	          :preview-video="game.preview_video?.path || null"
@@ -59,7 +59,7 @@
 
       <!-- Sidebar - Steam Style -->
       <div class="game-detail__sidebar">
-        <div class="sidebar-card">
+        <div class="sidebar-card" :style="{ minHeight: desktopSidebarMinHeight }">
           <div class="sidebar-card__inner" ref="sidebarCardInnerRef">
           <!-- Header Banner (Steam Style) -->
           <div class="sidebar-header-image">
@@ -373,14 +373,24 @@ const handleToggleFavorite = async () => {
 }
 
 const sidebarCardInnerRef = ref<HTMLElement | null>(null)
+const mainContentRef = ref<HTMLElement | null>(null)
 const sidebarContentHeight = ref(0)
+const mainBaseHeight = ref(0)
 const isDesktop = ref(true)
 let sidebarResizeObserver: ResizeObserver | null = null
+let mainResizeObserver: ResizeObserver | null = null
 
 const disconnectSidebarObserver = () => {
   if (sidebarResizeObserver) {
     sidebarResizeObserver.disconnect()
     sidebarResizeObserver = null
+  }
+}
+
+const disconnectMainObserver = () => {
+  if (mainResizeObserver) {
+    mainResizeObserver.disconnect()
+    mainResizeObserver = null
   }
 }
 
@@ -391,6 +401,24 @@ const syncSidebarHeight = () => {
     return
   }
   sidebarContentHeight.value = Math.round(element.getBoundingClientRect().height)
+}
+
+const syncMainBaseHeight = () => {
+  const element = mainContentRef.value
+  if (!element) {
+    mainBaseHeight.value = 0
+    return
+  }
+
+  const measuredHeight = Math.round(element.getBoundingClientRect().height)
+  if (!measuredHeight) return
+
+  const isStretchingFromSidebar =
+    mainBaseHeight.value > 0 &&
+    sidebarContentHeight.value > mainBaseHeight.value
+  if (!isStretchingFromSidebar) {
+    mainBaseHeight.value = measuredHeight
+  }
 }
 
 const setupSidebarObserver = async () => {
@@ -419,6 +447,30 @@ const setupSidebarObserver = async () => {
   sidebarResizeObserver.observe(element)
 }
 
+const setupMainObserver = async () => {
+  await nextTick()
+
+  if (!isDesktop.value || typeof ResizeObserver === 'undefined') {
+    disconnectMainObserver()
+    syncMainBaseHeight()
+    return
+  }
+
+  const element = mainContentRef.value
+  if (!element) {
+    mainBaseHeight.value = 0
+    return
+  }
+
+  disconnectMainObserver()
+  syncMainBaseHeight()
+
+  mainResizeObserver = new ResizeObserver(() => {
+    syncMainBaseHeight()
+  })
+  mainResizeObserver.observe(element)
+}
+
 const updateBreakpoint = () => {
   if (typeof window === 'undefined') return
   isDesktop.value = window.innerWidth >= 1024
@@ -426,8 +478,13 @@ const updateBreakpoint = () => {
 
 const desktopTopSectionHeight = computed(() => {
   if (!isDesktop.value) return undefined
-  if (sidebarContentHeight.value <= 520) return undefined
-  return Math.round(sidebarContentHeight.value)
+  const targetHeight = Math.max(mainBaseHeight.value, sidebarContentHeight.value)
+  return targetHeight > 0 ? Math.round(targetHeight) : undefined
+})
+
+const desktopSidebarMinHeight = computed(() => {
+  if (!isDesktop.value || mainBaseHeight.value <= 0) return undefined
+  return `${Math.round(mainBaseHeight.value)}px`
 })
 
 const loadGameDetail = async (gameId: string) => {
@@ -464,17 +521,20 @@ onMounted(async () => {
   updateBreakpoint()
   window.addEventListener('resize', updateBreakpoint)
   await setupSidebarObserver()
+  await setupMainObserver()
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateBreakpoint)
   disconnectSidebarObserver()
+  disconnectMainObserver()
 })
 
 watch(
   [game, isDesktop, wiki],
   async () => {
     await setupSidebarObserver()
+    await setupMainObserver()
   },
   { flush: 'post' },
 )

@@ -10,9 +10,9 @@
       </p>
     </div>
 
-    <!-- Top Game Carousel (Full Width) -->
-    <a-row class="dashboard-carousel-section">
-      <a-col :span="24">
+    <!-- Top Hero Section -->
+    <a-row :gutter="[16, 16]" class="dashboard-hero-section">
+      <a-col :xs="24" :sm="24" :md="24" :lg="17" :xl="17">
         <game-carousel
           v-if="carouselGames.length > 0"
           :games="carouselGames"
@@ -20,48 +20,44 @@
           :interval="5000"
         />
       </a-col>
-    </a-row>
+      <a-col :xs="24" :sm="24" :md="24" :lg="7" :xl="7">
+        <div class="dashboard-stats-grid">
+          <stat-card
+            title="游戏总数"
+            :value="totalGames"
+            icon="mdi-gamepad-variant"
+            color="#1a9fff"
+            :height="104"
+            @click="router.push('/games')"
+          />
 
-    <!-- Statistics Cards Row -->
-    <a-row :gutter="[16, 16]" class="dashboard-stats-row">
-      <a-col :xs="12" :sm="12" :md="6" :lg="6" :xl="6">
-        <stat-card
-          title="游戏总数"
-          :value="totalGames"
-          icon="mdi-gamepad-variant"
-          color="#1a9fff"
-          @click="router.push('/games')"
-        />
-      </a-col>
+          <stat-card
+            title="收藏"
+            :value="favorites.length"
+            icon="mdi-heart"
+            color="#f53f3f"
+            :height="104"
+            @click="router.push('/games?filter=favorites')"
+          />
 
-      <a-col :xs="12" :sm="12" :md="6" :lg="6" :xl="6">
-        <stat-card
-          title="收藏"
-          :value="favorites.length"
-          icon="mdi-heart"
-          color="#f53f3f"
-          @click="router.push('/games?filter=favorites')"
-        />
-      </a-col>
+          <stat-card
+            title="新入库"
+            :value="recentAdditions.length"
+            icon="mdi-new-box"
+            color="#00b42a"
+            :height="104"
+            @click="router.push('/games?sort=newest')"
+          />
 
-      <a-col :xs="12" :sm="12" :md="6" :lg="6" :xl="6">
-        <stat-card
-          title="新入库"
-          :value="recentAdditions.length"
-          icon="mdi-new-box"
-          color="#00b42a"
-          @click="router.push('/games?sort=newest')"
-        />
-      </a-col>
-
-      <a-col :xs="12" :sm="12" :md="6" :lg="6" :xl="6">
-        <stat-card
-          title="待处理"
-          :value="pendingReviews"
-          icon="mdi-clock"
-          color="#ff7d00"
-          @click="router.push('/games/pending')"
-        />
+          <stat-card
+            title="待处理"
+            :value="pendingReviews"
+            icon="mdi-clock"
+            color="#ff7d00"
+            :height="104"
+            @click="router.push('/games/pending')"
+          />
+        </div>
       </a-col>
     </a-row>
 
@@ -80,7 +76,7 @@
       <template #item="{ item }">
         <game-card
           :game="item"
-          @click="viewGame(item.id)"
+          @view="viewGame"
           @toggle-favorite="toggleFavorite(item.id)"
         />
       </template>
@@ -98,7 +94,7 @@
       <template #item="{ item }">
         <game-card
           :game="item"
-          @click="viewGame(item.id)"
+          @view="viewGame"
           @toggle-favorite="toggleFavorite(item.id)"
         />
       </template>
@@ -176,8 +172,8 @@ const lastLoadedAt = ref(0)
 
 const pendingReviews = computed(() => pendingReviewGameCount.value)
 
-const viewGame = (id: string) => {
-  router.push({ name: 'game-detail', params: { id } })
+const viewGame = (id: string | number) => {
+  router.push({ name: 'game-detail', params: { id: String(id) } })
 }
 
 const toggleFavorite = async (id: string) => {
@@ -280,15 +276,49 @@ onActivated(async () => {
   font-weight: 500;
 }
 
-.dashboard-stats-row {
+.dashboard-hero-section {
   margin-bottom: 32px;
-  margin-top: 16px;
+  align-items: stretch;
 }
 
-.dashboard-carousel-section {
-  margin-bottom: 16px;
+.dashboard-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  height: 100%;
 }
 
+.dashboard-stats-grid :deep(.stat-card) {
+  height: 100%;
+}
+
+.dashboard-stats-grid :deep(.arco-card-body) {
+  padding: 14px 18px;
+  height: 100%;
+}
+
+.dashboard-stats-grid :deep(.stat-card-main) {
+  height: 100%;
+}
+
+.dashboard-stats-grid :deep(.stat-card-title) {
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.dashboard-stats-grid :deep(.stat-card-value) {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.dashboard-stats-grid :deep(.stat-icon-wrapper) {
+  padding: 8px;
+}
+
+.dashboard-stats-grid :deep(.stat-card-icon) {
+  font-size: 22px !important;
+}
 
 
 .dashboard-empty {
@@ -322,12 +352,25 @@ onActivated(async () => {
 }
 
 /* Responsive - Arco Design Breakpoints */
+@media (max-width: 992px) {
+  .dashboard-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+  }
+}
+
 /* md: 768px */
 @media (max-width: 768px) {
   .dashboard-section-title {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
+  }
+}
+
+@media (max-width: 576px) {
+  .dashboard-stats-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
