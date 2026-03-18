@@ -21,6 +21,7 @@ type Game struct {
 type GameAsset struct {
 	ID        int64  `db:"id"`
 	GameID    int64  `db:"game_id"`
+	AssetUID  string `db:"asset_uid"`
 	AssetType string `db:"asset_type"`
 	Path      string `db:"path"`
 	SortOrder int    `db:"sort_order"`
@@ -98,4 +99,14 @@ type WikiHistoryEntry struct {
 	Content       string  `db:"content"`
 	ChangeSummary *string `db:"change_summary"`
 	CreatedAt     string  `db:"created_at"`
+}
+
+type ReviewIssueOverride struct {
+	ID        int64   `db:"id" json:"id"`
+	GameID    int64   `db:"game_id" json:"game_id"`
+	IssueKey  string  `db:"issue_key" json:"issue_key"`
+	Status    string  `db:"status" json:"status"`
+	Reason    *string `db:"reason" json:"reason"`
+	CreatedAt string  `db:"created_at" json:"created_at"`
+	UpdatedAt string  `db:"updated_at" json:"updated_at"`
 }

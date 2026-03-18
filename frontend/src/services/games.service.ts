@@ -55,6 +55,7 @@ interface GameFileApiItem {
 
 interface ScreenshotApiItem {
   id: number
+  asset_uid: string
   path: string
   sort_order: number
 }
@@ -62,6 +63,7 @@ interface ScreenshotApiItem {
 interface GameDetailApiItem extends GameListApiItem {
   wiki_content: string | null
   wiki_content_html: string | null
+  preview_video: ScreenshotApiItem | null
   screenshots: ScreenshotApiItem[]
   series: MetadataApiItem[]
   platforms: MetadataApiItem[]
@@ -135,6 +137,7 @@ function mapGameDetail(item: GameDetailApiItem): Game {
     platform: item.platforms[0]?.name,
     wiki_content: item.wiki_content,
     wiki_content_html: item.wiki_content_html,
+    preview_video: item.preview_video,
     screenshot_items: screenshots,
     screenshots: screenshots.map((shot) => shot.path),
     files: files.map(mapFile),

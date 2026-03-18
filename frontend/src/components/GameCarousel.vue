@@ -66,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { IconLeft, IconRight } from '@arco-design/web-vue/es/icon'
 import type { Game } from '@/services/types'
@@ -143,16 +143,17 @@ const goToSlide = (index: number) => {
   currentIndex.value = index
 }
 
-const startAutoPlay = () => {
-  if (props.autoPlay && games.value.length > 1) {
-    autoPlayTimer = window.setInterval(nextSlide, props.interval)
-  }
-}
-
 const stopAutoPlay = () => {
   if (autoPlayTimer) {
     clearInterval(autoPlayTimer)
     autoPlayTimer = null
+  }
+}
+
+const startAutoPlay = () => {
+  stopAutoPlay()
+  if (props.autoPlay && games.value.length > 1) {
+    autoPlayTimer = window.setInterval(nextSlide, props.interval)
   }
 }
 
@@ -176,10 +177,6 @@ watch(
     startAutoPlay()
   },
 )
-
-onMounted(() => {
-  startAutoPlay()
-})
 
 onUnmounted(() => {
   stopAutoPlay()

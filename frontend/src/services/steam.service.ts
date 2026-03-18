@@ -1,6 +1,5 @@
 import { get, post } from './api'
 import type { ApiResponse, SteamFetchImagesResponse, SteamGameDetails, SteamGameSearchResult } from './types'
-import { useUiStore } from '@/stores/ui'
 
 interface SteamSearchApiItem {
   app_id: number
@@ -30,23 +29,16 @@ function mapSearchResult(item: SteamSearchApiItem): SteamGameSearchResult {
 export const steamService = {
   async searchGames(query: string): Promise<SteamGameSearchResult[]> {
     if (!query || query.trim().length === 0) return []
-    const uiStore = useUiStore()
     const response = await get<ApiResponse<SteamSearchApiItem[]>>('/steam/search', {
       params: {
         q: query.trim(),
-        proxy: uiStore.getProxyUrl() || undefined,
       },
     })
     return (response.data || []).map(mapSearchResult)
   },
 
   async getGameDetails(appId: string): Promise<SteamGameDetails> {
-    const uiStore = useUiStore()
-    const response = await get<ApiResponse<SteamAssetsApiItem>>(`/steam/${appId}/assets`, {
-      params: {
-        proxy: uiStore.getProxyUrl() || undefined,
-      },
-    })
+    const response = await get<ApiResponse<SteamAssetsApiItem>>(`/steam/${appId}/assets`)
     const data = response.data
     return {
       name: data.name,
@@ -65,12 +57,7 @@ export const steamService = {
   },
 
   async applyAssets(appId: string, payload: { game_id: number; cover_url?: string; banner_url?: string; screenshot_urls: string[] }): Promise<SteamFetchImagesResponse> {
-    const uiStore = useUiStore()
-    const response = await post<ApiResponse<SteamAssetsApiItem>>(`/steam/${appId}/apply-assets`, payload, {
-      params: {
-        proxy: uiStore.getProxyUrl() || undefined,
-      },
-    })
+    const response = await post<ApiResponse<SteamAssetsApiItem>>(`/steam/${appId}/apply-assets`, payload)
     return {
       coverImage: response.data.cover_url || '',
       bannerImage: response.data.banner_url || '',

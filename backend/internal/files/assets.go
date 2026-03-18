@@ -22,6 +22,11 @@ var allowedImageContentTypes = map[string]string{
 	"image/gif":  ".gif",
 }
 
+var allowedVideoContentTypes = map[string]string{
+	"video/mp4":  ".mp4",
+	"video/webm": ".webm",
+}
+
 var ErrInvalidImageType = errors.New("invalid image type")
 var ErrInvalidRemoteURL = errors.New("invalid remote image url")
 var ErrBlockedRemoteURL = errors.New("blocked remote image url")
@@ -51,13 +56,19 @@ func NewAssetStore(baseDir string, proxyURL string, timeout time.Duration) *Asse
 	}
 }
 
-func (s *AssetStore) SaveUploadedAsset(gameID int64, assetType string, file io.Reader, contentType string, index int) (string, error) {
-	extension, err := validateImageContentType(contentType)
+func (s *AssetStore) SaveUploadedAsset(
+	gameID int64,
+	assetType string,
+	assetName string,
+	file io.Reader,
+	contentType string,
+) (string, error) {
+	extension, err := validateAssetContentType(assetType, contentType)
 	if err != nil {
 		return "", err
 	}
 
-	dir, filename := assetTarget(gameID, assetType, extension, index)
+	dir, filename := assetTarget(gameID, assetType, assetName, extension)
 	targetDir := filepath.Join(s.baseDir, dir)
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return "", fmt.Errorf("create asset directory: %w", err)
@@ -77,7 +88,12 @@ func (s *AssetStore) SaveUploadedAsset(gameID int64, assetType string, file io.R
 	return "/" + filepath.ToSlash(filepath.Join("assets", dir, filename)), nil
 }
 
-func (s *AssetStore) DownloadRemoteAsset(gameID int64, assetType string, remoteURL string, index int) (string, error) {
+func (s *AssetStore) DownloadRemoteAsset(
+	gameID int64,
+	assetType string,
+	assetName string,
+	remoteURL string,
+) (string, error) {
 	parsed, err := validateRemoteImageURL(remoteURL)
 	if err != nil {
 		return "", err
@@ -105,7 +121,7 @@ func (s *AssetStore) DownloadRemoteAsset(gameID int64, assetType string, remoteU
 		contentType = contentType[:idx]
 	}
 
-	return s.SaveUploadedAsset(gameID, assetType, resp.Body, contentType, index)
+	return s.SaveUploadedAsset(gameID, assetType, assetName, resp.Body, contentType)
 }
 
 func (s *AssetStore) DeleteAsset(assetPath string) error {
@@ -127,14 +143,18 @@ func (s *AssetStore) DeleteAsset(assetPath string) error {
 	return nil
 }
 
-func validateImageContentType(contentType string) (string, error) {
+func validateAssetContentType(assetType string, contentType string) (string, error) {
 	contentType = strings.ToLower(strings.TrimSpace(contentType))
-	if extension, ok := allowedImageContentTypes[contentType]; ok {
+	allowed := allowedImageContentTypes
+	if assetType == "video" {
+		allowed = allowedVideoContentTypes
+	}
+	if extension, ok := allowed[contentType]; ok {
 		return extension, nil
 	}
 
 	if parsed, _, err := mime.ParseMediaType(contentType); err == nil {
-		if extension, ok := allowedImageContentTypes[parsed]; ok {
+		if extension, ok := allowed[parsed]; ok {
 			return extension, nil
 		}
 	}
@@ -142,16 +162,19 @@ func validateImageContentType(contentType string) (string, error) {
 	return "", ErrInvalidImageType
 }
 
-func assetTarget(gameID int64, assetType string, extension string, index int) (string, string) {
+func assetTarget(gameID int64, assetType string, assetName string, extension string) (string, string) {
 	dir := fmt.Sprintf("%d", gameID)
-	switch assetType {
-	case "cover":
-		return dir, "cover" + extension
-	case "banner":
-		return dir, "banner" + extension
-	default:
-		return dir, fmt.Sprintf("%d%s", index+1, extension)
+	if strings.TrimSpace(assetName) == "" {
+		switch assetType {
+		case "cover":
+			assetName = "cover"
+		case "banner":
+			assetName = "banner"
+		default:
+			assetName = "asset"
+		}
 	}
+	return dir, assetName + extension
 }
 
 func validateRemoteImageURL(raw string) (*url.URL, error) {

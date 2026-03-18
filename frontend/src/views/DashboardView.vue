@@ -60,6 +60,7 @@
           :value="pendingReviews"
           icon="mdi-clock"
           color="#ff7d00"
+          @click="router.push('/games/pending')"
         />
       </a-col>
     </a-row>

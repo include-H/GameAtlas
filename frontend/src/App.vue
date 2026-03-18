@@ -22,17 +22,6 @@
               <icon-up />
             </template>
           </a-button>
-
-          <!-- Settings -->
-          <a-button
-            type="text"
-            shape="circle"
-            @click="showSettingsModal = true"
-          >
-            <template #icon>
-              <icon-settings />
-            </template>
-          </a-button>
         </a-space>
       </div>
     </a-layout-header>
@@ -176,67 +165,11 @@
   >
     {{ message.content }}
   </a-message>
-
-  <!-- Settings Modal -->
-  <a-modal
-    v-model:visible="showSettingsModal"
-    title="设置"
-    :width="600"
-    :footer="false"
-  >
-    <a-form :model="uiStore.proxyConfig" layout="vertical">
-      <a-form-item label="启用代理">
-        <a-switch v-model="uiStore.proxyConfig.enabled" />
-        <template #extra>
-          启用后访问 Steam API 将通过代理服务器
-        </template>
-      </a-form-item>
-
-      <template v-if="uiStore.proxyConfig.enabled">
-        <a-form-item label="代理协议">
-          <a-select v-model="uiStore.proxyConfig.protocol">
-            <a-option value="http">HTTP</a-option>
-            <a-option value="https">HTTPS</a-option>
-            <a-option value="socks4">SOCKS4</a-option>
-            <a-option value="socks5">SOCKS5</a-option>
-          </a-select>
-        </a-form-item>
-
-        <a-form-item label="代理地址">
-          <a-input
-            v-model="uiStore.proxyConfig.host"
-            placeholder="例如：192.168.1.254"
-            allow-clear
-          />
-        </a-form-item>
-
-        <a-form-item label="代理端口">
-          <a-input
-            v-model="uiStore.proxyConfig.port"
-            placeholder="例如：7890"
-            allow-clear
-          />
-        </a-form-item>
-
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="saveProxySettings">
-              保存设置
-            </a-button>
-            <a-button @click="testProxyConnection">
-              测试连接
-            </a-button>
-          </a-space>
-        </a-form-item>
-      </template>
-    </a-form>
-  </a-modal>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, provide } from 'vue'
 import { useRouter } from 'vue-router'
-import { useUiStore } from '@/stores/ui'
 import useMenu from '@/hooks/useMenu'
 import useLocale from '@/hooks/useLocale'
 import AlertBanner from '@/components/AlertBanner.vue'
@@ -245,11 +178,9 @@ import {
   IconMenuFold,
   IconMenuUnfold,
   IconUp,
-  IconSettings,
 } from '@arco-design/web-vue/es/icon'
 
 const router = useRouter()
-const uiStore = useUiStore()
 const { menuList, activeKey } = useMenu()
 const { t } = useLocale()
 
@@ -259,7 +190,6 @@ const sideWidth = 240
 
 // State
 const collapsed = ref(false)
-const showSettingsModal = ref(false)
 
 // Message state
 const message = ref({
@@ -298,25 +228,6 @@ const showMessage = (content: string, type = 'info') => {
   }, 3000)
 }
 
-const saveProxySettings = () => {
-  uiStore.setProxyConfig(uiStore.proxyConfig)
-  showMessage('代理设置已保存', 'success')
-}
-
-const testProxyConnection = async () => {
-  try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/steam/search?q=test&proxy=${uiStore.getProxyUrl()}`)
-    const data = await response.json()
-    if (data.success !== undefined) {
-      showMessage('代理连接测试成功', 'success')
-    } else {
-      showMessage('代理连接测试失败', 'error')
-    }
-  } catch (error) {
-    showMessage('代理连接测试失败：' + (error as Error).message, 'error')
-  }
-}
-
 // Mobile detection - reactive
 const isMobile = ref(false)
 const showMobileMenu = ref(false)
@@ -338,8 +249,6 @@ const handleResize = () => {
 onMounted(() => {
   handleResize()
   window.addEventListener('resize', handleResize)
-  // 初始化代理配置
-  uiStore.initializeProxyConfig()
 })
 
 onUnmounted(() => {

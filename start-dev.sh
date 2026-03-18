@@ -6,6 +6,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$SCRIPT_DIR/backend"
 FRONTEND_DIR="$SCRIPT_DIR/frontend"
 BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:3000/api/health}"
+BACKEND_ENV_FILE="$BACKEND_DIR/.env"
+DEFAULT_DEV_DB="$BACKEND_DIR/data/app.db"
+DEFAULT_DEV_ASSETS_DIR="$BACKEND_DIR/data/gamelist"
 
 BACKEND_PID=""
 
@@ -44,6 +47,14 @@ echo "预热 Go 依赖..."
 echo "启动 Go 后端..."
 (
   cd "$BACKEND_DIR"
+  if [[ ! -f "$BACKEND_ENV_FILE" ]] && [[ -f "$DEFAULT_DEV_DB" ]] && [[ -z "${DB_PATH:-}" ]]; then
+    export DB_PATH="data/app.db"
+    echo "未检测到 backend/.env，开发环境默认使用示例数据库: $DB_PATH"
+  fi
+  if [[ ! -f "$BACKEND_ENV_FILE" ]] && [[ -d "$DEFAULT_DEV_ASSETS_DIR" ]] && [[ -z "${ASSETS_DIR:-}" ]]; then
+    export ASSETS_DIR="data/gamelist"
+    echo "未检测到 backend/.env，开发环境默认使用示例素材目录: $ASSETS_DIR"
+  fi
   go run ./cmd/server
 ) &
 BACKEND_PID=$!

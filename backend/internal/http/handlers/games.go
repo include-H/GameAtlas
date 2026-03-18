@@ -186,6 +186,7 @@ type gameListItemResponse struct {
 
 type gameAssetResponse struct {
 	ID        int64  `json:"id"`
+	AssetUID  string `json:"asset_uid"`
 	Path      string `json:"path"`
 	SortOrder int    `json:"sort_order"`
 }
@@ -224,6 +225,7 @@ type gameDetailResponse struct {
 	NeedsReview     bool                   `json:"needs_review"`
 	Views           int64                  `json:"views"`
 	Downloads       int64                  `json:"downloads"`
+	PreviewVideo    *gameAssetResponse     `json:"preview_video"`
 	Screenshots     []gameAssetResponse    `json:"screenshots"`
 	Series          []metadataItemResponse `json:"series"`
 	Platforms       []metadataItemResponse `json:"platforms"`
@@ -257,9 +259,20 @@ func toGameDetailResponse(detail *services.GameDetail) gameDetailResponse {
 	for _, asset := range detail.Screenshots {
 		screenshots = append(screenshots, gameAssetResponse{
 			ID:        asset.ID,
+			AssetUID:  asset.AssetUID,
 			Path:      asset.Path,
 			SortOrder: asset.SortOrder,
 		})
+	}
+
+	var previewVideo *gameAssetResponse
+	if detail.PreviewVideo != nil {
+		previewVideo = &gameAssetResponse{
+			ID:        detail.PreviewVideo.ID,
+			AssetUID:  detail.PreviewVideo.AssetUID,
+			Path:      detail.PreviewVideo.Path,
+			SortOrder: detail.PreviewVideo.SortOrder,
+		}
 	}
 
 	return gameDetailResponse{
@@ -276,6 +289,7 @@ func toGameDetailResponse(detail *services.GameDetail) gameDetailResponse {
 		NeedsReview:     detail.Game.NeedsReview,
 		Views:           detail.Game.Views,
 		Downloads:       detail.Game.Downloads,
+		PreviewVideo:    previewVideo,
 		Screenshots:     screenshots,
 		Series:          toMetadataResponses(detail.Series),
 		Platforms:       toMetadataResponses(detail.Platforms),

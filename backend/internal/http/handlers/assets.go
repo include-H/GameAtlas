@@ -39,17 +39,25 @@ func (h *AssetsHandler) Upload(assetType string) gin.HandlerFunc {
 			}
 		}
 
-		path, err := h.service.Upload(gameID, assetType, file, sortOrder)
+		result, err := h.service.Upload(gameID, assetType, file, sortOrder)
 		if err != nil {
 			writeServiceError(c, err, "invalid asset upload")
 			return
 		}
 
+		data := gin.H{
+			"path": result.Path,
+		}
+		if result.AssetID != nil {
+			data["asset_id"] = *result.AssetID
+		}
+		if result.AssetUID != "" {
+			data["asset_uid"] = result.AssetUID
+		}
+
 		c.JSON(http.StatusCreated, gin.H{
 			"success": true,
-			"data": gin.H{
-				"path": path,
-			},
+			"data":    data,
 		})
 	}
 }
@@ -69,5 +77,23 @@ func (h *AssetsHandler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    gin.H{"deleted": true},
+	})
+}
+
+func (h *AssetsHandler) ReorderScreenshots(c *gin.Context) {
+	var input domain.ScreenshotOrderUpdateInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid screenshot reorder payload"})
+		return
+	}
+
+	if err := h.service.ReorderScreenshots(input); err != nil {
+		writeServiceError(c, err, "invalid screenshot reorder payload")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    gin.H{"updated": true},
 	})
 }

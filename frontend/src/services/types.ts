@@ -62,6 +62,14 @@ export interface GameFileEntry {
 
 export interface ScreenshotItem {
   id?: number
+  asset_uid?: string
+  path: string
+  sort_order?: number
+}
+
+export interface VideoAssetItem {
+  id?: number
+  asset_uid?: string
   path: string
   sort_order?: number
 }
@@ -82,6 +90,7 @@ export interface Game {
   publishers?: Publisher[]
   cover_image?: string | null
   banner_image?: string | null
+  preview_video?: VideoAssetItem | null
   screenshots?: string[]
   screenshot_items?: ScreenshotItem[]
   wiki_content?: string | null
@@ -194,4 +203,14 @@ export interface SteamFetchImagesResponse {
   coverImage: string
   bannerImage: string
   screenshots: string[]
+}
+
+export interface ReviewIssueOverride {
+  id: number
+  game_id: number
+  issue_key: string
+  status: string
+  reason?: string | null
+  created_at: string
+  updated_at: string
 }

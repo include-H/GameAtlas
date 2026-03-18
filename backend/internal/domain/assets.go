@@ -2,8 +2,15 @@ package domain
 
 type DeleteAssetInput struct {
 	GameID    int64  `json:"game_id"`
+	AssetID   *int64 `json:"asset_id"`
+	AssetUID  string `json:"asset_uid"`
 	AssetType string `json:"asset_type"`
 	Path      string `json:"path"`
+}
+
+type ScreenshotOrderUpdateInput struct {
+	GameID    int64    `json:"game_id"`
+	AssetUIDs []string `json:"asset_uids"`
 }
 
 type SteamSearchResult struct {

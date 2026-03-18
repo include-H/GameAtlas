@@ -43,19 +43,22 @@
       </div>
       </div>
 
-      <!-- Main Content -->
-      <div class="game-detail__content">
-        <div class="game-detail__main" ref="mainRef">
-        <!-- Screenshot Carousel -->
-        <screenshot-carousel
-          :screenshots="game.screenshots || []"
-          :alt="game.title"
+	      <!-- Main Content -->
+	      <div class="game-detail__content">
+	        <div class="game-detail__main">
+	        <!-- Screenshot Carousel -->
+	        <screenshot-carousel
+	          :preview-video="game.preview_video?.path || null"
+	          :video-poster="game.banner_image || game.cover_image || null"
+	          :screenshots="game.screenshots || []"
+	          :alt="game.title"
+	          :height="desktopTopSectionHeight"
         />
       </div>
 
       <!-- Sidebar - Steam Style -->
       <div class="game-detail__sidebar">
-        <div class="sidebar-card" ref="sidebarCardRef" :style="sidebarCardStyle">
+        <div class="sidebar-card">
           <div class="sidebar-card__inner" ref="sidebarCardInnerRef">
           <!-- Header Banner (Steam Style) -->
           <div class="sidebar-header-image">
@@ -365,27 +368,20 @@ const handleToggleFavorite = async () => {
   }
 }
 
-const mainRef = ref<HTMLElement | null>(null)
-const sidebarCardRef = ref<HTMLElement | null>(null)
 const sidebarCardInnerRef = ref<HTMLElement | null>(null)
-const sidebarHeight = ref<number | undefined>(undefined)
 const sidebarContentHeight = ref(0)
 const isDesktop = ref(true)
-let mainResizeObserver: ResizeObserver | null = null
 let sidebarResizeObserver: ResizeObserver | null = null
 
 const updateBreakpoint = () => {
   if (typeof window === 'undefined') return
   isDesktop.value = window.innerWidth >= 1024
-  if (!isDesktop.value) {
-    sidebarHeight.value = undefined
-  }
 }
 
-const sidebarCardStyle = computed(() => {
-  if (!isDesktop.value || !sidebarHeight.value) return {}
-  if (sidebarHeight.value <= sidebarContentHeight.value) return {}
-  return { minHeight: `${sidebarHeight.value}px` }
+const desktopTopSectionHeight = computed(() => {
+  if (!isDesktop.value) return undefined
+  if (sidebarContentHeight.value <= 520) return undefined
+  return Math.round(sidebarContentHeight.value)
 })
 
 const loadGameDetail = async (gameId: string) => {
@@ -423,15 +419,6 @@ onMounted(async () => {
   window.addEventListener('resize', updateBreakpoint)
 
   await nextTick()
-  if (mainRef.value && typeof ResizeObserver !== 'undefined') {
-    mainResizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0]
-      if (!entry) return
-      if (!isDesktop.value) return
-      sidebarHeight.value = entry.contentRect.height
-    })
-    mainResizeObserver.observe(mainRef.value)
-  }
   if (sidebarCardInnerRef.value && typeof ResizeObserver !== 'undefined') {
     sidebarResizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0]
@@ -444,10 +431,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateBreakpoint)
-  if (mainResizeObserver) {
-    mainResizeObserver.disconnect()
-    mainResizeObserver = null
-  }
   if (sidebarResizeObserver) {
     sidebarResizeObserver.disconnect()
     sidebarResizeObserver = null
@@ -680,6 +663,12 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-soft);
+}
+
+.sidebar-card__inner {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
 }
 
 /* 侧边栏横幅区域 (Steam Header Image) */

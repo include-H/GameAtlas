@@ -6,10 +6,33 @@ export type PendingIssueKey =
   | 'missing-files'
   | 'missing-metadata'
 
+export type PendingIssueDetailKey =
+  | 'missing-cover'
+  | 'missing-banner'
+  | 'missing-screenshots'
+  | 'missing-wiki-content'
+  | 'missing-files-list'
+  | 'missing-developer'
+  | 'missing-publisher'
+  | 'missing-platform'
+  | 'missing-summary'
+
 export interface PendingIssueDefinition {
   key: PendingIssueKey
   label: string
   description: string
+}
+
+export interface PendingIssueDetailDefinition {
+  key: PendingIssueDetailKey
+  label: string
+  group: PendingIssueKey
+}
+
+export interface PendingIssueEvaluation {
+  groups: PendingIssueKey[]
+  details: PendingIssueDetailKey[]
+  ignoredDetails: PendingIssueDetailKey[]
 }
 
 export const pendingIssueDefinitions: PendingIssueDefinition[] = [
@@ -35,23 +58,81 @@ export const pendingIssueDefinitions: PendingIssueDefinition[] = [
   },
 ]
 
+export const pendingIssueDetailDefinitions: PendingIssueDetailDefinition[] = [
+  {
+    key: 'missing-cover',
+    label: '缺封面',
+    group: 'missing-assets',
+  },
+  {
+    key: 'missing-banner',
+    label: '缺横幅',
+    group: 'missing-assets',
+  },
+  {
+    key: 'missing-screenshots',
+    label: '缺截图',
+    group: 'missing-assets',
+  },
+  {
+    key: 'missing-wiki-content',
+    label: '缺 Wiki 内容',
+    group: 'missing-wiki',
+  },
+  {
+    key: 'missing-files-list',
+    label: '缺下载文件',
+    group: 'missing-files',
+  },
+  {
+    key: 'missing-developer',
+    label: '缺开发商',
+    group: 'missing-metadata',
+  },
+  {
+    key: 'missing-publisher',
+    label: '缺发行商',
+    group: 'missing-metadata',
+  },
+  {
+    key: 'missing-platform',
+    label: '缺平台',
+    group: 'missing-metadata',
+  },
+  {
+    key: 'missing-summary',
+    label: '缺简介',
+    group: 'missing-metadata',
+  },
+]
+
 export function getPendingIssueLabel(key?: string | null) {
   return pendingIssueDefinitions.find((item) => item.key === key)?.label || '待处理'
 }
 
-export function getPendingIssues(game: Game): PendingIssueKey[] {
-  const issues: PendingIssueKey[] = []
+export function getPendingIssueDetailLabel(key?: string | null) {
+  return pendingIssueDetailDefinitions.find((item) => item.key === key)?.label || '待补充'
+}
+
+export function evaluatePendingIssues(game: Game, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueEvaluation {
+  const details: PendingIssueDetailKey[] = []
+  const ignoredSet = new Set(ignoredDetails)
 
   const hasCover = !!game.cover_image
   const hasBanner = !!game.banner_image
   const hasScreenshots = !!game.screenshots && game.screenshots.length > 0
-  if (!hasCover || !hasBanner || !hasScreenshots) {
-    issues.push('missing-assets')
+  if (!hasCover) {
+    details.push('missing-cover')
   }
-
+  if (!hasBanner) {
+    details.push('missing-banner')
+  }
+  if (!hasScreenshots) {
+    details.push('missing-screenshots')
+  }
   const hasWiki = !!game.wiki_content?.trim() || !!game.wiki_content_html?.trim()
   if (!hasWiki) {
-    issues.push('missing-wiki')
+    details.push('missing-wiki-content')
   }
 
   const hasFiles =
@@ -59,21 +140,62 @@ export function getPendingIssues(game: Game): PendingIssueKey[] {
     (!!game.file_paths && game.file_paths.length > 0) ||
     !!game.file_path
   if (!hasFiles) {
-    issues.push('missing-files')
+    details.push('missing-files-list')
   }
 
   const hasDeveloper = !!game.developers && game.developers.length > 0
   const hasPublisher = !!game.publishers && game.publishers.length > 0
   const hasPlatform = (!!game.platforms && game.platforms.length > 0) || !!game.platform
   const hasSummary = !!game.summary?.trim()
-  if (!hasDeveloper || !hasPublisher || !hasPlatform || !hasSummary) {
-    issues.push('missing-metadata')
+  if (!hasDeveloper) {
+    details.push('missing-developer')
+  }
+  if (!hasPublisher) {
+    details.push('missing-publisher')
+  }
+  if (!hasPlatform) {
+    details.push('missing-platform')
+  }
+  if (!hasSummary) {
+    details.push('missing-summary')
   }
 
-  return issues
+  const visibleDetails = details.filter((detail) => !ignoredSet.has(detail))
+  const groups = Array.from(new Set(
+    visibleDetails
+      .map((detail) => pendingIssueDetailDefinitions.find((item) => item.key === detail)?.group)
+      .filter((group): group is PendingIssueKey => Boolean(group)),
+  ))
+
+  return {
+    groups,
+    details: visibleDetails,
+    ignoredDetails: details.filter((detail) => ignoredSet.has(detail)),
+  }
+}
+
+export function getPendingIssues(game: Game, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueKey[] {
+  return evaluatePendingIssues(game, ignoredDetails).groups
+}
+
+export function getPendingIssueDetails(game: Game, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueDetailKey[] {
+  return evaluatePendingIssues(game, ignoredDetails).details
+}
+
+export function getIgnoredPendingIssueDetails(game: Game, ignoredDetails: PendingIssueDetailKey[] = []) {
+  return evaluatePendingIssues(game, ignoredDetails).ignoredDetails
+}
+
+export function isSeverePendingGame(game: Game, ignoredDetails: PendingIssueDetailKey[] = []) {
+  const evaluation = evaluatePendingIssues(game, ignoredDetails)
+  return (
+    evaluation.details.length >= 3 ||
+    evaluation.groups.includes('missing-files') ||
+    (evaluation.groups.includes('missing-assets') && evaluation.groups.includes('missing-wiki'))
+  )
 }
 
 export function matchesPendingIssue(game: Game, key?: string | null) {
   if (!key) return true
-  return getPendingIssues(game).includes(key as PendingIssueKey)
+  return evaluatePendingIssues(game).groups.includes(key as PendingIssueKey)
 }

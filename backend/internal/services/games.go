@@ -30,13 +30,14 @@ type GamesListResult struct {
 }
 
 type GameDetail struct {
-	Game        *domain.Game
-	Screenshots []domain.GameAsset
-	Series      []domain.MetadataItem
-	Platforms   []domain.MetadataItem
-	Developers  []domain.MetadataItem
-	Publishers  []domain.MetadataItem
-	Files       []domain.GameFile
+	Game         *domain.Game
+	PreviewVideo *domain.GameAsset
+	Screenshots  []domain.GameAsset
+	Series       []domain.MetadataItem
+	Platforms    []domain.MetadataItem
+	Developers   []domain.MetadataItem
+	Publishers   []domain.MetadataItem
+	Files        []domain.GameFile
 }
 
 func NewGamesService(cfg config.Config, gamesRepo *repositories.GamesRepository, gameFilesRepo *repositories.GameFilesRepository) *GamesService {
@@ -83,6 +84,10 @@ func (s *GamesService) GetDetail(id int64) (*GameDetail, error) {
 	if err != nil {
 		return nil, err
 	}
+	videos, err := s.gamesRepo.ListVideos(id)
+	if err != nil {
+		return nil, err
+	}
 	series, err := s.gamesRepo.ListMetadata("series", "game_series", "series_id", id)
 	if err != nil {
 		return nil, err
@@ -107,14 +112,20 @@ func (s *GamesService) GetDetail(id int64) (*GameDetail, error) {
 		_ = s.refreshFileSize(id, &files[index])
 	}
 
+	var previewVideo *domain.GameAsset
+	if len(videos) > 0 {
+		previewVideo = &videos[0]
+	}
+
 	return &GameDetail{
-		Game:        game,
-		Screenshots: screenshots,
-		Series:      emptyMetadata(series),
-		Platforms:   emptyMetadata(platforms),
-		Developers:  emptyMetadata(developers),
-		Publishers:  emptyMetadata(publishers),
-		Files:       emptyFiles(files),
+		Game:         game,
+		PreviewVideo: previewVideo,
+		Screenshots:  screenshots,
+		Series:       emptyMetadata(series),
+		Platforms:    emptyMetadata(platforms),
+		Developers:   emptyMetadata(developers),
+		Publishers:   emptyMetadata(publishers),
+		Files:        emptyFiles(files),
 	}, nil
 }
 

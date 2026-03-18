@@ -4,7 +4,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import base from './modules/base'
 import register from './modules/register'
 import dashboard from './modules/dashboard'
-import games, { gameDetailRoute, wikiEditRoute } from './modules/games'
+import games, { gameDetailRoute, pendingCenterRoute, wikiEditRoute } from './modules/games'
 import notFound from './modules/not-found'
 
 /**
@@ -14,6 +14,7 @@ import notFound from './modules/not-found'
 export const appRoutes: RouteRecordRaw[] = [
   dashboard,
   games,
+  pendingCenterRoute,
   gameDetailRoute,
   wikiEditRoute,
 ]

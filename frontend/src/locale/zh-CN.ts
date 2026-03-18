@@ -8,6 +8,9 @@ export default {
     register: '注册',
     dashboard: '首页',
     games: '游戏库',
+    pending: {
+      center: '待处理中心',
+    },
     notFound: '未找到页面',
     'game.detail': '游戏详情',
     'wiki.edit': '编辑Wiki',

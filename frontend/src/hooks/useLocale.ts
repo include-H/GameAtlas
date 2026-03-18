@@ -11,6 +11,9 @@ const locales: Record<Locale, any> = {
       register: 'Register',
       dashboard: 'Dashboard',
       games: 'Games',
+      pending: {
+        center: 'Pending Center',
+      },
       notFound: 'Not Found',
       'game.detail': 'Game Detail',
       'wiki.edit': 'Edit Wiki',

@@ -1,7 +1,10 @@
 package services
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"mime/multipart"
 	"os"
 	"strings"
@@ -19,6 +22,12 @@ type AssetsService struct {
 	store      *files.AssetStore
 }
 
+type UploadResult struct {
+	Path     string
+	AssetID  *int64
+	AssetUID string
+}
+
 func NewAssetsService(cfg config.Config, gamesRepo *repositories.GamesRepository, assetsRepo *repositories.AssetsRepository) *AssetsService {
 	proxy := cfg.HTTPProxy
 	if proxy == "" {
@@ -32,28 +41,35 @@ func NewAssetsService(cfg config.Config, gamesRepo *repositories.GamesRepository
 	}
 }
 
-func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart.FileHeader, sortOrder int) (string, error) {
+func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart.FileHeader, sortOrder int) (*UploadResult, error) {
 	if _, err := s.gamesRepo.GetByID(gameID); err != nil {
-		return "", normalizeRepoError(err)
+		return nil, normalizeRepoError(err)
 	}
 
 	src, err := header.Open()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer src.Close()
 
 	contentType := header.Header.Get("Content-Type")
-	path, err := s.store.SaveUploadedAsset(gameID, assetType, src, contentType, sortOrder)
+	assetUID, assetName := allocateAssetIdentity(gameID, assetType)
+	path, err := s.store.SaveUploadedAsset(gameID, assetType, assetName, src, contentType)
 	if err != nil {
-		return "", normalizeAssetError(err)
+		return nil, normalizeAssetError(err)
 	}
 
-	if err := s.persistAssetPath(gameID, assetType, path, sortOrder); err != nil {
-		return "", err
+	asset, err := s.persistAssetPath(gameID, assetType, assetUID, path, sortOrder)
+	if err != nil {
+		return nil, err
 	}
 
-	return path, nil
+	result := &UploadResult{Path: path}
+	if asset != nil {
+		result.AssetUID = asset.AssetUID
+		result.AssetID = &asset.ID
+	}
+	return result, nil
 }
 
 func (s *AssetsService) Delete(input domain.DeleteAssetInput) error {
@@ -77,12 +93,42 @@ func (s *AssetsService) Delete(input domain.DeleteAssetInput) error {
 			return normalizeRepoError(err)
 		}
 	case "screenshot":
-		deleted, err := s.assetsRepo.DeleteScreenshot(input.GameID, assetPath)
-		if err != nil {
-			return err
+		if strings.TrimSpace(input.AssetUID) != "" {
+			asset, err := s.assetsRepo.DeleteScreenshotByUID(input.GameID, strings.TrimSpace(input.AssetUID))
+			if err != nil {
+				return normalizeRepoError(err)
+			}
+			assetPath = asset.Path
+		} else if input.AssetID != nil && *input.AssetID > 0 {
+			asset, err := s.assetsRepo.DeleteScreenshotByID(input.GameID, *input.AssetID)
+			if err != nil {
+				return normalizeRepoError(err)
+			}
+			assetPath = asset.Path
+		} else {
+			deleted, err := s.assetsRepo.DeleteScreenshot(input.GameID, assetPath)
+			if err != nil {
+				return err
+			}
+			if !deleted {
+				return ErrNotFound
+			}
 		}
-		if !deleted {
-			return ErrNotFound
+	case "video":
+		if strings.TrimSpace(input.AssetUID) != "" {
+			asset, err := s.assetsRepo.DeleteAssetByUID(input.GameID, strings.TrimSpace(input.AssetUID), "video")
+			if err != nil {
+				return normalizeRepoError(err)
+			}
+			assetPath = asset.Path
+		} else {
+			deleted, err := s.assetsRepo.DeleteAssetByPath(input.GameID, "video", assetPath)
+			if err != nil {
+				return err
+			}
+			if !deleted {
+				return ErrNotFound
+			}
 		}
 	default:
 		return ErrValidation
@@ -98,28 +144,74 @@ func (s *AssetsService) ApplyRemoteAsset(gameID int64, assetType string, remoteU
 	if _, err := s.gamesRepo.GetByID(gameID); err != nil {
 		return "", normalizeRepoError(err)
 	}
-	path, err := s.store.DownloadRemoteAsset(gameID, assetType, remoteURL, sortOrder)
+	assetUID, assetName := allocateAssetIdentity(gameID, assetType)
+	path, err := s.store.DownloadRemoteAsset(gameID, assetType, assetName, remoteURL)
 	if err != nil {
 		return "", normalizeAssetError(err)
 	}
-	if err := s.persistAssetPath(gameID, assetType, path, sortOrder); err != nil {
+	if _, err := s.persistAssetPath(gameID, assetType, assetUID, path, sortOrder); err != nil {
 		return "", err
 	}
 	return path, nil
 }
 
-func (s *AssetsService) persistAssetPath(gameID int64, assetType string, path string, sortOrder int) error {
+func (s *AssetsService) persistAssetPath(gameID int64, assetType string, assetUID string, path string, sortOrder int) (*domain.GameAsset, error) {
 	switch assetType {
 	case "cover":
-		return s.assetsRepo.UpdateGameImage(gameID, "cover_image", &path)
+		return nil, s.assetsRepo.UpdateGameImage(gameID, "cover_image", &path)
 	case "banner":
-		return s.assetsRepo.UpdateGameImage(gameID, "banner_image", &path)
+		return nil, s.assetsRepo.UpdateGameImage(gameID, "banner_image", &path)
 	case "screenshot":
-		_, err := s.assetsRepo.AddScreenshot(gameID, path, sortOrder)
-		return err
+		asset, err := s.assetsRepo.AddScreenshot(gameID, assetUID, path, sortOrder)
+		return asset, err
+	case "video":
+		asset, err := s.assetsRepo.AddVideo(gameID, assetUID, path, sortOrder)
+		return asset, err
 	default:
+		return nil, ErrValidation
+	}
+}
+
+func newAssetUID(gameID int64) string {
+	buf := make([]byte, 3)
+	if _, err := rand.Read(buf); err != nil {
+		return fmt.Sprintf("%d-%06x", gameID, time.Now().UnixNano()&0xffffff)
+	}
+	return fmt.Sprintf("%d-%s", gameID, hex.EncodeToString(buf))
+}
+
+func newAssetToken(gameID int64, assetType string) string {
+	switch assetType {
+	case "cover", "banner":
+		return fmt.Sprintf("%s-%s", assetType, newAssetUID(gameID))
+	default:
+		return newAssetUID(gameID)
+	}
+}
+
+func allocateAssetIdentity(gameID int64, assetType string) (string, string) {
+	switch assetType {
+	case "screenshot":
+		uid := newAssetUID(gameID)
+		return uid, uid
+	case "video":
+		uid := newAssetUID(gameID)
+		return uid, uid
+	case "cover", "banner":
+		return "", newAssetToken(gameID, assetType)
+	default:
+		return "", newAssetToken(gameID, assetType)
+	}
+}
+
+func (s *AssetsService) ReorderScreenshots(input domain.ScreenshotOrderUpdateInput) error {
+	if _, err := s.gamesRepo.GetByID(input.GameID); err != nil {
+		return normalizeRepoError(err)
+	}
+	if len(input.AssetUIDs) == 0 {
 		return ErrValidation
 	}
+	return normalizeRepoError(s.assetsRepo.UpdateScreenshotSortOrders(input.GameID, input.AssetUIDs))
 }
 
 func normalizeAssetError(err error) error {

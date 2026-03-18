@@ -52,8 +52,8 @@ Error response:
   "summary": "Classic team shooter",
   "release_date": "2000-11-09",
   "engine": "GoldSrc",
-  "cover_image": "/assets/games/1/cover.jpg",
-  "banner_image": "/assets/games/1/banner.jpg",
+  "cover_image": "/assets/1/cover.jpg",
+  "banner_image": "/assets/1/banner.jpg",
   "needs_review": false,
   "views": 0,
   "downloads": 0,
@@ -72,8 +72,8 @@ Error response:
   "summary": "Classic team shooter",
   "release_date": "2000-11-09",
   "engine": "GoldSrc",
-  "cover_image": "/assets/games/1/cover.jpg",
-  "banner_image": "/assets/games/1/banner.jpg",
+  "cover_image": "/assets/1/cover.jpg",
+  "banner_image": "/assets/1/banner.jpg",
   "wiki_content": "# Title",
   "wiki_content_html": "<h1>Title</h1>",
   "needs_review": false,
@@ -82,7 +82,7 @@ Error response:
   "screenshots": [
     {
       "id": 10,
-      "path": "/assets/games/1/screenshots/1.jpg",
+      "path": "/assets/1/1.jpg",
       "sort_order": 0
     }
   ],
@@ -105,8 +105,8 @@ Error response:
   "summary": "Classic team shooter",
   "release_date": "2000-11-09",
   "engine": "GoldSrc",
-  "cover_image": "/assets/games/1/cover.jpg",
-  "banner_image": "/assets/games/1/banner.jpg",
+  "cover_image": "/assets/1/cover.jpg",
+  "banner_image": "/assets/1/banner.jpg",
   "needs_review": false,
   "series_ids": [1],
   "platform_ids": [1],
@@ -160,7 +160,7 @@ Rules:
 
 ```json
 {
-  "path": "/assets/games/1/cover.jpg"
+  "path": "/assets/1/cover.jpg"
 }
 ```
 
@@ -306,4 +306,3 @@ These old routes are not part of V2:
 - `DELETE /api/upload/file`
 - all websocket routes
 - all auth and register/login routes
-

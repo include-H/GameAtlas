@@ -1,5 +1,5 @@
 import type { RouteRecordRaw } from 'vue-router'
-import { IconTrophy } from '@arco-design/web-vue/es/icon'
+import { IconTrophy, IconExclamationCircle } from '@arco-design/web-vue/es/icon'
 
 /**
  * Games routes
@@ -29,6 +29,21 @@ export const gameDetailRoute = {
     roles: ['*'],
     hideInMenu: true,
     activeMenu: 'games',
+  },
+} as RouteRecordRaw
+
+/**
+ * Pending center route
+ */
+export const pendingCenterRoute = {
+  path: '/games/pending',
+  name: 'pending-center',
+  component: () => import('@/views/PendingCenterView.vue'),
+  meta: {
+    locale: 'menu.pending.center',
+    requiresAuth: true,
+    roles: ['*'],
+    icon: IconExclamationCircle,
   },
 } as RouteRecordRaw
 

@@ -248,19 +248,27 @@ func (r *GamesRepository) IncrementDownloads(id int64) error {
 	return nil
 }
 
-func (r *GamesRepository) ListScreenshots(gameID int64) ([]domain.GameAsset, error) {
+func (r *GamesRepository) listAssetsByType(gameID int64, assetType string) ([]domain.GameAsset, error) {
 	var assets []domain.GameAsset
 	err := r.db.Select(&assets, `
-		SELECT id, game_id, asset_type, path, sort_order, created_at
+		SELECT id, game_id, asset_uid, asset_type, path, sort_order, created_at
 		FROM game_assets
-		WHERE game_id = ? AND asset_type = 'screenshot'
+		WHERE game_id = ? AND asset_type = ?
 		ORDER BY sort_order ASC, id ASC
-	`, gameID)
+	`, gameID, assetType)
 	if err != nil {
-		return nil, fmt.Errorf("list screenshots: %w", err)
+		return nil, fmt.Errorf("list %s assets: %w", assetType, err)
 	}
 
 	return assets, nil
+}
+
+func (r *GamesRepository) ListScreenshots(gameID int64) ([]domain.GameAsset, error) {
+	return r.listAssetsByType(gameID, "screenshot")
+}
+
+func (r *GamesRepository) ListVideos(gameID int64) ([]domain.GameAsset, error) {
+	return r.listAssetsByType(gameID, "video")
 }
 
 func (r *GamesRepository) ListMetadata(table, joinTable, joinColumn string, gameID int64) ([]domain.MetadataItem, error) {

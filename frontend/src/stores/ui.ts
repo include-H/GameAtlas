@@ -4,13 +4,6 @@ import { ref, computed } from 'vue'
 export type ViewMode = 'grid' | 'list'
 export type CardSize = 'small' | 'medium' | 'large'
 
-export interface ProxyConfig {
-  enabled: boolean
-  host: string
-  port: string
-  protocol: 'http' | 'https' | 'socks4' | 'socks5'
-}
-
 export const useUiStore = defineStore('ui', () => {
   // Theme
   const isDark = ref(true)
@@ -27,14 +20,6 @@ export const useUiStore = defineStore('ui', () => {
 
   // Pagination
   const itemsPerPage = ref(20)
-
-  // Proxy configuration for Steam API
-  const proxyConfig = ref<ProxyConfig>({
-    enabled: false,
-    host: '',
-    port: '',
-    protocol: 'http'
-  })
 
   // Alerts
   const alerts = ref<Array<{
@@ -154,30 +139,6 @@ export const useUiStore = defineStore('ui', () => {
     }
   }
 
-  // Proxy configuration methods
-  const setProxyConfig = (config: ProxyConfig) => {
-    proxyConfig.value = config
-    localStorage.setItem('proxyConfig', JSON.stringify(config))
-  }
-
-  const getProxyUrl = () => {
-    if (!proxyConfig.value.enabled || !proxyConfig.value.host || !proxyConfig.value.port) {
-      return null
-    }
-    return `${proxyConfig.value.protocol}://${proxyConfig.value.host}:${proxyConfig.value.port}`
-  }
-
-  const initializeProxyConfig = () => {
-    const stored = localStorage.getItem('proxyConfig')
-    if (stored) {
-      try {
-        proxyConfig.value = JSON.parse(stored)
-      } catch (e) {
-        console.error('Failed to parse proxy config:', e)
-      }
-    }
-  }
-
   return {
     // State
     isDark,
@@ -189,7 +150,6 @@ export const useUiStore = defineStore('ui', () => {
     showSortOptions,
     itemsPerPage,
     alerts,
-    proxyConfig,
     // Actions
     initializeTheme,
     toggleTheme,
@@ -206,8 +166,5 @@ export const useUiStore = defineStore('ui', () => {
     clearAlerts,
     setItemsPerPage,
     initializeItemsPerPage,
-    setProxyConfig,
-    getProxyUrl,
-    initializeProxyConfig,
   }
 })

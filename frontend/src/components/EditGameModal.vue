@@ -208,7 +208,7 @@
         <!-- 封面图 -->
         <a-col :span="8">
           <a-form-item label="封面图">
-            <div class="media-section">
+            <div class="media-section media-section--cover">
               <div class="media-frame media-frame--cover">
                 <div v-if="form.cover_image" class="media-preview">
                   <a-image
@@ -246,10 +246,10 @@
           </a-form-item>
         </a-col>
 
-        <!-- 横幅图 -->
-        <a-col :span="8">
-          <a-form-item label="横幅图">
-            <div class="media-section">
+	        <!-- 横幅图 -->
+	        <a-col :span="8">
+	          <a-form-item label="横幅图">
+	            <div class="media-section">
               <div class="media-frame media-frame--banner">
                 <div v-if="form.banner_image" class="media-preview">
                   <a-image
@@ -281,11 +281,48 @@
                   <icon-image class="media-empty-icon" />
                   <span class="media-empty-title">未设置横幅</span>
                   <span class="media-empty-subtitle">点击选择图片</span>
-                </div>
-              </div>
-            </div>
-          </a-form-item>
-        </a-col>
+	                </div>
+	              </div>
+	            </div>
+	          </a-form-item>
+
+	          <a-form-item label="预告片" class="media-subitem">
+	            <div class="media-section">
+	              <div class="media-frame media-frame--video">
+	                <div v-if="form.preview_video" class="media-preview">
+	                  <video
+	                    :src="form.preview_video.path"
+	                    class="media-video"
+	                    controls
+	                    playsinline
+	                    preload="metadata"
+	                  />
+	                  <div class="media-overlay">
+	                    <div class="media-overlay-actions">
+	                      <button class="media-action-button" type="button" @click.stop="showVideoSelector = true">
+	                        <icon-upload />
+	                      </button>
+	                      <button class="media-action-button media-action-button--danger" type="button" @click.stop="removePreviewVideo">
+	                        <icon-delete />
+	                      </button>
+	                    </div>
+	                  </div>
+	                </div>
+	                <div
+	                  v-else
+	                  class="media-empty-action"
+	                  role="button"
+	                  tabindex="0"
+	                  @click="showVideoSelector = true"
+	                >
+	                  <icon-upload class="media-empty-icon" />
+	                  <span class="media-empty-title">未设置预告片</span>
+	                  <span class="media-empty-subtitle">点击上传视频</span>
+	                </div>
+	              </div>
+	            </div>
+	          </a-form-item>
+	        </a-col>
 
         <!-- 截图 -->
         <a-col :span="8">
@@ -306,19 +343,26 @@
               <a-image-preview-group v-else infinite>
                 <div class="screenshots-grid">
                   <div
-                    v-for="(url, index) in form.screenshots"
-                    :key="index"
+                    v-for="screenshot in form.screenshots"
+                    :key="screenshot.asset_uid || screenshot.client_key"
                     class="screenshot-thumb"
+                    :class="{ 'is-dragging': draggedScreenshotKey === screenshot.client_key, 'is-drop-target': dragOverScreenshotKey === screenshot.client_key }"
+                    draggable="true"
+                    @dragstart="handleScreenshotDragStart(screenshot.client_key)"
+                    @dragenter.prevent="handleScreenshotDragEnter(screenshot.client_key)"
+                    @dragover.prevent
+                    @drop.prevent="handleScreenshotDrop(screenshot.client_key)"
+                    @dragend="handleScreenshotDragEnd"
                   >
                     <a-image
-                      :src="url"
+                      :src="screenshot.path"
                       width="100%"
                       height="100%"
                       fit="cover"
                       hide-footer
                     />
                     <div class="screenshot-overlay">
-                      <button class="media-action-button media-action-button--danger" type="button" @click.stop="removeScreenshot(index)">
+                      <button class="media-action-button media-action-button--danger" type="button" @click.stop="removeScreenshot(screenshot.client_key)">
                         <icon-delete />
                       </button>
                     </div>
@@ -337,10 +381,10 @@
             </div>
           </a-form-item>
         </a-col>
-      </a-row>
+	      </a-row>
 
-      <a-form-item>
-        <a-space style="justify-content: flex-end; width: 100%">
+		      <a-form-item>
+	        <a-space style="justify-content: flex-end; width: 100%">
           <a-button @click="handleCancel">取消</a-button>
           <a-button type="primary" html-type="submit" :loading="isSubmitting">
             保存
@@ -432,10 +476,11 @@
       title="选择封面图"
       :width="700"
       :footer="false"
-    >
-      <div class="cover-selector-content">
-        <!-- Steam 搜索 -->
-        <div class="steam-search-section">
+	    >
+	      <div class="cover-selector-content">
+	        <a-divider>从 Steam 获取</a-divider>
+	        <!-- Steam 搜索 -->
+	        <div class="steam-search-section">
           <a-input-search
             v-model="steamCoverSearchQuery"
             placeholder="搜索 Steam 游戏..."
@@ -495,7 +540,7 @@
           </div>
         </div>
 
-        <a-divider />
+	        <a-divider>本地上传</a-divider>
 
         <!-- 本地上传 -->
         <a-upload
@@ -546,11 +591,12 @@
       v-model:visible="showBannerSelector"
       title="选择横幅图"
       :width="800"
-      :footer="false"
-    >
-      <div class="cover-selector-content">
-        <!-- Steam 搜索 -->
-        <div class="steam-search-section">
+	      :footer="false"
+	    >
+	      <div class="cover-selector-content">
+	        <a-divider>从 Steam 获取</a-divider>
+	        <!-- Steam 搜索 -->
+	        <div class="steam-search-section">
           <a-input-search
             v-model="steamBannerSearchQuery"
             placeholder="搜索 Steam 游戏..."
@@ -610,7 +656,7 @@
           </div>
         </div>
 
-        <a-divider />
+	        <a-divider>本地上传</a-divider>
 
         <!-- 本地上传 -->
         <a-upload
@@ -657,15 +703,16 @@
     </a-modal>
 
     <!-- Screenshot Selector Modal -->
-    <a-modal
-      v-model:visible="showScreenshotSelector"
+	    <a-modal
+	      v-model:visible="showScreenshotSelector"
       title="添加截图"
       :width="800"
       :footer="false"
-    >
-      <div class="screenshot-selector-content">
-        <!-- Steam 搜索 -->
-        <div class="steam-search-section">
+	    >
+	      <div class="screenshot-selector-content">
+	        <a-divider>从 Steam 获取</a-divider>
+	        <!-- Steam 搜索 -->
+	        <div class="steam-search-section">
           <a-input-search
             v-model="steamScreenshotSearchQuery"
             placeholder="搜索 Steam 游戏..."
@@ -741,7 +788,7 @@
           </div>
         </div>
 
-        <a-divider />
+	        <a-divider>本地上传</a-divider>
 
         <!-- 本地上传 -->
         <a-upload
@@ -761,7 +808,7 @@
           </a-button>
         </a-upload>
 
-        <a-divider>或</a-divider>
+	        <a-divider>或从 URL 加载</a-divider>
 
         <!-- URL 下载 -->
         <div class="url-input-section">
@@ -789,16 +836,50 @@
           <a-button type="primary" :disabled="!screenshotPreviewUrl" :loading="isDownloadingScreenshot" @click="confirmScreenshotSelection">
             确定
           </a-button>
-        </div>
-      </div>
-    </a-modal>
-  </a-modal>
+	        </div>
+	      </div>
+	    </a-modal>
+
+	    <a-modal
+	      v-model:visible="showVideoSelector"
+	      title="设置预告片"
+	      :width="720"
+	      :footer="false"
+	    >
+	      <div class="cover-selector-content">
+	        <a-divider>本地上传</a-divider>
+	        <input
+	          ref="videoFileInput"
+	          type="file"
+	          accept="video/mp4,video/webm"
+	          class="hidden-file-input"
+	          @change="handleVideoFileChange"
+	        />
+	        <a-button type="dashed" long :loading="isUploadingVideo" @click="openVideoFilePicker">
+	          <template #icon>
+	            <icon-upload />
+	          </template>
+	          {{ isUploadingVideo ? '上传中...' : '上传 MP4 / WebM' }}
+	        </a-button>
+	        <div v-if="isUploadingVideo || videoUploadProgress > 0" class="video-upload-progress">
+	          <div class="video-upload-progress__meta">
+	            <span>{{ videoUploadFileName || '预告片上传中' }}</span>
+	            <span>{{ videoUploadProgress }}%</span>
+	          </div>
+	          <a-progress :percent="videoUploadProgress" :show-text="false" size="small" />
+	        </div>
+	        <div class="cover-selector-actions">
+	          <a-button @click="showVideoSelector = false">取消</a-button>
+	        </div>
+	      </div>
+	    </a-modal>
+	  </a-modal>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useUiStore } from '@/stores/ui'
-import { deleteAsset, uploadAsset } from '@/services/assets'
+import { deleteAsset, reorderScreenshots, uploadAsset, type UploadedAssetResult } from '@/services/assets'
 import { directoryService } from '@/services/directory.service'
 import type { Game } from '@/services/types'
 import gamesService from '@/services/games.service'
@@ -816,10 +897,7 @@ import {
 import steamService from '@/services/steam.service'
 import { seriesService } from '@/services/series.service'
 import { platformService } from '@/services/platforms.service'
-import type { Platform } from '@/services/types'
-import type { Series } from '@/services/types'
-import type { Developer } from '@/services/types'
-import type { Publisher } from '@/services/types'
+import type { Developer, Platform, Publisher, ScreenshotItem, Series, VideoAssetItem } from '@/services/types'
 
 interface Props {
   visible: boolean
@@ -830,6 +908,20 @@ interface FilePathItem {
   id?: number
   path: string
   label: string
+}
+
+interface EditableScreenshot {
+  id?: number
+  asset_uid?: string
+  path: string
+  sort_order?: number
+  client_key: string
+}
+
+interface EditableVideo {
+  id?: number
+  asset_uid?: string
+  path: string
 }
 
 interface GameForm {
@@ -844,7 +936,8 @@ interface GameForm {
   summary: string
   cover_image: string
   banner_image: string
-  screenshots: string[]
+  preview_video: EditableVideo | null
+  screenshots: EditableScreenshot[]
   file_paths: FilePathItem[]
 }
 
@@ -908,7 +1001,7 @@ const steamBannerImages = ref<string[]>([])
 const selectedBannerImage = ref('')
 
 // Files to delete only after successful submit
-const pendingDeleteAssets = ref<Array<{ type: 'cover' | 'banner' | 'screenshot'; path: string }>>([])
+const pendingDeleteAssets = ref<Array<{ type: 'cover' | 'banner' | 'screenshot' | 'video'; path: string; assetId?: number; assetUid?: string }>>([])
 
 const filteredSeriesOptions = computed(() => {
   return [...seriesOptions.value].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
@@ -982,6 +1075,7 @@ const form = ref<GameForm>({
   summary: '',
   cover_image: '',
   banner_image: '',
+  preview_video: null,
   screenshots: [],
   file_paths: [{ path: '', label: '' }]
 })
@@ -1019,6 +1113,13 @@ const showScreenshotSelector = ref(false)
 const screenshotSearchUrl = ref('')
 const screenshotPreviewUrl = ref('')
 const isDownloadingScreenshot = ref(false)
+const draggedScreenshotKey = ref<string | null>(null)
+const dragOverScreenshotKey = ref<string | null>(null)
+const showVideoSelector = ref(false)
+const videoFileInput = ref<HTMLInputElement | null>(null)
+const isUploadingVideo = ref(false)
+const videoUploadProgress = ref(0)
+const videoUploadFileName = ref('')
 const screenshotUploadAction = computed(() => {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
   return `${baseUrl}/assets/screenshot`
@@ -1030,6 +1131,65 @@ const screenshotUploadData = computed(() => ({
 const uploadHeaders = computed(() => {
   return {}
 })
+
+const createScreenshotKey = (asset: Pick<EditableScreenshot, 'id' | 'asset_uid' | 'path'>, index = 0) => {
+  if (asset.asset_uid) return `uid:${asset.asset_uid}`
+  if (typeof asset.id === 'number') return `db:${asset.id}`
+  return `path:${asset.path}:${index}:${Date.now()}`
+}
+
+const createEditableScreenshot = (
+  asset: ScreenshotItem | UploadedAssetResult | string,
+  index: number,
+): EditableScreenshot => {
+  if (typeof asset === 'string') {
+    return {
+      path: asset,
+      sort_order: index,
+      client_key: createScreenshotKey({ path: asset }, index),
+    }
+  }
+
+  const screenshotId = 'id' in asset ? asset.id : ('asset_id' in asset ? asset.asset_id : undefined)
+  const screenshotSortOrder = 'sort_order' in asset ? asset.sort_order : index
+
+  return {
+    id: screenshotId,
+    asset_uid: asset.asset_uid,
+    path: asset.path,
+    sort_order: screenshotSortOrder ?? index,
+    client_key: createScreenshotKey({
+      id: screenshotId,
+      asset_uid: asset.asset_uid,
+      path: asset.path,
+    }, index),
+  }
+}
+
+const createEditableVideo = (asset: VideoAssetItem | UploadedAssetResult | string): EditableVideo => {
+  if (typeof asset === 'string') {
+    return { path: asset }
+  }
+  return {
+    id: 'id' in asset ? asset.id : ('asset_id' in asset ? asset.asset_id : undefined),
+    asset_uid: asset.asset_uid,
+    path: asset.path,
+  }
+}
+
+const reorderEditableScreenshots = (fromKey: string, toKey: string) => {
+  const screenshots = [...form.value.screenshots]
+  const fromIndex = screenshots.findIndex((item) => item.client_key === fromKey)
+  const toIndex = screenshots.findIndex((item) => item.client_key === toKey)
+  if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return
+
+  const [moved] = screenshots.splice(fromIndex, 1)
+  screenshots.splice(toIndex, 0, moved)
+  form.value.screenshots = screenshots.map((item, index) => ({
+    ...item,
+    sort_order: index,
+  }))
+}
 
 // File browser state
 const showFileBrowser = ref(false)
@@ -1056,6 +1216,7 @@ const createEmptyForm = (): GameForm => ({
   summary: '',
   cover_image: '',
   banner_image: '',
+  preview_video: null,
   screenshots: [],
   file_paths: [{ path: '', label: '' }],
 })
@@ -1096,6 +1257,13 @@ const resetTransientState = () => {
   selectedSteamScreenshots.value = new Set()
   screenshotSearchUrl.value = ''
   screenshotPreviewUrl.value = ''
+  showVideoSelector.value = false
+  videoUploadProgress.value = 0
+  videoUploadFileName.value = ''
+  isUploadingVideo.value = false
+  if (videoFileInput.value) {
+    videoFileInput.value.value = ''
+  }
 }
 
 const hydrateFormFromGame = (game: Game | null) => {
@@ -1150,7 +1318,10 @@ const hydrateFormFromGame = (game: Game | null) => {
     summary: game.summary || '',
     cover_image: game.cover_image || '',
     banner_image: game.banner_image || '',
-    screenshots: game.screenshots || [],
+    preview_video: game.preview_video ? createEditableVideo(game.preview_video) : null,
+    screenshots: (game.screenshot_items || game.screenshots || []).map((asset, index) =>
+      createEditableScreenshot(asset, index),
+    ),
     file_paths: filePaths,
   }
 
@@ -1251,14 +1422,41 @@ const handleDateChange = (value: Date | number | string | null) => {
   }
 }
 
-const queueAssetDeletion = (type: 'cover' | 'banner' | 'screenshot', path: string) => {
+const queueAssetDeletion = (
+  type: 'cover' | 'banner' | 'screenshot' | 'video',
+  path: string,
+  assetId?: number,
+  assetUid?: string,
+) => {
   if (!path) return
-  pendingDeleteAssets.value.push({ type, path })
+  pendingDeleteAssets.value.push({ type, path, assetId, assetUid })
+}
+
+const handleScreenshotDragStart = (clientKey: string) => {
+  draggedScreenshotKey.value = clientKey
+  dragOverScreenshotKey.value = clientKey
+}
+
+const handleScreenshotDragEnter = (clientKey: string) => {
+  if (!draggedScreenshotKey.value || draggedScreenshotKey.value === clientKey) return
+  dragOverScreenshotKey.value = clientKey
+}
+
+const handleScreenshotDrop = (clientKey: string) => {
+  if (!draggedScreenshotKey.value) return
+  reorderEditableScreenshots(draggedScreenshotKey.value, clientKey)
+  draggedScreenshotKey.value = null
+  dragOverScreenshotKey.value = null
+}
+
+const handleScreenshotDragEnd = () => {
+  draggedScreenshotKey.value = null
+  dragOverScreenshotKey.value = null
 }
 
 const uploadAssetFromUrl = async (
   url: string,
-  assetType: 'cover' | 'banner' | 'screenshot',
+  assetType: 'cover' | 'banner' | 'screenshot' | 'video',
   sortOrder = 0,
 ) => {
   if (!props.game?.id) {
@@ -1295,11 +1493,11 @@ const confirmCoverSelection = async () => {
   if (!coverPreviewUrl.value) return
   isDownloadingCover.value = true
   try {
-    const path = await uploadAssetFromUrl(coverPreviewUrl.value, 'cover')
+    const uploaded = await uploadAssetFromUrl(coverPreviewUrl.value, 'cover')
     if (form.value.cover_image) {
       queueAssetDeletion('cover', form.value.cover_image)
     }
-    form.value.cover_image = path
+    form.value.cover_image = uploaded.path
     showCoverSelector.value = false
     coverSearchUrl.value = ''
     coverPreviewUrl.value = ''
@@ -1438,8 +1636,8 @@ const confirmScreenshotSelection = async () => {
   if (!screenshotPreviewUrl.value) return
   isDownloadingScreenshot.value = true
   try {
-    const path = await uploadAssetFromUrl(screenshotPreviewUrl.value, 'screenshot', form.value.screenshots.length)
-    form.value.screenshots.push(path)
+    const uploaded = await uploadAssetFromUrl(screenshotPreviewUrl.value, 'screenshot', form.value.screenshots.length)
+    form.value.screenshots.push(createEditableScreenshot(uploaded, form.value.screenshots.length))
     showScreenshotSelector.value = false
     screenshotSearchUrl.value = ''
     screenshotPreviewUrl.value = ''
@@ -1454,7 +1652,9 @@ const confirmScreenshotSelection = async () => {
 const handleScreenshotUploadSuccess = (fileItem: any) => {
   const response = fileItem.response
   if (response?.success && response?.data?.path) {
-    form.value.screenshots.push(response.data.path)
+    form.value.screenshots.push(
+      createEditableScreenshot(response.data, form.value.screenshots.length),
+    )
     showScreenshotSelector.value = false
     uiStore.addAlert('截图上传成功', 'success')
   } else {
@@ -1464,6 +1664,42 @@ const handleScreenshotUploadSuccess = (fileItem: any) => {
 
 const handleScreenshotUploadError = () => {
   uiStore.addAlert('截图上传失败', 'error')
+}
+
+const openVideoFilePicker = () => {
+  if (isUploadingVideo.value) return
+  videoFileInput.value?.click()
+}
+
+const handleVideoFileChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file || !props.game?.id) return
+
+  isUploadingVideo.value = true
+  videoUploadProgress.value = 0
+  videoUploadFileName.value = file.name
+
+  try {
+    const uploaded = await uploadAsset('video', props.game.id, file, 0, (percent) => {
+      videoUploadProgress.value = percent
+    })
+    if (form.value.preview_video) {
+      queueAssetDeletion('video', form.value.preview_video.path, form.value.preview_video.id, form.value.preview_video.asset_uid)
+    }
+    form.value.preview_video = createEditableVideo(uploaded)
+    videoUploadProgress.value = 100
+    showVideoSelector.value = false
+    uiStore.addAlert('预告片上传成功', 'success')
+  } catch (error: any) {
+    videoUploadProgress.value = 0
+    uiStore.addAlert('预告片上传失败：' + (error?.message || '未知错误'), 'error')
+  } finally {
+    isUploadingVideo.value = false
+    if (videoFileInput.value) {
+      videoFileInput.value.value = ''
+    }
+  }
 }
 
 const removeCover = () => {
@@ -1480,11 +1716,17 @@ const removeBanner = () => {
   form.value.banner_image = ''
 }
 
-const removeScreenshot = (index: number) => {
-  const screenshotUrl = form.value.screenshots[index]
-  if (!screenshotUrl) return
-  queueAssetDeletion('screenshot', screenshotUrl)
-  form.value.screenshots.splice(index, 1)
+const removeScreenshot = (clientKey: string) => {
+  const screenshot = form.value.screenshots.find((item) => item.client_key === clientKey)
+  if (!screenshot) return
+  queueAssetDeletion('screenshot', screenshot.path, screenshot.id, screenshot.asset_uid)
+  form.value.screenshots = form.value.screenshots.filter((item) => item.client_key !== clientKey)
+}
+
+const removePreviewVideo = () => {
+  if (!form.value.preview_video) return
+  queueAssetDeletion('video', form.value.preview_video.path, form.value.preview_video.id, form.value.preview_video.asset_uid)
+  form.value.preview_video = null
 }
 
 // File path management
@@ -1601,11 +1843,11 @@ const loadBannerFromUrl = async () => {
 
   isDownloadingBanner.value = true
   try {
-    const path = await uploadAssetFromUrl(bannerSearchUrl.value, 'banner')
+    const uploaded = await uploadAssetFromUrl(bannerSearchUrl.value, 'banner')
     if (form.value.banner_image) {
       queueAssetDeletion('banner', form.value.banner_image)
     }
-    form.value.banner_image = path
+    form.value.banner_image = uploaded.path
     showBannerSelector.value = false
     bannerSearchUrl.value = ''
     bannerPreviewUrl.value = ''
@@ -1683,11 +1925,11 @@ const downloadSelectedSteamCover = async () => {
 
   isSearchingSteamCover.value = true
   try {
-    const path = await uploadAssetFromUrl(selectedCoverImage.value, 'cover')
+    const uploaded = await uploadAssetFromUrl(selectedCoverImage.value, 'cover')
     if (form.value.cover_image) {
       queueAssetDeletion('cover', form.value.cover_image)
     }
-    form.value.cover_image = path
+    form.value.cover_image = uploaded.path
     showCoverSelector.value = false
     backToCoverGameSearch()
     steamCoverSearchQuery.value = ''
@@ -1790,8 +2032,8 @@ const downloadSelectedSteamScreenshots = async () => {
       const index = indices[i]
       const screenshotUrl = steamScreenshotsData.value!.screenshots[index]
       const currentIndex = form.value.screenshots.length
-      const path = await uploadAssetFromUrl(screenshotUrl, 'screenshot', currentIndex)
-      form.value.screenshots.push(path)
+      const uploaded = await uploadAssetFromUrl(screenshotUrl, 'screenshot', currentIndex)
+      form.value.screenshots.push(createEditableScreenshot(uploaded, currentIndex))
     }
 
     showScreenshotSelector.value = false
@@ -2028,12 +2270,22 @@ const handleSubmit = async () => {
     if (pendingDeleteAssets.value.length > 0) {
       for (const item of pendingDeleteAssets.value) {
         try {
-          await deleteAsset(props.game.id, item.type, item.path)
+          await deleteAsset(props.game.id, item.type, item.path, item.assetId, item.assetUid)
         } catch (e) {
           console.error('Failed to delete asset after save:', item.path, e)
         }
       }
       pendingDeleteAssets.value = []
+    }
+
+    const orderedScreenshotUids = form.value.screenshots
+      .map((item, index) => {
+        item.sort_order = index
+        return item.asset_uid
+      })
+      .filter((assetUid): assetUid is string => !!assetUid)
+    if (orderedScreenshotUids.length > 0) {
+      await reorderScreenshots(props.game.id, orderedScreenshotUids)
     }
 
     // Refresh series options after successful save (load popular)
@@ -2127,6 +2379,15 @@ const handleSubmit = async () => {
   width: 100%;
 }
 
+.media-section--cover {
+  max-width: 88%;
+  margin: 0 auto;
+}
+
+.media-subitem {
+  margin-top: 8px;
+}
+
 .media-frame {
   width: 100%;
   overflow: hidden;
@@ -2213,6 +2474,38 @@ const handleSubmit = async () => {
   aspect-ratio: 16 / 9;
 }
 
+.media-frame--video {
+  aspect-ratio: 16 / 9;
+}
+
+.media-video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #000;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.video-upload-progress {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.video-upload-progress__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+}
+
 .media-actions {
   margin-top: 4px;
 }
@@ -2260,9 +2553,21 @@ const handleSubmit = async () => {
   border-radius: 6px;
   overflow: hidden;
   background: var(--color-fill-2);
-  cursor: pointer;
+  cursor: grab;
   position: relative;
   border: 1px solid var(--color-border-2);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+
+.screenshot-thumb.is-dragging {
+  opacity: 0.45;
+  transform: scale(0.98);
+  cursor: grabbing;
+}
+
+.screenshot-thumb.is-drop-target {
+  border-color: rgb(var(--primary-6));
+  box-shadow: 0 0 0 1px rgba(var(--primary-6), 0.35);
 }
 
 .screenshot-thumb img {
