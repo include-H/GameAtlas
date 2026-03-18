@@ -24,8 +24,9 @@
         <a-col :span="12">
           <a-form-item label="开发商">
             <a-select
-              v-model="form.developer"
-              placeholder="选择开发商"
+              v-model="form.developers"
+              placeholder="选择开发商（可多选）"
+              multiple
               allow-clear
               allow-search
               allow-create
@@ -47,8 +48,9 @@
         <a-col :span="12">
           <a-form-item label="发行商">
             <a-select
-              v-model="form.publisher"
-              placeholder="选择发行商"
+              v-model="form.publishers"
+              placeholder="选择发行商（可多选）"
+              multiple
               allow-clear
               allow-search
               allow-create
@@ -291,12 +293,17 @@
 	              <div class="media-frame media-frame--video">
 	                <div v-if="form.preview_video" class="media-preview">
 	                  <video
-	                    :src="form.preview_video.path"
 	                    class="media-video"
 	                    controls
 	                    playsinline
 	                    preload="metadata"
-	                  />
+	                  >
+	                    <source
+	                      v-for="src in previewVideoSources"
+	                      :key="src"
+	                      :src="src"
+	                    />
+	                  </video>
 	                  <div class="media-overlay">
 	                    <div class="media-overlay-actions">
 	                      <button class="media-action-button" type="button" @click.stop="showVideoSelector = true">
@@ -847,6 +854,87 @@
 	      :footer="false"
 	    >
 	      <div class="cover-selector-content">
+	        <a-divider>从 Steam 获取</a-divider>
+	        <div class="steam-search-section">
+	          <a-input-search
+	            v-model="steamVideoSearchQuery"
+	            placeholder="搜索 Steam 游戏..."
+	            :loading="isSearchingSteamVideo"
+	            @search="searchSteamForVideo"
+	            @clear="handleVideoSearchClear"
+	            allow-clear
+	          />
+
+	          <div v-if="steamVideoSearchResults.length > 0 && !selectedSteamVideoGame" class="steam-search-results">
+	            <div class="steam-search-title">选择游戏</div>
+	            <div
+	              v-for="game in steamVideoSearchResults"
+	              :key="game.id"
+	              class="steam-search-result-item"
+	              @click="selectSteamVideoGame(game)"
+	            >
+	              <img :src="game.tinyImage || '/placeholder-cover.jpg'" :alt="game.name" />
+	              <div class="steam-result-info">
+	                <div class="steam-result-name">{{ game.name }}</div>
+	                <div class="steam-result-meta">{{ game.releaseDate || '' }}</div>
+	              </div>
+	            </div>
+	          </div>
+
+	          <div v-if="selectedSteamVideoGame" class="steam-summary-section">
+	            <div class="steam-search-title">
+	              {{ selectedSteamVideoGame.name }} 的预告片
+	              <a-button type="text" size="mini" @click="backToVideoSearch">返回</a-button>
+	            </div>
+	            <div v-if="steamVideoCandidates.length > 0" class="steam-video-source-card">
+	              <div class="steam-video-source-card__label">可下载源（{{ steamVideoCandidates.length }}）</div>
+	              <a-radio-group v-model="selectedSteamVideoCandidate" class="steam-video-source-list">
+	                <a-radio
+	                  v-for="candidate in steamVideoCandidates"
+	                  :key="candidate.url"
+	                  :value="candidate.url"
+	                  class="steam-video-source-item"
+	                >
+	                  <span>{{ getSteamVideoCandidateLabel(candidate.url) }}</span>
+	                  <a-tag v-if="candidate.isDash" size="small" color="arcoblue">DASH</a-tag>
+	                </a-radio>
+	              </a-radio-group>
+	            </div>
+	            <a-empty
+	              v-else-if="!isSearchingSteamVideo"
+	              description="Steam 未返回可下载预告片"
+	              class="steam-summary-empty"
+	            />
+	            <div v-if="steamVideoCandidates.length === 0 && steamVideoDebug.length > 0" class="steam-video-debug">
+	              <div class="steam-video-debug__title">调试信息</div>
+	              <div v-for="(line, index) in steamVideoDebug" :key="`dbg-${index}`" class="steam-video-debug__line">
+	                {{ line }}
+	              </div>
+	            </div>
+	            <a-button
+	              v-if="steamVideoPreviewUrl"
+	              type="primary"
+	              long
+	              :loading="isDownloadingSteamVideo"
+	              @click="downloadSteamPreviewVideo"
+	            >
+	              下载预告片
+	            </a-button>
+	            <div v-if="steamVideoDownloadState !== 'idle'" class="video-upload-progress">
+	              <div class="video-upload-progress__meta">
+	                <span>{{ steamVideoDownloadStatus }}</span>
+	                <span>{{ steamVideoDownloadProgress }}%</span>
+	              </div>
+	              <a-progress
+	                :percent="steamVideoDownloadProgress"
+	                :show-text="false"
+	                size="small"
+	                :status="steamVideoDownloadState === 'error' ? 'danger' : steamVideoDownloadState === 'success' ? 'success' : 'normal'"
+	              />
+	            </div>
+	          </div>
+	        </div>
+
 	        <a-divider>本地上传</a-divider>
 	        <input
 	          ref="videoFileInput"
@@ -897,7 +985,9 @@ import {
 import steamService from '@/services/steam.service'
 import { seriesService } from '@/services/series.service'
 import { platformService } from '@/services/platforms.service'
-import type { Developer, Platform, Publisher, ScreenshotItem, Series, VideoAssetItem } from '@/services/types'
+import { resolveAssetCandidates } from '@/utils/asset-url'
+import { importSteamVideoAsFile } from '@/utils/steam-video-import'
+import type { Developer, Platform, Publisher, ScreenshotItem, Series, SteamGameDetails, VideoAssetItem } from '@/services/types'
 
 interface Props {
   visible: boolean
@@ -927,8 +1017,8 @@ interface EditableVideo {
 interface GameForm {
   title: string
   title_alt: string
-  developer: string | number | null
-  publisher: string | number | null
+  developers: Array<string | number>
+  publishers: Array<string | number>
   release_date: string | undefined
   engine: string
   platform: (string | number)[]
@@ -991,7 +1081,21 @@ const steamSummarySearchQuery = ref('')
 const steamSummarySearchResults = ref<any[]>([])
 const selectedSteamSummaryGame = ref<any>(null)
 const steamSummaryPreview = ref('')
+const steamSummaryDetails = ref<SteamGameDetails | null>(null)
 const isSearchingSteamSummary = ref(false)
+const steamVideoSearchQuery = ref('')
+const steamVideoSearchResults = ref<any[]>([])
+const selectedSteamVideoGame = ref<any>(null)
+const steamVideoCandidates = ref<Array<{ url: string; name: string; isDash: boolean }>>([])
+const selectedSteamVideoCandidate = ref('')
+const steamVideoPreviewUrl = ref('')
+const steamVideoPreviewName = ref('')
+const steamVideoDebug = ref<string[]>([])
+const isSearchingSteamVideo = ref(false)
+const isDownloadingSteamVideo = ref(false)
+const steamVideoDownloadProgress = ref(0)
+const steamVideoDownloadStatus = ref('准备下载预告片')
+const steamVideoDownloadState = ref<'idle' | 'running' | 'success' | 'error'>('idle')
 
 const steamBannerSearchQuery = ref('')
 const steamBannerSearchResults = ref<any[]>([])
@@ -1002,6 +1106,7 @@ const selectedBannerImage = ref('')
 
 // Files to delete only after successful submit
 const pendingDeleteAssets = ref<Array<{ type: 'cover' | 'banner' | 'screenshot' | 'video'; path: string; assetId?: number; assetUid?: string }>>([])
+const previewVideoSources = computed(() => resolveAssetCandidates(form.value.preview_video?.path || ''))
 
 const filteredSeriesOptions = computed(() => {
   return [...seriesOptions.value].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
@@ -1033,10 +1138,17 @@ const handleDeveloperSearch = async (query: string) => {
   try {
     const { developersService } = await import('@/services/developers.service')
     const results = await developersService.searchDevelopers(query)
-    const current = developerOptions.value.find(d => d.id === form.value.developer)
+    const selectedIds = new Set(
+      form.value.developers
+        .map((item) => normalizeOptionId(item))
+        .filter((item): item is number => item !== null),
+    )
+    const selectedItems = developerOptions.value.filter((item) => selectedIds.has(item.id))
     developerOptions.value = results
-    if (current && !results.find(d => d.id === current.id)) {
-      developerOptions.value.push(current)
+    for (const selectedItem of selectedItems) {
+      if (!developerOptions.value.find((item) => item.id === selectedItem.id)) {
+        developerOptions.value.push(selectedItem)
+      }
     }
   } finally {
     isSearchingDevelopers.value = false
@@ -1053,10 +1165,17 @@ const handlePublisherSearch = async (query: string) => {
   try {
     const { publishersService } = await import('@/services/publishers.service')
     const results = await publishersService.searchPublishers(query)
-    const current = publisherOptions.value.find(p => p.id === form.value.publisher)
+    const selectedIds = new Set(
+      form.value.publishers
+        .map((item) => normalizeOptionId(item))
+        .filter((item): item is number => item !== null),
+    )
+    const selectedItems = publisherOptions.value.filter((item) => selectedIds.has(item.id))
     publisherOptions.value = results
-    if (current && !results.find(p => p.id === current.id)) {
-      publisherOptions.value.push(current)
+    for (const selectedItem of selectedItems) {
+      if (!publisherOptions.value.find((item) => item.id === selectedItem.id)) {
+        publisherOptions.value.push(selectedItem)
+      }
     }
   } finally {
     isSearchingPublishers.value = false
@@ -1066,8 +1185,8 @@ const handlePublisherSearch = async (query: string) => {
 const form = ref<GameForm>({
   title: '',
   title_alt: '',
-  developer: '',
-  publisher: '',
+  developers: [],
+  publishers: [],
   release_date: undefined,
   engine: '',
   platform: [],
@@ -1207,8 +1326,8 @@ const visible = computed({
 const createEmptyForm = (): GameForm => ({
   title: '',
   title_alt: '',
-  developer: '',
-  publisher: '',
+  developers: [],
+  publishers: [],
   release_date: undefined,
   engine: '',
   platform: [],
@@ -1233,6 +1352,20 @@ const resetTransientState = () => {
   steamSummarySearchResults.value = []
   selectedSteamSummaryGame.value = null
   steamSummaryPreview.value = ''
+  steamSummaryDetails.value = null
+  steamVideoSearchQuery.value = ''
+  steamVideoSearchResults.value = []
+  selectedSteamVideoGame.value = null
+  steamVideoCandidates.value = []
+  selectedSteamVideoCandidate.value = ''
+  steamVideoPreviewUrl.value = ''
+  steamVideoPreviewName.value = ''
+  steamVideoDebug.value = []
+  isSearchingSteamVideo.value = false
+  isDownloadingSteamVideo.value = false
+  steamVideoDownloadProgress.value = 0
+  steamVideoDownloadStatus.value = '准备下载预告片'
+  steamVideoDownloadState.value = 'idle'
 
   steamCoverSearchQuery.value = ''
   steamCoverSearchResults.value = []
@@ -1299,18 +1432,18 @@ const hydrateFormFromGame = (game: Game | null) => {
   const seriesId: string | number | null = game.series && game.series.length > 0
     ? game.series[0].id
     : null
-  const developerId: string | number | null = game.developers && game.developers.length > 0
-    ? game.developers[0].id
-    : null
-  const publisherId: string | number | null = game.publishers && game.publishers.length > 0
-    ? game.publishers[0].id
-    : null
+  const developerIds: Array<string | number> = game.developers
+    ? game.developers.map((item) => item.id)
+    : []
+  const publisherIds: Array<string | number> = game.publishers
+    ? game.publishers.map((item) => item.id)
+    : []
 
   form.value = {
     title: game.title || '',
     title_alt: game.title_alt || '',
-    developer: developerId,
-    publisher: publisherId,
+    developers: developerIds,
+    publishers: publisherIds,
     release_date: game.release_date || undefined,
     engine: game.engine || '',
     platform: platformList,
@@ -1358,10 +1491,12 @@ const initializeOptions = async (currentGame?: Game | null) => {
     const { developersService } = await import('@/services/developers.service')
     const popularDevelopers = await developersService.getPopularDevelopers(50)
     developerOptions.value = popularDevelopers
-    if (currentGame?.developers?.[0]) {
-      const existing = popularDevelopers.find(d => d.id === currentGame.developers![0].id)
-      if (!existing) {
-        developerOptions.value.push(currentGame.developers![0] as any)
+    if (currentGame?.developers && currentGame.developers.length > 0) {
+      for (const developer of currentGame.developers) {
+        const existing = developerOptions.value.find((item) => item.id === developer.id)
+        if (!existing) {
+          developerOptions.value.push(developer as any)
+        }
       }
     }
   } catch (error) {
@@ -1373,10 +1508,12 @@ const initializeOptions = async (currentGame?: Game | null) => {
     const { publishersService } = await import('@/services/publishers.service')
     const popularPublishers = await publishersService.getPopularPublishers(50)
     publisherOptions.value = popularPublishers
-    if (currentGame?.publishers?.[0]) {
-      const existing = popularPublishers.find(p => p.id === currentGame.publishers![0].id)
-      if (!existing) {
-        publisherOptions.value.push(currentGame.publishers![0] as any)
+    if (currentGame?.publishers && currentGame.publishers.length > 0) {
+      for (const publisher of currentGame.publishers) {
+        const existing = publisherOptions.value.find((item) => item.id === publisher.id)
+        if (!existing) {
+          publisherOptions.value.push(publisher as any)
+        }
       }
     }
   } catch (error) {
@@ -1562,11 +1699,33 @@ const stripHtmlToText = (html: string) => {
     .trim()
 }
 
+const applySteamMetadataToForm = (details: { releaseDate?: string; developers?: string[]; publishers?: string[] }) => {
+  if (details.releaseDate) {
+    form.value.release_date = details.releaseDate
+    releaseDate.value = new Date(`${details.releaseDate}T00:00:00`)
+  }
+  if (details.developers && details.developers.length > 0) {
+    const merged = new Set<string | number>(form.value.developers)
+    for (const name of details.developers) {
+      if (name.trim()) merged.add(name.trim())
+    }
+    form.value.developers = Array.from(merged)
+  }
+  if (details.publishers && details.publishers.length > 0) {
+    const merged = new Set<string | number>(form.value.publishers)
+    for (const name of details.publishers) {
+      if (name.trim()) merged.add(name.trim())
+    }
+    form.value.publishers = Array.from(merged)
+  }
+}
+
 const handleSummarySearchClear = () => {
   steamSummarySearchQuery.value = ''
   steamSummarySearchResults.value = []
   selectedSteamSummaryGame.value = null
   steamSummaryPreview.value = ''
+  steamSummaryDetails.value = null
 }
 
 const searchSteamForSummary = async () => {
@@ -1578,6 +1737,7 @@ const searchSteamForSummary = async () => {
     steamSummarySearchResults.value = results
     selectedSteamSummaryGame.value = null
     steamSummaryPreview.value = ''
+    steamSummaryDetails.value = null
   } catch (error: any) {
     uiStore.addAlert('搜索失败：' + (error?.message || '未知错误'), 'error')
   } finally {
@@ -1602,9 +1762,11 @@ watch(showSummarySelector, (isOpen) => {
 const selectSteamSummaryGame = async (game: any) => {
   selectedSteamSummaryGame.value = game
   steamSummaryPreview.value = ''
+  steamSummaryDetails.value = null
   isSearchingSteamSummary.value = true
   try {
     const details = await steamService.getGameDetails(game.id)
+    steamSummaryDetails.value = details
     steamSummaryPreview.value = stripHtmlToText(details.description || '')
   } catch (error: any) {
     uiStore.addAlert('获取简介失败：' + (error?.message || '未知错误'), 'error')
@@ -1616,18 +1778,26 @@ const selectSteamSummaryGame = async (game: any) => {
 const backToSummarySearch = () => {
   selectedSteamSummaryGame.value = null
   steamSummaryPreview.value = ''
+  steamSummaryDetails.value = null
 }
 
 const confirmSummaryImport = () => {
-  if (!steamSummaryPreview.value) {
-    uiStore.addAlert('当前没有可导入的简介', 'warning')
+  const details = steamSummaryDetails.value
+  const hasImportableMetadata = !!details?.releaseDate || !!details?.developers?.[0] || !!details?.publishers?.[0]
+  if (!steamSummaryPreview.value && !hasImportableMetadata) {
+    uiStore.addAlert('当前没有可导入的 Steam 信息', 'warning')
     return
   }
 
-  form.value.summary = steamSummaryPreview.value
+  if (steamSummaryPreview.value) {
+    form.value.summary = steamSummaryPreview.value
+  }
+  if (details) {
+    applySteamMetadataToForm(details)
+  }
   showSummarySelector.value = false
   uiStore.addAlert(
-    `已导入简介：${selectedSteamSummaryGame.value?.name || 'Steam 游戏'}`,
+    `已导入 Steam 信息：${selectedSteamSummaryGame.value?.name || 'Steam 游戏'}`,
     'success',
   )
 }
@@ -1664,6 +1834,145 @@ const handleScreenshotUploadSuccess = (fileItem: any) => {
 
 const handleScreenshotUploadError = () => {
   uiStore.addAlert('截图上传失败', 'error')
+}
+
+const handleVideoSearchClear = () => {
+  steamVideoSearchQuery.value = ''
+  steamVideoSearchResults.value = []
+  selectedSteamVideoGame.value = null
+  steamVideoCandidates.value = []
+  selectedSteamVideoCandidate.value = ''
+  steamVideoPreviewUrl.value = ''
+  steamVideoPreviewName.value = ''
+  steamVideoDebug.value = []
+}
+
+const searchSteamForVideo = async () => {
+  if (!steamVideoSearchQuery.value.trim()) return
+  isSearchingSteamVideo.value = true
+  try {
+    const results = await steamService.searchGames(steamVideoSearchQuery.value.trim())
+    steamVideoSearchResults.value = results
+    selectedSteamVideoGame.value = null
+    steamVideoCandidates.value = []
+    selectedSteamVideoCandidate.value = ''
+    steamVideoPreviewUrl.value = ''
+    steamVideoPreviewName.value = ''
+    steamVideoDebug.value = []
+  } catch (error: any) {
+    uiStore.addAlert('搜索失败：' + (error?.message || '未知错误'), 'error')
+  } finally {
+    isSearchingSteamVideo.value = false
+  }
+}
+
+watch(showVideoSelector, (isOpen) => {
+  if (!isOpen) return
+  const query = pickSteamSearchQuery()
+  if (!query) return
+  steamVideoSearchQuery.value = query
+  searchSteamForVideo()
+})
+
+watch(selectedSteamVideoCandidate, (value) => {
+  const selected = steamVideoCandidates.value.find((item) => item.url === value)
+  if (!selected) return
+  steamVideoPreviewUrl.value = selected.url
+  steamVideoPreviewName.value = selected.name
+})
+
+const getSteamVideoCandidateLabel = (candidateUrl: string) => {
+  const index = steamVideoCandidates.value.findIndex((item) => item.url === candidateUrl)
+  if (index === -1) {
+    return 'Trailer'
+  }
+  return `Trailer ${index + 1}`
+}
+
+const selectSteamVideoGame = async (game: any) => {
+  selectedSteamVideoGame.value = game
+  steamVideoCandidates.value = []
+  selectedSteamVideoCandidate.value = ''
+  steamVideoPreviewUrl.value = ''
+  steamVideoPreviewName.value = ''
+  steamVideoDebug.value = []
+  isSearchingSteamVideo.value = true
+  try {
+    const details = await steamService.getGameDetails(game.id)
+    steamVideoCandidates.value = details.previewVideos || []
+    if (steamVideoCandidates.value.length > 0) {
+      selectedSteamVideoCandidate.value = steamVideoCandidates.value[0].url
+      steamVideoPreviewUrl.value = steamVideoCandidates.value[0].url
+      steamVideoPreviewName.value = steamVideoCandidates.value[0].name
+    } else {
+      steamVideoPreviewUrl.value = details.previewVideoUrl || ''
+      steamVideoPreviewName.value = details.previewVideoName || ''
+      if (steamVideoPreviewUrl.value) {
+        steamVideoCandidates.value = [{
+          url: steamVideoPreviewUrl.value,
+          name: steamVideoPreviewName.value || 'trailer-source',
+          isDash: steamVideoPreviewUrl.value.includes('.mpd') || steamVideoPreviewUrl.value.includes('.m3u8'),
+        }]
+        selectedSteamVideoCandidate.value = steamVideoPreviewUrl.value
+      }
+    }
+    steamVideoDebug.value = details.previewVideoDebug || []
+  } catch (error: any) {
+    uiStore.addAlert('获取预告片失败：' + (error?.message || '未知错误'), 'error')
+  } finally {
+    isSearchingSteamVideo.value = false
+  }
+}
+
+const backToVideoSearch = () => {
+  selectedSteamVideoGame.value = null
+  steamVideoCandidates.value = []
+  selectedSteamVideoCandidate.value = ''
+  steamVideoPreviewUrl.value = ''
+  steamVideoPreviewName.value = ''
+  steamVideoDebug.value = []
+}
+
+const downloadSteamPreviewVideo = async () => {
+  if (!props.game?.id || !selectedSteamVideoGame.value || !steamVideoPreviewUrl.value) return
+  isDownloadingSteamVideo.value = true
+  steamVideoDownloadState.value = 'running'
+  steamVideoDownloadProgress.value = 3
+  steamVideoDownloadStatus.value = '正在准备预告片导入'
+  try {
+    const trailerLabel = getSteamVideoCandidateLabel(steamVideoPreviewUrl.value).replace(/\s+/g, '_').toLowerCase()
+    const file = await importSteamVideoAsFile({
+      url: steamVideoPreviewUrl.value,
+      gameName: selectedSteamVideoGame.value.name || form.value.title || 'Steam',
+      label: trailerLabel,
+      onProgress: (percent, status) => {
+        steamVideoDownloadProgress.value = Math.max(1, Math.min(100, Math.round(percent)))
+        steamVideoDownloadStatus.value = status
+      },
+    })
+
+    const uploaded = await uploadAsset('video', props.game.id, file, 0, (percent) => {
+      const blended = 92 + Math.round(percent * 0.08)
+      steamVideoDownloadProgress.value = Math.min(100, blended)
+      steamVideoDownloadStatus.value = '正在上传到素材库'
+    })
+    if (form.value.preview_video) {
+      queueAssetDeletion('video', form.value.preview_video.path, form.value.preview_video.id, form.value.preview_video.asset_uid)
+    }
+    form.value.preview_video = createEditableVideo(uploaded)
+    steamVideoDownloadProgress.value = 100
+    steamVideoDownloadStatus.value = '预告片已完成导入'
+    steamVideoDownloadState.value = 'success'
+    await new Promise((resolve) => setTimeout(resolve, 700))
+    showVideoSelector.value = false
+    uiStore.addAlert('预告片下载成功', 'success')
+  } catch (error: any) {
+    steamVideoDownloadState.value = 'error'
+    steamVideoDownloadStatus.value = '下载失败（可重试）'
+    uiStore.addAlert('预告片下载失败：' + (error?.message || '未知错误'), 'error')
+  } finally {
+    isDownloadingSteamVideo.value = false
+  }
 }
 
 const openVideoFilePicker = () => {
@@ -2067,36 +2376,39 @@ const slugifyMetadataName = (name: string) => {
     .replace(/^-+|-+$/g, '')
 }
 
-const resolveSingleMetadataSelection = async <T extends { id: number; name: string }>(
-  value: string | number | null | undefined,
+const resolveMetadataSelections = async <T extends { id: number; name: string }>(
+  values: Array<string | number>,
   options: { value: T[] },
   createItem: (payload: { name: string; slug?: string }) => Promise<T>,
 ) => {
-  if (value === null || value === undefined || value === '') {
-    return [] as number[]
+  const ids: number[] = []
+  for (const value of values) {
+    const normalizedId = normalizeOptionId(value)
+    if (normalizedId !== null) {
+      ids.push(normalizedId)
+      continue
+    }
+
+    if (typeof value !== 'string' || !value.trim()) {
+      continue
+    }
+
+    const name = value.trim()
+    const existing = options.value.find((item) => item.name.trim().toLowerCase() === name.toLowerCase())
+    if (existing) {
+      ids.push(existing.id)
+      continue
+    }
+
+    const created = await createItem({
+      name,
+      slug: slugifyMetadataName(name),
+    })
+    options.value = [...options.value, created]
+    ids.push(created.id)
   }
 
-  const normalizedId = normalizeOptionId(value)
-  if (normalizedId !== null) {
-    return [normalizedId]
-  }
-
-  if (typeof value !== 'string' || !value.trim()) {
-    return [] as number[]
-  }
-
-  const name = value.trim()
-  const existing = options.value.find((item) => item.name.trim().toLowerCase() === name.toLowerCase())
-  if (existing) {
-    return [existing.id]
-  }
-
-  const created = await createItem({
-    name,
-    slug: slugifyMetadataName(name),
-  })
-  options.value = [...options.value, created]
-  return [created.id]
+  return Array.from(new Set(ids))
 }
 
 const resolvePlatformSelections = async (values: Array<string | number>) => {
@@ -2189,30 +2501,30 @@ const handleSubmit = async () => {
     let developerIds: number[] | undefined = undefined
     try {
       const { developersService } = await import('@/services/developers.service')
-      developerIds = await resolveSingleMetadataSelection(
-        form.value.developer,
+      developerIds = await resolveMetadataSelections(
+        form.value.developers,
         developerOptions,
         (payload) => developersService.createDeveloper(payload),
       )
-      form.value.developer = developerIds[0] ?? ''
+      form.value.developers = [...developerIds]
     } catch (error: any) {
-      console.error('Failed to process developer:', form.value.developer, error)
-      uiStore.addAlert(`开发商 "${form.value.developer}" 处理失败`, 'warning')
+      console.error('Failed to process developers:', form.value.developers, error)
+      uiStore.addAlert('开发商处理失败', 'warning')
     }
 
     // Process publisher - handle both existing ID and new name
     let publisherIds: number[] | undefined = undefined
     try {
       const { publishersService } = await import('@/services/publishers.service')
-      publisherIds = await resolveSingleMetadataSelection(
-        form.value.publisher,
+      publisherIds = await resolveMetadataSelections(
+        form.value.publishers,
         publisherOptions,
         (payload) => publishersService.createPublisher(payload),
       )
-      form.value.publisher = publisherIds[0] ?? ''
+      form.value.publishers = [...publisherIds]
     } catch (error: any) {
-      console.error('Failed to process publisher:', form.value.publisher, error)
-      uiStore.addAlert(`发行商 "${form.value.publisher}" 处理失败`, 'warning')
+      console.error('Failed to process publishers:', form.value.publishers, error)
+      uiStore.addAlert('发行商处理失败', 'warning')
     }
 
     let platformIds: number[] = []
@@ -2773,6 +3085,53 @@ const handleSubmit = async () => {
   color: var(--color-text-2);
   line-height: 1.75;
   white-space: pre-wrap;
+}
+
+.steam-video-source-card {
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--color-fill-1);
+  border: 1px solid var(--color-border-2);
+}
+
+.steam-video-source-card__label {
+  margin-bottom: 8px;
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+
+.steam-video-source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.steam-video-source-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.steam-video-debug {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-2);
+  background: var(--color-fill-1);
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+
+.steam-video-debug__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  margin-bottom: 6px;
+}
+
+.steam-video-debug__line {
+  line-height: 1.6;
+  color: var(--color-text-3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .steam-images-grid {

@@ -95,6 +95,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { resolveAssetUrl } from '@/utils/asset-url'
 
 interface Props {
   screenshots?: string[]
@@ -139,11 +140,12 @@ const visibleScreenshots = computed(() => {
 const mediaItems = computed<MediaItem[]>(() => {
   const items: MediaItem[] = []
   if (props.previewVideo) {
+    const videoUrl = resolveAssetUrl(props.previewVideo)
     items.push({
-      key: `video:${props.previewVideo}`,
+      key: `video:${videoUrl}`,
       type: 'video',
-      url: props.previewVideo,
-      thumbnail: props.videoPoster || placeholderImage,
+      url: videoUrl,
+      thumbnail: props.videoPoster ? resolveAssetUrl(props.videoPoster) : placeholderImage,
     })
   }
   visibleScreenshots.value.forEach((shot, index) => {

@@ -91,6 +91,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.GET("/steam/search", steamHandler.Search)
 	api.GET("/steam/:appId/assets", steamHandler.Preview)
 	api.POST("/steam/:appId/apply-assets", steamHandler.Apply)
+	api.GET("/steam/proxy", steamHandler.Proxy)
 
 	registerAssetRoutes(router, cfg.AssetsDir)
 	registerStaticRoutes(router, cfg.StaticDir)

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -146,6 +147,21 @@ func (s *AssetsService) ApplyRemoteAsset(gameID int64, assetType string, remoteU
 	}
 	assetUID, assetName := allocateAssetIdentity(gameID, assetType)
 	path, err := s.store.DownloadRemoteAsset(gameID, assetType, assetName, remoteURL)
+	if err != nil {
+		return "", normalizeAssetError(err)
+	}
+	if _, err := s.persistAssetPath(gameID, assetType, assetUID, path, sortOrder); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func (s *AssetsService) ApplyRawAsset(gameID int64, assetType string, content []byte, contentType string, sortOrder int) (string, error) {
+	if _, err := s.gamesRepo.GetByID(gameID); err != nil {
+		return "", normalizeRepoError(err)
+	}
+	assetUID, assetName := allocateAssetIdentity(gameID, assetType)
+	path, err := s.store.SaveUploadedAsset(gameID, assetType, assetName, bytes.NewReader(content), contentType)
 	if err != nil {
 		return "", normalizeAssetError(err)
 	}

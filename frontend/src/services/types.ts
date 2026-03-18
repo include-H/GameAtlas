@@ -189,6 +189,10 @@ export interface SteamGameDetails {
   releaseDate: string
   developers: string[]
   publishers: string[]
+  previewVideos: Array<{ url: string; name: string; isDash: boolean }>
+  previewVideoUrl?: string
+  previewVideoName?: string
+  previewVideoDebug?: string[]
   genres: string[]
   tags: string[]
   platforms: string[]
@@ -202,6 +206,7 @@ export interface SteamGameDetails {
 export interface SteamFetchImagesResponse {
   coverImage: string
   bannerImage: string
+  previewVideo?: string
   screenshots: string[]
 }
 

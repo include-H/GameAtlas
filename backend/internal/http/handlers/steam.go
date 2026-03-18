@@ -74,3 +74,25 @@ func (h *SteamHandler) Apply(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": preview})
 }
+
+func (h *SteamHandler) Proxy(c *gin.Context) {
+	rawURL := strings.TrimSpace(c.Query("url"))
+	proxy := strings.TrimSpace(c.Query("proxy"))
+	if rawURL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "url is required"})
+		return
+	}
+
+	contentType, payload, err := h.service.ProxyAsset(rawURL, proxy)
+	if err != nil {
+		writeServiceError(c, err, "invalid steam proxy request")
+		return
+	}
+
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	c.Header("Cache-Control", "no-store")
+	c.Header("Access-Control-Expose-Headers", "Content-Type, Content-Length")
+	c.Data(http.StatusOK, contentType, payload)
+}
