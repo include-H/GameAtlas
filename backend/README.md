@@ -1,6 +1,6 @@
 # Backend
 
-Phase 2 Go backend foundation for the NAS Game Library rebuild.
+Phase 2 Go backend foundation for the GameAtlas rebuild.
 
 ## Current scope
 

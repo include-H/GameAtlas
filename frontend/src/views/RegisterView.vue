@@ -5,7 +5,7 @@
         <!-- Logo/Title -->
         <div class="register-header">
           <icon-trophy class="register-icon" />
-          <h1 class="register-title">GameManager</h1>
+          <h1 class="register-title">GameAtlas</h1>
           <p class="register-subtitle">
             点击按钮进入游戏库
           </p>

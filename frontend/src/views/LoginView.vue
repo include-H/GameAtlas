@@ -5,7 +5,7 @@
         <!-- Logo/Title -->
         <div class="login-header">
           <icon-trophy :size="64" :style="{ color: 'rgb(var(--primary-6))' }" />
-          <h1 class="login-title">GameManager</h1>
+          <h1 class="login-title">GameAtlas</h1>
           <p class="login-subtitle">
             点击按钮进入游戏库
           </p>

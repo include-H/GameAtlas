@@ -185,7 +185,7 @@ const { menuList, activeKey } = useMenu()
 const { t } = useLocale()
 
 // App configuration
-const appName = 'GameManager'
+const appName = 'GameAtlas'
 const sideWidth = 240
 
 // State

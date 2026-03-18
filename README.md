@@ -1,4 +1,4 @@
-# GameManager
+# GameAtlas
 
 一个面向 NAS 场景的游戏库管理系统。
 
