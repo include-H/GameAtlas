@@ -16,34 +16,25 @@
       </a-space>
     </div>
 
-    <a-row :gutter="[16, 16]" class="pending-center__stats">
-      <a-col :xs="12" :sm="12" :md="6" :lg="6">
-        <a-card class="stat-card stat-card--total" :bordered="false">
-          <div class="stat-card__label">待处理总数</div>
-          <div class="stat-card__value">{{ totalPendingCount }}</div>
-          <div class="stat-card__hint">当前命中待处理规则的游戏</div>
-        </a-card>
-      </a-col>
-      <a-col
+    <div class="pending-center__stats">
+      <a-card class="stat-card stat-card--total" :bordered="false">
+        <div class="stat-card__label">待处理总数</div>
+        <div class="stat-card__value">{{ totalPendingCount }}</div>
+        <div class="stat-card__hint">当前命中待处理规则的游戏</div>
+      </a-card>
+      <a-card
         v-for="definition in pendingIssueDefinitions"
         :key="definition.key"
-        :xs="12"
-        :sm="12"
-        :md="6"
-        :lg="6"
+        class="stat-card stat-card--issue"
+        :class="{ 'stat-card--active': selectedIssue === definition.key }"
+        :bordered="false"
+        @click="toggleIssueFilter(definition.key)"
       >
-        <a-card
-          class="stat-card stat-card--issue"
-          :class="{ 'stat-card--active': selectedIssue === definition.key }"
-          :bordered="false"
-          @click="toggleIssueFilter(definition.key)"
-        >
-          <div class="stat-card__label">{{ definition.label }}</div>
-          <div class="stat-card__value">{{ issueCounts[definition.key] || 0 }}</div>
-          <div class="stat-card__hint">{{ definition.description }}</div>
-        </a-card>
-      </a-col>
-    </a-row>
+        <div class="stat-card__label">{{ definition.label }}</div>
+        <div class="stat-card__value">{{ issueCounts[definition.key] || 0 }}</div>
+        <div class="stat-card__hint">{{ definition.description }}</div>
+      </a-card>
+    </div>
 
     <a-card class="pending-center__filters" :bordered="false">
       <a-row :gutter="[12, 12]">
@@ -95,8 +86,13 @@
     </a-card>
 
     <div class="pending-center__result-meta">
-      <span>显示 {{ filteredGames.length }} 个待处理游戏，已忽略 {{ ignoredOverridesCount }} 个问题</span>
-      <a-button type="text" size="small" @click="resetFilters">重置筛选</a-button>
+      <span>
+        显示 {{ pageStart }}-{{ pageEnd }} / {{ filteredGames.length }} 个待处理游戏，已忽略 {{ ignoredOverridesCount }} 个问题
+      </span>
+      <div class="pending-center__result-actions">
+        <a-select v-model="itemsPerPage" :options="pageSizeOptions" size="small" />
+        <a-button type="text" size="small" @click="resetFilters">重置筛选</a-button>
+      </div>
     </div>
 
     <div v-if="isLoading" class="pending-center__loading">
@@ -116,7 +112,7 @@
     <div v-else class="pending-center__content">
       <div class="pending-center__list">
         <div
-          v-for="game in filteredGames"
+          v-for="game in paginatedGames"
           :key="game.id"
           class="pending-game"
           :class="{ 'pending-game--active': activeGame?.id === game.id }"
@@ -192,6 +188,16 @@
             </div>
           </div>
         </div>
+
+        <div v-if="totalPages > 1" class="pending-center__pagination">
+          <a-pagination
+            v-model:current="currentPage"
+            :total="filteredGames.length"
+            :page-size="itemsPerPage"
+            show-total
+            show-jumper
+          />
+        </div>
       </div>
 
       <a-card class="pending-center__detail" :bordered="false">
@@ -204,7 +210,13 @@
 
         <div v-if="activeGame" class="detail-panel">
           <div class="detail-panel__hero">
-            <img :src="getDisplayImage(activeGame)" :alt="activeGame.title" />
+            <img
+              :src="getDetailHeroImage(activeGame)"
+              :alt="activeGame.title"
+              class="detail-panel__hero-image"
+              :class="{ 'detail-panel__hero-image--contain': detailHeroFit === 'contain' }"
+              @load="updateDetailHeroFit"
+            />
           </div>
 
           <div class="detail-panel__section">
@@ -370,6 +382,15 @@ const sortBy = ref<'issue-count' | 'created-desc' | 'updated-asc' | 'downloads-d
 const onlySevere = ref(false)
 const onlyRecent = ref(false)
 const showIgnored = ref(false)
+const currentPage = ref(1)
+const itemsPerPage = ref(5)
+const detailHeroFit = ref<'cover' | 'contain'>('cover')
+
+const pageSizeOptions = [
+  { label: '5 / 页', value: 5 },
+  { label: '10 / 页', value: 10 },
+  { label: '20 / 页', value: 20 },
+]
 
 const placeholderImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23424242" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/%3E%3C/svg%3E'
 
@@ -462,8 +483,43 @@ const filteredGames = computed(() => {
   })
 })
 
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredGames.value.length / itemsPerPage.value)))
+
+const paginatedGames = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value
+  const end = start + itemsPerPage.value
+  return filteredGames.value.slice(start, end)
+})
+
+const pageStart = computed(() => {
+  if (filteredGames.value.length === 0) return 0
+  return (currentPage.value - 1) * itemsPerPage.value + 1
+})
+
+const pageEnd = computed(() => {
+  if (filteredGames.value.length === 0) return 0
+  return Math.min(currentPage.value * itemsPerPage.value, filteredGames.value.length)
+})
+
 watch(
   filteredGames,
+  () => {
+    currentPage.value = 1
+  },
+)
+
+watch(
+  [filteredGames, itemsPerPage],
+  () => {
+    if (currentPage.value > totalPages.value) {
+      currentPage.value = totalPages.value
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  paginatedGames,
   (games) => {
     if (games.length === 0) {
       activeGame.value = null
@@ -476,6 +532,14 @@ watch(
       : null
 
     activeGame.value = matched || games[0]
+  },
+  { immediate: true },
+)
+
+watch(
+  activeGame,
+  () => {
+    detailHeroFit.value = activeGame.value?.banner_image ? 'cover' : 'contain'
   },
   { immediate: true },
 )
@@ -505,6 +569,22 @@ const getDisplayImage = (game: Game) => {
   return game.cover_image || game.banner_image || game.screenshots?.[0] || placeholderImage
 }
 
+const getDetailHeroImage = (game: Game) => {
+  return game.banner_image || game.cover_image || game.screenshots?.[0] || placeholderImage
+}
+
+const updateDetailHeroFit = (event: Event) => {
+  const target = event.target as HTMLImageElement | null
+
+  if (!target?.naturalWidth || !target.naturalHeight) {
+    detailHeroFit.value = 'cover'
+    return
+  }
+
+  const aspectRatio = target.naturalWidth / target.naturalHeight
+  detailHeroFit.value = aspectRatio >= 1.5 ? 'cover' : 'contain'
+}
+
 const formatDate = (value?: string | null) => {
   if (!value) return '未知时间'
   const date = new Date(value)
@@ -527,6 +607,7 @@ const resetFilters = () => {
   onlySevere.value = false
   onlyRecent.value = false
   showIgnored.value = false
+  currentPage.value = 1
 }
 
 const ignoreIssue = async (game: Game, issueKey: PendingIssueDetailKey) => {
@@ -633,6 +714,12 @@ onMounted(async () => {
   color: var(--color-text-3);
 }
 
+.pending-center__stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+}
+
 .stat-card {
   border-radius: 18px;
   cursor: pointer;
@@ -693,7 +780,14 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   color: var(--color-text-3);
+}
+
+.pending-center__result-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .pending-center__loading {
@@ -717,6 +811,12 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.pending-center__pagination {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
 }
 
 .pending-game {
@@ -818,12 +918,25 @@ onMounted(async () => {
   border-radius: 16px;
   overflow: hidden;
   background: var(--color-fill-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.detail-panel__hero img {
+.detail-panel__hero-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
+}
+
+.detail-panel__hero-image--contain {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 100%;
+  object-fit: contain;
+  padding: 12px;
 }
 
 .detail-panel__section {
@@ -902,6 +1015,10 @@ onMounted(async () => {
 }
 
 @media (max-width: 1100px) {
+  .pending-center__stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .pending-center__content {
     grid-template-columns: 1fr;
   }
@@ -916,6 +1033,14 @@ onMounted(async () => {
   .pending-center__result-meta {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .pending-center__result-actions {
+    justify-content: space-between;
+  }
+
+  .pending-center__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .pending-game {
