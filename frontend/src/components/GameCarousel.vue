@@ -70,6 +70,7 @@ import { ref, computed, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { IconLeft, IconRight } from '@arco-design/web-vue/es/icon'
 import type { Game } from '@/services/types'
+import { resolveAssetUrl } from '@/utils/asset-url'
 
 interface Props {
   games: Game[]
@@ -92,18 +93,17 @@ const screenshotIndexCache = new Map<number, number>()
 const games = computed(() => props.games.slice(0, 5))
 
 const getBackgroundImage = (game: Game) => {
-  // 优先使用截图，从截图中随机选择一张
-  if (game.screenshots && game.screenshots.length > 0) {
-    // 如果还没有缓存索引，就随机选择一个并缓存
+  const screenshots = (game.screenshots || []).filter(Boolean)
+  if (screenshots.length > 0) {
     if (!screenshotIndexCache.has(game.id)) {
-      const randomIndex = Math.floor(Math.random() * game.screenshots.length)
+      const randomIndex = Math.floor(Math.random() * screenshots.length)
       screenshotIndexCache.set(game.id, randomIndex)
     }
     const index = screenshotIndexCache.get(game.id)!
-    return game.screenshots[index]
+    return resolveAssetUrl(screenshots[index])
   }
-  // 其次使用横幅图，最后使用封面
-  return game.banner_image || game.cover_image || '/placeholder-game.jpg'
+
+  return resolveAssetUrl(game.banner_image || game.cover_image || '/placeholder-game.jpg')
 }
 
 const getDescription = (game: Game) => {
@@ -214,14 +214,14 @@ onUnmounted(() => {
 
 .slide-backdrop {
   position: absolute;
-  inset: 0;
+  inset: -4%;
   background-size: cover;
   background-position: center;
-  /* Performance-friendly atmospheric effect instead of expensive blur */
-  opacity: 0.35;
-  filter: grayscale(0.5) brightness(0.7);
+  opacity: 0.88;
+  filter: blur(26px) saturate(0.95) brightness(0.55);
   z-index: 1;
-  will-change: transform, opacity;
+  transform: scale(1.08);
+  will-change: transform, opacity, filter;
 }
 
 .slide-foreground {
@@ -231,21 +231,16 @@ onUnmounted(() => {
   background-position: center;
   background-repeat: no-repeat;
   z-index: 2;
-  /* Subtly darkened for better contrast with backdrop */
-  filter: drop-shadow(0 0 30px rgba(0, 0, 0, 0.6));
+  filter: drop-shadow(0 24px 42px rgba(0, 0, 0, 0.48));
   will-change: transform, opacity;
 }
 
 .carousel-overlay {
   position: absolute;
   inset: 0;
-  /* Stronger radial vignette to blend foreground into atmospheric backdrop */
-  background: radial-gradient(
-    circle at center,
-    rgba(0, 0, 0, 0) 30%,
-    rgba(0, 0, 0, 0.4) 70%,
-    rgba(0, 0, 0, 0.8) 100%
-  );
+  background:
+    linear-gradient(90deg, rgba(6, 10, 18, 0.82) 0%, rgba(6, 10, 18, 0.46) 34%, rgba(6, 10, 18, 0.18) 58%, rgba(6, 10, 18, 0.56) 100%),
+    radial-gradient(circle at center, rgba(0, 0, 0, 0) 34%, rgba(0, 0, 0, 0.2) 72%, rgba(0, 0, 0, 0.58) 100%);
   z-index: 3;
 }
 

@@ -30,14 +30,15 @@ type GamesListResult struct {
 }
 
 type GameDetail struct {
-	Game         *domain.Game
-	PreviewVideo *domain.GameAsset
-	Screenshots  []domain.GameAsset
-	Series       []domain.MetadataItem
-	Platforms    []domain.MetadataItem
-	Developers   []domain.MetadataItem
-	Publishers   []domain.MetadataItem
-	Files        []domain.GameFile
+	Game          *domain.Game
+	PreviewVideo  *domain.GameAsset
+	PreviewVideos []domain.GameAsset
+	Screenshots   []domain.GameAsset
+	Series        []domain.MetadataItem
+	Platforms     []domain.MetadataItem
+	Developers    []domain.MetadataItem
+	Publishers    []domain.MetadataItem
+	Files         []domain.GameFile
 }
 
 func NewGamesService(cfg config.Config, gamesRepo *repositories.GamesRepository, gameFilesRepo *repositories.GameFilesRepository) *GamesService {
@@ -114,18 +115,29 @@ func (s *GamesService) GetDetail(id int64) (*GameDetail, error) {
 
 	var previewVideo *domain.GameAsset
 	if len(videos) > 0 {
-		previewVideo = &videos[0]
+		if game.PreviewVideoAssetUID != nil && strings.TrimSpace(*game.PreviewVideoAssetUID) != "" {
+			for index := range videos {
+				if videos[index].AssetUID == strings.TrimSpace(*game.PreviewVideoAssetUID) {
+					previewVideo = &videos[index]
+					break
+				}
+			}
+		}
+		if previewVideo == nil {
+			previewVideo = &videos[0]
+		}
 	}
 
 	return &GameDetail{
-		Game:         game,
-		PreviewVideo: previewVideo,
-		Screenshots:  screenshots,
-		Series:       emptyMetadata(series),
-		Platforms:    emptyMetadata(platforms),
-		Developers:   emptyMetadata(developers),
-		Publishers:   emptyMetadata(publishers),
-		Files:        emptyFiles(files),
+		Game:          game,
+		PreviewVideo:  previewVideo,
+		PreviewVideos: videos,
+		Screenshots:   screenshots,
+		Series:        emptyMetadata(series),
+		Platforms:     emptyMetadata(platforms),
+		Developers:    emptyMetadata(developers),
+		Publishers:    emptyMetadata(publishers),
+		Files:         emptyFiles(files),
 	}, nil
 }
 
@@ -143,6 +155,23 @@ func (s *GamesService) Create(input domain.GameWriteInput) (*domain.Game, error)
 func (s *GamesService) Update(id int64, input domain.GameWriteInput) (*domain.Game, error) {
 	if err := validateGameInput(input); err != nil {
 		return nil, err
+	}
+	if input.PreviewVideoAssetUID != nil && strings.TrimSpace(*input.PreviewVideoAssetUID) != "" {
+		videos, err := s.gamesRepo.ListVideos(id)
+		if err != nil {
+			return nil, err
+		}
+		targetUID := strings.TrimSpace(*input.PreviewVideoAssetUID)
+		found := false
+		for _, video := range videos {
+			if video.AssetUID == targetUID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, ErrValidation
+		}
 	}
 	game, err := s.gamesRepo.Update(id, trimGameInput(input))
 	if err != nil {
@@ -177,6 +206,7 @@ func trimGameInput(input domain.GameWriteInput) domain.GameWriteInput {
 	input.Engine = trimStringPtr(input.Engine)
 	input.CoverImage = trimStringPtr(input.CoverImage)
 	input.BannerImage = trimStringPtr(input.BannerImage)
+	input.PreviewVideoAssetUID = trimStringPtr(input.PreviewVideoAssetUID)
 	return input
 }
 

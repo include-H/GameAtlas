@@ -91,6 +91,7 @@ export interface Game {
   cover_image?: string | null
   banner_image?: string | null
   preview_video?: VideoAssetItem | null
+  preview_videos?: VideoAssetItem[]
   screenshots?: string[]
   screenshot_items?: ScreenshotItem[]
   wiki_content?: string | null
@@ -120,6 +121,7 @@ export interface GameInput {
   developers?: number[]
   publishers?: number[]
   platforms?: Array<number | string>
+  preview_video_asset_uid?: string | null
   screenshots?: string[]
   file_paths?: string[]
 }

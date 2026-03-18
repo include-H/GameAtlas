@@ -33,7 +33,6 @@
           autoplay
           controls
           loop
-          muted
           playsinline
           preload="metadata"
           @canplay="tryPlayVideo"
@@ -100,6 +99,7 @@ import { resolveAssetUrl } from '@/utils/asset-url'
 interface Props {
   screenshots?: string[]
   previewVideo?: string | null
+  previewVideos?: string[]
   videoPoster?: string | null
   alt?: string
   height?: number
@@ -108,6 +108,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   screenshots: () => [],
   previewVideo: null,
+  previewVideos: () => [],
   videoPoster: null,
   alt: 'Game screenshot',
   height: undefined,
@@ -139,15 +140,18 @@ const visibleScreenshots = computed(() => {
 
 const mediaItems = computed<MediaItem[]>(() => {
   const items: MediaItem[] = []
-  if (props.previewVideo) {
-    const videoUrl = resolveAssetUrl(props.previewVideo)
+  const previewVideos = props.previewVideos.length > 0
+    ? props.previewVideos
+    : (props.previewVideo ? [props.previewVideo] : [])
+  previewVideos.filter(Boolean).forEach((previewVideo, index) => {
+    const videoUrl = resolveAssetUrl(previewVideo)
     items.push({
-      key: `video:${videoUrl}`,
+      key: `video:${index}:${videoUrl}`,
       type: 'video',
       url: videoUrl,
       thumbnail: props.videoPoster ? resolveAssetUrl(props.videoPoster) : placeholderImage,
     })
-  }
+  })
   visibleScreenshots.value.forEach((shot, index) => {
     items.push({
       key: `image:${index}:${shot}`,
@@ -164,10 +168,12 @@ const currentMedia = computed(() => {
 })
 
 const placeholderImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450"%3E%3Crect fill="%231a1a1a" width="800" height="450"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23666" font-size="24"%3E暂无截图%3C/text%3E%3C/svg%3E'
+const filmstripHeight = computed(() => (mediaItems.value.length > 1 ? 80 : 0))
 
 const viewportStyle = computed(() => {
   if (props.height) {
-    return { height: `${props.height}px` }
+    const viewportHeight = Math.max(props.height - filmstripHeight.value, 240)
+    return { height: `${viewportHeight}px` }
   }
   if (currentMedia.value?.type === 'video') {
     return { aspectRatio: '16 / 9' }
@@ -196,7 +202,7 @@ watch(() => props.height, (newHeight) => {
   applyHeight(newHeight)
 }, { immediate: true })
 
-watch(() => [props.screenshots, props.previewVideo], () => {
+watch(() => [props.screenshots, props.previewVideo, props.previewVideos], () => {
   brokenImages.value = []
   currentIndex.value = 0
   aspectResolved.value = false
@@ -271,7 +277,6 @@ const onVideoLoaded = () => {
 const tryPlayVideo = () => {
   const video = videoRef.value
   if (!video) return
-  video.muted = true
   const playPromise = video.play()
   if (playPromise && typeof playPromise.catch === 'function') {
     playPromise.catch(() => {

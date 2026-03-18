@@ -49,6 +49,7 @@
 	        <!-- Screenshot Carousel -->
 	        <screenshot-carousel
 	          :preview-video="game.preview_video?.path || null"
+	          :preview-videos="game.preview_videos?.map((item) => item.path) || []"
 	          :video-poster="game.banner_image || game.cover_image || null"
 	          :screenshots="game.screenshots || []"
 	          :alt="game.title"
@@ -107,11 +108,11 @@
             </div>
             <div v-if="game.developers && game.developers.length > 0" class="sidebar-info__item">
               <span class="sidebar-info__label">开发商</span>
-              <span class="sidebar-info__value">{{ game.developers[0].name }}</span>
+              <span class="sidebar-info__value">{{ developerNames }}</span>
             </div>
             <div v-if="game.publishers && game.publishers.length > 0" class="sidebar-info__item">
               <span class="sidebar-info__label">发行商</span>
-              <span class="sidebar-info__value">{{ game.publishers[0].name }}</span>
+              <span class="sidebar-info__value">{{ publisherNames }}</span>
             </div>
             <div v-if="game.release_date" class="sidebar-info__item">
               <span class="sidebar-info__label">发行日期</span>
@@ -309,6 +310,9 @@ const heroBackgroundStyle = computed(() => {
   }
 })
 
+const developerNames = computed(() => (game.value?.developers || []).map((item) => item.name).join(' / '))
+const publisherNames = computed(() => (game.value?.publishers || []).map((item) => item.name).join(' / '))
+
 // Sidebar 高度计算
 
 const canEdit = computed(() => true)
@@ -373,6 +377,48 @@ const sidebarContentHeight = ref(0)
 const isDesktop = ref(true)
 let sidebarResizeObserver: ResizeObserver | null = null
 
+const disconnectSidebarObserver = () => {
+  if (sidebarResizeObserver) {
+    sidebarResizeObserver.disconnect()
+    sidebarResizeObserver = null
+  }
+}
+
+const syncSidebarHeight = () => {
+  const element = sidebarCardInnerRef.value
+  if (!element) {
+    sidebarContentHeight.value = 0
+    return
+  }
+  sidebarContentHeight.value = Math.round(element.getBoundingClientRect().height)
+}
+
+const setupSidebarObserver = async () => {
+  await nextTick()
+
+  if (!isDesktop.value || typeof ResizeObserver === 'undefined') {
+    disconnectSidebarObserver()
+    syncSidebarHeight()
+    return
+  }
+
+  const element = sidebarCardInnerRef.value
+  if (!element) {
+    sidebarContentHeight.value = 0
+    return
+  }
+
+  disconnectSidebarObserver()
+  syncSidebarHeight()
+
+  sidebarResizeObserver = new ResizeObserver((entries) => {
+    const entry = entries[0]
+    if (!entry) return
+    sidebarContentHeight.value = Math.round(entry.contentRect.height)
+  })
+  sidebarResizeObserver.observe(element)
+}
+
 const updateBreakpoint = () => {
   if (typeof window === 'undefined') return
   isDesktop.value = window.innerWidth >= 1024
@@ -417,25 +463,21 @@ watch(
 onMounted(async () => {
   updateBreakpoint()
   window.addEventListener('resize', updateBreakpoint)
-
-  await nextTick()
-  if (sidebarCardInnerRef.value && typeof ResizeObserver !== 'undefined') {
-    sidebarResizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0]
-      if (!entry) return
-      sidebarContentHeight.value = entry.contentRect.height
-    })
-    sidebarResizeObserver.observe(sidebarCardInnerRef.value)
-  }
+  await setupSidebarObserver()
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateBreakpoint)
-  if (sidebarResizeObserver) {
-    sidebarResizeObserver.disconnect()
-    sidebarResizeObserver = null
-  }
+  disconnectSidebarObserver()
 })
+
+watch(
+  [game, isDesktop, wiki],
+  async () => {
+    await setupSidebarObserver()
+  },
+  { flush: 'post' },
+)
 
 </script>
 
@@ -553,7 +595,6 @@ onUnmounted(() => {
 
 .game-detail__main > :deep(.screenshot-carousel__viewport) {
   border-radius: var(--radius-lg);
-  max-height: min(48vh, 420px);
 }
 
 .game-detail__main > :deep(.screenshot-carousel__filmstrip) {

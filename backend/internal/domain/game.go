@@ -1,21 +1,22 @@
 package domain
 
 type Game struct {
-	ID              int64   `db:"id"`
-	Title           string  `db:"title"`
-	TitleAlt        *string `db:"title_alt"`
-	Summary         *string `db:"summary"`
-	ReleaseDate     *string `db:"release_date"`
-	Engine          *string `db:"engine"`
-	CoverImage      *string `db:"cover_image"`
-	BannerImage     *string `db:"banner_image"`
-	WikiContent     *string `db:"wiki_content"`
-	WikiContentHTML *string `db:"wiki_content_html"`
-	NeedsReview     bool    `db:"needs_review"`
-	Views           int64   `db:"views"`
-	Downloads       int64   `db:"downloads"`
-	CreatedAt       string  `db:"created_at"`
-	UpdatedAt       string  `db:"updated_at"`
+	ID                   int64   `db:"id"`
+	Title                string  `db:"title"`
+	TitleAlt             *string `db:"title_alt"`
+	Summary              *string `db:"summary"`
+	ReleaseDate          *string `db:"release_date"`
+	Engine               *string `db:"engine"`
+	CoverImage           *string `db:"cover_image"`
+	BannerImage          *string `db:"banner_image"`
+	WikiContent          *string `db:"wiki_content"`
+	WikiContentHTML      *string `db:"wiki_content_html"`
+	NeedsReview          bool    `db:"needs_review"`
+	PreviewVideoAssetUID *string `db:"preview_video_asset_uid"`
+	Views                int64   `db:"views"`
+	Downloads            int64   `db:"downloads"`
+	CreatedAt            string  `db:"created_at"`
+	UpdatedAt            string  `db:"updated_at"`
 }
 
 type GameAsset struct {
@@ -67,18 +68,19 @@ type GamesListParams struct {
 }
 
 type GameWriteInput struct {
-	Title        string  `json:"title"`
-	TitleAlt     *string `json:"title_alt"`
-	Summary      *string `json:"summary"`
-	ReleaseDate  *string `json:"release_date"`
-	Engine       *string `json:"engine"`
-	CoverImage   *string `json:"cover_image"`
-	BannerImage  *string `json:"banner_image"`
-	NeedsReview  bool    `json:"needs_review"`
-	SeriesIDs    []int64 `json:"series_ids"`
-	PlatformIDs  []int64 `json:"platform_ids"`
-	DeveloperIDs []int64 `json:"developer_ids"`
-	PublisherIDs []int64 `json:"publisher_ids"`
+	Title                string  `json:"title"`
+	TitleAlt             *string `json:"title_alt"`
+	Summary              *string `json:"summary"`
+	ReleaseDate          *string `json:"release_date"`
+	Engine               *string `json:"engine"`
+	CoverImage           *string `json:"cover_image"`
+	BannerImage          *string `json:"banner_image"`
+	NeedsReview          bool    `json:"needs_review"`
+	SeriesIDs            []int64 `json:"series_ids"`
+	PlatformIDs          []int64 `json:"platform_ids"`
+	DeveloperIDs         []int64 `json:"developer_ids"`
+	PublisherIDs         []int64 `json:"publisher_ids"`
+	PreviewVideoAssetUID *string `json:"preview_video_asset_uid"`
 }
 
 type GameFileWriteInput struct {

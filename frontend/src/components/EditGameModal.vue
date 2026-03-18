@@ -224,7 +224,7 @@
                   <div class="media-overlay">
                     <div class="media-overlay-actions">
                       <button class="media-action-button" type="button" @click.stop="showCoverSelector = true">
-                        <icon-image />
+                        <icon-settings />
                       </button>
                       <button class="media-action-button media-action-button--danger" type="button" @click.stop="removeCover">
                         <icon-delete />
@@ -265,7 +265,7 @@
                   <div class="media-overlay">
                     <div class="media-overlay-actions">
                       <button class="media-action-button" type="button" @click.stop="showBannerSelector = true">
-                        <icon-image />
+                        <icon-settings />
                       </button>
                       <button class="media-action-button media-action-button--danger" type="button" @click.stop="removeBanner">
                         <icon-delete />
@@ -291,7 +291,7 @@
 	          <a-form-item label="预告片" class="media-subitem">
 	            <div class="media-section">
 	              <div class="media-frame media-frame--video">
-	                <div v-if="form.preview_video" class="media-preview">
+	                <div v-if="primaryPreviewVideo" class="media-preview">
 	                  <video
 	                    class="media-video"
 	                    controls
@@ -304,13 +304,10 @@
 	                      :src="src"
 	                    />
 	                  </video>
-	                  <div class="media-overlay">
+	                  <div class="media-overlay media-overlay--top-right">
 	                    <div class="media-overlay-actions">
-	                      <button class="media-action-button" type="button" @click.stop="showVideoSelector = true">
-	                        <icon-upload />
-	                      </button>
-	                      <button class="media-action-button media-action-button--danger" type="button" @click.stop="removePreviewVideo">
-	                        <icon-delete />
+	                      <button class="media-action-button" type="button" @click.stop="openVideoSelector">
+	                        <icon-settings />
 	                      </button>
 	                    </div>
 	                  </div>
@@ -320,11 +317,11 @@
 	                  class="media-empty-action"
 	                  role="button"
 	                  tabindex="0"
-	                  @click="showVideoSelector = true"
+	                  @click="openVideoSelector"
 	                >
 	                  <icon-upload class="media-empty-icon" />
 	                  <span class="media-empty-title">未设置预告片</span>
-	                  <span class="media-empty-subtitle">点击上传视频</span>
+	                  <span class="media-empty-subtitle">从 Steam 获取或上传本地视频</span>
 	                </div>
 	              </div>
 	            </div>
@@ -956,8 +953,60 @@
 	          </div>
 	          <a-progress :percent="videoUploadProgress" :show-text="false" size="small" />
 	        </div>
+	        <div v-if="form.preview_videos.length > 0" class="video-library-card">
+	          <div class="video-library-card__header">
+	            <span>当前预告片</span>
+	            <span>{{ form.preview_videos.length }} 个</span>
+	          </div>
+	          <div class="video-library-list">
+	            <div
+	              v-for="(video, index) in form.preview_videos"
+	              :key="video.asset_uid || video.path"
+	              class="video-library-item"
+	              :class="{ 'is-primary': form.primary_preview_video_uid === video.asset_uid }"
+	            >
+	              <button class="video-library-item__preview" type="button" @click="setPrimaryPreviewVideo(video.asset_uid)">
+	                <div class="video-library-item__thumb">
+	                  <img
+	                    v-if="form.banner_image || form.cover_image"
+	                    :src="form.banner_image || form.cover_image || ''"
+	                    :alt="`Trailer ${index + 1}`"
+	                  />
+	                  <div v-else class="video-library-item__thumb-placeholder">
+	                    <icon-video-camera />
+	                  </div>
+	                </div>
+	                <div class="video-library-item__info">
+	                  <div class="video-library-item__title-row">
+	                    <span class="video-library-item__title">Trailer {{ index + 1 }}</span>
+	                    <a-tag v-if="form.primary_preview_video_uid === video.asset_uid" size="small" color="arcoblue">主预告</a-tag>
+	                  </div>
+	                  <div class="video-library-item__path">{{ video.asset_uid || video.path }}</div>
+	                </div>
+	              </button>
+	              <div class="video-library-item__actions">
+	                <a-button
+	                  v-if="form.primary_preview_video_uid !== video.asset_uid"
+	                  size="mini"
+	                  type="text"
+	                  @click="setPrimaryPreviewVideo(video.asset_uid)"
+	                >
+	                  设为主预告
+	                </a-button>
+	                <a-button size="mini" type="text" status="danger" @click="removePreviewVideo(video.asset_uid)">
+	                  删除
+	                </a-button>
+	              </div>
+	            </div>
+	          </div>
+	        </div>
+	        <a-empty
+	          v-else
+	          description="还没有添加预告片，可从上方 Steam 获取或上传本地视频"
+	          class="video-library-empty"
+	        />
 	        <div class="cover-selector-actions">
-	          <a-button @click="showVideoSelector = false">取消</a-button>
+	          <a-button @click="showVideoSelector = false">完成</a-button>
 	        </div>
 	      </div>
 	    </a-modal>
@@ -981,6 +1030,8 @@ import {
   IconUpload,
   IconCloudDownload,
   IconCheck,
+  IconVideoCamera,
+  IconSettings,
 } from '@arco-design/web-vue/es/icon'
 import steamService from '@/services/steam.service'
 import { seriesService } from '@/services/series.service'
@@ -1012,6 +1063,7 @@ interface EditableVideo {
   id?: number
   asset_uid?: string
   path: string
+  sort_order?: number
 }
 
 interface GameForm {
@@ -1026,7 +1078,8 @@ interface GameForm {
   summary: string
   cover_image: string
   banner_image: string
-  preview_video: EditableVideo | null
+  preview_videos: EditableVideo[]
+  primary_preview_video_uid: string
   screenshots: EditableScreenshot[]
   file_paths: FilePathItem[]
 }
@@ -1106,7 +1159,12 @@ const selectedBannerImage = ref('')
 
 // Files to delete only after successful submit
 const pendingDeleteAssets = ref<Array<{ type: 'cover' | 'banner' | 'screenshot' | 'video'; path: string; assetId?: number; assetUid?: string }>>([])
-const previewVideoSources = computed(() => resolveAssetCandidates(form.value.preview_video?.path || ''))
+const primaryPreviewVideo = computed(() => {
+  if (form.value.preview_videos.length === 0) return null
+  const selected = form.value.preview_videos.find((item) => item.asset_uid === form.value.primary_preview_video_uid)
+  return selected || form.value.preview_videos[0]
+})
+const previewVideoSources = computed(() => resolveAssetCandidates(primaryPreviewVideo.value?.path || ''))
 
 const filteredSeriesOptions = computed(() => {
   return [...seriesOptions.value].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
@@ -1194,7 +1252,8 @@ const form = ref<GameForm>({
   summary: '',
   cover_image: '',
   banner_image: '',
-  preview_video: null,
+  preview_videos: [],
+  primary_preview_video_uid: '',
   screenshots: [],
   file_paths: [{ path: '', label: '' }]
 })
@@ -1293,6 +1352,7 @@ const createEditableVideo = (asset: VideoAssetItem | UploadedAssetResult | strin
     id: 'id' in asset ? asset.id : ('asset_id' in asset ? asset.asset_id : undefined),
     asset_uid: asset.asset_uid,
     path: asset.path,
+    sort_order: 'sort_order' in asset ? asset.sort_order : undefined,
   }
 }
 
@@ -1335,7 +1395,8 @@ const createEmptyForm = (): GameForm => ({
   summary: '',
   cover_image: '',
   banner_image: '',
-  preview_video: null,
+  preview_videos: [],
+  primary_preview_video_uid: '',
   screenshots: [],
   file_paths: [{ path: '', label: '' }],
 })
@@ -1451,7 +1512,8 @@ const hydrateFormFromGame = (game: Game | null) => {
     summary: game.summary || '',
     cover_image: game.cover_image || '',
     banner_image: game.banner_image || '',
-    preview_video: game.preview_video ? createEditableVideo(game.preview_video) : null,
+    preview_videos: (game.preview_videos || (game.preview_video ? [game.preview_video] : [])).map((asset) => createEditableVideo(asset)),
+    primary_preview_video_uid: game.preview_video?.asset_uid || game.preview_videos?.[0]?.asset_uid || '',
     screenshots: (game.screenshot_items || game.screenshots || []).map((asset, index) =>
       createEditableScreenshot(asset, index),
     ),
@@ -1889,6 +1951,22 @@ const getSteamVideoCandidateLabel = (candidateUrl: string) => {
   return `Trailer ${index + 1}`
 }
 
+const appendPreviewVideo = (video: EditableVideo) => {
+  form.value.preview_videos.push(video)
+  if (!form.value.primary_preview_video_uid && video.asset_uid) {
+    form.value.primary_preview_video_uid = video.asset_uid
+  }
+}
+
+const openVideoSelector = () => {
+  showVideoSelector.value = true
+}
+
+const setPrimaryPreviewVideo = (assetUid?: string) => {
+  if (!assetUid) return
+  form.value.primary_preview_video_uid = assetUid
+}
+
 const selectSteamVideoGame = async (game: any) => {
   selectedSteamVideoGame.value = game
   steamVideoCandidates.value = []
@@ -1951,20 +2029,16 @@ const downloadSteamPreviewVideo = async () => {
       },
     })
 
-    const uploaded = await uploadAsset('video', props.game.id, file, 0, (percent) => {
+    const uploaded = await uploadAsset('video', props.game.id, file, form.value.preview_videos.length, (percent) => {
       const blended = 92 + Math.round(percent * 0.08)
       steamVideoDownloadProgress.value = Math.min(100, blended)
       steamVideoDownloadStatus.value = '正在上传到素材库'
     })
-    if (form.value.preview_video) {
-      queueAssetDeletion('video', form.value.preview_video.path, form.value.preview_video.id, form.value.preview_video.asset_uid)
-    }
-    form.value.preview_video = createEditableVideo(uploaded)
+    appendPreviewVideo(createEditableVideo(uploaded))
     steamVideoDownloadProgress.value = 100
     steamVideoDownloadStatus.value = '预告片已完成导入'
     steamVideoDownloadState.value = 'success'
     await new Promise((resolve) => setTimeout(resolve, 700))
-    showVideoSelector.value = false
     uiStore.addAlert('预告片下载成功', 'success')
   } catch (error: any) {
     steamVideoDownloadState.value = 'error'
@@ -1990,15 +2064,11 @@ const handleVideoFileChange = async (event: Event) => {
   videoUploadFileName.value = file.name
 
   try {
-    const uploaded = await uploadAsset('video', props.game.id, file, 0, (percent) => {
+    const uploaded = await uploadAsset('video', props.game.id, file, form.value.preview_videos.length, (percent) => {
       videoUploadProgress.value = percent
     })
-    if (form.value.preview_video) {
-      queueAssetDeletion('video', form.value.preview_video.path, form.value.preview_video.id, form.value.preview_video.asset_uid)
-    }
-    form.value.preview_video = createEditableVideo(uploaded)
+    appendPreviewVideo(createEditableVideo(uploaded))
     videoUploadProgress.value = 100
-    showVideoSelector.value = false
     uiStore.addAlert('预告片上传成功', 'success')
   } catch (error: any) {
     videoUploadProgress.value = 0
@@ -2032,10 +2102,14 @@ const removeScreenshot = (clientKey: string) => {
   form.value.screenshots = form.value.screenshots.filter((item) => item.client_key !== clientKey)
 }
 
-const removePreviewVideo = () => {
-  if (!form.value.preview_video) return
-  queueAssetDeletion('video', form.value.preview_video.path, form.value.preview_video.id, form.value.preview_video.asset_uid)
-  form.value.preview_video = null
+const removePreviewVideo = (assetUid?: string) => {
+  const target = form.value.preview_videos.find((item) => item.asset_uid === assetUid)
+  if (!target) return
+  queueAssetDeletion('video', target.path, target.id, target.asset_uid)
+  form.value.preview_videos = form.value.preview_videos.filter((item) => item.asset_uid !== assetUid)
+  if (form.value.primary_preview_video_uid === assetUid) {
+    form.value.primary_preview_video_uid = form.value.preview_videos[0]?.asset_uid || ''
+  }
 }
 
 // File path management
@@ -2549,6 +2623,7 @@ const handleSubmit = async () => {
       summary: form.value.summary,
       cover_image: form.value.cover_image,
       banner_image: form.value.banner_image,
+      preview_video_asset_uid: form.value.primary_preview_video_uid || null,
     })
 
     const keptFileIds = new Set<number>()
@@ -2764,13 +2839,21 @@ const handleSubmit = async () => {
   justify-content: center;
   background: rgba(8, 10, 16, 0.5);
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.2s ease;
+}
+
+.media-overlay--top-right {
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 14px;
 }
 
 .media-overlay-actions {
   display: inline-flex;
   align-items: center;
   gap: 12px;
+  pointer-events: auto;
 }
 
 .media-preview:hover .media-overlay,
@@ -2830,16 +2913,17 @@ const handleSubmit = async () => {
   justify-content: center;
   border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--color-text-1);
+  background: rgba(15, 23, 42, 0.82);
+  color: rgba(255, 255, 255, 0.92);
   font-size: 18px;
   cursor: pointer;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(8px);
   transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
 .media-action-button:hover {
-  background: #fff;
+  background: rgba(15, 23, 42, 0.92);
   transform: scale(1.06);
 }
 
@@ -2851,7 +2935,6 @@ const handleSubmit = async () => {
 .media-action-button--danger:hover {
   background: rgba(224, 73, 89, 0.98);
 }
-
 
 /* Screenshots Grid */
 .screenshots-grid {
@@ -3132,6 +3215,125 @@ const handleSubmit = async () => {
   line-height: 1.6;
   color: var(--color-text-3);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.video-library-card {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--color-fill-1);
+  border: 1px solid var(--color-border-2);
+}
+
+.video-library-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  color: var(--color-text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.video-library-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.video-library-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border-2);
+  background: rgba(255, 255, 255, 0.02);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.video-library-item.is-primary {
+  border-color: rgba(var(--primary-6), 0.45);
+  background: rgba(var(--primary-6), 0.08);
+}
+
+.video-library-item__preview {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.video-library-item__thumb {
+  width: 112px;
+  height: 63px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-library-item__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.video-library-item__thumb-placeholder {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 22px;
+}
+
+.video-library-item__info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.video-library-item__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.video-library-item__title {
+  color: var(--color-text-1);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.video-library-item__path {
+  color: var(--color-text-3);
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.video-library-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.video-library-empty {
+  margin-top: 14px;
+  padding: 20px 0;
+  border-radius: 12px;
+  background: var(--color-fill-1);
 }
 
 .steam-images-grid {

@@ -226,6 +226,7 @@ type gameDetailResponse struct {
 	Views           int64                  `json:"views"`
 	Downloads       int64                  `json:"downloads"`
 	PreviewVideo    *gameAssetResponse     `json:"preview_video"`
+	PreviewVideos   []gameAssetResponse    `json:"preview_videos"`
 	Screenshots     []gameAssetResponse    `json:"screenshots"`
 	Series          []metadataItemResponse `json:"series"`
 	Platforms       []metadataItemResponse `json:"platforms"`
@@ -275,6 +276,16 @@ func toGameDetailResponse(detail *services.GameDetail) gameDetailResponse {
 		}
 	}
 
+	previewVideos := make([]gameAssetResponse, 0, len(detail.PreviewVideos))
+	for _, asset := range detail.PreviewVideos {
+		previewVideos = append(previewVideos, gameAssetResponse{
+			ID:        asset.ID,
+			AssetUID:  asset.AssetUID,
+			Path:      asset.Path,
+			SortOrder: asset.SortOrder,
+		})
+	}
+
 	return gameDetailResponse{
 		ID:              detail.Game.ID,
 		Title:           detail.Game.Title,
@@ -290,6 +301,7 @@ func toGameDetailResponse(detail *services.GameDetail) gameDetailResponse {
 		Views:           detail.Game.Views,
 		Downloads:       detail.Game.Downloads,
 		PreviewVideo:    previewVideo,
+		PreviewVideos:   previewVideos,
 		Screenshots:     screenshots,
 		Series:          toMetadataResponses(detail.Series),
 		Platforms:       toMetadataResponses(detail.Platforms),

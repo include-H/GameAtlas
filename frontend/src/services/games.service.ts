@@ -64,6 +64,7 @@ interface GameDetailApiItem extends GameListApiItem {
   wiki_content: string | null
   wiki_content_html: string | null
   preview_video: ScreenshotApiItem | null
+  preview_videos: ScreenshotApiItem[]
   screenshots: ScreenshotApiItem[]
   series: MetadataApiItem[]
   platforms: MetadataApiItem[]
@@ -138,6 +139,7 @@ function mapGameDetail(item: GameDetailApiItem): Game {
     wiki_content: item.wiki_content,
     wiki_content_html: item.wiki_content_html,
     preview_video: item.preview_video,
+    preview_videos: [...(item.preview_videos || [])].sort((a, b) => a.sort_order - b.sort_order),
     screenshot_items: screenshots,
     screenshots: screenshots.map((shot) => shot.path),
     files: files.map(mapFile),
@@ -238,6 +240,7 @@ export const gamesService = {
       cover_image: data.cover_image ?? null,
       banner_image: data.banner_image ?? null,
       needs_review: data.needs_review ?? false,
+      preview_video_asset_uid: data.preview_video_asset_uid ?? null,
       series_ids: data.series || [],
       platform_ids: mapPlatformValues(data.platforms),
       developer_ids: data.developers || [],

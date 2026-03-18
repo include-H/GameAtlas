@@ -147,6 +147,7 @@ const gamesStore = useGamesStore()
 const uiStore = useUiStore()
 
 const isLoading = ref(false)
+const detailedGames = ref<Record<number, import('@/services/types').Game>>({})
 
 // Directly use gamesStore.stats (it's already a ref)
 const totalGames = computed(() => gamesStore.stats?.total_games || 0)
@@ -160,13 +161,14 @@ const isEmpty = computed(() => {
 
 // Get games for carousel (combine recent and most played, shuffle them)
 const carouselGames = computed(() => {
-  const games = [...recentAdditions.value, ...mostPlayed.value]
-  // Remove duplicates
-  const uniqueGames = games.filter((game, index, self) =>
-    index === self.findIndex((g) => g.id === game.id)
-  )
-  // Shuffle array
-  return uniqueGames.sort(() => Math.random() - 0.5)
+  const orderedIds = [...recentAdditions.value, ...mostPlayed.value]
+    .map((game) => game.id)
+    .filter((id, index, self) => self.indexOf(id) === index)
+
+  return orderedIds
+    .map((id) => detailedGames.value[id])
+    .filter((game): game is import('@/services/types').Game => !!game)
+    .sort(() => Math.random() - 0.5)
 })
 
 const pendingReviewGameCount = ref(0)
@@ -201,12 +203,19 @@ const loadDashboardData = async () => {
         try {
           return await gamesService.getGame(String(game.id))
         } catch {
-          return game
+          return null
         }
       }),
     )
+    detailedGames.value = details
+      .filter((game): game is import('@/services/types').Game => !!game)
+      .reduce<Record<number, import('@/services/types').Game>>((acc, game) => {
+        acc[game.id] = game
+        return acc
+      }, {})
     pendingReviewGameCount.value = 0
     for (const game of details) {
+      if (!game) continue
       const issues = getPendingIssues(game)
       if (issues.length > 0) {
         pendingReviewGameCount.value += 1

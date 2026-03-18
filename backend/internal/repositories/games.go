@@ -91,6 +91,7 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 			g.wiki_content,
 			g.wiki_content_html,
 			g.needs_review,
+			g.preview_video_asset_uid,
 			g.views,
 			g.downloads,
 			g.created_at,
@@ -129,6 +130,7 @@ func (r *GamesRepository) GetByID(id int64) (*domain.Game, error) {
 			wiki_content,
 			wiki_content_html,
 			needs_review,
+			preview_video_asset_uid,
 			views,
 			downloads,
 			created_at,
@@ -147,11 +149,11 @@ func (r *GamesRepository) GetByID(id int64) (*domain.Game, error) {
 func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, error) {
 	const query = `
 		INSERT INTO games (
-			title, title_alt, summary, release_date, engine, cover_image, banner_image, needs_review
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			title, title_alt, summary, release_date, engine, cover_image, banner_image, needs_review, preview_video_asset_uid
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING
 			id, title, title_alt, summary, release_date, engine, cover_image, banner_image,
-			wiki_content, wiki_content_html, needs_review, views, downloads, created_at, updated_at`
+			wiki_content, wiki_content_html, needs_review, preview_video_asset_uid, views, downloads, created_at, updated_at`
 
 	var game domain.Game
 	if err := r.db.Get(
@@ -165,6 +167,7 @@ func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, err
 		input.CoverImage,
 		input.BannerImage,
 		boolToInt(input.NeedsReview),
+		input.PreviewVideoAssetUID,
 	); err != nil {
 		return nil, fmt.Errorf("create game: %w", err)
 	}
@@ -188,6 +191,7 @@ func (r *GamesRepository) Update(id int64, input domain.GameWriteInput) (*domain
 			cover_image = ?,
 			banner_image = ?,
 			needs_review = ?,
+			preview_video_asset_uid = ?,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`
 
@@ -201,6 +205,7 @@ func (r *GamesRepository) Update(id int64, input domain.GameWriteInput) (*domain
 		input.CoverImage,
 		input.BannerImage,
 		boolToInt(input.NeedsReview),
+		input.PreviewVideoAssetUID,
 		id,
 	)
 	if err != nil {

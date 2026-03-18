@@ -64,6 +64,11 @@ func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart
 	if err != nil {
 		return nil, err
 	}
+	if assetType == "video" && asset != nil {
+		if err := s.ensurePrimaryVideo(gameID, asset.AssetUID); err != nil {
+			return nil, err
+		}
+	}
 
 	result := &UploadResult{Path: path}
 	if asset != nil {
@@ -116,12 +121,23 @@ func (s *AssetsService) Delete(input domain.DeleteAssetInput) error {
 			}
 		}
 	case "video":
+		isPrimaryVideo := false
+		game, err := s.gamesRepo.GetByID(input.GameID)
+		if err != nil {
+			return normalizeRepoError(err)
+		}
+		if game.PreviewVideoAssetUID != nil && strings.TrimSpace(*game.PreviewVideoAssetUID) != "" {
+			if strings.TrimSpace(input.AssetUID) != "" {
+				isPrimaryVideo = strings.TrimSpace(*game.PreviewVideoAssetUID) == strings.TrimSpace(input.AssetUID)
+			}
+		}
 		if strings.TrimSpace(input.AssetUID) != "" {
 			asset, err := s.assetsRepo.DeleteAssetByUID(input.GameID, strings.TrimSpace(input.AssetUID), "video")
 			if err != nil {
 				return normalizeRepoError(err)
 			}
 			assetPath = asset.Path
+			isPrimaryVideo = game.PreviewVideoAssetUID != nil && strings.TrimSpace(*game.PreviewVideoAssetUID) == strings.TrimSpace(asset.AssetUID)
 		} else {
 			deleted, err := s.assetsRepo.DeleteAssetByPath(input.GameID, "video", assetPath)
 			if err != nil {
@@ -129,6 +145,11 @@ func (s *AssetsService) Delete(input domain.DeleteAssetInput) error {
 			}
 			if !deleted {
 				return ErrNotFound
+			}
+		}
+		if isPrimaryVideo {
+			if err := s.assignFallbackPrimaryVideo(input.GameID); err != nil {
+				return err
 			}
 		}
 	default:
@@ -141,6 +162,20 @@ func (s *AssetsService) Delete(input domain.DeleteAssetInput) error {
 	return nil
 }
 
+func (s *AssetsService) SetPrimaryVideo(input domain.PrimaryVideoUpdateInput) error {
+	if input.GameID <= 0 || strings.TrimSpace(input.AssetUID) == "" {
+		return ErrValidation
+	}
+	if _, err := s.gamesRepo.GetByID(input.GameID); err != nil {
+		return normalizeRepoError(err)
+	}
+	asset, err := s.assetsRepo.GetAssetByUID(input.GameID, strings.TrimSpace(input.AssetUID), "video")
+	if err != nil {
+		return normalizeRepoError(err)
+	}
+	return normalizeRepoError(s.assetsRepo.UpdateGamePreviewVideoAssetUID(input.GameID, &asset.AssetUID))
+}
+
 func (s *AssetsService) ApplyRemoteAsset(gameID int64, assetType string, remoteURL string, sortOrder int) (string, error) {
 	if _, err := s.gamesRepo.GetByID(gameID); err != nil {
 		return "", normalizeRepoError(err)
@@ -150,8 +185,14 @@ func (s *AssetsService) ApplyRemoteAsset(gameID int64, assetType string, remoteU
 	if err != nil {
 		return "", normalizeAssetError(err)
 	}
-	if _, err := s.persistAssetPath(gameID, assetType, assetUID, path, sortOrder); err != nil {
+	asset, err := s.persistAssetPath(gameID, assetType, assetUID, path, sortOrder)
+	if err != nil {
 		return "", err
+	}
+	if assetType == "video" && asset != nil {
+		if err := s.ensurePrimaryVideo(gameID, asset.AssetUID); err != nil {
+			return "", err
+		}
 	}
 	return path, nil
 }
@@ -165,8 +206,14 @@ func (s *AssetsService) ApplyRawAsset(gameID int64, assetType string, content []
 	if err != nil {
 		return "", normalizeAssetError(err)
 	}
-	if _, err := s.persistAssetPath(gameID, assetType, assetUID, path, sortOrder); err != nil {
+	asset, err := s.persistAssetPath(gameID, assetType, assetUID, path, sortOrder)
+	if err != nil {
 		return "", err
+	}
+	if assetType == "video" && asset != nil {
+		if err := s.ensurePrimaryVideo(gameID, asset.AssetUID); err != nil {
+			return "", err
+		}
 	}
 	return path, nil
 }
@@ -186,6 +233,28 @@ func (s *AssetsService) persistAssetPath(gameID int64, assetType string, assetUI
 	default:
 		return nil, ErrValidation
 	}
+}
+
+func (s *AssetsService) ensurePrimaryVideo(gameID int64, assetUID string) error {
+	game, err := s.gamesRepo.GetByID(gameID)
+	if err != nil {
+		return normalizeRepoError(err)
+	}
+	if game.PreviewVideoAssetUID != nil && strings.TrimSpace(*game.PreviewVideoAssetUID) != "" {
+		return nil
+	}
+	return normalizeRepoError(s.assetsRepo.UpdateGamePreviewVideoAssetUID(gameID, &assetUID))
+}
+
+func (s *AssetsService) assignFallbackPrimaryVideo(gameID int64) error {
+	videos, err := s.gamesRepo.ListVideos(gameID)
+	if err != nil {
+		return normalizeRepoError(err)
+	}
+	if len(videos) == 0 {
+		return normalizeRepoError(s.assetsRepo.UpdateGamePreviewVideoAssetUID(gameID, nil))
+	}
+	return normalizeRepoError(s.assetsRepo.UpdateGamePreviewVideoAssetUID(gameID, &videos[0].AssetUID))
 }
 
 func newAssetUID(gameID int64) string {
