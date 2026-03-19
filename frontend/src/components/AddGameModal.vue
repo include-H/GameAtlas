@@ -17,6 +17,13 @@
           @press-enter="handleSubmit"
         />
       </a-form-item>
+
+      <a-form-item field="visibility" label="可见性">
+        <a-radio-group v-model="form.visibility" type="button">
+          <a-radio value="public">公开</a-radio>
+          <a-radio value="private">私有</a-radio>
+        </a-radio-group>
+      </a-form-item>
     </a-form>
 
     <div class="add-game-modal__actions">
@@ -36,6 +43,7 @@ import type { FieldRule } from '@arco-design/web-vue'
 
 interface FormState {
   title: string
+  visibility: 'public' | 'private'
 }
 
 const props = defineProps<{
@@ -50,7 +58,8 @@ const emit = defineEmits<{
 const formRef = ref()
 const isSubmitting = ref(false)
 const form = ref<FormState>({
-  title: ''
+  title: '',
+  visibility: 'public',
 })
 
 const rules: Record<string, FieldRule[]> = {
@@ -74,18 +83,21 @@ const handleSubmit = async () => {
   isSubmitting.value = true
 
   emit('submit', {
-    title: form.value.title
+    title: form.value.title,
+    visibility: form.value.visibility,
   })
 
   // Reset form
   visible.value = false
   form.value.title = ''
+  form.value.visibility = 'public'
   isSubmitting.value = false
 }
 
 const handleCancel = () => {
   visible.value = false
   form.value.title = ''
+  form.value.visibility = 'public'
 }
 </script>
 

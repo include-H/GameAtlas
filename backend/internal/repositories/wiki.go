@@ -29,7 +29,7 @@ func (r *WikiRepository) Get(gameID int64) (*domain.Game, error) {
 	return &game, nil
 }
 
-func (r *WikiRepository) Update(gameID int64, content, html string, changeSummary *string) (*domain.Game, error) {
+func (r *WikiRepository) Update(gameID int64, content, html string, changeSummary *string, historyLimit int) (*domain.Game, error) {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return nil, fmt.Errorf("begin wiki update: %w", err)
@@ -50,6 +50,23 @@ func (r *WikiRepository) Update(gameID int64, content, html string, changeSummar
 	`, gameID, content, changeSummary); err != nil {
 		_ = tx.Rollback()
 		return nil, fmt.Errorf("insert wiki history: %w", err)
+	}
+
+	if historyLimit > 0 {
+		if _, err := tx.Exec(`
+			DELETE FROM wiki_history
+			WHERE game_id = ?
+			  AND id NOT IN (
+			    SELECT id
+			    FROM wiki_history
+			    WHERE game_id = ?
+			    ORDER BY id DESC
+			    LIMIT ?
+			  )
+		`, gameID, gameID, historyLimit); err != nil {
+			_ = tx.Rollback()
+			return nil, fmt.Errorf("prune wiki history: %w", err)
+		}
 	}
 
 	var game domain.Game

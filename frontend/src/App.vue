@@ -10,6 +10,9 @@
 
       <div class="header-right">
         <a-space :size="20">
+          <a-button type="text" @click="handleAuthAction">
+            {{ isAdmin ? '退出' : '登录' }}
+          </a-button>
           <a-button type="text" shape="circle" @click="scrollToTop">
             <template #icon>
               <icon-up />
@@ -110,6 +113,7 @@ import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import useMenu from '@/hooks/useMenu'
 import { useUiStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 import AlertBanner from '@/components/AlertBanner.vue'
 import AppNavigationMenu from '@/components/AppNavigationMenu.vue'
 import SharedAmbientBackground from '@/components/SharedAmbientBackground.vue'
@@ -122,8 +126,10 @@ import {
 
 const router = useRouter()
 const uiStore = useUiStore()
+const authStore = useAuthStore()
 const { menuList, activeKey, openKeys: routeOpenKeys } = useMenu()
 const { sidebarCollapsed } = storeToRefs(uiStore)
+const { isAdmin } = storeToRefs(authStore)
 
 const appName = 'GameAtlas'
 const sideWidth = 240
@@ -155,6 +161,21 @@ const syncOpenKeysWithRoute = () => {
 
 const handleLogoClick = () => {
   router.push({ name: 'dashboard' })
+}
+
+const handleAuthAction = async () => {
+  if (!isAdmin.value) {
+    router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
+    return
+  }
+
+  try {
+    await authStore.logout()
+    showMessage('已退出管理模式', 'success')
+    router.push({ name: 'dashboard' })
+  } catch {
+    showMessage('退出失败', 'error')
+  }
 }
 
 const scrollToTop = () => {

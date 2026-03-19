@@ -5,11 +5,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 
 	"github.com/hao/game/internal/config"
+	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/http/handlers"
 	"github.com/hao/game/internal/markdown"
 	"github.com/hao/game/internal/repositories"
@@ -26,21 +29,25 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	router.Use(gin.Logger(), gin.Recovery())
 
 	healthHandler := handlers.NewHealthHandler(db)
+	authService := services.NewAuthService(cfg)
+	authHandler := handlers.NewAuthHandler(authService)
 	gamesRepo := repositories.NewGamesRepository(db)
 	gameFilesRepo := repositories.NewGameFilesRepository(db)
 	assetsRepo := repositories.NewAssetsRepository(db)
 	metadataRepo := repositories.NewMetadataRepository(db)
+	tagsRepo := repositories.NewTagsRepository(db)
 	reviewIssueOverridesRepo := repositories.NewReviewIssueOverrideRepository(db)
 	wikiRepo := repositories.NewWikiRepository(db)
 	markdownRenderer := markdown.NewRenderer()
-	gamesService := services.NewGamesService(cfg, gamesRepo, gameFilesRepo)
+	gamesService := services.NewGamesService(cfg, gamesRepo, gameFilesRepo, metadataRepo, tagsRepo)
 	gameFilesService := services.NewGameFilesService(cfg, gamesRepo, gameFilesRepo)
 	assetsService := services.NewAssetsService(cfg, gamesRepo, assetsRepo)
 	directoryService := services.NewDirectoryService(cfg)
-	metadataService := services.NewMetadataService(metadataRepo)
+	metadataService := services.NewMetadataService(cfg, metadataRepo)
+	tagsService := services.NewTagsService(tagsRepo)
 	reviewIssueOverrideService := services.NewReviewIssueOverrideService(gamesRepo, reviewIssueOverridesRepo)
 	steamService := services.NewSteamService(cfg, assetsService)
-	wikiService := services.NewWikiService(gamesRepo, wikiRepo, markdownRenderer)
+	wikiService := services.NewWikiService(gamesRepo, wikiRepo, markdownRenderer, cfg.WikiHistoryLimit)
 	assetsHandler := handlers.NewAssetsHandler(assetsService)
 	directoryHandler := handlers.NewDirectoryHandler(directoryService)
 	gamesHandler := handlers.NewGamesHandler(gamesService)
@@ -53,10 +60,21 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	reviewIssueOverrideHandler := handlers.NewReviewIssueOverrideHandler(reviewIssueOverrideService)
 	steamHandler := handlers.NewSteamHandler(steamService)
 	wikiHandler := handlers.NewWikiHandler(wikiService)
+	tagsHandler := handlers.NewTagsHandler(tagsService)
+
+	router.Use(func(c *gin.Context) {
+		session, _ := c.Cookie(services.AuthCookieName)
+		c.Set("is_admin", authService.IsAdmin(session))
+		c.Next()
+	})
 
 	api := router.Group("/api")
 	api.GET("/health", healthHandler.Get)
+	api.POST("/auth/login", authHandler.Login)
+	api.POST("/auth/logout", authHandler.Logout)
+	api.GET("/auth/me", authHandler.Me)
 	api.GET("/games", gamesHandler.List)
+	api.GET("/games/stats", gamesHandler.Stats)
 	api.GET("/games/:id", gamesHandler.Get)
 	api.POST("/games", gamesHandler.Create)
 	api.PUT("/games/:id", gamesHandler.Update)
@@ -78,6 +96,10 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.POST("/developers", developersHandler.Create)
 	api.GET("/publishers", publishersHandler.List)
 	api.POST("/publishers", publishersHandler.Create)
+	api.GET("/tag-groups", tagsHandler.ListGroups)
+	api.POST("/tag-groups", tagsHandler.CreateGroup)
+	api.GET("/tags", tagsHandler.ListTags)
+	api.POST("/tags", tagsHandler.CreateTag)
 	api.GET("/review-issue-overrides", reviewIssueOverrideHandler.List)
 	api.PUT("/games/:id/review-issues/:issueKey/ignore", reviewIssueOverrideHandler.Ignore)
 	api.DELETE("/games/:id/review-issues/:issueKey/ignore", reviewIssueOverrideHandler.Delete)
@@ -95,19 +117,64 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.POST("/steam/:appId/apply-assets", steamHandler.Apply)
 	api.GET("/steam/proxy", steamHandler.Proxy)
 
-	registerAssetRoutes(router, cfg.AssetsDir)
+	registerAssetRoutes(router, cfg.AssetsDir, gamesRepo)
 	registerCustomDataRoutes(router, filepath.Dir(cfg.AssetsDir))
 	registerStaticRoutes(router, cfg.StaticDir)
 
 	return router
 }
 
-func registerAssetRoutes(router *gin.Engine, assetsDir string) {
+func registerAssetRoutes(router *gin.Engine, assetsDir string, gamesRepo *repositories.GamesRepository) {
 	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
 		return
 	}
 
-	router.Static("/assets", assetsDir)
+	router.GET("/assets/*filepath", func(c *gin.Context) {
+		rawPath := strings.TrimPrefix(c.Param("filepath"), "/")
+		if rawPath == "" {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		segments := strings.Split(rawPath, "/")
+		if len(segments) < 2 {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		gameID, err := strconv.ParseInt(strings.TrimSpace(segments[0]), 10, 64)
+		if err != nil || gameID <= 0 {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		game, err := gamesRepo.GetByID(gameID)
+		if err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		isAdmin, _ := c.Get("is_admin")
+		admin, _ := isAdmin.(bool)
+		if !admin && game.Visibility == domain.GameVisibilityPrivate {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		targetPath := filepath.Join(assetsDir, filepath.FromSlash(rawPath))
+		relative, err := filepath.Rel(assetsDir, targetPath)
+		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		if _, err := os.Stat(targetPath); err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		c.File(targetPath)
+	})
 }
 
 func registerCustomDataRoutes(router *gin.Engine, dataDir string) {
@@ -125,15 +192,32 @@ func registerCustomDataRoutes(router *gin.Engine, dataDir string) {
 		".woff2": {},
 	}
 
-	router.GET("/data/:filename", func(c *gin.Context) {
-		filename := filepath.Base(c.Param("filename"))
-		extension := filepath.Ext(filename)
+	router.GET("/data/*filepath", func(c *gin.Context) {
+		rawPath := strings.TrimPrefix(c.Param("filepath"), "/")
+		if rawPath == "" {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		cleanPath := filepath.Clean(filepath.FromSlash(rawPath))
+		if cleanPath == "." || cleanPath == ".." || strings.HasPrefix(cleanPath, ".."+string(filepath.Separator)) {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		extension := filepath.Ext(cleanPath)
 		if _, ok := allowedExtensions[extension]; !ok {
 			c.Status(http.StatusNotFound)
 			return
 		}
 
-		assetPath := filepath.Join(dataDir, filename)
+		assetPath := filepath.Join(dataDir, cleanPath)
+		relative, err := filepath.Rel(dataDir, assetPath)
+		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
 		if _, err := os.Stat(assetPath); err != nil {
 			c.Status(http.StatusNotFound)
 			return

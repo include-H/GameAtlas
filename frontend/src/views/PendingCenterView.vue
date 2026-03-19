@@ -318,7 +318,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import gamesService from '@/services/games.service'
 import reviewIssuesService from '@/services/review-issues.service'
@@ -336,6 +336,7 @@ import {
   type PendingIssueDetailKey,
   type PendingIssueKey,
 } from '@/utils/pendingIssues'
+import { createDetailRouteQuery } from '@/utils/navigation'
 import {
   IconBook,
   IconEdit,
@@ -347,6 +348,7 @@ defineOptions({
   name: 'PendingCenterView',
 })
 
+const route = useRoute()
 const router = useRouter()
 const uiStore = useUiStore()
 
@@ -630,7 +632,11 @@ const openWiki = (game: Game) => {
 }
 
 const viewGame = (game: Game) => {
-  router.push({ name: 'game-detail', params: { id: String(game.id) } })
+  router.push({
+    name: 'game-detail',
+    params: { id: String(game.id) },
+    query: createDetailRouteQuery(route),
+  })
 }
 
 const loadPendingGames = async () => {

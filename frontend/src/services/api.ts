@@ -7,6 +7,7 @@ const mockMode = import.meta.env.VITE_MOCK_MODE === 'true' || false
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   timeout: mockMode ? 1000 : 30000,  // Faster timeout in mock mode
   headers: {
     'Content-Type': 'application/json',

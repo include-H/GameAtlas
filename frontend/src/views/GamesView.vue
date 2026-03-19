@@ -16,7 +16,7 @@
           </a-radio>
         </a-radio-group>
 
-        <a-button class="app-primary-cta" type="primary" @click="handleAddGame">
+        <a-button v-if="isAdmin" class="app-primary-cta" type="primary" @click="handleAddGame">
           <template #icon>
             <icon-plus />
           </template>
@@ -38,19 +38,8 @@
           />
         </a-col>
 
-        <!-- Series Filter -->
-        <a-col :xs="12" :sm="8" :md="4" :lg="4" :xl="4" :xxl="4">
-          <a-select
-            v-model="selectedSeries"
-            :options="seriesOptions"
-            placeholder="系列"
-            allow-clear
-            allow-search
-          />
-        </a-col>
-
         <!-- Platform Filter -->
-        <a-col :xs="12" :sm="8" :md="3" :lg="3" :xl="3" :xxl="3">
+        <a-col :xs="12" :sm="8" :md="4" :lg="4" :xl="4" :xxl="4">
           <a-select
             v-model="selectedPlatform"
             :options="platformOptions"
@@ -60,7 +49,7 @@
         </a-col>
 
         <!-- Sort -->
-        <a-col :xs="24" :sm="8" :md="5" :lg="5" :xl="5" :xxl="5">
+        <a-col :xs="24" :sm="8" :md="6" :lg="6" :xl="6" :xxl="6">
           <a-select
             v-model="sortBy"
             :options="sortOptions"
@@ -79,7 +68,63 @@
             :options="itemsPerPageOptions"
           />
         </a-col>
+
+        <a-col :xs="24" :sm="8" :md="4" :lg="4" :xl="4" :xxl="4">
+          <a-button class="games-filter-drawer-btn" type="secondary" long @click="showTagFilters = !showTagFilters">
+            <template #icon>
+              <icon-filter />
+            </template>
+            {{ showTagFilters ? '收起标签筛选' : '展开标签筛选' }}
+            <span v-if="selectedTagIds.length > 0" class="games-filter-drawer-btn__count">
+              {{ selectedTagIds.length }}
+            </span>
+          </a-button>
+        </a-col>
       </a-row>
+
+      <div v-if="showTagFilters" class="tag-filter-section">
+        <div class="tag-filter-section__header">
+          <span class="tag-filter-section__title">标签筛选</span>
+          <span class="tag-filter-section__hint">同组多选为或，不同组之间为且</span>
+        </div>
+
+        <a-row v-if="filterableTagGroups.length > 0" :gutter="12" class="mt-3">
+          <a-col
+            v-for="group in filterableTagGroups"
+            :key="group.id"
+            :xs="24"
+            :sm="12"
+            :md="12"
+            :lg="12"
+            :xl="12"
+            :xxl="12"
+          >
+            <div class="tag-filter-grid-item">
+              <div class="tag-filter-drawer__label">{{ group.name }}</div>
+              <a-select
+                :model-value="getSelectedTagIdsForGroup(group.id)"
+                :multiple="group.allow_multiple"
+                :allow-search="true"
+                allow-clear
+                :placeholder="group.name"
+                @change="handleTagGroupSelectionChange(group.id, $event)"
+              >
+                <a-option
+                  v-for="tag in getTagsForGroup(group.id)"
+                  :key="tag.id"
+                  :value="tag.id"
+                  :label="tag.name"
+                >
+                  {{ tag.name }}
+                </a-option>
+              </a-select>
+            </div>
+          </a-col>
+        </a-row>
+        <div v-else class="tag-filter-section__empty">
+          暂无可筛选标签。重启后端完成 migration 后，这里会显示标签组。
+        </div>
+      </div>
 
       <!-- Active Filters -->
       <a-row v-if="hasActiveFilters" class="mt-3">
@@ -92,13 +137,6 @@
               @close="updateRoute({ search: undefined })"
             >
               搜索: {{ route.query.search }}
-            </a-tag>
-            <a-tag
-              v-if="route.query.series"
-              closable
-              @close="updateRoute({ series: undefined })"
-            >
-              系列: {{ seriesLabelMap[String(route.query.series)] || route.query.series }}
             </a-tag>
             <a-tag
               v-if="route.query.platform"
@@ -120,6 +158,14 @@
               @close="updateRoute({ needs: undefined })"
             >
               待处理: {{ needsFilterLabel }}
+            </a-tag>
+            <a-tag
+              v-for="tagId in selectedTagIds"
+              :key="tagId"
+              closable
+              @close="removeTagFilter(tagId)"
+            >
+              标签: {{ tagLabelMap[String(tagId)] || tagId }}
             </a-tag>
             <a-button
               size="small"
@@ -149,16 +195,11 @@
     <!-- Games Grid/List -->
     <div v-else-if="games && games.length > 0">
       <!-- Grid View -->
-      <a-row v-if="viewMode === 'grid'" :gutter="16">
-        <a-col
+      <div v-if="viewMode === 'grid'" class="games-grid">
+        <div
           v-for="game in games"
           :key="game.id"
-          :xs="12"
-          :sm="8"
-          :md="6"
-          :lg="4"
-          :xl="4"
-          :xxl="3"
+          class="games-grid__item"
         >
           <game-card
             :game="game"
@@ -166,8 +207,8 @@
             @toggle-favorite="toggleFavorite(game.id)"
             @delete="handleDelete(game.id, game.title)"
           />
-        </a-col>
-      </a-row>
+        </div>
+      </div>
 
       <!-- List View -->
       <a-row v-else :gutter="16">
@@ -229,17 +270,21 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onActivated } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
+import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import gamesService from '@/services/games.service'
 import platformService from '@/services/platforms.service'
-import { seriesService } from '@/services/series.service'
+import tagsService from '@/services/tags.service'
 import { getPendingIssueLabel, matchesPendingIssue } from '@/utils/pendingIssues'
+import { createDetailRouteQuery } from '@/utils/navigation'
+import type { Tag, TagGroup } from '@/services/types'
 import GameCard from '@/components/GameCard.vue'
 import AddGameModal from '@/components/AddGameModal.vue'
 import { Modal, Message } from '@arco-design/web-vue'
-import { IconApps, IconList, IconSort, IconTrophy, IconPlus } from '@arco-design/web-vue/es/icon'
+import { IconApps, IconList, IconSort, IconTrophy, IconPlus, IconFilter } from '@arco-design/web-vue/es/icon'
 
 defineOptions({
   name: 'GamesView',
@@ -254,15 +299,18 @@ const props = defineProps<Props>()
 const route = useRoute()
 const router = useRouter()
 const gamesStore = useGamesStore()
+const authStore = useAuthStore()
 const uiStore = useUiStore()
+const { isAdmin } = storeToRefs(authStore)
 
 const isLoading = ref(false)
 const searchQuery = ref('')
 const viewMode = ref<'grid' | 'list'>('grid')
 const showAddModal = ref(false)
-const seriesOptions = ref<{ label: string; value: string }[]>([])
-
+const showTagFilters = ref(false)
 const platformOptions = ref<{ label: string; value: string }[]>([])
+const tagGroups = ref<TagGroup[]>([])
+const tags = ref<Tag[]>([])
 
 const itemsPerPageOptions = ref([
   { label: '12', value: 12 },
@@ -296,12 +344,6 @@ const currentPage = computed({
     }
   },
 })
-const selectedSeries = computed({
-  get: () => (route.query.series as string) || null,
-  set: (series: string | null) => {
-    updateRoute({ series })
-  },
-})
 const selectedPlatform = computed({
   get: () => (route.query.platform as string) || null,
   set: (platform: string | null) => {
@@ -329,11 +371,23 @@ const itemsPerPage = computed({
 const filterFavorites = computed(() => props.filter === 'favorites' || route.query.filter === 'favorites')
 const needsFilter = computed(() => (route.query.needs as string) || '')
 const needsFilterLabel = computed(() => getPendingIssueLabel(needsFilter.value))
+const selectedTagIds = computed(() => {
+  const raw = route.query.tag
+  const values = Array.isArray(raw) ? raw : raw ? [raw] : []
+  return values
+    .map((value) => Number(value))
+    .filter((value) => !Number.isNaN(value) && value > 0)
+})
+const filterableTagGroups = computed(() =>
+  [...tagGroups.value]
+    .filter((group) => group.is_filterable)
+    .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id),
+)
 
 const hasActiveFilters = computed(() => {
   return searchQuery.value ||
-    selectedSeries.value ||
     selectedPlatform.value ||
+    selectedTagIds.value.length > 0 ||
     filterFavorites.value ||
     route.query.status === 'pending-review' ||
     !!needsFilter.value
@@ -348,12 +402,12 @@ const pageTitle = computed(() => {
   return '所有游戏'
 })
 
-const seriesLabelMap = computed<Record<string, string>>(() => {
-  return Object.fromEntries(seriesOptions.value.map((item) => [item.value, item.label]))
-})
-
 const platformLabelMap = computed<Record<string, string>>(() => {
   return Object.fromEntries(platformOptions.value.map((item) => [item.value, item.label]))
+})
+
+const tagLabelMap = computed<Record<string, string>>(() => {
+  return Object.fromEntries(tags.value.map((item) => [String(item.id), item.name]))
 })
 
 const updateRoute = (newParams: Record<string, any>) => {
@@ -366,7 +420,7 @@ const updateRoute = (newParams: Record<string, any>) => {
   })
   
   // Reset page when filters or search change
-  if (newParams.search !== undefined || newParams.series !== undefined || newParams.platform !== undefined || newParams.filter !== undefined || newParams.needs !== undefined || newParams.status !== undefined) {
+  if (newParams.search !== undefined || newParams.platform !== undefined || newParams.tag !== undefined || newParams.filter !== undefined || newParams.needs !== undefined || newParams.status !== undefined) {
     query.page = '1'
   }
   
@@ -379,17 +433,23 @@ watch(() => route.query, () => {
 })
 
 const viewGame = (id: string | number) => {
-  router.push({ name: 'game-detail', params: { id: String(id) } })
+  router.push({
+    name: 'game-detail',
+    params: { id: String(id) },
+    query: createDetailRouteQuery(route),
+  })
 }
 
 const handleAddGame = () => {
+  if (!isAdmin.value) return
   showAddModal.value = true
 }
 
-const handleAddGameSubmit = async (data: { title: string }) => {
+const handleAddGameSubmit = async (data: { title: string; visibility: 'public' | 'private' }) => {
   try {
     await gamesService.createGame({
-      title: data.title
+      title: data.title,
+      visibility: data.visibility,
     })
 
     uiStore.addAlert(`游戏 "${data.title}" 添加成功`, 'success')
@@ -411,6 +471,7 @@ const toggleFavorite = async (id: number) => {
 }
 
 const handleDelete = (id: number, title: string) => {
+  if (!isAdmin.value) return
   Modal.confirm({
     title: '确认删除',
     content: `确定要删除游戏 "${title}" 吗？此操作不可撤销。`,
@@ -438,6 +499,65 @@ const clearFilters = () => {
   router.push({ name: 'games' })
 }
 
+const getTagsForGroup = (groupId: number) => {
+  return tags.value
+    .filter((item) => item.group_id === groupId && item.is_active)
+    .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)
+}
+
+const getSelectedTagIdsForGroup = (groupId: number) => {
+  const values = selectedTagIds.value.filter((tagId) => {
+    const tag = tags.value.find((item) => item.id === tagId)
+    return tag?.group_id === groupId
+  })
+  const group = tagGroups.value.find((item) => item.id === groupId)
+  return group?.allow_multiple ? values : (values[0] ?? undefined)
+}
+
+const updateSelectedTagsForGroup = (groupId: number, value: number | number[] | string | string[] | undefined) => {
+  const nextGroupValues = (Array.isArray(value) ? value : value === undefined || value === null || value === '' ? [] : [value])
+    .map((item) => Number(item))
+    .filter((item) => !Number.isNaN(item) && item > 0)
+
+  const nextTagIds = selectedTagIds.value.filter((tagId) => {
+    const tag = tags.value.find((item) => item.id === tagId)
+    return tag?.group_id !== groupId
+  })
+  nextTagIds.push(...nextGroupValues)
+  updateRoute({ tag: nextTagIds.length > 0 ? nextTagIds.map(String) : undefined })
+}
+
+const removeTagFilter = (tagId: number) => {
+  const nextTagIds = selectedTagIds.value.filter((value) => value !== tagId)
+  updateRoute({ tag: nextTagIds.length > 0 ? nextTagIds.map(String) : undefined })
+}
+
+const handleTagGroupSelectionChange = (groupId: number, value: number | number[] | string | string[] | undefined) => {
+  updateSelectedTagsForGroup(groupId, value)
+}
+
+const loadFilterOptions = async () => {
+  try {
+    const platforms = await platformService.getAllPlatforms()
+    platformOptions.value = platforms
+      .map((p) => ({ label: p.name, value: String(p.id) }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'zh-Hans-CN'))
+  } catch (error) {
+    console.error('Failed to load platforms:', error)
+  }
+
+  try {
+    const [loadedGroups, loadedTags] = await Promise.all([
+      tagsService.getTagGroups(),
+      tagsService.getTags({ active: true }),
+    ])
+    tagGroups.value = loadedGroups
+    tags.value = loadedTags
+  } catch (error) {
+    console.error('Failed to load tags:', error)
+  }
+}
+
 const loadGames = async () => {
   isLoading.value = true
 
@@ -453,8 +573,8 @@ const loadGames = async () => {
   }
   const filter = {
     search: (route.query.search as string) || undefined,
-    series: (route.query.series as string) || undefined,
     platform: (route.query.platform as string) || undefined,
+    tag_ids: selectedTagIds.value,
     favorite: filterFavorites.value || undefined,
     status: (route.query.status as string) || undefined,
   }
@@ -517,25 +637,7 @@ onMounted(async () => {
   // Initialize view mode from store
   viewMode.value = uiStore.gamesViewMode
 
-  // Load platforms
-  try {
-    const platforms = await platformService.getAllPlatforms()
-    platformOptions.value = platforms
-      .map(p => ({ label: p.name, value: String(p.id) }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'zh-Hans-CN'))
-  } catch (error) {
-    console.error('Failed to load platforms:', error)
-  }
-
-  // Load series options
-  try {
-    const allSeries = await seriesService.getAllSeries()
-    seriesOptions.value = allSeries
-      .map(s => ({ label: s.name, value: String(s.id) }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'zh-Hans-CN'))
-  } catch (error) {
-    console.error('Failed to load series:', error)
-  }
+  await loadFilterOptions()
 
   // Initialize WebSocket for real-time updates
   gamesStore.initializeWebSocket()
@@ -548,9 +650,8 @@ onMounted(async () => {
 })
 
 // Handle keep-alive activation
-onActivated(() => {
-  // Data is preserved by keep-alive, no need to reload
-  // The games list state is maintained when navigating back
+onActivated(async () => {
+  await loadFilterOptions()
 })
 
 // Watch search query for auto-search (with debounce and URL sync)
@@ -629,6 +730,74 @@ watch(viewMode, (value) => {
   margin-top: 12px;
 }
 
+.games-filter-drawer-btn {
+  justify-content: center;
+}
+
+.tag-filter-section {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border-2);
+}
+
+.tag-filter-section__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tag-filter-section__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-1);
+}
+
+.tag-filter-section__hint,
+.tag-filter-section__empty {
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.games-filter-drawer-btn__count {
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary-light-1);
+  color: rgb(var(--primary-6));
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tag-filter-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tag-filter-grid-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tag-filter-drawer__group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tag-filter-drawer__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-2);
+}
+
 .results-info {
   display: flex;
   justify-content: space-between;
@@ -666,6 +835,16 @@ watch(viewMode, (value) => {
   margin-top: 24px;
 }
 
+.games-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.games-grid__item {
+  min-width: 0;
+}
+
 .empty-state {
   padding: 48px 0;
 }
@@ -679,5 +858,41 @@ watch(viewMode, (value) => {
 .empty-description p {
   color: var(--color-text-3);
   margin: 0;
+}
+
+@media (max-width: 1199px) {
+  .games-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 991px) {
+  .games-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .games-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .games-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1600px) {
+  .games-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 2200px) {
+  .games-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
 }
 </style>

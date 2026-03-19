@@ -108,11 +108,12 @@ export const useUiStore = defineStore('ui', () => {
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 9)
     alerts.value.push({ id, type, message, dismissible })
 
-    // Auto-dismiss after 5 seconds for info and success
-    if (type === 'info' || type === 'success') {
+    // Auto-dismiss alerts by default; keep errors a bit longer for readability.
+    if (dismissible) {
+      const duration = type === 'error' ? 8000 : type === 'warning' ? 6500 : 5000
       setTimeout(() => {
         removeAlert(id)
-      }, 5000)
+      }, duration)
     }
 
     return id

@@ -58,7 +58,7 @@
               <icon-heart-fill v-else />
             </template>
           </a-button>
-          <a-dropdown>
+          <a-dropdown v-if="isAdmin">
             <a-button
               class="app-text-compact"
               type="text"
@@ -87,7 +87,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import type { Game } from '@/services/types'
+import { useAuthStore } from '@/stores/auth'
 import {
   IconHeartFill,
   IconHeart,
@@ -103,6 +105,9 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   isList: false,
 })
+
+const authStore = useAuthStore()
+const { isAdmin } = storeToRefs(authStore)
 
 defineEmits<{
   view: [id: string]

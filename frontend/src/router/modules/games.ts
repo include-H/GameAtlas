@@ -42,6 +42,7 @@ export const pendingCenterRoute = {
   meta: {
     locale: 'menu.pending.center',
     requiresAuth: true,
+    requiresAdmin: true,
     roles: ['*'],
     icon: IconExclamationCircle,
   },
@@ -57,6 +58,7 @@ export const wikiEditRoute = {
   meta: {
     locale: 'menu.wiki.edit',
     requiresAuth: true,
+    requiresAdmin: true,
     roles: ['*'],
     hideInMenu: true,
     activeMenu: 'games',

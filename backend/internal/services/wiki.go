@@ -9,9 +9,10 @@ import (
 )
 
 type WikiService struct {
-	gamesRepo *repositories.GamesRepository
-	wikiRepo  *repositories.WikiRepository
-	renderer  *markdown.Renderer
+	gamesRepo        *repositories.GamesRepository
+	wikiRepo         *repositories.WikiRepository
+	renderer         *markdown.Renderer
+	wikiHistoryLimit int
 }
 
 type WikiDocument struct {
@@ -23,18 +24,22 @@ type WikiDocument struct {
 	HistoryCount int     `json:"history_count,omitempty"`
 }
 
-func NewWikiService(gamesRepo *repositories.GamesRepository, wikiRepo *repositories.WikiRepository, renderer *markdown.Renderer) *WikiService {
+func NewWikiService(gamesRepo *repositories.GamesRepository, wikiRepo *repositories.WikiRepository, renderer *markdown.Renderer, wikiHistoryLimit int) *WikiService {
 	return &WikiService{
-		gamesRepo: gamesRepo,
-		wikiRepo:  wikiRepo,
-		renderer:  renderer,
+		gamesRepo:        gamesRepo,
+		wikiRepo:         wikiRepo,
+		renderer:         renderer,
+		wikiHistoryLimit: wikiHistoryLimit,
 	}
 }
 
-func (s *WikiService) Get(gameID int64) (*WikiDocument, error) {
-	game, err := s.wikiRepo.Get(gameID)
+func (s *WikiService) Get(gameID int64, includeAll bool) (*WikiDocument, error) {
+	game, err := s.gamesRepo.GetByID(gameID)
 	if err != nil {
 		return nil, normalizeRepoError(err)
+	}
+	if !includeAll && game.Visibility == domain.GameVisibilityPrivate {
+		return nil, ErrNotFound
 	}
 
 	return &WikiDocument{
@@ -58,7 +63,7 @@ func (s *WikiService) Update(gameID int64, input domain.WikiWriteInput) (*WikiDo
 	}
 
 	changeSummary := trimStringPtr(input.ChangeSummary)
-	game, err := s.wikiRepo.Update(gameID, content, html, changeSummary)
+	game, err := s.wikiRepo.Update(gameID, content, html, changeSummary, s.wikiHistoryLimit)
 	if err != nil {
 		return nil, normalizeRepoError(err)
 	}
@@ -72,9 +77,13 @@ func (s *WikiService) Update(gameID int64, input domain.WikiWriteInput) (*WikiDo
 	}, nil
 }
 
-func (s *WikiService) History(gameID int64) ([]domain.WikiHistoryEntry, error) {
-	if _, err := s.gamesRepo.GetByID(gameID); err != nil {
+func (s *WikiService) History(gameID int64, includeAll bool) ([]domain.WikiHistoryEntry, error) {
+	game, err := s.gamesRepo.GetByID(gameID)
+	if err != nil {
 		return nil, normalizeRepoError(err)
+	}
+	if !includeAll && game.Visibility == domain.GameVisibilityPrivate {
+		return nil, ErrNotFound
 	}
 	items, err := s.wikiRepo.ListHistory(gameID)
 	if err != nil {

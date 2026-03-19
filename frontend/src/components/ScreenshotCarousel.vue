@@ -33,6 +33,7 @@
           autoplay
           controls
           loop
+          muted
           playsinline
           preload="metadata"
           @canplay="tryPlayVideo"
@@ -277,6 +278,7 @@ const onVideoLoaded = () => {
 const tryPlayVideo = () => {
   const video = videoRef.value
   if (!video) return
+  video.muted = true
   const playPromise = video.play()
   if (playPromise && typeof playPromise.catch === 'function') {
     playPromise.catch(() => {

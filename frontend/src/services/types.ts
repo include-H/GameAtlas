@@ -21,6 +21,9 @@ export interface Series {
   slug?: string
   sort_order?: number
   created_at: string
+  game_count?: number
+  cover_image?: string | null
+  latest_updated_at?: string | null
 }
 
 export interface Platform {
@@ -45,6 +48,41 @@ export interface Publisher {
   slug: string
   sort_order: number
   created_at: string
+}
+
+export interface Tag {
+  id: number
+  group_id: number
+  group_key: string
+  group_name: string
+  name: string
+  slug: string
+  parent_id?: number | null
+  sort_order: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface TagGroup {
+  id: number
+  key: string
+  name: string
+  description?: string | null
+  sort_order: number
+  allow_multiple: boolean
+  is_filterable: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface GameTagGroup {
+  id: number
+  key: string
+  name: string
+  allow_multiple: boolean
+  is_filterable: boolean
+  tags: Tag[]
 }
 
 export interface GameFileEntry {
@@ -77,6 +115,7 @@ export interface Game {
   id: number
   title: string
   title_alt?: string | null
+  visibility?: 'public' | 'private'
   summary?: string | null
   developer?: string
   publisher?: string
@@ -87,6 +126,8 @@ export interface Game {
   series?: Series[]
   developers?: Developer[]
   publishers?: Publisher[]
+  tags?: Tag[]
+  tag_groups?: GameTagGroup[]
   cover_image?: string | null
   banner_image?: string | null
   preview_video?: VideoAssetItem | null
@@ -116,6 +157,7 @@ export interface Game {
 export interface GameInput {
   title: string
   title_alt?: string | null
+  visibility?: 'public' | 'private'
   summary?: string | null
   release_date?: string | null
   engine?: string | null
@@ -127,6 +169,7 @@ export interface GameInput {
   publishers?: number[]
   platforms?: Array<number | string>
   preview_video_asset_uid?: string | null
+  tag_ids?: number[]
   screenshots?: string[]
   file_paths?: string[]
 }
@@ -152,7 +195,7 @@ export interface GameStats {
   total_size: number
   recent_games: Game[]
   popular_games: Game[]
-  favorite_games: Game[]
+  favorite_count: number
   pending_reviews: number
 }
 
@@ -160,6 +203,7 @@ export interface GameFilter {
   search?: string
   series?: string
   platform?: string
+  tag_ids?: number[]
   favorite?: boolean
   status?: string
 }

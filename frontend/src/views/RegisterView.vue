@@ -38,14 +38,13 @@
 </template>
 
 <script setup lang="ts">
-import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
 import { IconTrophy, IconUser } from '@arco-design/web-vue/es/icon'
 
-const authStore = useAuthStore()
+const router = useRouter()
 
 const handleEnter = async () => {
-  await authStore.register()
-  window.location.href = '/'
+  router.push({ name: 'login' })
 }
 </script>
 

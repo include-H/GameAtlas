@@ -31,7 +31,7 @@ func (h *DownloadsHandler) Download(c *gin.Context) {
 		return
 	}
 
-	downloadFile, err := h.service.GetDownloadFile(gameID, fileID)
+	downloadFile, err := h.service.GetDownloadFile(gameID, fileID, isAdminRequest(c))
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrNotFound):
@@ -65,6 +65,9 @@ func (h *DownloadsHandler) Download(c *gin.Context) {
 }
 
 func (h *DownloadsHandler) LaunchScript(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	gameID, ok := parseIDParam(c, "id")
 	if !ok {
 		return
@@ -74,7 +77,7 @@ func (h *DownloadsHandler) LaunchScript(c *gin.Context) {
 		return
 	}
 
-	script, filename, err := h.service.BuildLaunchScript(gameID, fileID)
+	script, filename, err := h.service.BuildLaunchScript(gameID, fileID, isAdminRequest(c))
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrNotFound):

@@ -7,44 +7,69 @@
           <icon-trophy :size="64" :style="{ color: 'rgb(var(--primary-6))' }" />
           <h1 class="login-title">GameAtlas</h1>
           <p class="login-subtitle">
-            点击按钮进入游戏库
+            输入管理员密码以查看私有内容和管理游戏库
           </p>
         </div>
 
         <a-divider />
 
-        <!-- Login Button -->
-        <a-button
-          class="app-primary-cta app-primary-cta--large"
-          type="primary"
-          long
-          size="large"
-          @click="handleLogin"
-        >
-          <template #icon>
-            <icon-user />
-          </template>
-          进入系统
-        </a-button>
+        <a-space direction="vertical" fill :size="16">
+          <a-input-password
+            v-model="password"
+            size="large"
+            placeholder="输入管理员密码"
+            allow-clear
+            @press-enter="handleLogin"
+          />
+
+          <a-button
+            class="app-primary-cta app-primary-cta--large"
+            type="primary"
+            long
+            size="large"
+            :loading="isSubmitting"
+            @click="handleLogin"
+          >
+            <template #icon>
+              <icon-user />
+            </template>
+            登录管理模式
+          </a-button>
+        </a-space>
       </a-card>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { Message } from '@arco-design/web-vue'
 import { IconTrophy, IconUser } from '@arco-design/web-vue/es/icon'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const password = ref('')
+const isSubmitting = ref(false)
 
 const handleLogin = async () => {
-  await authStore.login()
-  // Redirect to the page user was trying to access, or dashboard
-  const redirect = (route.query.redirect as string) || '/'
-  router.push(redirect)
+  if (!password.value.trim()) {
+    Message.warning('请输入管理员密码')
+    return
+  }
+
+  isSubmitting.value = true
+  try {
+    await authStore.login(password.value)
+    const redirect = (route.query.redirect as string) || '/'
+    router.push(redirect)
+  } catch (error: any) {
+    Message.error(error?.response?.data?.error || '登录失败')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
 

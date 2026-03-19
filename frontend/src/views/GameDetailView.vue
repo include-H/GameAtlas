@@ -137,6 +137,20 @@
               <span class="sidebar-info__label">平台</span>
               <span class="sidebar-info__value">{{ game.platform }}</span>
             </div>
+            <div
+              v-for="group in game.tag_groups || []"
+              :key="group.id"
+              class="sidebar-info__item"
+            >
+              <span class="sidebar-info__label">{{ group.name }}</span>
+              <div class="sidebar-info__value">
+                <a-space wrap>
+                  <a-tag v-for="tag in group.tags" :key="tag.id">
+                    {{ tag.name }}
+                  </a-tag>
+                </a-space>
+              </div>
+            </div>
           </div>
           </div>
         </div>
@@ -238,6 +252,7 @@
             下载
           </a-button>
           <a-button
+            v-if="canEdit"
             class="app-secondary-cta version-action-btn version-action-btn--secondary"
             type="secondary"
             @click.stop="handleDownloadLaunchScript(version)"
@@ -264,8 +279,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
+import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import wikiService, { type WikiContent } from '@/services/wiki.service'
 import downloadService from '@/services/download.service'
@@ -274,6 +291,7 @@ import ScreenshotCarousel from '@/components/ScreenshotCarousel.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import EditGameModal from '@/components/EditGameModal.vue'
 import WikiToc from '@/components/WikiToc.vue'
+import { resolveReturnRoute } from '@/utils/navigation'
 import {
   IconEdit,
   IconLeft,
@@ -286,7 +304,9 @@ import {
 const route = useRoute()
 const router = useRouter()
 const gamesStore = useGamesStore()
+const authStore = useAuthStore()
 const uiStore = useUiStore()
+const { isAdmin } = storeToRefs(authStore)
 
 const game = computed(() => gamesStore.currentGame)
 const versions = computed(() => gamesStore.currentVersions)
@@ -327,7 +347,7 @@ const publisherNames = computed(() => (game.value?.publishers || []).map((item) 
 
 // Sidebar 高度计算
 
-const canEdit = computed(() => true)
+const canEdit = computed(() => isAdmin.value)
 
 const formatDate = (dateStr: string) => {
   if (!dateStr) return ''
@@ -385,7 +405,7 @@ const handleEditSuccess = async () => {
 }
 
 const handleGoBack = () => {
-  router.push({ name: 'games' })
+  router.push(resolveReturnRoute(route, { name: 'games' }))
 }
 
 const handleToggleFavorite = async () => {
@@ -528,6 +548,11 @@ const loadGameDetail = async (gameId: string) => {
       // Wiki doesn't exist
     }
   } catch (error) {
+    const status = (error as any)?.response?.status
+    if (status === 404) {
+      router.replace({ name: 'not-found' })
+      return
+    }
     uiStore.addAlert('加载游戏详情失败', 'error')
   }
 }
@@ -605,7 +630,8 @@ watch(
   height: 60vh;
   z-index: -1;
   overflow: hidden;
-  opacity: 0.24;
+  opacity: 0.58;
+  filter: saturate(1.04) blur(0.35px);
   pointer-events: none;
   /* Use mask to fade out the top part */
   -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
@@ -615,12 +641,9 @@ watch(
 .ambient-overlay {
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    circle at bottom right,
-    rgba(0, 0, 0, 0.06) 0%,
-    rgba(0, 0, 0, 0.18) 52%,
-    rgba(0, 0, 0, 0.34) 100%
-  );
+  background:
+    radial-gradient(circle at top right, rgba(26, 159, 255, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(15, 18, 25, 0.04), rgba(15, 18, 25, 0.24) 52%, rgba(15, 18, 25, 0.46));
 }
 
 /* Game Header (Title & Nav) */

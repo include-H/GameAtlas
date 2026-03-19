@@ -33,7 +33,7 @@
 
           <stat-card
             title="收藏"
-            :value="favorites.length"
+            :value="favoriteCount"
             icon="mdi-heart"
             color="#f53f3f"
             :height="104"
@@ -140,10 +140,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
-import gamesService from '@/services/games.service'
+import { createDetailRouteQuery } from '@/utils/navigation'
 import {
   IconTrophy
 } from '@arco-design/web-vue/es/icon'
@@ -157,12 +157,12 @@ defineOptions({
   name: 'DashboardView',
 })
 
+const route = useRoute()
 const router = useRouter()
 const gamesStore = useGamesStore()
 const uiStore = useUiStore()
 
 const isLoading = ref(false)
-const detailedGames = ref<Record<number, Game>>({})
 const isDashboardReady = ref(false)
 const showSplash = ref(true)
 const isSplashLeaving = ref(false)
@@ -175,7 +175,7 @@ const SPLASH_FADE_DURATION = 400
 const totalGames = computed(() => gamesStore.stats?.total_games || 0)
 const recentAdditions = computed(() => gamesStore.stats?.recent_games || [])
 const mostPlayed = computed(() => gamesStore.stats?.popular_games || [])
-const favorites = computed(() => gamesStore.stats?.favorite_games || [])
+const favoriteCount = computed(() => gamesStore.stats?.favorite_count || 0)
 
 const isEmpty = computed(() => {
   return recentAdditions.value.length === 0
@@ -183,13 +183,16 @@ const isEmpty = computed(() => {
 
 // Get games for carousel (combine recent and most played, shuffle them)
 const carouselGames = computed(() => {
-  const orderedIds = [...recentAdditions.value, ...mostPlayed.value]
-    .map((game) => game.id)
-    .filter((id, index, self) => self.indexOf(id) === index)
+  const seen = new Set<number>()
 
-  return orderedIds
-    .map((id) => detailedGames.value[id])
-    .filter((game): game is Game => !!game)
+  return [...recentAdditions.value, ...mostPlayed.value]
+    .filter((game): game is Game => {
+      if (!game || seen.has(game.id)) {
+        return false
+      }
+      seen.add(game.id)
+      return true
+    })
     .sort(() => Math.random() - 0.5)
 })
 
@@ -199,7 +202,11 @@ const lastLoadedAt = ref(0)
 const pendingReviews = computed(() => pendingReviewGameCount.value)
 
 const viewGame = (id: string | number) => {
-  router.push({ name: 'game-detail', params: { id: String(id) } })
+  router.push({
+    name: 'game-detail',
+    params: { id: String(id) },
+    query: createDetailRouteQuery(route),
+  })
 }
 
 const toggleFavorite = async (id: string) => {
@@ -216,25 +223,6 @@ const loadDashboardData = async () => {
   isDashboardReady.value = false
   try {
     const stats = await gamesStore.fetchStats()
-    const candidateIds = [...stats.recent_games, ...stats.popular_games]
-      .map((game) => String(game.id))
-      .filter((id, index, items) => items.indexOf(id) === index)
-
-    const details = await Promise.all(
-      candidateIds.map(async (id) => {
-        try {
-          return await gamesService.getGame(id)
-        } catch {
-          return null
-        }
-      }),
-    )
-    detailedGames.value = details
-      .filter((game): game is Game => !!game)
-      .reduce<Record<number, Game>>((acc, game) => {
-        acc[game.id] = game
-        return acc
-      }, {})
     pendingReviewGameCount.value = stats.pending_reviews || 0
     isDashboardReady.value = true
     lastLoadedAt.value = Date.now()

@@ -26,8 +26,10 @@ type Config struct {
 	SMBShareRoot      string
 	SMBUsername       string
 	SMBPassword       string
-	SMBDriveLetter    string
 	VHDDiffRoot       string
+	WikiHistoryLimit  int
+	AdminPassword     string
+	SessionSecret     string
 	LogLevel          string
 	ReadHeaderTimeout time.Duration
 	ShutdownTimeout   time.Duration
@@ -54,8 +56,10 @@ func Load() Config {
 		SMBShareRoot:      getEnv("SMB_SHARE_ROOT", ""),
 		SMBUsername:       getEnv("SMB_USERNAME", ""),
 		SMBPassword:       getEnv("SMB_PASSWORD", ""),
-		SMBDriveLetter:    strings.TrimSpace(getEnv("SMB_DRIVE_LETTER", "Z:")),
-		VHDDiffRoot:       getEnv("VHD_DIFF_ROOT", `C:\Game\VHDCache`),
+		VHDDiffRoot:       getEnv("VHD_DIFF_ROOT", `C:`),
+		WikiHistoryLimit:  getEnvAsInt("WIKI_HISTORY_LIMIT", 100),
+		AdminPassword:     getEnv("ADMIN_PASSWORD", ""),
+		SessionSecret:     getEnv("SESSION_SECRET", "change-me"),
 		LogLevel:          getEnv("LOG_LEVEL", "info"),
 		ReadHeaderTimeout: getEnvAsDuration("READ_HEADER_TIMEOUT", 5*time.Second),
 		ShutdownTimeout:   getEnvAsDuration("SHUTDOWN_TIMEOUT", 10*time.Second),

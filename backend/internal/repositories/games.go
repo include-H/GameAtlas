@@ -3,6 +3,7 @@ package repositories
 import (
 	"database/sql"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -30,6 +31,15 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 	where := []string{"1 = 1"}
 	args := map[string]any{}
 
+	if !params.IncludeAll {
+		visibility := strings.TrimSpace(params.Visibility)
+		if visibility == "" {
+			visibility = domain.GameVisibilityPublic
+		}
+		where = append(where, "g.visibility = :visibility")
+		args["visibility"] = visibility
+	}
+
 	if params.Search != "" {
 		where = append(where, "(g.title LIKE :search OR COALESCE(g.title_alt, '') LIKE :search)")
 		args["search"] = "%" + params.Search + "%"
@@ -49,6 +59,16 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 	if params.PlatformID > 0 {
 		where = append(where, "EXISTS (SELECT 1 FROM game_platforms gp WHERE gp.game_id = g.id AND gp.platform_id = :platform_id)")
 		args["platform_id"] = params.PlatformID
+	}
+	if len(params.TagIDs) > 0 {
+		tagFilters, tagArgs, err := r.buildTagFilters(params.TagIDs)
+		if err != nil {
+			return nil, 0, fmt.Errorf("build tag filters: %w", err)
+		}
+		where = append(where, tagFilters...)
+		for key, value := range tagArgs {
+			args[key] = value
+		}
 	}
 
 	sortField := allowedGameSortFields[params.Sort]
@@ -83,6 +103,7 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 			g.id,
 			g.title,
 			g.title_alt,
+			g.visibility,
 			g.summary,
 			g.release_date,
 			g.engine,
@@ -154,6 +175,7 @@ func (r *GamesRepository) GetByID(id int64) (*domain.Game, error) {
 			id,
 			title,
 			title_alt,
+			visibility,
 			summary,
 			release_date,
 			engine,
@@ -187,10 +209,10 @@ func (r *GamesRepository) GetByID(id int64) (*domain.Game, error) {
 func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, error) {
 	const query = `
 		INSERT INTO games (
-			title, title_alt, summary, release_date, engine, cover_image, banner_image, needs_review, preview_video_asset_uid
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			title, title_alt, visibility, summary, release_date, engine, cover_image, banner_image, needs_review, preview_video_asset_uid
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING
-			id, title, title_alt, summary, release_date, engine, cover_image, banner_image,
+			id, title, title_alt, visibility, summary, release_date, engine, cover_image, banner_image,
 			wiki_content, wiki_content_html, needs_review, preview_video_asset_uid, views, downloads, created_at, updated_at`
 
 	var game domain.Game
@@ -199,6 +221,7 @@ func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, err
 		query,
 		input.Title,
 		input.TitleAlt,
+		input.Visibility,
 		input.Summary,
 		input.ReleaseDate,
 		input.Engine,
@@ -223,6 +246,7 @@ func (r *GamesRepository) Update(id int64, input domain.GameWriteInput) (*domain
 		SET
 			title = ?,
 			title_alt = ?,
+			visibility = ?,
 			summary = ?,
 			release_date = ?,
 			engine = ?,
@@ -237,6 +261,7 @@ func (r *GamesRepository) Update(id int64, input domain.GameWriteInput) (*domain
 		query,
 		input.Title,
 		input.TitleAlt,
+		input.Visibility,
 		input.Summary,
 		input.ReleaseDate,
 		input.Engine,
@@ -263,6 +288,142 @@ func (r *GamesRepository) Update(id int64, input domain.GameWriteInput) (*domain
 	}
 
 	return r.GetByID(id)
+}
+
+func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStats, error) {
+	where := []string{"1 = 1"}
+	args := map[string]any{}
+
+	if !params.IncludeAll {
+		visibility := strings.TrimSpace(params.Visibility)
+		if visibility == "" {
+			visibility = domain.GameVisibilityPublic
+		}
+		where = append(where, "g.visibility = :visibility")
+		args["visibility"] = visibility
+	}
+
+	baseWhere := strings.Join(where, " AND ")
+
+	const baseSelect = `
+		SELECT
+			g.id,
+			g.title,
+			g.title_alt,
+			g.visibility,
+			g.summary,
+			g.release_date,
+			g.engine,
+			g.cover_image,
+			g.banner_image,
+			g.wiki_content,
+			g.wiki_content_html,
+			g.needs_review,
+			g.preview_video_asset_uid,
+			g.views,
+			g.downloads,
+			(
+				SELECT ga.path
+				FROM game_assets ga
+				WHERE ga.game_id = g.id AND ga.asset_type = 'screenshot'
+				ORDER BY ga.sort_order ASC, ga.id ASC
+				LIMIT 1
+			) AS primary_screenshot,
+			(
+				SELECT COUNT(*)
+				FROM game_assets ga
+				WHERE ga.game_id = g.id AND ga.asset_type = 'screenshot'
+			) AS screenshot_count,
+			(
+				SELECT COUNT(*)
+				FROM game_files gf
+				WHERE gf.game_id = g.id
+			) AS file_count,
+			(
+				SELECT COUNT(*)
+				FROM game_developers gd
+				WHERE gd.game_id = g.id
+			) AS developer_count,
+			(
+				SELECT COUNT(*)
+				FROM game_publishers gp
+				WHERE gp.game_id = g.id
+			) AS publisher_count,
+			(
+				SELECT COUNT(*)
+				FROM game_platforms gp
+				WHERE gp.game_id = g.id
+			) AS platform_count,
+			g.created_at,
+			g.updated_at
+		FROM games g
+		WHERE %s
+	`
+
+	summaryQuery := fmt.Sprintf(`
+		SELECT
+			COUNT(*) AS total_games,
+			COALESCE(SUM(g.downloads), 0) AS total_downloads,
+			COALESCE(SUM(g.views), 0) AS total_views,
+			COALESCE(SUM(CASE WHEN g.needs_review = 1 THEN 1 ELSE 0 END), 0) AS pending_reviews
+		FROM games g
+		WHERE %s
+	`, baseWhere)
+
+	type statsRow struct {
+		TotalGames     int   `db:"total_games"`
+		TotalDownloads int64 `db:"total_downloads"`
+		TotalViews     int64 `db:"total_views"`
+		PendingReviews int   `db:"pending_reviews"`
+	}
+
+	summaryStmt, summaryArgs, err := sqlx.Named(summaryQuery, args)
+	if err != nil {
+		return nil, fmt.Errorf("build games stats query: %w", err)
+	}
+	summaryStmt = r.db.Rebind(summaryStmt)
+
+	var summary statsRow
+	if err := r.db.Get(&summary, summaryStmt, summaryArgs...); err != nil {
+		return nil, fmt.Errorf("get games stats: %w", err)
+	}
+
+	loadGames := func(orderBy string) ([]domain.Game, error) {
+		query := fmt.Sprintf(baseSelect+`
+			ORDER BY %s
+			LIMIT 12
+		`, baseWhere, orderBy)
+		stmt, queryArgs, err := sqlx.Named(query, args)
+		if err != nil {
+			return nil, fmt.Errorf("build stats games query: %w", err)
+		}
+		stmt = r.db.Rebind(stmt)
+
+		var games []domain.Game
+		if err := r.db.Select(&games, stmt, queryArgs...); err != nil {
+			return nil, fmt.Errorf("list stats games: %w", err)
+		}
+		return games, nil
+	}
+
+	recentGames, err := loadGames("g.created_at DESC, g.id DESC")
+	if err != nil {
+		return nil, err
+	}
+	popularGames, err := loadGames("g.downloads DESC, g.id DESC")
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.GameStats{
+		TotalGames:     summary.TotalGames,
+		TotalDownloads: summary.TotalDownloads,
+		TotalViews:     summary.TotalViews,
+		TotalSize:      0,
+		RecentGames:    recentGames,
+		PopularGames:   popularGames,
+		PendingReviews: summary.PendingReviews,
+	}, nil
 }
 
 func (r *GamesRepository) Delete(id int64) (bool, error) {
@@ -353,12 +514,76 @@ func (r *GamesRepository) replaceRelations(gameID int64, input domain.GameWriteI
 		_ = tx.Rollback()
 		return err
 	}
+	if err := replaceRelationRows(tx, "game_tags", "tag_id", gameID, input.TagIDs); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit relations update: %w", err)
 	}
 
 	return nil
+}
+
+func (r *GamesRepository) buildTagFilters(tagIDs []int64) ([]string, map[string]any, error) {
+	normalized := uniquePositiveIDs(tagIDs)
+	if len(normalized) == 0 {
+		return nil, map[string]any{}, nil
+	}
+
+	query, queryArgs, err := sqlx.In(`
+		SELECT id, group_id
+		FROM tags
+		WHERE is_active = 1 AND id IN (?)
+	`, normalized)
+	if err != nil {
+		return nil, nil, fmt.Errorf("build tag grouping query: %w", err)
+	}
+	query = r.db.Rebind(query)
+
+	type row struct {
+		ID      int64 `db:"id"`
+		GroupID int64 `db:"group_id"`
+	}
+
+	var rows []row
+	if err := r.db.Select(&rows, query, queryArgs...); err != nil {
+		return nil, nil, fmt.Errorf("load tag groups: %w", err)
+	}
+	if len(rows) != len(normalized) {
+		return []string{"1 = 0"}, map[string]any{}, nil
+	}
+
+	grouped := map[int64][]int64{}
+	for _, item := range rows {
+		grouped[item.GroupID] = append(grouped[item.GroupID], item.ID)
+	}
+
+	groupIDs := make([]int64, 0, len(grouped))
+	for groupID := range grouped {
+		groupIDs = append(groupIDs, groupID)
+	}
+	sort.Slice(groupIDs, func(i, j int) bool {
+		return groupIDs[i] < groupIDs[j]
+	})
+
+	filters := make([]string, 0, len(groupIDs))
+	args := map[string]any{}
+	for groupIndex, groupID := range groupIDs {
+		placeholders := make([]string, 0, len(grouped[groupID]))
+		for tagIndex, tagID := range grouped[groupID] {
+			argKey := fmt.Sprintf("tag_%d_%d", groupIndex, tagIndex)
+			args[argKey] = tagID
+			placeholders = append(placeholders, ":"+argKey)
+		}
+		filters = append(filters, fmt.Sprintf(
+			"EXISTS (SELECT 1 FROM game_tags gt WHERE gt.game_id = g.id AND gt.tag_id IN (%s))",
+			strings.Join(placeholders, ", "),
+		))
+	}
+
+	return filters, args, nil
 }
 
 func replaceRelationRows(tx *sqlx.Tx, table, column string, gameID int64, ids []int64) error {

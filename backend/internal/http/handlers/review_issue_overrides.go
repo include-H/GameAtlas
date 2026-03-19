@@ -19,6 +19,9 @@ func NewReviewIssueOverrideHandler(service *services.ReviewIssueOverrideService)
 }
 
 func (h *ReviewIssueOverrideHandler) List(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	gameIDs, err := parseGameIDsQuery(c.Query("game_ids"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -41,6 +44,9 @@ func (h *ReviewIssueOverrideHandler) List(c *gin.Context) {
 }
 
 func (h *ReviewIssueOverrideHandler) Ignore(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	gameID, ok := parseIDParam(c, "id")
 	if !ok {
 		return
@@ -73,6 +79,9 @@ func (h *ReviewIssueOverrideHandler) Ignore(c *gin.Context) {
 }
 
 func (h *ReviewIssueOverrideHandler) Delete(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	gameID, ok := parseIDParam(c, "id")
 	if !ok {
 		return

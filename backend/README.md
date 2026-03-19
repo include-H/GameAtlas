@@ -27,7 +27,7 @@ The server serves API routes at `/api/*`. If `frontend/dist` exists, it is also 
 - `SMB_SHARE_ROOT`: SMB share root used when generating Windows launch BAT files, for example `\\192.168.1.4\Game`
   直接按正常 UNC 路径填写，不要写成代码里的转义形式 `\\\\192.168.1.4\\Game`
 - `SMB_USERNAME` / `SMB_PASSWORD`: fixed SMB credentials written into generated BAT files
-- `SMB_DRIVE_LETTER`: temporary Windows drive letter used by the BAT script, defaults to `Z:`
-- `VHD_DIFF_ROOT`: local Windows directory where differencing VHDX files are created, defaults to `C:\Game\VHDCache`
+- `VHD_DIFF_ROOT`: Windows drive root used for differencing VHDX files, for example `C:` or `D:`
+- `WIKI_HISTORY_LIMIT`: number of wiki history entries kept per game; set `0` to disable automatic cleanup
 - `PROXY`: one proxy value used by default for outbound requests
 - `HTTP_PROXY` / `HTTPS_PROXY` / `STEAM_PROXY`: optional overrides if one module needs a different proxy

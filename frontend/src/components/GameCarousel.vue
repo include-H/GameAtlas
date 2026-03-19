@@ -67,10 +67,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { IconLeft, IconRight } from '@arco-design/web-vue/es/icon'
 import type { Game } from '@/services/types'
 import { resolveAssetUrl } from '@/utils/asset-url'
+import { createDetailRouteQuery } from '@/utils/navigation'
 
 interface Props {
   games: Game[]
@@ -83,27 +84,20 @@ const props = withDefaults(defineProps<Props>(), {
   interval: 5000,
 })
 
+const route = useRoute()
 const router = useRouter()
 const currentIndex = ref(0)
 let autoPlayTimer: number | null = null
 
-// 缓存每个游戏的截图索引，确保同一游戏每次显示相同的截图
-const screenshotIndexCache = new Map<number, number>()
-
 const games = computed(() => props.games.slice(0, 5))
 
 const getBackgroundImage = (game: Game) => {
-  const screenshots = (game.screenshots || []).filter(Boolean)
-  if (screenshots.length > 0) {
-    if (!screenshotIndexCache.has(game.id)) {
-      const randomIndex = Math.floor(Math.random() * screenshots.length)
-      screenshotIndexCache.set(game.id, randomIndex)
-    }
-    const index = screenshotIndexCache.get(game.id)!
-    return resolveAssetUrl(screenshots[index])
-  }
-
-  return resolveAssetUrl(game.banner_image || game.cover_image || '/placeholder-game.jpg')
+  return resolveAssetUrl(
+    game.primary_screenshot
+      || game.banner_image
+      || game.cover_image
+      || '/placeholder-game.jpg',
+  )
 }
 
 const getDescription = (game: Game) => {
@@ -128,7 +122,11 @@ const getMetaInfo = (game: Game) => {
 }
 
 const viewGame = (id: number) => {
-  router.push({ name: 'game-detail', params: { id: String(id) } })
+  router.push({
+    name: 'game-detail',
+    params: { id: String(id) },
+    query: createDetailRouteQuery(route),
+  })
 }
 
 const nextSlide = () => {
@@ -163,7 +161,6 @@ watch(
     if (currentIndex.value >= games.value.length) {
       currentIndex.value = 0
     }
-    screenshotIndexCache.clear()
     stopAutoPlay()
     startAutoPlay()
   },

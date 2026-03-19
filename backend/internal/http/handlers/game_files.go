@@ -23,7 +23,7 @@ func (h *GameFilesHandler) List(c *gin.Context) {
 		return
 	}
 
-	files, err := h.service.List(gameID)
+	files, err := h.service.List(gameID, isAdminRequest(c))
 	if err != nil {
 		writeServiceError(c, err, "file_path is required")
 		return
@@ -38,6 +38,9 @@ func (h *GameFilesHandler) List(c *gin.Context) {
 func (h *GameFilesHandler) Create(c *gin.Context) {
 	gameID, ok := parseIDParam(c, "id")
 	if !ok {
+		return
+	}
+	if !requireAdmin(c) {
 		return
 	}
 
@@ -65,6 +68,9 @@ func (h *GameFilesHandler) Create(c *gin.Context) {
 func (h *GameFilesHandler) Update(c *gin.Context) {
 	gameID, ok := parseIDParam(c, "id")
 	if !ok {
+		return
+	}
+	if !requireAdmin(c) {
 		return
 	}
 	fileID, ok := parseIDParam(c, "fileId")
@@ -96,6 +102,9 @@ func (h *GameFilesHandler) Update(c *gin.Context) {
 func (h *GameFilesHandler) Delete(c *gin.Context) {
 	gameID, ok := parseIDParam(c, "id")
 	if !ok {
+		return
+	}
+	if !requireAdmin(c) {
 		return
 	}
 	fileID, ok := parseIDParam(c, "fileId")

@@ -17,7 +17,13 @@ import { resolveAssetUrl } from '@/utils/asset-url'
 
 const route = useRoute()
 
-const SUPPORTED_ROUTE_NAMES = new Set(['dashboard', 'games', 'pending-center'])
+const SUPPORTED_ROUTE_NAMES = new Set([
+  'dashboard',
+  'games',
+  'pending-center',
+  'series-library',
+  'series-detail',
+])
 
 let cachedBackgroundUrl = ''
 let inflightBackgroundRequest: Promise<string> | null = null

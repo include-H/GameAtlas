@@ -20,6 +20,9 @@ func NewAssetsHandler(service *services.AssetsService) *AssetsHandler {
 
 func (h *AssetsHandler) Upload(assetType string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !requireAdmin(c) {
+			return
+		}
 		gameID, err := strconv.ParseInt(c.PostForm("game_id"), 10, 64)
 		if err != nil || gameID <= 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "valid game_id is required"})
@@ -63,6 +66,9 @@ func (h *AssetsHandler) Upload(assetType string) gin.HandlerFunc {
 }
 
 func (h *AssetsHandler) Delete(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	var input domain.DeleteAssetInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid asset payload"})
@@ -81,6 +87,9 @@ func (h *AssetsHandler) Delete(c *gin.Context) {
 }
 
 func (h *AssetsHandler) ReorderScreenshots(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	var input domain.ScreenshotOrderUpdateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid screenshot reorder payload"})
@@ -99,6 +108,9 @@ func (h *AssetsHandler) ReorderScreenshots(c *gin.Context) {
 }
 
 func (h *AssetsHandler) SetPrimaryVideo(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	var input domain.PrimaryVideoUpdateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid primary video payload"})

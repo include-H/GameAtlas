@@ -35,6 +35,9 @@ func (h *MetadataHandler) List(c *gin.Context) {
 }
 
 func (h *MetadataHandler) Create(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	var input domain.MetadataWriteInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
