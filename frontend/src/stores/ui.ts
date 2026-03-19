@@ -83,6 +83,12 @@ export const useUiStore = defineStore('ui', () => {
   // UI state methods
   const toggleSidebar = () => {
     sidebarCollapsed.value = !sidebarCollapsed.value
+    localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed.value))
+  }
+
+  const setSidebarCollapsed = (value: boolean) => {
+    sidebarCollapsed.value = value
+    localStorage.setItem('sidebarCollapsed', String(value))
   }
 
   const toggleFilters = () => {
@@ -139,6 +145,13 @@ export const useUiStore = defineStore('ui', () => {
     }
   }
 
+  const initializeSidebarCollapsed = () => {
+    const stored = localStorage.getItem('sidebarCollapsed')
+    if (stored === 'true' || stored === 'false') {
+      sidebarCollapsed.value = stored === 'true'
+    }
+  }
+
   return {
     // State
     isDark,
@@ -166,5 +179,7 @@ export const useUiStore = defineStore('ui', () => {
     clearAlerts,
     setItemsPerPage,
     initializeItemsPerPage,
+    initializeSidebarCollapsed,
+    setSidebarCollapsed,
   }
 })

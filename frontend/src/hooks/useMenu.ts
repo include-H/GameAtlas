@@ -9,6 +9,7 @@ export interface MenuItem {
   locale: string
   icon?: any
   children?: MenuItem[]
+  parentNames?: string[]
   hideInMenu?: boolean
   roles?: string[]
   requiresAuth?: boolean
@@ -22,7 +23,8 @@ export interface MenuItem {
  */
 function generateMenuItems(
   routes: RouteRecordRaw[],
-  permission: ReturnType<typeof usePermission>
+  permission: ReturnType<typeof usePermission>,
+  parentNames: string[] = []
 ): MenuItem[] {
   const menuItems: MenuItem[] = []
 
@@ -47,6 +49,7 @@ function generateMenuItems(
       path: route.path,
       locale: route.meta.locale as string,
       icon: route.meta?.icon,
+      parentNames,
       hideInMenu: route.meta?.hideInMenu as boolean | undefined,
       roles: route.meta?.roles as string[],
       requiresAuth: route.meta?.requiresAuth as boolean,
@@ -54,7 +57,7 @@ function generateMenuItems(
 
     // Process children recursively
     if (route.children && route.children.length > 0) {
-      const children = generateMenuItems(route.children, permission)
+      const children = generateMenuItems(route.children, permission, [...parentNames, menuItem.name])
       if (children.length > 0) {
         menuItem.children = children
       }
@@ -90,13 +93,30 @@ export default function useMenu() {
     return activeMenu || (route.name as string)
   })
 
+  const findMenuItemByName = (items: MenuItem[], name: string): MenuItem | undefined => {
+    for (const item of items) {
+      if (item.name === name) {
+        return item
+      }
+
+      if (item.children?.length) {
+        const target = findMenuItemByName(item.children, name)
+        if (target) {
+          return target
+        }
+      }
+    }
+
+    return undefined
+  }
+
   /**
    * Get open menu keys (for submenus)
    * Currently returns empty array, can be expanded to track open state
    */
   const openKeys = computed<string[]>(() => {
-    // Can be expanded to track which submenus should be open
-    return []
+    const current = findMenuItemByName(menuList.value, activeKey.value)
+    return current?.parentNames ?? []
   })
 
   return {

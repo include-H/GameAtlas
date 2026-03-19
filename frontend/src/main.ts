@@ -38,5 +38,6 @@ uiStore.initializeTheme()
 uiStore.initializeViewMode()
 uiStore.initializeCardSize()
 uiStore.initializeItemsPerPage()
+uiStore.initializeSidebarCollapsed()
 
 app.mount('#app')
