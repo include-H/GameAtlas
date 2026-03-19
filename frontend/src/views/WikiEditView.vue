@@ -12,7 +12,7 @@
           </a-breadcrumb-item>
         </a-breadcrumb>
         <h1 class="wiki-edit-title">
-          {{ isExisting ? 'Edit Wiki' : 'Create Wiki' }}
+          {{ isExisting ? '编辑 Wiki' : '创建 Wiki' }}
         </h1>
         <p v-if="game" class="wiki-edit-subtitle">
           {{ game.title }}
@@ -21,12 +21,15 @@
 
       <div class="wiki-edit-actions">
         <a-button
+          class="app-secondary-cta"
+          type="secondary"
           :disabled="isSaving"
           @click="router.back()"
         >
-          Cancel
+          取消
         </a-button>
         <a-button
+          class="app-primary-cta"
           type="primary"
           :loading="isSaving"
           @click="handleSave"
@@ -34,7 +37,7 @@
           <template #icon>
             <icon-save />
           </template>
-          Save
+          保存
         </a-button>
       </div>
     </div>
@@ -80,8 +83,8 @@ const isExisting = computed(() => Boolean(wiki.value?.content))
 
 const breadcrumbs = computed(() => {
   const items = [
-    { title: 'Home', to: '/' },
-    { title: 'Games', to: '/games' },
+    { title: '首页', to: '/' },
+    { title: '游戏库', to: '/games' },
   ]
 
   if (game.value) {
@@ -91,7 +94,7 @@ const breadcrumbs = computed(() => {
     })
   }
 
-  items.push({ title: isExisting.value ? 'Edit Wiki' : 'Create Wiki', to: '' })
+  items.push({ title: isExisting.value ? '编辑 Wiki' : '创建 Wiki', to: '' })
 
   return items
 })
@@ -108,11 +111,11 @@ const handleSave = async () => {
     }
 
     await wikiService.updateWikiPage(String(game.value.id), wikiDataToSend)
-    uiStore.addAlert(isExisting.value ? 'Wiki updated successfully' : 'Wiki created successfully', 'success')
+    uiStore.addAlert(isExisting.value ? 'Wiki 已更新' : 'Wiki 已创建', 'success')
 
     router.push({ name: 'game-detail', params: { id: String(game.value.id) } })
   } catch (error: any) {
-    const errorMessage = error?.response?.data?.error || error?.message || 'Failed to save wiki'
+    const errorMessage = error?.response?.data?.error || error?.message || '保存 Wiki 失败'
     uiStore.addAlert(errorMessage, 'error')
     console.error('Failed to save wiki:', error)
   } finally {

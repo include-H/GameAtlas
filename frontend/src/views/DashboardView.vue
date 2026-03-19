@@ -1,7 +1,7 @@
 <template>
-  <div class="dashboard">
+  <div class="dashboard" :class="{ 'is-ready': isDashboardReady }">
     <!-- Welcome Section (Slimmer Header) -->
-    <div class="dashboard-section-title">
+    <div v-show="isDashboardReady" class="dashboard-section-title">
       <h1 class="text-gradient">
         发现
       </h1>
@@ -11,7 +11,7 @@
     </div>
 
     <!-- Top Hero Section -->
-    <a-row :gutter="[16, 16]" class="dashboard-hero-section">
+    <a-row v-show="isDashboardReady" :gutter="[16, 16]" class="dashboard-hero-section">
       <a-col :xs="24" :sm="24" :md="24" :lg="17" :xl="17">
         <game-carousel
           v-if="carouselGames.length > 0"
@@ -62,10 +62,11 @@
     </a-row>
 
     <!-- Divider between stats and content -->
-    <a-divider class="dashboard-divider" />
+    <a-divider v-show="isDashboardReady" class="dashboard-divider" />
 
     <!-- Recently Added -->
     <card-row
+      v-show="isDashboardReady"
       v-if="recentAdditions.length > 0"
       title="最近添加"
       icon="mdi-new-box"
@@ -84,6 +85,7 @@
 
     <!-- Most Downloaded -->
     <card-row
+      v-show="isDashboardReady"
       v-if="mostPlayed.length > 0"
       title="下载最多"
       icon="mdi-download"
@@ -101,7 +103,7 @@
     </card-row>
 
     <!-- Empty State -->
-    <div v-if="isEmpty" class="dashboard-empty">
+    <div v-show="isDashboardReady" v-if="isEmpty" class="dashboard-empty">
       <icon-trophy class="dashboard-empty-icon" />
       <h2 class="dashboard-empty-title">还没有游戏</h2>
       <p class="dashboard-empty-text">
@@ -110,13 +112,30 @@
       <a-button
         type="primary"
         size="large"
-        class="dashboard-empty-button"
+        class="app-primary-cta app-primary-cta--large dashboard-empty-button"
         @click="router.push('/games')"
       >
         浏览游戏
       </a-button>
     </div>
+
   </div>
+
+  <div
+    v-if="showSplash"
+    class="dashboard-loading"
+    :class="{ 'dashboard-loading--leaving': isSplashLeaving }"
+  >
+    <div class="dashboard-loading__backdrop" />
+    <div class="dashboard-loading__content">
+      <p class="dashboard-loading__eyebrow">WELCOME TO</p>
+      <h1 class="dashboard-loading__brand">GameAtlas</h1>
+      <div class="dashboard-loading__track">
+        <span class="dashboard-loading__bar" />
+      </div>
+    </div>
+  </div>
+
 </template>
 
 <script setup lang="ts">
@@ -125,7 +144,6 @@ import { useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
 import gamesService from '@/services/games.service'
-import { getPendingIssues } from '@/utils/pendingIssues'
 import {
   IconTrophy
 } from '@arco-design/web-vue/es/icon'
@@ -133,6 +151,7 @@ import StatCard from '@/components/StatCard.vue'
 import CardRow from '@/components/CardRow.vue'
 import GameCard from '@/components/GameCard.vue'
 import GameCarousel from '@/components/GameCarousel.vue'
+import type { Game } from '@/services/types'
 
 defineOptions({
   name: 'DashboardView',
@@ -143,7 +162,14 @@ const gamesStore = useGamesStore()
 const uiStore = useUiStore()
 
 const isLoading = ref(false)
-const detailedGames = ref<Record<number, import('@/services/types').Game>>({})
+const detailedGames = ref<Record<number, Game>>({})
+const isDashboardReady = ref(false)
+const showSplash = ref(true)
+const isSplashLeaving = ref(false)
+const splashStartedAt = ref(0)
+
+const MIN_SPLASH_DURATION = 1200
+const SPLASH_FADE_DURATION = 400
 
 // Directly use gamesStore.stats (it's already a ref)
 const totalGames = computed(() => gamesStore.stats?.total_games || 0)
@@ -163,7 +189,7 @@ const carouselGames = computed(() => {
 
   return orderedIds
     .map((id) => detailedGames.value[id])
-    .filter((game): game is import('@/services/types').Game => !!game)
+    .filter((game): game is Game => !!game)
     .sort(() => Math.random() - 0.5)
 })
 
@@ -187,45 +213,59 @@ const toggleFavorite = async (id: string) => {
 
 const loadDashboardData = async () => {
   isLoading.value = true
+  isDashboardReady.value = false
   try {
-    await gamesStore.fetchStats()
-    const allGames = await gamesService.getGames({
-      page: 1,
-      pageSize: 500,
-      sort: { field: 'updated_at', order: 'desc' },
-    })
+    const stats = await gamesStore.fetchStats()
+    const candidateIds = [...stats.recent_games, ...stats.popular_games]
+      .map((game) => String(game.id))
+      .filter((id, index, items) => items.indexOf(id) === index)
+
     const details = await Promise.all(
-      allGames.data.map(async (game) => {
+      candidateIds.map(async (id) => {
         try {
-          return await gamesService.getGame(String(game.id))
+          return await gamesService.getGame(id)
         } catch {
           return null
         }
       }),
     )
     detailedGames.value = details
-      .filter((game): game is import('@/services/types').Game => !!game)
-      .reduce<Record<number, import('@/services/types').Game>>((acc, game) => {
+      .filter((game): game is Game => !!game)
+      .reduce<Record<number, Game>>((acc, game) => {
         acc[game.id] = game
         return acc
       }, {})
-    pendingReviewGameCount.value = 0
-    for (const game of details) {
-      if (!game) continue
-      const issues = getPendingIssues(game)
-      if (issues.length > 0) {
-        pendingReviewGameCount.value += 1
-      }
-    }
+    pendingReviewGameCount.value = stats.pending_reviews || 0
+    isDashboardReady.value = true
     lastLoadedAt.value = Date.now()
   } catch (error) {
     uiStore.addAlert('加载数据失败', 'error')
+    isDashboardReady.value = true
   } finally {
     isLoading.value = false
   }
 }
 
-onMounted(loadDashboardData)
+const finishSplash = async () => {
+  const elapsed = Date.now() - splashStartedAt.value
+  const remaining = Math.max(0, MIN_SPLASH_DURATION - elapsed)
+
+  if (remaining > 0) {
+    await new Promise((resolve) => window.setTimeout(resolve, remaining))
+  }
+
+  isSplashLeaving.value = true
+  await new Promise((resolve) => window.setTimeout(resolve, SPLASH_FADE_DURATION))
+  showSplash.value = false
+}
+
+onMounted(async () => {
+  splashStartedAt.value = Date.now()
+  await Promise.all([
+    loadDashboardData(),
+    finishSplash(),
+  ])
+})
 
 onActivated(async () => {
   if (Date.now() - lastLoadedAt.value > 30000) {
@@ -236,8 +276,126 @@ onActivated(async () => {
 
 <style scoped>
 .dashboard {
+  position: relative;
+  z-index: 2;
   animation: fadeInUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
   padding-bottom: 24px;
+  transition: opacity 0.28s ease;
+}
+
+.dashboard:not(.is-ready) {
+  opacity: 0;
+}
+
+.dashboard.is-ready {
+  opacity: 1;
+}
+
+.dashboard-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+
+.dashboard-loading--leaving {
+  opacity: 0;
+}
+
+.dashboard-loading__backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top, rgba(62, 123, 250, 0.28), transparent 45%),
+    radial-gradient(circle at bottom, rgba(44, 212, 191, 0.18), transparent 40%),
+    linear-gradient(180deg, #07111f 0%, #04070d 100%);
+}
+
+.dashboard-loading__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: min(520px, calc(100vw - 48px));
+  animation: splashReveal 1.6s ease both;
+}
+
+.dashboard-loading__eyebrow {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.42em;
+}
+
+.dashboard-loading__brand {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.96);
+  font-size: clamp(44px, 9vw, 84px);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.dashboard-loading__track {
+  position: relative;
+  width: 100%;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 30px rgba(26, 159, 255, 0.18);
+}
+
+.dashboard-loading__bar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+  background: linear-gradient(90deg, #7ce7d4 0%, #4b8dff 52%, #f0f7ff 100%);
+  animation: splashLoad 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes splashReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.985);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  72% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px) scale(1.015);
+  }
+}
+
+@keyframes splashLoad {
+  0% {
+    transform: scaleX(0);
+    opacity: 0.7;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
 }
 
 @keyframes fadeInUp {

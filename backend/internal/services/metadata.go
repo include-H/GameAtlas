@@ -57,10 +57,9 @@ func (s *MetadataService) Create(resource MetadataResource, input domain.Metadat
 	}
 
 	cleanInput := domain.MetadataWriteInput{
-		Name:        name,
-		Slug:        &slugValue,
-		Description: trimStringPtr(input.Description),
-		SortOrder:   &sortOrder,
+		Name:      name,
+		Slug:      &slugValue,
+		SortOrder: &sortOrder,
 	}
 
 	switch resource.Table {

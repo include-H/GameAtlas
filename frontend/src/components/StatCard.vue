@@ -1,7 +1,7 @@
 <template>
   <a-card
     :style="{
-      background: 'var(--color-bg-2)',
+      background: 'rgba(22, 26, 37, 0.4)',
       border: '1px solid var(--color-border-1)',
       borderLeft: `4px solid ${color}`,
       boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
@@ -103,6 +103,8 @@ const iconComponent = computed(() => {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   border: none;
   overflow: hidden;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .stat-card:hover {

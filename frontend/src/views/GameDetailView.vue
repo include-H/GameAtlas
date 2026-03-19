@@ -4,7 +4,7 @@
       <!-- Game Header Navigation & Title -->
       <div class="game-detail__header">
         <div class="header-content">
-        <a-button class="header-back-btn" type="text" @click="handleGoBack">
+        <a-button class="app-text-compact header-back-btn" type="text" @click="handleGoBack">
           <template #icon>
             <icon-left />
           </template>
@@ -15,8 +15,8 @@
           <h1 class="header-title">{{ game.title }}</h1>
           <div class="header-actions">
             <a-button 
+              class="app-text-compact header-favorite-btn"
               type="text" 
-              class="header-favorite-btn"
               :class="{ 'is-favorite': game.isFavorite }"
               @click="handleToggleFavorite"
             >
@@ -29,8 +29,8 @@
 
             <a-button 
               v-if="canEdit"
+              class="app-text-compact header-edit-btn"
               type="text" 
-              class="header-edit-btn"
               @click="showEditModal = true"
             >
               <template #icon>
@@ -88,6 +88,7 @@
           <!-- Download Button -->
           <div class="sidebar-actions">
             <a-button
+              class="app-primary-cta app-primary-cta--large"
               type="primary"
               size="large"
               long
@@ -157,6 +158,7 @@
                 <span>关于这款游戏</span>
                 <a-button
                   v-if="canEdit"
+                  class="app-text-compact"
                   type="text"
                   size="small"
                   @click="router.push({ name: 'wiki-edit', params: { gameId: String(game.id) } })"
@@ -179,6 +181,7 @@
             <p class="game-detail__no-wiki-text">暂无游戏介绍</p>
             <a-button
               v-if="canEdit"
+              class="app-primary-cta"
               type="primary"
               @click="router.push({ name: 'wiki-edit', params: { gameId: String(game.id) } })"
             >
@@ -208,7 +211,7 @@
     v-model:visible="showDownloadModal"
     title="选择游戏版本"
     :footer="false"
-    :width="500"
+    :width="620"
   >
     <div v-if="versions.length > 0" class="download-version-list">
       <div
@@ -227,12 +230,21 @@
             <span v-if="version.releaseDate" class="version-date">{{ formatDate(version.releaseDate) }}</span>
           </div>
         </div>
-        <a-button type="primary" size="small">
-          <template #icon>
-            <icon-download />
-          </template>
-          下载
-        </a-button>
+        <div class="version-actions">
+          <a-button class="app-primary-cta version-action-btn version-action-btn--primary" type="primary">
+            <template #icon>
+              <icon-download />
+            </template>
+            下载
+          </a-button>
+          <a-button
+            class="app-secondary-cta version-action-btn version-action-btn--secondary"
+            type="secondary"
+            @click.stop="handleDownloadLaunchScript(version)"
+          >
+            启动脚本
+          </a-button>
+        </div>
       </div>
     </div>
     <div v-else class="download-empty">
@@ -351,10 +363,24 @@ const handleDownloadVersion = async (version: GameVersion) => {
   }
 }
 
+const handleDownloadLaunchScript = (version: GameVersion) => {
+  if (!game.value) return
+
+  try {
+    downloadService.downloadLaunchScript(String(game.value.id), version.id)
+    uiStore.addAlert(`已下载 ${version.version} 的启动脚本`, 'success')
+  } catch (error) {
+    uiStore.addAlert('启动脚本下载失败', 'error')
+  }
+}
+
 const handleEditSuccess = async () => {
   // Reload game data after edit
   if (game.value) {
-    await gamesStore.fetchGame(String(game.value.id))
+    await Promise.all([
+      gamesStore.fetchGame(String(game.value.id)),
+      gamesStore.fetchGameVersions(String(game.value.id)),
+    ])
   }
 }
 
@@ -818,21 +844,6 @@ watch(
   border-bottom: 1px solid var(--color-border-1);
 }
 
-.sidebar-actions :deep(.arco-btn) {
-  background: linear-gradient(135deg, var(--color-primary-6), #007aff);
-  border: none;
-  font-weight: 600;
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 12px rgba(26, 159, 255, 0.3);
-  transition: all var(--transition-fast);
-}
-
-.sidebar-actions :deep(.arco-btn:hover) {
-  background: linear-gradient(135deg, var(--color-primary-5), #3395ff);
-  box-shadow: 0 6px 16px rgba(26, 159, 255, 0.4);
-  transform: translateY(-1px);
-}
-
 /* Sidebar Info */
 .sidebar-info {
   padding: 12px;
@@ -885,9 +896,10 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px;
+  gap: 20px;
+  padding: 16px 18px;
   background: var(--color-fill-2);
-  border-radius: 4px;
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -898,20 +910,22 @@ watch(
 
 .version-info {
   flex: 1;
+  min-width: 0;
 }
 
 .version-name {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 600;
   color: var(--color-text-1);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .version-meta {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--color-text-3);
   display: flex;
   gap: 16px;
@@ -919,6 +933,29 @@ watch(
 
 .version-size {
   color: var(--color-text-2);
+}
+
+.version-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.version-action-btn {
+  min-width: 96px;
+  min-height: 42px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.version-action-btn--primary {
+  box-shadow: none;
+}
+
+.version-action-btn--secondary {
+  box-shadow: none;
 }
 
 /* Download Empty State */
@@ -952,6 +989,19 @@ watch(
   .sidebar-header-image {
     aspect-ratio: 21/9;
     max-height: 200px;
+  }
+
+  .download-version-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .version-actions {
+    width: 100%;
+  }
+
+  .version-action-btn {
+    flex: 1;
   }
 }
 </style>

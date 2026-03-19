@@ -7,7 +7,7 @@
       </div>
 
       <a-space>
-        <a-button @click="loadPendingGames">
+        <a-button class="app-secondary-cta" type="secondary" @click="loadPendingGames">
           <template #icon>
             <icon-refresh />
           </template>
@@ -91,7 +91,7 @@
       </span>
       <div class="pending-center__result-actions">
         <a-select v-model="itemsPerPage" :options="pageSizeOptions" size="small" />
-        <a-button type="text" size="small" @click="resetFilters">重置筛选</a-button>
+        <a-button class="app-text-compact" type="text" size="small" @click="resetFilters">重置筛选</a-button>
       </div>
     </div>
 
@@ -235,6 +235,7 @@
                   <span class="detail-checklist__group">{{ getPendingIssueLabel(detail.group) }}</span>
                   <a-button
                     v-if="!detail.ignored"
+                    class="app-text-compact"
                     size="mini"
                     type="text"
                     status="warning"
@@ -244,6 +245,7 @@
                   </a-button>
                   <a-button
                     v-else
+                    class="app-text-compact"
                     size="mini"
                     type="text"
                     @click="restoreIssue(activeGame, detail.key)"
@@ -260,19 +262,19 @@
             <div class="detail-overview">
               <div class="detail-overview__item">
                 <span>文件</span>
-                <strong>{{ activeGame.files?.length || activeGame.file_paths?.length || 0 }}</strong>
+                <strong>{{ activeGame.files?.length || activeGame.file_paths?.length || activeGame.file_count || 0 }}</strong>
               </div>
               <div class="detail-overview__item">
                 <span>截图</span>
-                <strong>{{ activeGame.screenshots?.length || 0 }}</strong>
+                <strong>{{ activeGame.screenshots?.length || activeGame.screenshot_count || 0 }}</strong>
               </div>
               <div class="detail-overview__item">
                 <span>开发商</span>
-                <strong>{{ activeGame.developers?.length || 0 }}</strong>
+                <strong>{{ activeGame.developers?.length || activeGame.developer_count || 0 }}</strong>
               </div>
               <div class="detail-overview__item">
                 <span>平台</span>
-                <strong>{{ activeGame.platforms?.length || (activeGame.platform ? 1 : 0) }}</strong>
+                <strong>{{ activeGame.platforms?.length || (activeGame.platform ? 1 : 0) || activeGame.platform_count || 0 }}</strong>
               </div>
             </div>
           </div>
@@ -280,19 +282,19 @@
           <div class="detail-panel__section">
             <div class="detail-panel__section-title">快捷处理</div>
             <a-space wrap>
-              <a-button type="primary" @click="openEdit(activeGame)">
+              <a-button class="app-primary-cta" type="primary" @click="openEdit(activeGame)">
                 <template #icon>
                   <icon-edit />
                 </template>
                 编辑资料
               </a-button>
-              <a-button @click="openWiki(activeGame)">
+              <a-button class="app-secondary-cta" type="secondary" @click="openWiki(activeGame)">
                 <template #icon>
                   <icon-book />
                 </template>
                 编辑 Wiki
               </a-button>
-              <a-button @click="viewGame(activeGame)">
+              <a-button class="app-secondary-cta" type="secondary" @click="viewGame(activeGame)">
                 <template #icon>
                   <icon-right />
                 </template>
@@ -545,11 +547,11 @@ const activeGameDetails = computed(() => {
 })
 
 const getDisplayImage = (game: Game) => {
-  return game.cover_image || game.banner_image || game.screenshots?.[0] || placeholderImage
+  return game.cover_image || game.banner_image || game.primary_screenshot || game.screenshots?.[0] || placeholderImage
 }
 
 const getDetailHeroImage = (game: Game) => {
-  return game.banner_image || game.cover_image || game.screenshots?.[0] || placeholderImage
+  return game.banner_image || game.cover_image || game.primary_screenshot || game.screenshots?.[0] || placeholderImage
 }
 
 const updateDetailHeroFit = (event: Event) => {
@@ -614,9 +616,13 @@ const restoreIssue = async (game: Game, issueKey: PendingIssueDetailKey) => {
   }
 }
 
-const openEdit = (game: Game) => {
-  editingGame.value = game
-  showEditModal.value = true
+const openEdit = async (game: Game) => {
+  try {
+    editingGame.value = await gamesService.getGame(String(game.id))
+    showEditModal.value = true
+  } catch {
+    uiStore.addAlert('加载游戏详情失败', 'error')
+  }
 }
 
 const openWiki = (game: Game) => {
@@ -639,18 +645,8 @@ const loadPendingGames = async () => {
       },
     })
 
-    const details = await Promise.all(
-      response.data.map(async (game) => {
-        try {
-          return await gamesService.getGame(String(game.id))
-        } catch {
-          return game
-        }
-      }),
-    )
-
-    reviewIssueOverrides.value = await reviewIssuesService.list(details.map((game) => game.id))
-    pendingGames.value = details.filter((game) => getPendingIssueDetails(game).length > 0)
+    reviewIssueOverrides.value = await reviewIssuesService.list(response.data.map((game) => game.id))
+    pendingGames.value = response.data.filter((game) => getPendingIssueDetails(game).length > 0)
   } catch (error) {
     uiStore.addAlert('加载待处理中心失败', 'error')
   } finally {

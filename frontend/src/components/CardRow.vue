@@ -18,8 +18,9 @@
         <!-- Scroll Buttons -->
         <div v-if="showScrollButtons && items.length > 0" class="card-row__controls">
           <a-button
+            class="app-secondary-compact"
             size="small"
-            type="primary"
+            type="secondary"
             @click="scrollLeft"
           >
             <template #icon>
@@ -27,8 +28,9 @@
             </template>
           </a-button>
           <a-button
+            class="app-secondary-compact"
             size="small"
-            type="primary"
+            type="secondary"
             @click="scrollRight"
           >
             <template #icon>
@@ -39,6 +41,7 @@
 
         <a-button
           v-if="showViewAll"
+          class="app-text-compact"
           type="text"
           size="small"
           @click="router.push(viewAllRoute)"
@@ -253,10 +256,13 @@ onUnmounted(() => {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  scrollbar-color: transparent transparent;
 }
 
 .card-row__scroll::-webkit-scrollbar {
-  display: none;
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
 }
 
 .card-row__item {

@@ -19,7 +19,6 @@ export interface Series {
   id: number
   name: string
   slug?: string
-  description?: string
   sort_order?: number
   created_at: string
 }
@@ -100,6 +99,12 @@ export interface Game {
   file_paths?: Array<string | { id?: number; path: string; label?: string; notes?: string; size?: number | null; sort_order?: number }>
   files?: GameFileEntry[]
   needs_review?: boolean
+  primary_screenshot?: string | null
+  screenshot_count?: number
+  file_count?: number
+  developer_count?: number
+  publisher_count?: number
+  platform_count?: number
   views: number
   downloads: number
   created_at: string
@@ -136,6 +141,7 @@ export interface GameVersion {
   checksum?: string
   isLatest: boolean
   downloadUrl?: string
+  launchScriptUrl?: string
   changelog?: string
 }
 

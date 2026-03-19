@@ -23,6 +23,11 @@ type Config struct {
 	HTTPProxy         string
 	HTTPSProxy        string
 	SteamProxy        string
+	SMBShareRoot      string
+	SMBUsername       string
+	SMBPassword       string
+	SMBDriveLetter    string
+	VHDDiffRoot       string
 	LogLevel          string
 	ReadHeaderTimeout time.Duration
 	ShutdownTimeout   time.Duration
@@ -46,6 +51,11 @@ func Load() Config {
 		HTTPProxy:         getEnv("HTTP_PROXY", proxy),
 		HTTPSProxy:        getEnv("HTTPS_PROXY", proxy),
 		SteamProxy:        getEnv("STEAM_PROXY", proxy),
+		SMBShareRoot:      getEnv("SMB_SHARE_ROOT", ""),
+		SMBUsername:       getEnv("SMB_USERNAME", ""),
+		SMBPassword:       getEnv("SMB_PASSWORD", ""),
+		SMBDriveLetter:    strings.TrimSpace(getEnv("SMB_DRIVE_LETTER", "Z:")),
+		VHDDiffRoot:       getEnv("VHD_DIFF_ROOT", `C:\Game\VHDCache`),
 		LogLevel:          getEnv("LOG_LEVEL", "info"),
 		ReadHeaderTimeout: getEnvAsDuration("READ_HEADER_TIMEOUT", 5*time.Second),
 		ShutdownTimeout:   getEnvAsDuration("SHUTDOWN_TIMEOUT", 10*time.Second),

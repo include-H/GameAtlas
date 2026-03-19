@@ -27,7 +27,6 @@ export const seriesService = {
   async createSeries(data: {
     name: string
     slug?: string
-    description?: string
     sort_order?: number
   }): Promise<Series> {
     const response = await post<ApiResponse<Series>>('/series', data)

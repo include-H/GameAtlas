@@ -94,6 +94,38 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 			g.preview_video_asset_uid,
 			g.views,
 			g.downloads,
+			(
+				SELECT ga.path
+				FROM game_assets ga
+				WHERE ga.game_id = g.id AND ga.asset_type = 'screenshot'
+				ORDER BY ga.sort_order ASC, ga.id ASC
+				LIMIT 1
+			) AS primary_screenshot,
+			(
+				SELECT COUNT(*)
+				FROM game_assets ga
+				WHERE ga.game_id = g.id AND ga.asset_type = 'screenshot'
+			) AS screenshot_count,
+			(
+				SELECT COUNT(*)
+				FROM game_files gf
+				WHERE gf.game_id = g.id
+			) AS file_count,
+			(
+				SELECT COUNT(*)
+				FROM game_developers gd
+				WHERE gd.game_id = g.id
+			) AS developer_count,
+			(
+				SELECT COUNT(*)
+				FROM game_publishers gp
+				WHERE gp.game_id = g.id
+			) AS publisher_count,
+			(
+				SELECT COUNT(*)
+				FROM game_platforms gp
+				WHERE gp.game_id = g.id
+			) AS platform_count,
 			g.created_at,
 			g.updated_at
 		FROM games g
@@ -133,6 +165,12 @@ func (r *GamesRepository) GetByID(id int64) (*domain.Game, error) {
 			preview_video_asset_uid,
 			views,
 			downloads,
+			NULL AS primary_screenshot,
+			0 AS screenshot_count,
+			0 AS file_count,
+			0 AS developer_count,
+			0 AS publisher_count,
+			0 AS platform_count,
 			created_at,
 			updated_at
 		FROM games

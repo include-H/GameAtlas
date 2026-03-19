@@ -15,6 +15,12 @@ type Game struct {
 	PreviewVideoAssetUID *string `db:"preview_video_asset_uid"`
 	Views                int64   `db:"views"`
 	Downloads            int64   `db:"downloads"`
+	PrimaryScreenshot    *string `db:"primary_screenshot"`
+	ScreenshotCount      int64   `db:"screenshot_count"`
+	FileCount            int64   `db:"file_count"`
+	DeveloperCount       int64   `db:"developer_count"`
+	PublisherCount       int64   `db:"publisher_count"`
+	PlatformCount        int64   `db:"platform_count"`
 	CreatedAt            string  `db:"created_at"`
 	UpdatedAt            string  `db:"updated_at"`
 }
@@ -50,10 +56,9 @@ type MetadataItem struct {
 }
 
 type MetadataWriteInput struct {
-	Name        string  `json:"name"`
-	Slug        *string `json:"slug"`
-	Description *string `json:"description"`
-	SortOrder   *int    `json:"sort_order"`
+	Name      string  `json:"name"`
+	Slug      *string `json:"slug"`
+	SortOrder *int    `json:"sort_order"`
 }
 
 type GamesListParams struct {

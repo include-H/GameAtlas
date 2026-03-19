@@ -66,6 +66,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.PUT("/games/:id/files/:fileId", gameFilesHandler.Update)
 	api.DELETE("/games/:id/files/:fileId", gameFilesHandler.Delete)
 	api.GET("/games/:id/files/:fileId/download", downloadsHandler.Download)
+	api.GET("/games/:id/files/:fileId/launch-script", downloadsHandler.LaunchScript)
 	api.GET("/games/:id/wiki", wikiHandler.Get)
 	api.PUT("/games/:id/wiki", wikiHandler.Update)
 	api.GET("/games/:id/wiki/history", wikiHandler.History)
@@ -95,6 +96,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.GET("/steam/proxy", steamHandler.Proxy)
 
 	registerAssetRoutes(router, cfg.AssetsDir)
+	registerCustomDataRoutes(router, filepath.Dir(cfg.AssetsDir))
 	registerStaticRoutes(router, cfg.StaticDir)
 
 	return router
@@ -106,6 +108,39 @@ func registerAssetRoutes(router *gin.Engine, assetsDir string) {
 	}
 
 	router.Static("/assets", assetsDir)
+}
+
+func registerCustomDataRoutes(router *gin.Engine, dataDir string) {
+	allowedExtensions := map[string]struct{}{
+		".jpg":   {},
+		".jpeg":  {},
+		".png":   {},
+		".webp":  {},
+		".avif":  {},
+		".gif":   {},
+		".svg":   {},
+		".ttf":   {},
+		".otf":   {},
+		".woff":  {},
+		".woff2": {},
+	}
+
+	router.GET("/data/:filename", func(c *gin.Context) {
+		filename := filepath.Base(c.Param("filename"))
+		extension := filepath.Ext(filename)
+		if _, ok := allowedExtensions[extension]; !ok {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		assetPath := filepath.Join(dataDir, filename)
+		if _, err := os.Stat(assetPath); err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		c.File(assetPath)
+	})
 }
 
 func registerStaticRoutes(router *gin.Engine, staticDir string) {

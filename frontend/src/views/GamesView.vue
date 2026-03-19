@@ -16,7 +16,7 @@
           </a-radio>
         </a-radio-group>
 
-        <a-button type="primary" @click="handleAddGame">
+        <a-button class="app-primary-cta" type="primary" @click="handleAddGame">
           <template #icon>
             <icon-plus />
           </template>
@@ -212,7 +212,7 @@
       </template>
       <a-button
         v-if="hasActiveFilters"
-        type="primary"
+        type="secondary"
         @click="clearFilters"
       >
         清除筛选

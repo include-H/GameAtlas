@@ -19,6 +19,14 @@
    @media (max-width: 768px) { ... }  // md breakpoint
    ----------------------------------------------------------------------- */
 
+@font-face {
+  font-family: 'CustomDataFont';
+  src: url('/data/LXGWWenKaiGBScreen.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   /* -----------------------------------------------------------------------
      1. Color Palette (Deeper dark mode, vibrant accents)
@@ -66,6 +74,7 @@
   --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  --font-family-base: 'CustomDataFont', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 }
 
 /* -----------------------------------------------------------------------
@@ -96,12 +105,80 @@ body[arco-theme='dark'] {
    Global Body Adjustments
    ----------------------------------------------------------------------- */
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  font-family: var(--font-family-base);
   letter-spacing: 0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--color-bg-1);
   color: var(--color-text-1);
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: var(--font-family-base);
+}
+
+/* -----------------------------------------------------------------------
+   Global Scrollbar
+   ----------------------------------------------------------------------- */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.24) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.24);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.36);
+  background-clip: content-box;
+}
+
+body[arco-theme='light'] {
+  scrollbar-color: rgba(36, 46, 67, 0.22) transparent;
+}
+
+body[arco-theme='light'] *::-webkit-scrollbar-thumb {
+  background: rgba(36, 46, 67, 0.22);
+  background-clip: content-box;
+}
+
+body[arco-theme='light'] *::-webkit-scrollbar-thumb:hover {
+  background: rgba(36, 46, 67, 0.34);
+  background-clip: content-box;
+}
+
+.arco-scrollbar-thumb-bar {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.arco-scrollbar-thumb:hover .arco-scrollbar-thumb-bar,
+.arco-scrollbar-thumb-dragging .arco-scrollbar-thumb-bar {
+  background: rgba(255, 255, 255, 0.36);
+}
+
+body[arco-theme='light'] .arco-scrollbar-thumb-bar {
+  background: rgba(36, 46, 67, 0.22);
+}
+
+body[arco-theme='light'] .arco-scrollbar-thumb:hover .arco-scrollbar-thumb-bar,
+body[arco-theme='light'] .arco-scrollbar-thumb-dragging .arco-scrollbar-thumb-bar {
+  background: rgba(36, 46, 67, 0.34);
 }
 
 /* Add a very subtle gradient background to the entire app to make cards pop */
@@ -194,27 +271,170 @@ body[arco-theme='light'] .glass-header {
 .arco-btn {
   border-radius: var(--radius-md);
   font-weight: 500;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+  box-shadow: none;
+}
+
+.arco-btn:not(.arco-btn-primary):not(.arco-btn-secondary):not(.arco-btn-outline):not(.arco-btn-text) {
+  background: var(--color-bg-3);
+  border-color: var(--color-border-2);
+  color: var(--color-text-1);
+}
+
+.arco-btn:not(.arco-btn-primary):not(.arco-btn-secondary):not(.arco-btn-outline):not(.arco-btn-text):hover {
+  background: var(--color-fill-3);
+  border-color: var(--color-border-3);
+  color: var(--color-text-1);
+}
+
+.arco-btn-size-mini {
+  font-size: 12px;
+}
+
+.arco-btn-size-small {
+  font-size: 13px;
+}
+
+.arco-btn-size-default {
+  font-size: 14px;
+}
+
+.arco-btn-size-large {
+  font-size: 15px;
 }
 
 .arco-btn-primary {
   background: linear-gradient(135deg, var(--color-primary-6), #007aff);
-  border: none;
-  box-shadow: 0 4px 12px rgba(26, 159, 255, 0.3);
+  border: 1px solid transparent;
+  box-shadow: 0 4px 10px rgba(26, 159, 255, 0.24);
 }
 
 .arco-btn-primary:hover {
   background: linear-gradient(135deg, var(--color-primary-5), #3395ff);
-  box-shadow: 0 6px 16px rgba(26, 159, 255, 0.4);
+  box-shadow: 0 6px 14px rgba(26, 159, 255, 0.3);
   transform: translateY(-1px);
 }
 
 .arco-btn-secondary {
   background: var(--color-fill-2);
+  border-color: var(--color-border-2);
+  color: var(--color-text-1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
 }
 
 .arco-btn-secondary:hover {
   background: var(--color-fill-3);
+  border-color: var(--color-border-3);
+}
+
+.arco-btn-outline {
+  background: transparent;
+  border-color: var(--color-border-2);
+  color: var(--color-text-2);
+}
+
+.arco-btn-outline:hover {
+  background: var(--color-fill-2);
+  border-color: var(--color-primary-light-4);
+  color: var(--color-text-1);
+}
+
+.arco-btn-text {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.arco-btn-text:hover {
+  background: var(--color-fill-2);
+}
+
+.arco-btn-status-danger.arco-btn-primary,
+.arco-btn-status-danger.arco-btn-secondary {
+  border-color: transparent;
+  color: #fff;
+}
+
+.arco-btn-status-danger.arco-btn-primary {
+  background: linear-gradient(135deg, #d94355, #ff4d4f);
+  box-shadow: 0 4px 10px rgba(255, 77, 79, 0.24);
+}
+
+.arco-btn-status-danger.arco-btn-primary:hover {
+  background: linear-gradient(135deg, #e85768, #ff6163);
+  box-shadow: 0 6px 14px rgba(255, 77, 79, 0.3);
+}
+
+.arco-btn-status-danger.arco-btn-secondary {
+  background: rgba(255, 77, 79, 0.14);
+  border-color: rgba(255, 77, 79, 0.28);
+}
+
+.arco-btn-status-danger.arco-btn-secondary:hover {
+  background: rgba(255, 77, 79, 0.2);
+  border-color: rgba(255, 77, 79, 0.4);
+}
+
+.arco-btn-status-danger.arco-btn-outline,
+.arco-btn-status-danger.arco-btn-text {
+  color: var(--color-danger-6);
+}
+
+.app-primary-cta {
+  min-height: 42px;
+  padding-inline: 18px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: 0 8px 18px rgba(26, 159, 255, 0.22);
+}
+
+.app-primary-cta:hover {
+  box-shadow: 0 10px 22px rgba(26, 159, 255, 0.28);
+}
+
+.app-primary-cta .arco-icon,
+.app-primary-cta :deep(.arco-icon) {
+  font-size: 16px;
+}
+
+.app-primary-cta--large {
+  min-height: 48px;
+  border-radius: 14px;
+  font-size: 15px;
+  padding-inline: 20px;
+}
+
+.app-secondary-cta {
+  min-height: 42px;
+  padding-inline: 18px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.app-secondary-cta--large {
+  min-height: 48px;
+  border-radius: 14px;
+  font-size: 15px;
+  padding-inline: 20px;
+}
+
+.app-secondary-compact {
+  min-height: 32px;
+  padding-inline: 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.app-text-compact {
+  min-height: 32px;
+  padding-inline: 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 /* Inputs / Selects */

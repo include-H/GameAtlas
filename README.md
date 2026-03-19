@@ -70,6 +70,11 @@ bash start-dev.sh
 - 游戏素材：`data/gamelist`
 - ROM 根目录：`ROM`
 
+自定义前端资源：
+
+- 自定义背景图：`data/bg.jpg`
+- 自定义全局字体：`data/LXGWWenKaiGBScreen.ttf`
+
 素材示例：
 
 ```text
@@ -78,6 +83,17 @@ data/gamelist/1/banner.jpg
 data/gamelist/1/1.jpg
 data/gamelist/1/2.jpg
 ```
+
+### 自定义背景和字体
+
+后端会按只读静态资源方式暴露 `backend/data` 下的部分文件，前端会自动读取：
+
+- `backend/data/bg.jpg`
+  首页共享背景优先使用这张图；如果不存在，才回退到系统自动挑选的游戏素材背景。
+- `backend/data/LXGWWenKaiGBScreen.ttf`
+  前端全局默认字体会使用这个字体文件，包含正文和常见表单控件。
+
+当前约定是固定文件名。如果你要替换背景或字体，直接覆盖同名文件即可。
 
 ## 生产打包
 

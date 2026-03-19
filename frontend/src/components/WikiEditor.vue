@@ -4,22 +4,22 @@
     <div class="wiki-editor__toolbar">
       <a-space :size="4">
         <a-button-group>
-          <a-button @click="insertMarkdown('**', '**')">
+          <a-button type="text" @click="insertMarkdown('**', '**')">
             <template #icon>
               <icon-bold />
             </template>
           </a-button>
-          <a-button @click="insertMarkdown('*', '*')">
+          <a-button type="text" @click="insertMarkdown('*', '*')">
             <template #icon>
               <icon-italic />
             </template>
           </a-button>
-          <a-button @click="insertMarkdown('__', '__')">
+          <a-button type="text" @click="insertMarkdown('__', '__')">
             <template #icon>
               <icon-minus />
             </template>
           </a-button>
-          <a-button @click="insertMarkdown('~~', '~~')">
+          <a-button type="text" @click="insertMarkdown('~~', '~~')">
             <template #icon>
               <icon-highlight />
             </template>
@@ -29,15 +29,15 @@
         <a-divider direction="vertical" :margin="8" />
 
         <a-button-group>
-          <a-button @click="insertLine('# ')">
+          <a-button type="text" @click="insertLine('# ')">
             <template #icon>
               <icon-h1 />
             </template>
           </a-button>
-          <a-button @click="insertLine('## ')">
+          <a-button type="text" @click="insertLine('## ')">
             <span class="toolbar-h2">H2</span>
           </a-button>
-          <a-button @click="insertLine('### ')">
+          <a-button type="text" @click="insertLine('### ')">
             <span class="toolbar-h3">H3</span>
           </a-button>
         </a-button-group>
@@ -45,17 +45,17 @@
         <a-divider direction="vertical" :margin="8" />
 
         <a-button-group>
-          <a-button @click="insertLink">
+          <a-button type="text" @click="insertLink">
             <template #icon>
               <icon-link />
             </template>
           </a-button>
-          <a-button @click="insertImage">
+          <a-button type="text" @click="insertImage">
             <template #icon>
               <icon-image />
             </template>
           </a-button>
-          <a-button @click="insertCode">
+          <a-button type="text" @click="insertCode">
             <template #icon>
               <icon-code />
             </template>
@@ -65,17 +65,17 @@
         <a-divider direction="vertical" :margin="8" />
 
         <a-button-group>
-          <a-button @click="insertLine('- ')">
+          <a-button type="text" @click="insertLine('- ')">
             <template #icon>
               <icon-unordered-list />
             </template>
           </a-button>
-          <a-button @click="insertLine('1. ')">
+          <a-button type="text" @click="insertLine('1. ')">
             <template #icon>
               <icon-ordered-list />
             </template>
           </a-button>
-          <a-button @click="insertLine('> ')">
+          <a-button type="text" @click="insertLine('> ')">
             <template #icon>
               <icon-text />
             </template>
@@ -83,15 +83,12 @@
         </a-button-group>
       </a-space>
 
-      <a-button
-        :type="showPreview ? 'primary' : 'secondary'"
-        @click="showPreview = !showPreview"
-      >
+      <a-button type="secondary" @click="showPreview = !showPreview">
         <template #icon>
           <icon-eye-invisible v-if="showPreview" />
           <icon-eye v-else />
         </template>
-        {{ showPreview ? 'Edit' : 'Preview' }}
+        {{ showPreview ? '返回编辑' : '预览' }}
       </a-button>
     </div>
 
@@ -102,7 +99,7 @@
         v-show="!showPreview"
         ref="editorRef"
         v-model="content"
-        placeholder="Write your wiki content in Markdown..."
+        placeholder="使用 Markdown 编写 Wiki 内容..."
         class="wiki-editor__textarea"
         @keydown.tab.prevent="handleTab"
       />
@@ -112,7 +109,7 @@
         <markdown-renderer v-if="content" :content="content" />
         <div v-else class="wiki-editor__preview-empty">
           <icon-file class="wiki-editor__preview-icon" />
-          <p>Start typing to see preview</p>
+          <p>开始输入后可在这里预览</p>
         </div>
       </div>
     </div>
@@ -120,10 +117,10 @@
     <!-- Word count -->
     <div class="wiki-editor__footer">
       <a-tag size="small">
-        {{ wordCount }} words
+        {{ wordCount }} 词
       </a-tag>
       <a-tag size="small" class="wiki-editor__footer-tag">
-        {{ characterCount }} characters
+        {{ characterCount }} 字
       </a-tag>
     </div>
   </div>

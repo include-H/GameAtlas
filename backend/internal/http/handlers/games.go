@@ -169,19 +169,25 @@ func parseQueryInt64(c *gin.Context, key string, fallback int64) int64 {
 }
 
 type gameListItemResponse struct {
-	ID          int64   `json:"id"`
-	Title       string  `json:"title"`
-	TitleAlt    *string `json:"title_alt"`
-	Summary     *string `json:"summary"`
-	ReleaseDate *string `json:"release_date"`
-	Engine      *string `json:"engine"`
-	CoverImage  *string `json:"cover_image"`
-	BannerImage *string `json:"banner_image"`
-	NeedsReview bool    `json:"needs_review"`
-	Views       int64   `json:"views"`
-	Downloads   int64   `json:"downloads"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	ID                int64   `json:"id"`
+	Title             string  `json:"title"`
+	TitleAlt          *string `json:"title_alt"`
+	Summary           *string `json:"summary"`
+	ReleaseDate       *string `json:"release_date"`
+	Engine            *string `json:"engine"`
+	CoverImage        *string `json:"cover_image"`
+	BannerImage       *string `json:"banner_image"`
+	NeedsReview       bool    `json:"needs_review"`
+	Views             int64   `json:"views"`
+	Downloads         int64   `json:"downloads"`
+	PrimaryScreenshot *string `json:"primary_screenshot"`
+	ScreenshotCount   int64   `json:"screenshot_count"`
+	FileCount         int64   `json:"file_count"`
+	DeveloperCount    int64   `json:"developer_count"`
+	PublisherCount    int64   `json:"publisher_count"`
+	PlatformCount     int64   `json:"platform_count"`
+	CreatedAt         string  `json:"created_at"`
+	UpdatedAt         string  `json:"updated_at"`
 }
 
 type gameAssetResponse struct {
@@ -239,19 +245,25 @@ type gameDetailResponse struct {
 
 func toGameListItemResponse(game domain.Game) gameListItemResponse {
 	return gameListItemResponse{
-		ID:          game.ID,
-		Title:       game.Title,
-		TitleAlt:    game.TitleAlt,
-		Summary:     game.Summary,
-		ReleaseDate: game.ReleaseDate,
-		Engine:      game.Engine,
-		CoverImage:  game.CoverImage,
-		BannerImage: game.BannerImage,
-		NeedsReview: game.NeedsReview,
-		Views:       game.Views,
-		Downloads:   game.Downloads,
-		CreatedAt:   game.CreatedAt,
-		UpdatedAt:   game.UpdatedAt,
+		ID:                game.ID,
+		Title:             game.Title,
+		TitleAlt:          game.TitleAlt,
+		Summary:           game.Summary,
+		ReleaseDate:       game.ReleaseDate,
+		Engine:            game.Engine,
+		CoverImage:        game.CoverImage,
+		BannerImage:       game.BannerImage,
+		NeedsReview:       game.NeedsReview,
+		Views:             game.Views,
+		Downloads:         game.Downloads,
+		PrimaryScreenshot: game.PrimaryScreenshot,
+		ScreenshotCount:   game.ScreenshotCount,
+		FileCount:         game.FileCount,
+		DeveloperCount:    game.DeveloperCount,
+		PublisherCount:    game.PublisherCount,
+		PlatformCount:     game.PlatformCount,
+		CreatedAt:         game.CreatedAt,
+		UpdatedAt:         game.UpdatedAt,
 	}
 }
 

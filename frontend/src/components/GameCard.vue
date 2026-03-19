@@ -47,6 +47,7 @@
         <!-- Card Actions moved inside metadata row -->
         <div v-if="!isList" class="game-card__actions">
           <a-button
+            class="app-text-compact"
             type="text"
             size="small"
             :class="{ 'is-favorite': game.isFavorite }"
@@ -59,6 +60,7 @@
           </a-button>
           <a-dropdown>
             <a-button
+              class="app-text-compact"
               type="text"
               size="small"
               @click.stop

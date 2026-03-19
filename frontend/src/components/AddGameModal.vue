@@ -3,8 +3,7 @@
     v-model:visible="visible"
     title="添加游戏"
     :width="600"
-    :ok-loading="isSubmitting"
-    @ok="handleSubmit"
+    :footer="false"
     @cancel="handleCancel"
     :mask-closable="false"
   >
@@ -19,6 +18,15 @@
         />
       </a-form-item>
     </a-form>
+
+    <div class="add-game-modal__actions">
+      <a-button class="app-secondary-cta" type="secondary" @click="handleCancel">
+        取消
+      </a-button>
+      <a-button class="app-primary-cta" type="primary" :loading="isSubmitting" @click="handleSubmit">
+        添加
+      </a-button>
+    </div>
   </a-modal>
 </template>
 
@@ -84,6 +92,12 @@ const handleCancel = () => {
 <style scoped>
 :deep(.arco-input-group) {
   display: flex;
+  gap: 8px;
+}
+
+.add-game-modal__actions {
+  display: flex;
+  justify-content: flex-end;
   gap: 8px;
 }
 </style>

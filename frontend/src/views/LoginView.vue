@@ -15,6 +15,7 @@
 
         <!-- Login Button -->
         <a-button
+          class="app-primary-cta app-primary-cta--large"
           type="primary"
           long
           size="large"

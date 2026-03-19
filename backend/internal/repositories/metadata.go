@@ -34,10 +34,10 @@ func (r *MetadataRepository) List(table string) ([]domain.MetadataItem, error) {
 func (r *MetadataRepository) CreateSeries(input domain.MetadataWriteInput, slug string, sortOrder int) (*domain.MetadataItem, error) {
 	var item domain.MetadataItem
 	err := r.db.Get(&item, `
-		INSERT INTO series (name, slug, description, parent_series_id, sort_order)
-		VALUES (?, ?, ?, NULL, ?)
+		INSERT INTO series (name, slug, sort_order)
+		VALUES (?, ?, ?)
 		RETURNING id, name, slug, sort_order, created_at
-	`, input.Name, slug, input.Description, sortOrder)
+	`, input.Name, slug, sortOrder)
 	if err != nil {
 		return nil, fmt.Errorf("create series: %w", err)
 	}

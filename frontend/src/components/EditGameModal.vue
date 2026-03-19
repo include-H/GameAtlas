@@ -174,7 +174,7 @@
                 placeholder="版本备注"
                 class="file-label-input"
               />
-              <a-button @click="openFileBrowser(index)">
+              <a-button type="secondary" @click="openFileBrowser(index)">
                 <template #icon>
                   <icon-folder />
                 </template>
@@ -191,7 +191,7 @@
           </div>
           
           <a-button
-            type="dashed"
+            type="secondary"
             long
             @click="addFilePath"
             :style="{ marginTop: '8px' }"
@@ -331,57 +331,60 @@
         <!-- 截图 -->
         <a-col :span="8">
           <a-form-item label="截图">
-            <div class="media-section">
-              <div v-if="form.screenshots.length === 0" class="media-frame media-frame--banner">
-                <div
-                  class="media-empty-action"
-                  role="button"
-                  tabindex="0"
-                  @click="showScreenshotSelector = true"
-                >
-                  <icon-image class="media-empty-icon" />
-                  <span class="media-empty-title">未设置截图</span>
-                  <span class="media-empty-subtitle">点击添加截图</span>
-                </div>
-              </div>
-              <a-image-preview-group v-else infinite>
-                <div class="screenshots-grid">
+            <div class="media-section media-section--cover">
+              <div class="media-frame media-frame--cover screenshots-frame">
+                <div v-if="form.screenshots.length === 0" class="media-empty-action">
                   <div
-                    v-for="screenshot in form.screenshots"
-                    :key="screenshot.asset_uid || screenshot.client_key"
-                    class="screenshot-thumb"
-                    :class="{ 'is-dragging': draggedScreenshotKey === screenshot.client_key, 'is-drop-target': dragOverScreenshotKey === screenshot.client_key }"
-                    draggable="true"
-                    @dragstart="handleScreenshotDragStart(screenshot.client_key)"
-                    @dragenter.prevent="handleScreenshotDragEnter(screenshot.client_key)"
-                    @dragover.prevent
-                    @drop.prevent="handleScreenshotDrop(screenshot.client_key)"
-                    @dragend="handleScreenshotDragEnd"
-                  >
-                    <a-image
-                      :src="screenshot.path"
-                      width="100%"
-                      height="100%"
-                      fit="cover"
-                      hide-footer
-                    />
-                    <div class="screenshot-overlay">
-                      <button class="media-action-button media-action-button--danger" type="button" @click.stop="removeScreenshot(screenshot.client_key)">
-                        <icon-delete />
-                      </button>
-                    </div>
-                  </div>
-                  <div
-                    class="screenshot-add-tile"
+                    class="media-empty-action media-empty-action--inner"
                     role="button"
                     tabindex="0"
                     @click="showScreenshotSelector = true"
                   >
                     <icon-image class="media-empty-icon" />
-                    <span class="media-empty-title">添加截图</span>
+                    <span class="media-empty-title">未设置截图</span>
+                    <span class="media-empty-subtitle">点击添加截图</span>
                   </div>
                 </div>
-              </a-image-preview-group>
+                <a-image-preview-group v-else infinite>
+                  <div class="screenshots-grid-wrapper">
+                    <div class="screenshots-grid">
+                      <div
+                        v-for="screenshot in form.screenshots"
+                        :key="screenshot.asset_uid || screenshot.client_key"
+                        class="screenshot-thumb"
+                        :class="{ 'is-dragging': draggedScreenshotKey === screenshot.client_key, 'is-drop-target': dragOverScreenshotKey === screenshot.client_key }"
+                        draggable="true"
+                        @dragstart="handleScreenshotDragStart(screenshot.client_key)"
+                        @dragenter.prevent="handleScreenshotDragEnter(screenshot.client_key)"
+                        @dragover.prevent
+                        @drop.prevent="handleScreenshotDrop(screenshot.client_key)"
+                        @dragend="handleScreenshotDragEnd"
+                      >
+                        <a-image
+                          :src="screenshot.path"
+                          width="100%"
+                          height="100%"
+                          fit="cover"
+                          hide-footer
+                        />
+                        <div class="screenshot-overlay">
+                          <button class="media-action-button media-action-button--danger" type="button" @click.stop="removeScreenshot(screenshot.client_key)">
+                            <icon-delete />
+                          </button>
+                        </div>
+                      </div>
+                      <div
+                        class="screenshot-add-tile"
+                        role="button"
+                        tabindex="0"
+                        @click="showScreenshotSelector = true"
+                      >
+                        <span class="screenshot-add-tile__label">添加截图</span>
+                      </div>
+                    </div>
+                  </div>
+                </a-image-preview-group>
+              </div>
             </div>
           </a-form-item>
         </a-col>
@@ -389,8 +392,8 @@
 
 		      <a-form-item>
 	        <a-space style="justify-content: flex-end; width: 100%">
-          <a-button @click="handleCancel">取消</a-button>
-          <a-button type="primary" html-type="submit" :loading="isSubmitting">
+          <a-button class="app-secondary-cta" type="secondary" @click="handleCancel">取消</a-button>
+          <a-button class="app-primary-cta" type="primary" html-type="submit" :loading="isSubmitting">
             保存
           </a-button>
         </a-space>
@@ -448,7 +451,7 @@
           <div v-if="selectedSteamSummaryGame" class="steam-summary-section">
             <div class="steam-search-title">
               {{ selectedSteamSummaryGame.name }} 的简介
-              <a-button type="text" size="mini" @click="backToSummarySearch">返回</a-button>
+              <a-button class="app-text-compact" type="text" size="mini" @click="backToSummarySearch">返回</a-button>
             </div>
 
             <div v-if="steamSummaryPreview" class="steam-summary-preview">
@@ -463,6 +466,7 @@
 
             <a-button
               v-if="steamSummaryPreview"
+              class="app-primary-cta"
               type="primary"
               long
               @click="confirmSummaryImport"
@@ -519,7 +523,7 @@
           <div v-if="selectedSteamGame && steamCoverImages.length > 0" class="steam-images-section">
             <div class="steam-search-title">
               {{ selectedSteamGame.name }} 的封面
-              <a-button type="text" size="mini" @click="backToCoverGameSearch">返回</a-button>
+              <a-button class="app-text-compact" type="text" size="mini" @click="backToCoverGameSearch">返回</a-button>
             </div>
             <div class="steam-images-grid">
               <div
@@ -534,6 +538,7 @@
             </div>
             <a-button
               v-if="selectedCoverImage"
+              class="app-primary-cta"
               type="primary"
               long
               :loading="isSearchingSteamCover"
@@ -556,7 +561,7 @@
           @success="handleCoverUploadSuccess"
           @error="handleCoverUploadError"
         >
-          <a-button type="dashed" long>
+          <a-button class="app-secondary-cta" type="secondary" long>
             <template #icon>
               <icon-upload />
             </template>
@@ -573,7 +578,7 @@
           @press-enter="loadCoverFromUrl"
         >
           <template #append>
-            <a-button type="primary" @click="loadCoverFromUrl">
+            <a-button class="app-secondary-cta" type="secondary" @click="loadCoverFromUrl">
               加载
             </a-button>
           </template>
@@ -582,8 +587,8 @@
           <img :src="coverPreviewUrl" @error="handleCoverError" />
         </div>
         <div class="cover-selector-actions">
-          <a-button @click="showCoverSelector = false">取消</a-button>
-          <a-button type="primary" :disabled="!coverPreviewUrl" :loading="isDownloadingCover" @click="confirmCoverSelection">
+          <a-button class="app-secondary-cta" type="secondary" @click="showCoverSelector = false">取消</a-button>
+          <a-button class="app-primary-cta" type="primary" :disabled="!coverPreviewUrl" :loading="isDownloadingCover" @click="confirmCoverSelection">
             确定
           </a-button>
         </div>
@@ -635,7 +640,7 @@
           <div v-if="selectedSteamBannerGame && steamBannerImages.length > 0" class="steam-images-section">
             <div class="steam-search-title">
               {{ selectedSteamBannerGame.name }} 的横幅
-              <a-button type="text" size="mini" @click="backToBannerGameSearch">返回</a-button>
+              <a-button class="app-text-compact" type="text" size="mini" @click="backToBannerGameSearch">返回</a-button>
             </div>
             <div class="steam-images-grid">
               <div
@@ -650,6 +655,7 @@
             </div>
             <a-button
               v-if="selectedBannerImage"
+              class="app-primary-cta"
               type="primary"
               long
               :loading="isSearchingSteamBanner"
@@ -672,7 +678,7 @@
           @success="handleBannerUploadSuccess"
           @error="handleBannerUploadError"
         >
-          <a-button type="dashed" long>
+          <a-button class="app-secondary-cta" type="secondary" long>
             <template #icon>
               <icon-upload />
             </template>
@@ -689,7 +695,7 @@
           @press-enter="loadBannerFromUrl"
         >
           <template #append>
-            <a-button type="primary" @click="loadBannerFromUrl">
+            <a-button class="app-secondary-cta" type="secondary" @click="loadBannerFromUrl">
               加载
             </a-button>
           </template>
@@ -698,8 +704,8 @@
           <img :src="bannerPreviewUrl" @error="handleCoverError" />
         </div>
         <div class="cover-selector-actions">
-          <a-button @click="showBannerSelector = false">取消</a-button>
-          <a-button type="primary" :disabled="!bannerPreviewUrl" :loading="isDownloadingBanner" @click="confirmBannerSelection">
+          <a-button class="app-secondary-cta" type="secondary" @click="showBannerSelector = false">取消</a-button>
+          <a-button class="app-primary-cta" type="primary" :disabled="!bannerPreviewUrl" :loading="isDownloadingBanner" @click="confirmBannerSelection">
             确定
           </a-button>
         </div>
@@ -752,7 +758,7 @@
             <div class="steam-game-info">
               <img :src="steamScreenshotsData.cover" :alt="steamScreenshotsData.name" />
               <span>{{ steamScreenshotsData.name }}</span>
-              <a-button type="text" size="mini" @click="backToScreenshotGameSearch">返回</a-button>
+              <a-button class="app-text-compact" type="text" size="mini" @click="backToScreenshotGameSearch">返回</a-button>
             </div>
 
             <div v-if="steamScreenshotsData.usedFallbackAssets" class="steam-screenshot-hint">
@@ -782,6 +788,7 @@
 
             <a-button
               v-if="selectedSteamScreenshots.size > 0"
+              class="app-primary-cta"
               type="primary"
               long
               :loading="isDownloadingSteamScreenshots"
@@ -804,7 +811,7 @@
           @success="handleScreenshotUploadSuccess"
           @error="handleScreenshotUploadError"
         >
-          <a-button type="dashed" long>
+          <a-button class="app-secondary-cta" type="secondary" long>
             <template #icon>
               <icon-upload />
             </template>
@@ -822,7 +829,7 @@
             @press-enter="loadScreenshotPreview"
           >
             <template #append>
-              <a-button type="primary" @click="loadScreenshotPreview">
+              <a-button class="app-secondary-cta" type="secondary" @click="loadScreenshotPreview">
                 加载
               </a-button>
             </template>
@@ -836,8 +843,8 @@
 
         <!-- 操作按钮 -->
         <div class="cover-selector-actions">
-          <a-button @click="showScreenshotSelector = false">取消</a-button>
-          <a-button type="primary" :disabled="!screenshotPreviewUrl" :loading="isDownloadingScreenshot" @click="confirmScreenshotSelection">
+          <a-button class="app-secondary-cta" type="secondary" @click="showScreenshotSelector = false">取消</a-button>
+          <a-button class="app-primary-cta" type="primary" :disabled="!screenshotPreviewUrl" :loading="isDownloadingScreenshot" @click="confirmScreenshotSelection">
             确定
           </a-button>
 	        </div>
@@ -881,7 +888,7 @@
 	          <div v-if="selectedSteamVideoGame" class="steam-summary-section">
 	            <div class="steam-search-title">
 	              {{ selectedSteamVideoGame.name }} 的预告片
-	              <a-button type="text" size="mini" @click="backToVideoSearch">返回</a-button>
+	              <a-button class="app-text-compact" type="text" size="mini" @click="backToVideoSearch">返回</a-button>
 	            </div>
 	            <div v-if="steamVideoCandidates.length > 0" class="steam-video-source-card">
 	              <div class="steam-video-source-card__label">可下载源（{{ steamVideoCandidates.length }}）</div>
@@ -893,7 +900,7 @@
 	                  class="steam-video-source-item"
 	                >
 	                  <span>{{ getSteamVideoCandidateLabel(candidate.url) }}</span>
-	                  <a-tag v-if="candidate.isDash" size="small" color="arcoblue">DASH</a-tag>
+	                  <a-tag v-if="candidate.isDash" size="small" color="arcoblue">流媒体</a-tag>
 	                </a-radio>
 	              </a-radio-group>
 	            </div>
@@ -908,11 +915,12 @@
 	                {{ line }}
 	              </div>
 	            </div>
-	            <a-button
-	              v-if="steamVideoPreviewUrl"
-	              type="primary"
-	              long
-	              :loading="isDownloadingSteamVideo"
+		            <a-button
+		              v-if="steamVideoPreviewUrl"
+		              class="app-primary-cta"
+		              type="primary"
+		              long
+		              :loading="isDownloadingSteamVideo"
 	              @click="downloadSteamPreviewVideo"
 	            >
 	              下载预告片
@@ -940,7 +948,7 @@
 	          class="hidden-file-input"
 	          @change="handleVideoFileChange"
 	        />
-	        <a-button type="dashed" long :loading="isUploadingVideo" @click="openVideoFilePicker">
+	        <a-button class="app-secondary-cta" type="secondary" long :loading="isUploadingVideo" @click="openVideoFilePicker">
 	          <template #icon>
 	            <icon-upload />
 	          </template>
@@ -970,7 +978,7 @@
 	                  <img
 	                    v-if="form.banner_image || form.cover_image"
 	                    :src="form.banner_image || form.cover_image || ''"
-	                    :alt="`Trailer ${index + 1}`"
+	                    :alt="`预告片 ${index + 1}`"
 	                  />
 	                  <div v-else class="video-library-item__thumb-placeholder">
 	                    <icon-video-camera />
@@ -978,7 +986,7 @@
 	                </div>
 	                <div class="video-library-item__info">
 	                  <div class="video-library-item__title-row">
-	                    <span class="video-library-item__title">Trailer {{ index + 1 }}</span>
+	                    <span class="video-library-item__title">预告片 {{ index + 1 }}</span>
 	                    <a-tag v-if="form.primary_preview_video_uid === video.asset_uid" size="small" color="arcoblue">主预告</a-tag>
 	                  </div>
 	                  <div class="video-library-item__path">{{ video.asset_uid || video.path }}</div>
@@ -988,12 +996,13 @@
 	                <a-button
 	                  v-if="form.primary_preview_video_uid !== video.asset_uid"
 	                  size="mini"
+	                  class="app-text-compact"
 	                  type="text"
 	                  @click="setPrimaryPreviewVideo(video.asset_uid)"
 	                >
 	                  设为主预告
 	                </a-button>
-	                <a-button size="mini" type="text" status="danger" @click="removePreviewVideo(video.asset_uid)">
+	                <a-button class="app-text-compact" size="mini" type="text" status="danger" @click="removePreviewVideo(video.asset_uid)">
 	                  删除
 	                </a-button>
 	              </div>
@@ -1006,7 +1015,7 @@
 	          class="video-library-empty"
 	        />
 	        <div class="cover-selector-actions">
-	          <a-button @click="showVideoSelector = false">完成</a-button>
+	          <a-button class="app-secondary-cta" type="secondary" @click="showVideoSelector = false">完成</a-button>
 	        </div>
 	      </div>
 	    </a-modal>
@@ -1946,9 +1955,9 @@ watch(selectedSteamVideoCandidate, (value) => {
 const getSteamVideoCandidateLabel = (candidateUrl: string) => {
   const index = steamVideoCandidates.value.findIndex((item) => item.url === candidateUrl)
   if (index === -1) {
-    return 'Trailer'
+    return '预告片'
   }
-  return `Trailer ${index + 1}`
+  return `预告片 ${index + 1}`
 }
 
 const appendPreviewVideo = (video: EditableVideo) => {
@@ -2125,7 +2134,14 @@ const openFileBrowser = async (index: number) => {
   currentFileIndex.value = index
   try {
     const defaultPath = await directoryService.getDefaultDirectory()
-    initialPath.value = form.value.file_paths[index]?.path || defaultPath
+    const existingPath = (form.value.file_paths[index]?.path || '').trim()
+    if (!existingPath) {
+      initialPath.value = defaultPath
+    } else if (!existingPath.includes('/') && !existingPath.includes('\\')) {
+      initialPath.value = defaultPath
+    } else {
+      initialPath.value = existingPath.replace(/[\\/][^\\/]*$/, '') || defaultPath
+    }
     showFileBrowser.value = true
   } catch (error) {
     console.error('Failed to get default directory:', error)
@@ -2817,6 +2833,11 @@ const handleSubmit = async () => {
   border-color: rgba(var(--primary-6), 0.45);
 }
 
+.media-empty-action--inner {
+  border: none;
+  border-radius: 0;
+}
+
 .media-empty-icon {
   font-size: 30px;
 }
@@ -2914,9 +2935,9 @@ const handleSubmit = async () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.82);
+  background: rgba(36, 43, 61, 0.9);
   color: rgba(255, 255, 255, 0.92);
   font-size: 18px;
   cursor: pointer;
@@ -2926,24 +2947,37 @@ const handleSubmit = async () => {
 }
 
 .media-action-button:hover {
-  background: rgba(15, 23, 42, 0.92);
+  background: rgba(45, 54, 77, 0.96);
   transform: scale(1.06);
 }
 
 .media-action-button--danger {
-  background: rgba(208, 58, 74, 0.92);
+  border-color: rgba(255, 77, 79, 0.28);
+  background: rgba(255, 77, 79, 0.2);
   color: #fff;
 }
 
 .media-action-button--danger:hover {
-  background: rgba(224, 73, 89, 0.98);
+  background: rgba(255, 77, 79, 0.28);
 }
 
 /* Screenshots Grid */
 .screenshots-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.screenshots-frame {
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.screenshots-grid-wrapper {
+  width: 100%;
+  height: 100%;
+  padding: 10px;
+  overflow-y: auto;
 }
 
 .screenshot-thumb {
@@ -2975,18 +3009,26 @@ const handleSubmit = async () => {
 }
 
 .screenshot-add-tile {
+  width: 100%;
   aspect-ratio: 16 / 9;
   border-radius: 6px;
+  overflow: hidden;
+  position: relative;
   border: 1px dashed rgba(255, 255, 255, 0.1);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.015) 100%);
   color: var(--color-text-3);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  padding: 10px;
+  box-sizing: border-box;
   cursor: pointer;
   transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.screenshot-add-tile__label {
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .screenshot-add-tile:hover {

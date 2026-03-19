@@ -15,6 +15,7 @@
 
         <!-- Enter Button -->
         <a-button
+          class="app-primary-cta app-primary-cta--large"
           type="primary"
           size="large"
           long
@@ -28,12 +29,8 @@
 
         <a-divider />
 
-        <!-- Login Link -->
         <div class="register-footer">
-          <span class="text-grey">已有账号？</span>
-          <a-link @click="router.push('/login')">
-            返回登录
-          </a-link>
+          <span class="text-grey">当前版本无需单独登录，点击上方按钮即可进入。</span>
         </div>
       </a-card>
     </div>
@@ -41,16 +38,14 @@
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { IconTrophy, IconUser } from '@arco-design/web-vue/es/icon'
 
-const router = useRouter()
 const authStore = useAuthStore()
 
 const handleEnter = async () => {
   await authStore.register()
-  router.push('/')
+  window.location.href = '/'
 }
 </script>
 

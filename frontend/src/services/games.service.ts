@@ -29,6 +29,12 @@ interface GameListApiItem {
   needs_review: boolean
   views: number
   downloads: number
+  primary_screenshot?: string | null
+  screenshot_count?: number
+  file_count?: number
+  developer_count?: number
+  publisher_count?: number
+  platform_count?: number
   created_at: string
   updated_at: string
 }
@@ -116,6 +122,12 @@ function mapGameListItem(item: GameListApiItem): Game {
     cover_image: item.cover_image,
     banner_image: item.banner_image,
     needs_review: item.needs_review,
+    primary_screenshot: item.primary_screenshot ?? null,
+    screenshot_count: item.screenshot_count ?? 0,
+    file_count: item.file_count ?? 0,
+    developer_count: item.developer_count ?? 0,
+    publisher_count: item.publisher_count ?? 0,
+    platform_count: item.platform_count ?? 0,
     views: item.views,
     downloads: item.downloads,
     created_at: item.created_at,
@@ -160,6 +172,13 @@ function mapPlatformValues(values?: Array<number | string>): number[] {
   return values
     .map((value) => Number(value))
     .filter((value) => !Number.isNaN(value))
+}
+
+function getFileName(filePath?: string | null): string {
+  const normalized = (filePath || '').trim()
+  if (!normalized) return ''
+  const segments = normalized.split(/[\\/]/)
+  return segments[segments.length - 1] || normalized
 }
 
 async function listMetadata<T extends Series | Platform | Developer | Publisher>(resource: string): Promise<T[]> {
@@ -285,11 +304,12 @@ export const gamesService = {
     return files.map((file, index) => ({
       id: String(file.id),
       gameId,
-      version: file.label || `文件 ${index + 1}`,
+      version: file.label?.trim() || getFileName(file.file_path) || `文件 ${index + 1}`,
       releaseDate: file.updated_at || file.created_at,
-      size: file.size_bytes || 0,
+      size: file.size_bytes ?? 0,
       isLatest: index === 0,
       downloadUrl: `/api/games/${gameId}/files/${file.id}/download`,
+      launchScriptUrl: `/api/games/${gameId}/files/${file.id}/launch-script`,
       changelog: file.notes || undefined,
     }))
   },

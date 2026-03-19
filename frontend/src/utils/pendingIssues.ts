@@ -120,7 +120,10 @@ export function evaluatePendingIssues(game: Game, ignoredDetails: PendingIssueDe
 
   const hasCover = !!game.cover_image
   const hasBanner = !!game.banner_image
-  const hasScreenshots = !!game.screenshots && game.screenshots.length > 0
+  const hasScreenshots =
+    (!!game.screenshots && game.screenshots.length > 0) ||
+    (typeof game.screenshot_count === 'number' && game.screenshot_count > 0) ||
+    !!game.primary_screenshot
   if (!hasCover) {
     details.push('missing-cover')
   }
@@ -138,14 +141,22 @@ export function evaluatePendingIssues(game: Game, ignoredDetails: PendingIssueDe
   const hasFiles =
     (!!game.files && game.files.length > 0) ||
     (!!game.file_paths && game.file_paths.length > 0) ||
-    !!game.file_path
+    !!game.file_path ||
+    (typeof game.file_count === 'number' && game.file_count > 0)
   if (!hasFiles) {
     details.push('missing-files-list')
   }
 
-  const hasDeveloper = !!game.developers && game.developers.length > 0
-  const hasPublisher = !!game.publishers && game.publishers.length > 0
-  const hasPlatform = (!!game.platforms && game.platforms.length > 0) || !!game.platform
+  const hasDeveloper =
+    (!!game.developers && game.developers.length > 0) ||
+    (typeof game.developer_count === 'number' && game.developer_count > 0)
+  const hasPublisher =
+    (!!game.publishers && game.publishers.length > 0) ||
+    (typeof game.publisher_count === 'number' && game.publisher_count > 0)
+  const hasPlatform =
+    (!!game.platforms && game.platforms.length > 0) ||
+    !!game.platform ||
+    (typeof game.platform_count === 'number' && game.platform_count > 0)
   const hasSummary = !!game.summary?.trim()
   if (!hasDeveloper) {
     details.push('missing-developer')

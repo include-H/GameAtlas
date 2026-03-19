@@ -52,11 +52,8 @@ CREATE TABLE IF NOT EXISTS series (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
     slug TEXT NOT NULL UNIQUE,
-    description TEXT,
-    parent_series_id INTEGER,
     sort_order INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (parent_series_id) REFERENCES series(id) ON DELETE SET NULL
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS platforms (
@@ -124,4 +121,3 @@ CREATE INDEX IF NOT EXISTS idx_game_assets_game_id ON game_assets (game_id);
 CREATE INDEX IF NOT EXISTS idx_wiki_history_game_id ON wiki_history (game_id);
 CREATE INDEX IF NOT EXISTS idx_games_title ON games (title);
 CREATE INDEX IF NOT EXISTS idx_games_updated_at ON games (updated_at);
-

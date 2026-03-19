@@ -24,6 +24,21 @@ cleanup_embedded_web() {
   touch "$EMBEDDED_WEB_DIR/.gitkeep"
 }
 
+copy_optional_runtime_data() {
+  local source_dir="$1"
+  local target_dir="$2"
+  local filenames=(
+    "bg.jpg"
+    "LXGWWenKaiGBScreen.ttf"
+  )
+
+  for filename in "${filenames[@]}"; do
+    if [[ -f "$source_dir/$filename" ]]; then
+      cp "$source_dir/$filename" "$target_dir/$filename"
+    fi
+  done
+}
+
 write_runtime_env() {
   local target="$1"
   cat > "$target" <<'EOF'
@@ -81,6 +96,9 @@ mkdir -p \
   "$PACKAGE_DIR/data/gamelist" \
   "$PACKAGE_DIR/ROM"
 
+echo "复制可选自定义资源..."
+copy_optional_runtime_data "$BACKEND_DIR/data" "$PACKAGE_DIR/data"
+
 echo "写入运行配置..."
 write_runtime_env "$PACKAGE_DIR/.env"
 cp "$PACKAGE_DIR/.env" "$PACKAGE_DIR/.env.example"
@@ -108,6 +126,8 @@ echo "  game-server"
 echo "  .env"
 echo "  data/db.db        # 首次运行后自动创建"
 echo "  data/gamelist"
+echo "  data/bg.jpg       # 如存在则作为共享背景"
+echo "  data/LXGWWenKaiGBScreen.ttf  # 如存在则作为全局字体"
 echo "  ROM"
 echo
 echo "启动方式:"

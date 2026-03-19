@@ -80,6 +80,8 @@
       </a-drawer>
 
       <a-layout class="content-layout">
+        <shared-ambient-background />
+
         <a-layout-content class="content">
           <router-view v-slot="{ Component }">
             <keep-alive :include="['GamesView', 'DashboardView']">
@@ -110,6 +112,7 @@ import useMenu from '@/hooks/useMenu'
 import { useUiStore } from '@/stores/ui'
 import AlertBanner from '@/components/AlertBanner.vue'
 import AppNavigationMenu from '@/components/AppNavigationMenu.vue'
+import SharedAmbientBackground from '@/components/SharedAmbientBackground.vue'
 import {
   IconTrophy,
   IconMenuFold,
@@ -235,6 +238,8 @@ provide('showMessage', showMessage)
   min-width: 0;
   flex: 1;
   overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 .pro-header {
@@ -303,6 +308,8 @@ provide('showMessage', showMessage)
   box-sizing: border-box;
   overflow-y: auto;
   overflow-x: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 .footer {
@@ -312,6 +319,8 @@ provide('showMessage', showMessage)
   background: transparent;
   padding: 16px 0;
   border-top: 1px solid var(--color-border-1);
+  position: relative;
+  z-index: 1;
 }
 
 .mobile-menu-btn {

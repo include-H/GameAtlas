@@ -1,13 +1,13 @@
 <template>
   <div class="not-found">
-    <a-result status="404" title="404" sub-title="Page Not Found">
+    <a-result status="404" title="404" sub-title="页面不存在">
       <template #extra>
         <div class="not-found-content">
           <p class="not-found-message">
-            The page you're looking for doesn't exist or has been moved.
+            你访问的页面不存在，或者已经被移动。
           </p>
-          <a-button type="primary" size="large" @click="goHome">
-            Go Home
+          <a-button class="app-primary-cta app-primary-cta--large" type="primary" size="large" @click="goHome">
+            返回首页
           </a-button>
         </div>
       </template>
