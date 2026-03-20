@@ -9,7 +9,7 @@ import App from './App.vue'
 import router from './router'
 import { useUiStore } from './stores/ui'
 import registerDirectives from './directives'
-import { setRootPixel } from './utils/flexible'
+import setRootPixel from './utils/flexible'
 
 // Initialize mobile adaptation (rem-based responsive)
 // This sets root font-size for mobile devices (< 540px)

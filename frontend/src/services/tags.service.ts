@@ -1,7 +1,7 @@
 import { get, post } from './api'
 import type { ApiResponse, Tag, TagGroup } from './types'
 
-export const tagsService = {
+const tagsService = {
   async getTagGroups(): Promise<TagGroup[]> {
     const response = await get<ApiResponse<TagGroup[]>>('/tag-groups')
     return response.data || []

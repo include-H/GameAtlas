@@ -14,7 +14,7 @@ export interface WikiHistoryEntry {
   created_at: string
 }
 
-export const wikiService = {
+const wikiService = {
   async getWikiPage(gameId: string): Promise<WikiContent | null> {
     try {
       const response = await get<ApiResponse<{

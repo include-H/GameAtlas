@@ -96,11 +96,22 @@
 
         <a-layout-content class="content">
           <router-view v-slot="{ Component, route }">
-            <transition name="route-fade" mode="out-in">
-              <div :key="String(route.name || route.path)" class="route-fade-shell">
-                <component :is="Component" />
-              </div>
-            </transition>
+            <template v-if="route.meta?.keepAlive !== false">
+              <keep-alive>
+                <component
+                  :is="Component"
+                  :key="String(route.name || route.path)"
+                  class="route-fade-shell"
+                />
+              </keep-alive>
+            </template>
+            <template v-else>
+              <component
+                :is="Component"
+                :key="String(route.name || route.path)"
+                class="route-fade-shell"
+              />
+            </template>
           </router-view>
 
           <alert-banner />

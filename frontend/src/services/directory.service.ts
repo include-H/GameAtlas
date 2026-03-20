@@ -8,7 +8,7 @@ export interface DirectoryItem {
   extension?: string
 }
 
-export interface DirectoryListResponse {
+interface DirectoryListResponse {
   currentPath: string
   parentPath: string | null
   items: DirectoryItem[]

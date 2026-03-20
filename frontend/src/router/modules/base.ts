@@ -7,5 +7,6 @@ export default {
   component: LoginView,
   meta: {
     hideInMenu: true,
+    keepAlive: false,
   },
 } as RouteRecordRaw

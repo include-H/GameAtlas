@@ -1,6 +1,6 @@
 import type { Game } from './types'
 
-export const FAVORITES_KEY = 'game-library-favorites'
+const FAVORITES_KEY = 'game-library-favorites'
 
 export interface GameListApiItem {
   id: number

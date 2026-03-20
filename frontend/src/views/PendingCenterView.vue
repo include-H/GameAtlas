@@ -653,7 +653,7 @@ const loadPendingGames = async () => {
 
     reviewIssueOverrides.value = await reviewIssuesService.list(response.data.map((game) => game.id))
     pendingGames.value = response.data.filter((game) => getPendingIssueDetails(game).length > 0)
-  } catch (error) {
+  } catch {
     uiStore.addAlert('加载待处理中心失败', 'error')
   } finally {
     isLoading.value = false

@@ -184,7 +184,7 @@ async function listMetadata<T extends Series | Platform | Developer | Publisher>
   return (response.data || []).map((item) => mapMetadataItem<T>(item))
 }
 
-export const gamesService = {
+const gamesService = {
   async getGames(params?: {
     page?: number
     pageSize?: number
@@ -233,9 +233,8 @@ export const gamesService = {
     const pageSize = Math.max(1, Math.min(params?.pageSize || 100, 200))
     const allGames: Game[] = []
     let page = 1
-    let totalPages = 1
 
-    do {
+    while (true) {
       const response = await this.getGames({
         page,
         pageSize,
@@ -244,9 +243,12 @@ export const gamesService = {
       })
 
       allGames.push(...response.data)
-      totalPages = response.pagination?.totalPages || 1
+      const totalPages = response.pagination?.totalPages || 1
+      if (page >= totalPages) {
+        break
+      }
       page += 1
-    } while (page <= totalPages)
+    }
 
     return allGames
   },

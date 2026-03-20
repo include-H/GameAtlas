@@ -29,7 +29,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	router.Use(gin.Logger(), gin.Recovery())
 
 	healthHandler := handlers.NewHealthHandler(db)
-	authService := services.NewAuthService(cfg)
+	authService := services.NewAuthService(cfg, db)
 	authHandler := handlers.NewAuthHandler(authService)
 	gamesRepo := repositories.NewGamesRepository(db)
 	gameFilesRepo := repositories.NewGameFilesRepository(db)
@@ -110,6 +110,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.POST("/assets/video", assetsHandler.Upload("video"))
 	api.POST("/assets/screenshot", assetsHandler.Upload("screenshot"))
 	api.PUT("/assets/screenshot/order", assetsHandler.ReorderScreenshots)
+	api.PUT("/assets/video/order", assetsHandler.ReorderVideos)
 	api.PUT("/assets/video/primary", assetsHandler.SetPrimaryVideo)
 	api.DELETE("/assets", assetsHandler.Delete)
 	api.GET("/directory/default", directoryHandler.Default)

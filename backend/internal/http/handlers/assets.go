@@ -107,6 +107,27 @@ func (h *AssetsHandler) ReorderScreenshots(c *gin.Context) {
 	})
 }
 
+func (h *AssetsHandler) ReorderVideos(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
+	var input domain.VideoOrderUpdateInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid video reorder payload"})
+		return
+	}
+
+	if err := h.service.ReorderVideos(input); err != nil {
+		writeServiceError(c, err, "invalid video reorder payload")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    gin.H{"updated": true},
+	})
+}
+
 func (h *AssetsHandler) SetPrimaryVideo(c *gin.Context) {
 	if !requireAdmin(c) {
 		return

@@ -138,7 +138,6 @@
                 :disabled="showSuccessTransition"
                 @focus="isTyping = true"
                 @blur="isTyping = false"
-                @press-enter="handleLogin"
               />
               <button
                 type="button"
@@ -152,17 +151,20 @@
               </button>
             </div>
           </label>
+          <p v-if="remainingAttempts !== null && !isCooldownActive" class="login-feedback">
+            剩余尝试次数：{{ remainingAttempts }}
+          </p>
 
           <a-button
             class="login-submit"
             type="primary"
+            html-type="submit"
             size="large"
             long
             :loading="isSubmitting && !showSuccessTransition"
-            :disabled="showSuccessTransition"
-            @click="handleLogin"
+            :disabled="isLoginDisabled"
           >
-            进入管理模式
+            {{ submitButtonText }}
           </a-button>
         </form>
       </div>
@@ -203,6 +205,8 @@ const showPassword = ref(false)
 const isSubmitting = ref(false)
 const isTyping = ref(false)
 const showSuccessTransition = ref(false)
+const remainingAttempts = ref<number | null>(null)
+const cooldownLeftSeconds = ref(0)
 
 const mouseX = ref(0)
 const mouseY = ref(0)
@@ -218,10 +222,25 @@ let blackBlinkTimer: number | null = null
 let purplePeekTimer: number | null = null
 let errorAnimationTimer: number | null = null
 let successTransitionTimer: number | null = null
+let cooldownTimer: number | null = null
 
 const shouldPeek = computed(() => password.value.length > 0 && showPassword.value)
 const isHidingPassword = computed(() => password.value.length > 0 && !showPassword.value)
 const isProtectingPassword = computed(() => isTyping.value && !showPassword.value)
+const isCooldownActive = computed(() => cooldownLeftSeconds.value > 0)
+const isLoginDisabled = computed(() => showSuccessTransition.value || isCooldownActive.value)
+const cooldownLabel = computed(() => {
+  const total = Math.max(0, cooldownLeftSeconds.value)
+  const minutes = Math.floor(total / 60)
+  const seconds = total % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+})
+const submitButtonText = computed(() => {
+  if (isCooldownActive.value) {
+    return `冷静中 ${cooldownLabel.value}`
+  }
+  return '进入管理模式'
+})
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value))
 const amplifyMotion = (value: number) => Math.sign(value) * Math.pow(Math.abs(value), 0.8)
@@ -447,9 +466,40 @@ const triggerErrorAnimation = () => {
   }, 0)
 }
 
+const clearCooldownTimer = () => {
+  if (cooldownTimer) {
+    window.clearInterval(cooldownTimer)
+    cooldownTimer = null
+  }
+}
+
+const startCooldown = (seconds: number) => {
+  clearCooldownTimer()
+  cooldownLeftSeconds.value = Math.max(0, Math.floor(seconds))
+  if (cooldownLeftSeconds.value <= 0) {
+    return
+  }
+
+  cooldownTimer = window.setInterval(() => {
+    if (cooldownLeftSeconds.value <= 1) {
+      cooldownLeftSeconds.value = 0
+      clearCooldownTimer()
+      return
+    }
+    cooldownLeftSeconds.value -= 1
+  }, 1000)
+}
+
 const handleLogin = async () => {
+  if (isSubmitting.value) {
+    return
+  }
   if (!password.value.trim()) {
     Message.warning('请输入访问密码')
+    return
+  }
+  if (isCooldownActive.value) {
+    Message.warning(`请在冷静期结束后再试（剩余 ${cooldownLabel.value}）`)
     return
   }
 
@@ -457,6 +507,9 @@ const handleLogin = async () => {
 
   try {
     await authStore.login(password.value)
+    remainingAttempts.value = null
+    cooldownLeftSeconds.value = 0
+    clearCooldownTimer()
     const redirect = resolveRedirect()
     showSuccessTransition.value = true
     successTransitionTimer = window.setTimeout(() => {
@@ -464,6 +517,23 @@ const handleLogin = async () => {
     }, 980)
   } catch (error: any) {
     triggerErrorAnimation()
+    const status = Number(error?.response?.status || 0)
+    const data = error?.response?.data?.data || {}
+
+    if (status === 401) {
+      const attempts = Number(data?.remaining_attempts)
+      if (Number.isFinite(attempts) && attempts >= 0) {
+        remainingAttempts.value = attempts
+      }
+    }
+
+    if (status === 429) {
+      const retryAfter = Number(data?.retry_after_seconds)
+      if (Number.isFinite(retryAfter) && retryAfter > 0) {
+        startCooldown(retryAfter)
+      }
+    }
+
     Message.error(error?.response?.data?.error || '登录失败')
   } finally {
     isSubmitting.value = false
@@ -488,6 +558,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('mousemove', handleMouseMove)
+  clearCooldownTimer()
   clearTimers()
 })
 
@@ -1431,6 +1502,17 @@ watchEffect(() => {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+.login-feedback {
+  margin: -2px 2px 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.login-feedback--warning {
+  color: #ffcc80;
 }
 
 .login-field {

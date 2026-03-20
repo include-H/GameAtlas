@@ -886,6 +886,24 @@
 	              </button>
 	              <div class="video-library-item__actions">
 	                <a-button
+	                  size="mini"
+	                  class="app-text-compact"
+	                  type="text"
+	                  :disabled="index === 0"
+	                  @click="reorderEditableVideos(video.asset_uid || video.path, -1)"
+	                >
+	                  上移
+	                </a-button>
+	                <a-button
+	                  size="mini"
+	                  class="app-text-compact"
+	                  type="text"
+	                  :disabled="index === form.preview_videos.length - 1"
+	                  @click="reorderEditableVideos(video.asset_uid || video.path, 1)"
+	                >
+	                  下移
+	                </a-button>
+	                <a-button
 	                  v-if="form.primary_preview_video_uid !== video.asset_uid"
 	                  size="mini"
 	                  class="app-text-compact"
@@ -917,7 +935,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useUiStore } from '@/stores/ui'
-import { deleteAsset, reorderScreenshots, uploadAsset, type UploadedAssetResult } from '@/services/assets'
+import { deleteAsset, reorderScreenshots, reorderVideos, uploadAsset, type UploadedAssetResult } from '@/services/assets'
 import { directoryService } from '@/services/directory.service'
 import type { Game } from '@/services/types'
 import gamesService from '@/services/games.service'
@@ -935,7 +953,7 @@ import {
 } from '@arco-design/web-vue/es/icon'
 import steamService from '@/services/steam.service'
 import { seriesService } from '@/services/series.service'
-import { platformService } from '@/services/platforms.service'
+import platformService from '@/services/platforms.service'
 import tagsService from '@/services/tags.service'
 import { resolveAssetCandidates } from '@/utils/asset-url'
 import { useSteamPicker } from '@/composables/useSteamPicker'
@@ -1372,6 +1390,25 @@ const createEditableVideo = (asset: VideoAssetItem | UploadedAssetResult | strin
     path: asset.path,
     sort_order: 'sort_order' in asset ? asset.sort_order : undefined,
   }
+}
+
+const getEditableVideoKey = (video: EditableVideo) => {
+  return video.asset_uid || video.path
+}
+
+const reorderEditableVideos = (targetKey: string, direction: -1 | 1) => {
+  const videos = [...form.value.preview_videos]
+  const index = videos.findIndex((item) => getEditableVideoKey(item) === targetKey)
+  if (index === -1) return
+  const nextIndex = index + direction
+  if (nextIndex < 0 || nextIndex >= videos.length) return
+
+  const [moved] = videos.splice(index, 1)
+  videos.splice(nextIndex, 0, moved)
+  form.value.preview_videos = videos.map((item, order) => ({
+    ...item,
+    sort_order: order,
+  }))
 }
 
 const reorderEditableScreenshots = (fromKey: string, toKey: string) => {
@@ -2509,6 +2546,16 @@ const handleSubmit = async () => {
       .filter((assetUid): assetUid is string => !!assetUid)
     if (orderedScreenshotUids.length > 0) {
       await reorderScreenshots(props.game.id, orderedScreenshotUids)
+    }
+
+    const orderedVideoUids = form.value.preview_videos
+      .map((item, index) => {
+        item.sort_order = index
+        return item.asset_uid
+      })
+      .filter((assetUid): assetUid is string => !!assetUid)
+    if (orderedVideoUids.length > 0) {
+      await reorderVideos(props.game.id, orderedVideoUids)
     }
 
     // Refresh series options after successful save (load popular)

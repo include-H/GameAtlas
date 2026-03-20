@@ -10,5 +10,6 @@ export default {
   meta: {
     locale: 'menu.notFound',
     hideInMenu: true,
+    keepAlive: false,
   },
 } as RouteRecordRaw

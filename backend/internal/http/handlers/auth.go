@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -27,15 +28,38 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	session, err := h.service.Login(payload.Password)
+	sourceKey := h.service.SourceKey(c.ClientIP(), c.Request.UserAgent())
+	session, err := h.service.Login(payload.Password, sourceKey)
 	if err != nil {
+		var denied *services.LoginDeniedError
+		if errors.As(err, &denied) {
+			switch denied.Reason {
+			case services.LoginDeniedLocked:
+				c.JSON(http.StatusTooManyRequests, gin.H{
+					"success": false,
+					"error":   "错误次数过多，请稍后再试",
+					"data": gin.H{
+						"retry_after_seconds": denied.RetryAfterSeconds,
+						"locked_until_unix":   denied.LockedUntilUnixUTC,
+					},
+				})
+			default:
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"success": false,
+					"error":   "密码错误",
+					"data": gin.H{
+						"remaining_attempts": denied.RemainingAttempts,
+					},
+				})
+			}
+			return
+		}
+
 		switch err {
 		case services.ErrAuthDisabled:
-			c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "error": "auth is not configured"})
-		case services.ErrUnauthorized:
-			c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "invalid password"})
+			c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "error": "登录功能未配置"})
 		default:
-			c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "login failed"})
+			c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "登录失败"})
 		}
 		return
 	}

@@ -100,7 +100,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import GameCard from '@/components/GameCard.vue'
-import { gamesService } from '@/services/games.service'
+import gamesService from '@/services/games.service'
 import type { Game } from '@/services/types'
 import { createDetailRouteQuery } from '@/utils/navigation'
 

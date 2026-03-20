@@ -59,10 +59,11 @@ export async function reorderScreenshots(gameId: number, assetUids: string[]) {
   return data.data
 }
 
-export async function setPrimaryVideo(gameId: number, assetUid: string) {
-  const { data } = await api.put<ApiResponse<{ updated: boolean }>>('/assets/video/primary', {
+export async function reorderVideos(gameId: number, assetUids: string[]) {
+  const { data } = await api.put<ApiResponse<{ updated: boolean }>>('/assets/video/order', {
     game_id: gameId,
-    asset_uid: assetUid,
+    asset_uids: assetUids,
   })
+
   return data.data
 }

@@ -43,122 +43,115 @@
       </div>
       </div>
 
-	      <!-- Main Content -->
-	      <div class="game-detail__content">
-	        <div class="game-detail__main" ref="mainContentRef">
-	        <!-- Screenshot Carousel -->
-	        <screenshot-carousel
-	          :preview-video="game.preview_video?.path || null"
-	          :preview-videos="game.preview_videos?.map((item) => item.path) || []"
-	          :video-poster="game.banner_image || game.cover_image || null"
-	          :screenshots="game.screenshots || []"
-	          :alt="game.title"
-	          :height="desktopTopSectionHeight"
-        />
-      </div>
+      <div ref="topSectionRef" class="game-detail__top">
+        <div class="game-detail__content">
+          <div class="game-detail__main">
+            <screenshot-carousel
+              :preview-video="game.preview_video?.path || null"
+              :preview-videos="game.preview_videos?.map((item) => item.path) || []"
+              :video-poster="game.banner_image || game.cover_image || null"
+              :screenshots="game.screenshots || []"
+              :alt="game.title"
+              :height="carouselHeight"
+            />
+          </div>
+        </div>
 
-      <!-- Sidebar - Steam Style -->
-      <div class="game-detail__sidebar">
-        <div class="sidebar-card" :style="{ minHeight: desktopSidebarMinHeight }">
-          <div class="sidebar-card__inner" ref="sidebarCardInnerRef">
-          <!-- Header Banner (Steam Style) -->
-          <div class="sidebar-header-image">
-            <img
-              v-if="game.banner_image"
-              :src="game.banner_image"
-              :alt="game.title"
-              class="sidebar-header-image__img"
-            />
-            <img
-              v-else-if="game.cover_image"
-              :src="game.cover_image"
-              :alt="game.title"
-              class="sidebar-header-image__img sidebar-header-image__img--contain"
-            />
-            <div v-else class="sidebar-header-image__placeholder">
-              {{ game.title?.charAt(0) || '?' }}
-            </div>
-          </div>
-          
-          <!-- Game Summary -->
-          <div v-if="game.summary" class="sidebar-summary">
-            {{ game.summary }}
-          </div>
-          
-          <!-- Download Button -->
-          <div class="sidebar-actions">
-            <a-button
-              class="app-primary-cta app-primary-cta--large"
-              type="primary"
-              size="large"
-              long
-              @click="showDownloadModal = true"
-            >
-              <template #icon>
-                <icon-download />
-              </template>
-              下载游戏
-            </a-button>
-          </div>
-          
-          <!-- Game Info -->
-          <div class="sidebar-info">
-            <div v-if="game.series && game.series.length > 0" class="sidebar-info__item">
-              <span class="sidebar-info__label">系列</span>
-              <span class="sidebar-info__value">{{ game.series[0].name }}</span>
-            </div>
-            <div v-if="game.developers && game.developers.length > 0" class="sidebar-info__item">
-              <span class="sidebar-info__label">开发商</span>
-              <span class="sidebar-info__value">{{ developerNames }}</span>
-            </div>
-            <div v-if="game.publishers && game.publishers.length > 0" class="sidebar-info__item">
-              <span class="sidebar-info__label">发行商</span>
-              <span class="sidebar-info__value">{{ publisherNames }}</span>
-            </div>
-            <div v-if="game.release_date" class="sidebar-info__item">
-              <span class="sidebar-info__label">发行日期</span>
-              <span class="sidebar-info__value">{{ formatDate(game.release_date) }}</span>
-            </div>
-            <div v-if="game.engine" class="sidebar-info__item">
-              <span class="sidebar-info__label">游戏引擎</span>
-              <span class="sidebar-info__value">{{ game.engine }}</span>
-            </div>
-            <div v-if="game.platforms && game.platforms.length > 0" class="sidebar-info__item">
-              <span class="sidebar-info__label">平台</span>
-              <div class="sidebar-info__value">
-                <a-space wrap>
-                  <a-tag v-for="platform in game.platforms" :key="platform">
-                    {{ platform }}
-                  </a-tag>
-                </a-space>
+        <div class="game-detail__sidebar">
+          <div class="sidebar-card sidebar-card--hero">
+            <div class="sidebar-header-image">
+              <img
+                v-if="game.banner_image"
+                :src="game.banner_image"
+                :alt="game.title"
+                class="sidebar-header-image__img"
+              />
+              <img
+                v-else-if="game.cover_image"
+                :src="game.cover_image"
+                :alt="game.title"
+                class="sidebar-header-image__img sidebar-header-image__img--contain"
+              />
+              <div v-else class="sidebar-header-image__placeholder">
+                {{ game.title?.charAt(0) || '?' }}
               </div>
             </div>
-            <div v-else-if="game.platform" class="sidebar-info__item">
-              <span class="sidebar-info__label">平台</span>
-              <span class="sidebar-info__value">{{ game.platform }}</span>
+
+            <div v-if="game.summary" class="sidebar-summary">
+              {{ game.summary }}
             </div>
-            <div
-              v-for="group in game.tag_groups || []"
-              :key="group.id"
-              class="sidebar-info__item"
-            >
-              <span class="sidebar-info__label">{{ group.name }}</span>
-              <div class="sidebar-info__value">
-                <a-space wrap>
-                  <a-tag v-for="tag in group.tags" :key="tag.id">
-                    {{ tag.name }}
-                  </a-tag>
-                </a-space>
-              </div>
+
+            <div class="sidebar-actions">
+              <a-button
+                class="app-primary-cta app-primary-cta--large"
+                type="primary"
+                size="large"
+                long
+                @click="showDownloadModal = true"
+              >
+                <template #icon>
+                  <icon-download />
+                </template>
+                下载游戏
+              </a-button>
             </div>
           </div>
+
+          <div class="sidebar-card sidebar-card--meta">
+            <div class="sidebar-info">
+              <div v-if="game.series && game.series.length > 0" class="sidebar-info__item">
+                <span class="sidebar-info__label">系列</span>
+                <span class="sidebar-info__value">{{ game.series[0].name }}</span>
+              </div>
+              <div v-if="game.developers && game.developers.length > 0" class="sidebar-info__item">
+                <span class="sidebar-info__label">开发商</span>
+                <span class="sidebar-info__value">{{ developerNames }}</span>
+              </div>
+              <div v-if="game.publishers && game.publishers.length > 0" class="sidebar-info__item">
+                <span class="sidebar-info__label">发行商</span>
+                <span class="sidebar-info__value">{{ publisherNames }}</span>
+              </div>
+              <div v-if="game.release_date" class="sidebar-info__item">
+                <span class="sidebar-info__label">发行日期</span>
+                <span class="sidebar-info__value">{{ formatDate(game.release_date) }}</span>
+              </div>
+              <div v-if="game.engine" class="sidebar-info__item">
+                <span class="sidebar-info__label">游戏引擎</span>
+                <span class="sidebar-info__value">{{ game.engine }}</span>
+              </div>
+              <div v-if="game.platforms && game.platforms.length > 0" class="sidebar-info__item">
+                <span class="sidebar-info__label">平台</span>
+                <div class="sidebar-info__value">
+                  <a-space wrap>
+                    <a-tag v-for="platform in game.platforms" :key="platform">
+                      {{ platform }}
+                    </a-tag>
+                  </a-space>
+                </div>
+              </div>
+              <div v-else-if="game.platform" class="sidebar-info__item">
+                <span class="sidebar-info__label">平台</span>
+                <span class="sidebar-info__value">{{ game.platform }}</span>
+              </div>
+              <div
+                v-for="group in game.tag_groups || []"
+                :key="group.id"
+                class="sidebar-info__item"
+              >
+                <span class="sidebar-info__label">{{ group.name }}</span>
+                <div class="sidebar-info__value">
+                  <a-space wrap>
+                    <a-tag v-for="tag in group.tags" :key="tag.id">
+                      {{ tag.name }}
+                    </a-tag>
+                  </a-space>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      </div>
-
-      <!-- Wiki Section - Full Width -->
       <div class="game-detail__wiki-section">
         <!-- Wiki Content with TOC -->
         <div v-if="wiki" class="game-detail__wiki-wrapper">
@@ -204,8 +197,8 @@
           </div>
         </a-card>
       </div>
+      </div>
     </div>
-  </div>
 
   <!-- Loading State -->
   <div v-else class="game-detail__loading">
@@ -271,7 +264,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
@@ -306,11 +299,12 @@ const versions = computed(() => gamesStore.currentVersions)
 const wiki = ref<WikiContent | null>(null)
 const showEditModal = ref(false)
 const showDownloadModal = ref(false)
+const topSectionRef = ref<HTMLElement | null>(null)
+const topSectionHeight = ref<number | undefined>(undefined)
+let topSectionObserver: ResizeObserver | null = null
 
 const developerNames = computed(() => (game.value?.developers || []).map((item) => item.name).join(' / '))
 const publisherNames = computed(() => (game.value?.publishers || []).map((item) => item.name).join(' / '))
-
-// Sidebar 高度计算
 
 const canEdit = computed(() => isAdmin.value)
 
@@ -343,7 +337,7 @@ const handleDownloadVersion = async (version: GameVersion) => {
     await downloadService.startDownload(String(game.value.id), version.id)
     uiStore.addAlert(`已开始下载 ${version.version}`, 'success')
     showDownloadModal.value = false
-  } catch (error) {
+  } catch {
     uiStore.addAlert('下载启动失败', 'error')
   }
 }
@@ -354,7 +348,7 @@ const handleDownloadLaunchScript = (version: GameVersion) => {
   try {
     downloadService.downloadLaunchScript(String(game.value.id), version.id)
     uiStore.addAlert(`已下载 ${version.version} 的启动脚本`, 'success')
-  } catch (error) {
+  } catch {
     uiStore.addAlert('启动脚本下载失败', 'error')
   }
 }
@@ -378,127 +372,22 @@ const handleToggleFavorite = async () => {
   try {
     await gamesStore.toggleFavorite(String(game.value.id))
     uiStore.addAlert('收藏已更新', 'success')
-  } catch (error) {
+  } catch {
     uiStore.addAlert('更新收藏失败', 'error')
   }
 }
 
-const sidebarCardInnerRef = ref<HTMLElement | null>(null)
-const mainContentRef = ref<HTMLElement | null>(null)
-const sidebarContentHeight = ref(0)
-const mainBaseHeight = ref(0)
-const isDesktop = ref(true)
-const DESKTOP_SCREENSHOT_MIN_HEIGHT = 550
-let sidebarResizeObserver: ResizeObserver | null = null
-let mainResizeObserver: ResizeObserver | null = null
-
-const disconnectSidebarObserver = () => {
-  if (sidebarResizeObserver) {
-    sidebarResizeObserver.disconnect()
-    sidebarResizeObserver = null
-  }
-}
-
-const disconnectMainObserver = () => {
-  if (mainResizeObserver) {
-    mainResizeObserver.disconnect()
-    mainResizeObserver = null
-  }
-}
-
-const syncSidebarHeight = () => {
-  const element = sidebarCardInnerRef.value
-  if (!element) {
-    sidebarContentHeight.value = 0
-    return
-  }
-  sidebarContentHeight.value = Math.round(element.getBoundingClientRect().height)
-}
-
-const syncMainBaseHeight = () => {
-  const element = mainContentRef.value
-  if (!element) {
-    mainBaseHeight.value = 0
-    return
-  }
-
-  const measuredHeight = Math.round(element.getBoundingClientRect().height)
-  if (!measuredHeight) return
-
-  const isStretchingFromSidebar =
-    mainBaseHeight.value > 0 &&
-    sidebarContentHeight.value > mainBaseHeight.value
-  if (!isStretchingFromSidebar) {
-    mainBaseHeight.value = measuredHeight
-  }
-}
-
-const setupSidebarObserver = async () => {
-  await nextTick()
-
-  if (!isDesktop.value || typeof ResizeObserver === 'undefined') {
-    disconnectSidebarObserver()
-    syncSidebarHeight()
-    return
-  }
-
-  const element = sidebarCardInnerRef.value
-  if (!element) {
-    sidebarContentHeight.value = 0
-    return
-  }
-
-  disconnectSidebarObserver()
-  syncSidebarHeight()
-
-  sidebarResizeObserver = new ResizeObserver((entries) => {
-    const entry = entries[0]
-    if (!entry) return
-    sidebarContentHeight.value = Math.round(entry.contentRect.height)
-  })
-  sidebarResizeObserver.observe(element)
-}
-
-const setupMainObserver = async () => {
-  await nextTick()
-
-  if (!isDesktop.value || typeof ResizeObserver === 'undefined') {
-    disconnectMainObserver()
-    syncMainBaseHeight()
-    return
-  }
-
-  const element = mainContentRef.value
-  if (!element) {
-    mainBaseHeight.value = 0
-    return
-  }
-
-  disconnectMainObserver()
-  syncMainBaseHeight()
-
-  mainResizeObserver = new ResizeObserver(() => {
-    syncMainBaseHeight()
-  })
-  mainResizeObserver.observe(element)
-}
-
-const updateBreakpoint = () => {
-  if (typeof window === 'undefined') return
-  isDesktop.value = window.innerWidth >= 1024
-}
-
-const desktopTopSectionHeight = computed(() => {
-  if (!isDesktop.value) return undefined
-  const targetHeight = Math.max(mainBaseHeight.value, sidebarContentHeight.value)
-  if (targetHeight <= 0) return DESKTOP_SCREENSHOT_MIN_HEIGHT
-  return Math.max(Math.round(targetHeight), DESKTOP_SCREENSHOT_MIN_HEIGHT)
+const carouselHeight = computed(() => {
+  if (!topSectionHeight.value) return undefined
+  return Math.max(Math.round(topSectionHeight.value), 420)
 })
 
-const desktopSidebarMinHeight = computed(() => {
-  if (!isDesktop.value || mainBaseHeight.value <= 0) return undefined
-  return `${Math.round(mainBaseHeight.value)}px`
-})
+const disconnectTopSectionObserver = () => {
+  if (topSectionObserver) {
+    topSectionObserver.disconnect()
+    topSectionObserver = null
+  }
+}
 
 const loadGameDetail = async (gameId: string) => {
   try {
@@ -534,27 +423,44 @@ watch(
   { immediate: true },
 )
 
-onMounted(async () => {
-  updateBreakpoint()
-  window.addEventListener('resize', updateBreakpoint)
-  await setupSidebarObserver()
-  await setupMainObserver()
-})
+const syncTopSectionHeight = () => {
+  const element = topSectionRef.value
+  if (!element) {
+    topSectionHeight.value = undefined
+    return
+  }
+  const nextHeight = Math.round(element.getBoundingClientRect().height)
+  topSectionHeight.value = nextHeight > 0 ? nextHeight : undefined
+}
 
-onUnmounted(() => {
-  window.removeEventListener('resize', updateBreakpoint)
-  disconnectSidebarObserver()
-  disconnectMainObserver()
+const setupTopSectionObserver = async () => {
+  await nextTick()
+  disconnectTopSectionObserver()
+  syncTopSectionHeight()
+
+  if (!topSectionRef.value || typeof ResizeObserver === 'undefined') return
+
+  topSectionObserver = new ResizeObserver(() => {
+    syncTopSectionHeight()
+  })
+  topSectionObserver.observe(topSectionRef.value)
+}
+
+onMounted(() => {
+  void setupTopSectionObserver()
 })
 
 watch(
-  [game, isDesktop, wiki],
-  async () => {
-    await setupSidebarObserver()
-    await setupMainObserver()
+  game,
+  () => {
+    void setupTopSectionObserver()
   },
   { flush: 'post' },
 )
+
+onUnmounted(() => {
+  disconnectTopSectionObserver()
+})
 
 </script>
 
@@ -574,6 +480,14 @@ watch(
   padding: 0 16px;
   width: 100%;
   box-sizing: border-box;
+}
+
+.game-detail__top {
+  display: grid;
+  grid-template-columns: minmax(0, 68fr) minmax(280px, 30fr);
+  column-gap: 16px;
+  align-items: stretch;
+  margin-top: 16px;
 }
 
 @keyframes fadeIn {
@@ -624,27 +538,34 @@ watch(
 .header-actions {
   display: flex; gap: 8px; } .header-favorite-btn, .header-edit-btn { color: var(--color-text-2); } .header-favorite-btn.is-favorite { color: #ff4d4f !important; } /* Main Content Layout - 固定比例: 左侧70%, 右侧30% */
 .game-detail__content {
+  width: 100%;
   display: flex;
-  padding: 16px 0;
-  align-items: flex-start;
-}
-
-/* Main Column - 固定占68%宽度 */
-.game-detail__main {
-  flex: 0 0 68%;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
   min-width: 0;
 }
 
+.game-detail__main {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  min-height: 420px;
+  height: 100%;
+}
+
 .game-detail__main > :deep(.screenshot-carousel) {
+  min-width: 0;
   margin-bottom: 0;
   width: 100%;
+  height: 100%;
 }
 
 .game-detail__main > :deep(.screenshot-carousel__viewport) {
   border-radius: var(--radius-lg);
+  min-height: 420px;
+}
+
+.game-detail__main > :deep(.screenshot-carousel__main) {
+  min-height: 420px;
 }
 
 .game-detail__main > :deep(.screenshot-carousel__filmstrip) {
@@ -666,7 +587,8 @@ watch(
 
 /* Wiki Section - Full Width */
 .game-detail__wiki-section {
-  padding: 0 0 16px;
+  padding: 16px 0;
+  min-width: 0;
 }
 
 .game-detail__wiki-wrapper {
@@ -736,14 +658,11 @@ watch(
 
 /* Sidebar - Steam Style - 固定占30%宽度 */
 .game-detail__sidebar {
-  flex: 0 0 30%;
-  margin-left: 16px;
   display: flex;
   flex-direction: column;
-  position: sticky;
-  top: 16px;
+  gap: 16px;
   min-width: 0;
-  margin-left: 16px;
+  height: 100%;
 }
 
 .sidebar-card {
@@ -756,10 +675,14 @@ watch(
   box-shadow: var(--shadow-soft);
 }
 
-.sidebar-card__inner {
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
+.sidebar-card--hero {
+  background:
+    linear-gradient(180deg, rgba(24, 30, 42, 0.98) 0%, rgba(18, 23, 33, 0.98) 100%);
+}
+
+.sidebar-card--meta {
+  padding-top: 4px;
+  flex: 1;
 }
 
 /* 侧边栏横幅区域 (Steam Header Image) */
@@ -966,13 +889,28 @@ watch(
 /* Responsive - Arco Design Breakpoints */
 /* lg: 992px */
 @media (max-width: 992px) {
-  .game-detail__content {
-    grid-template-columns: 1fr;
+  .game-detail__top {
+    display: flex;
+    flex-direction: column;
   }
 
   .game-detail__sidebar {
-    order: -1;
-    position: static;
+    width: 100%;
+    height: auto;
+  }
+
+  .game-detail__content,
+  .game-detail__main,
+  .game-detail__wiki-section {
+    width: 100%;
+  }
+
+  .game-detail__main > :deep(.screenshot-carousel__viewport) {
+    min-height: 320px;
+  }
+
+  .game-detail__main > :deep(.screenshot-carousel__main) {
+    min-height: 320px;
   }
 
   .sidebar-header-image {

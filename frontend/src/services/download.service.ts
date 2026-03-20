@@ -1,4 +1,4 @@
-export const downloadService = {
+const downloadService = {
   getDownloadUrl(gameId: string): string {
     return `/api/games/${gameId}`
   },

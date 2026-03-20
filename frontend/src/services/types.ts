@@ -219,20 +219,6 @@ export interface GameSort {
   seed?: number
 }
 
-export interface FileInfo {
-  name: string
-  path: string
-  isDirectory: boolean
-  size?: number | null
-  extension?: string
-}
-
-export interface BrowseResponse {
-  currentPath: string
-  items: FileInfo[]
-  parentPath: string | null
-}
-
 export interface SteamGameSearchResult {
   id: string
   name: string

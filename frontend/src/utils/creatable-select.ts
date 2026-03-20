@@ -1,4 +1,4 @@
-export interface CreatableNamedOption {
+interface CreatableNamedOption {
   id: number
   name: string
 }
@@ -12,7 +12,7 @@ export const sortCreatableOptionsByName = <T extends CreatableNamedOption>(optio
   return [...options].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
 }
 
-export const mergeSelectedOptions = <T extends { id: number }>(
+const mergeSelectedOptions = <T extends { id: number }>(
   results: T[],
   selectedValues: Array<string | number>,
   currentOptions: T[],

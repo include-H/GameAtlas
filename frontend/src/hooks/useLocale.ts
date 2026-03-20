@@ -1,7 +1,7 @@
 import { computed } from 'vue'
 import zhCN from '@/locale/zh-CN'
 
-export type Locale = 'zh-CN' | 'en-US'
+type Locale = 'zh-CN' | 'en-US'
 
 const locales: Record<Locale, any> = {
   'zh-CN': zhCN,

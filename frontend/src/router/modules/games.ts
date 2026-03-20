@@ -11,6 +11,7 @@ export default {
   meta: {
     locale: 'menu.games',
     requiresAuth: true,
+    keepAlive: true,
     icon: IconTrophy,
     roles: ['*'],
   },
@@ -26,6 +27,7 @@ export const timelineRoute = {
   meta: {
     locale: 'menu.games.timeline',
     requiresAuth: true,
+    keepAlive: true,
     icon: IconCalendarClock,
     roles: ['*'],
   },
@@ -41,6 +43,7 @@ export const gameDetailRoute = {
   meta: {
     locale: 'menu.game.detail',
     requiresAuth: true,
+    keepAlive: true,
     roles: ['*'],
     hideInMenu: true,
     activeMenu: 'games',
@@ -58,6 +61,7 @@ export const pendingCenterRoute = {
     locale: 'menu.pending.center',
     requiresAuth: true,
     requiresAdmin: true,
+    keepAlive: true,
     roles: ['*'],
     icon: IconExclamationCircle,
   },
@@ -74,6 +78,7 @@ export const wikiEditRoute = {
     locale: 'menu.wiki.edit',
     requiresAuth: true,
     requiresAdmin: true,
+    keepAlive: true,
     roles: ['*'],
     hideInMenu: true,
     activeMenu: 'games',

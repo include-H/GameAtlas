@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
-export type ViewMode = 'grid' | 'list'
-export type CardSize = 'small' | 'medium' | 'large'
+type ViewMode = 'grid' | 'list'
+type CardSize = 'small' | 'medium' | 'large'
 
 export const useUiStore = defineStore('ui', () => {
   // Theme

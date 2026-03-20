@@ -227,7 +227,7 @@ const toggleFavorite = async (id: string) => {
   try {
     await gamesStore.toggleFavorite(id)
     uiStore.addAlert('收藏已更新', 'success')
-  } catch (error) {
+  } catch {
     uiStore.addAlert('更新收藏失败', 'error')
   }
 }
@@ -240,7 +240,7 @@ const loadDashboardData = async () => {
     pendingReviewGameCount.value = stats.pending_reviews || 0
     isDashboardReady.value = true
     lastLoadedAt.value = Date.now()
-  } catch (error) {
+  } catch {
     uiStore.addAlert('加载数据失败', 'error')
     isDashboardReady.value = true
   } finally {

@@ -8,6 +8,7 @@ export default {
   meta: {
     locale: 'menu.series',
     requiresAuth: true,
+    keepAlive: true,
     icon: IconApps,
     roles: ['*'],
   },
@@ -20,6 +21,7 @@ export const seriesDetailRoute = {
   meta: {
     locale: 'menu.series.detail',
     requiresAuth: true,
+    keepAlive: true,
     roles: ['*'],
     hideInMenu: true,
     activeMenu: 'series-library',

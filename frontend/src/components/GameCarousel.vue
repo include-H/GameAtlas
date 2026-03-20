@@ -1,6 +1,5 @@
 <template>
   <div class="game-carousel">
-    <!-- Background Images -->
     <div class="carousel-background">
       <div
         v-for="(game, index) in games"
@@ -8,12 +7,6 @@
         class="carousel-slide"
         :class="{ active: currentIndex === index }"
       >
-        <!-- Layer 1: Blurred Backdrop (fills 21:9) -->
-        <div 
-          class="slide-backdrop" 
-          :style="{ backgroundImage: `url(${getBackgroundImage(game)})` }"
-        />
-        <!-- Layer 2: Clear Foreground (centered, preserves aspect ratio) -->
         <div 
           class="slide-foreground" 
           :style="{ backgroundImage: `url(${getBackgroundImage(game)})` }"
@@ -56,10 +49,10 @@
     </div>
 
     <!-- Navigation Arrows -->
-    <button class="carousel-arrow carousel-arrow-prev" @click="prevSlide">
+    <button class="carousel-arrow app-carousel-nav-button carousel-arrow-prev" @click="prevSlide" aria-label="上一张">
       <icon-left />
     </button>
-    <button class="carousel-arrow carousel-arrow-next" @click="nextSlide">
+    <button class="carousel-arrow app-carousel-nav-button carousel-arrow-next" @click="nextSlide" aria-label="下一张">
       <icon-right />
     </button>
   </div>
@@ -209,24 +202,11 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-.slide-backdrop {
-  position: absolute;
-  inset: -4%;
-  background-size: cover;
-  background-position: center;
-  opacity: 0.88;
-  filter: blur(26px) saturate(0.95) brightness(0.55);
-  z-index: 1;
-  transform: scale(1.08);
-  will-change: transform, opacity, filter;
-}
-
 .slide-foreground {
   position: absolute;
   inset: 0;
-  background-size: contain;
+  background-size: cover;
   background-position: center;
-  background-repeat: no-repeat;
   z-index: 2;
   filter: drop-shadow(0 24px 42px rgba(0, 0, 0, 0.48));
   will-change: transform, opacity;
@@ -322,25 +302,7 @@ onUnmounted(() => {
 
 .carousel-arrow {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
   z-index: 11;
-  transition: all 0.3s ease;
-}
-
-.carousel-arrow:hover {
-  background: rgba(255, 255, 255, 0.2);
 }
 
 .carousel-arrow-prev {

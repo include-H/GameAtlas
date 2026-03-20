@@ -485,7 +485,7 @@ const toggleFavorite = async (id: number) => {
   try {
     await gamesStore.toggleFavorite(id.toString())
     uiStore.addAlert('收藏已更新', 'success')
-  } catch (error) {
+  } catch {
     uiStore.addAlert('更新收藏失败', 'error')
   }
 }
@@ -677,7 +677,7 @@ const loadGames = async () => {
         totalPages: response.pagination.totalPages,
       }
     }
-  } catch (error) {
+  } catch {
     uiStore.addAlert('加载游戏失败', 'error')
   } finally {
     isLoading.value = false

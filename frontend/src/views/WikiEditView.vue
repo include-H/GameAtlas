@@ -224,7 +224,7 @@ const loadWikiEditorData = async (gameId: string) => {
     }
 
     await loadHistory(gameId)
-  } catch (error) {
+  } catch {
     uiStore.addAlert('Failed to load game', 'error')
     router.push({ name: 'games' })
   }

@@ -33,7 +33,7 @@ function mapSearchResult(item: SteamSearchApiItem): SteamGameSearchResult {
   }
 }
 
-export const steamService = {
+const steamService = {
   async searchGames(query: string): Promise<SteamGameSearchResult[]> {
     if (!query || query.trim().length === 0) return []
     const response = await get<ApiResponse<SteamSearchApiItem[]>>('/steam/search', {

@@ -34,7 +34,7 @@ apiClient.interceptors.response.use(
 )
 
 // Generic request wrapper
-export const request = async <T = any>(config: AxiosRequestConfig): Promise<T> => {
+const request = async <T = any>(config: AxiosRequestConfig): Promise<T> => {
   const response = await apiClient.request<T>(config)
   return response.data
 }

@@ -30,6 +30,11 @@ type Config struct {
 	WikiHistoryLimit  int
 	AdminPassword     string
 	SessionSecret     string
+	AuthMaxFails      int
+	AuthCooldown      time.Duration
+	AuthFailWindow    time.Duration
+	AuthStateTTL      time.Duration
+	AuthTrackBy       string
 	LogLevel          string
 	ReadHeaderTimeout time.Duration
 	ShutdownTimeout   time.Duration
@@ -60,6 +65,11 @@ func Load() Config {
 		WikiHistoryLimit:  getEnvAsInt("WIKI_HISTORY_LIMIT", 100),
 		AdminPassword:     getEnv("ADMIN_PASSWORD", ""),
 		SessionSecret:     getEnv("SESSION_SECRET", "change-me"),
+		AuthMaxFails:      getEnvAsInt("AUTH_MAX_FAILS", 5),
+		AuthCooldown:      getEnvAsDuration("AUTH_COOLDOWN", 10*time.Minute),
+		AuthFailWindow:    getEnvAsDuration("AUTH_FAIL_WINDOW", 30*time.Minute),
+		AuthStateTTL:      getEnvAsDuration("AUTH_STATE_TTL", 24*time.Hour),
+		AuthTrackBy:       getEnv("AUTH_TRACK_BY", "ip"),
 		LogLevel:          getEnv("LOG_LEVEL", "info"),
 		ReadHeaderTimeout: getEnvAsDuration("READ_HEADER_TIMEOUT", 5*time.Second),
 		ShutdownTimeout:   getEnvAsDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
