@@ -1,9 +1,9 @@
 <template>
   <div class="pending-center">
-    <div class="pending-center__header">
-      <div>
-        <h1 class="pending-center__title text-gradient">待处理中心</h1>
-        <p class="pending-center__subtitle">集中补齐图片、Wiki、文件和基础信息。</p>
+    <div class="pending-center__header page-hero">
+      <div class="page-hero__content">
+        <h1 class="pending-center__title page-hero__title text-gradient">待处理中心</h1>
+        <p class="pending-center__subtitle page-hero__subtitle">集中补齐图片、Wiki、文件和基础信息。</p>
       </div>
 
       <a-space>
@@ -679,20 +679,15 @@ onMounted(async () => {
 }
 
 .pending-center__header {
-  display: flex;
-  justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
 }
 
 .pending-center__title {
   margin: 0;
-  font-size: 30px;
 }
 
 .pending-center__subtitle {
-  margin: 8px 0 0;
-  color: var(--color-text-3);
+  margin: 0;
 }
 
 .pending-center__stats {

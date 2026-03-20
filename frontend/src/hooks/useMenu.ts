@@ -90,7 +90,7 @@ export default function useMenu() {
    */
   const activeKey = computed(() => {
     const activeMenu = route.meta?.activeMenu as string | undefined
-    return activeMenu || (route.name as string)
+    return activeMenu || ((route.name as string | undefined) ?? '')
   })
 
   const findMenuItemByName = (items: MenuItem[], name: string): MenuItem | undefined => {

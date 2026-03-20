@@ -78,26 +78,26 @@ type TagGroup struct {
 }
 
 type Tag struct {
-	ID          int64   `db:"id" json:"id"`
-	GroupID     int64   `db:"group_id" json:"group_id"`
-	GroupKey    string  `db:"group_key" json:"group_key"`
-	GroupName   string  `db:"group_name" json:"group_name"`
-	Name        string  `db:"name" json:"name"`
-	Slug        string  `db:"slug" json:"slug"`
-	ParentID    *int64  `db:"parent_id" json:"parent_id"`
-	SortOrder   int     `db:"sort_order" json:"sort_order"`
-	IsActive    bool    `db:"is_active" json:"is_active"`
-	CreatedAt   string  `db:"created_at" json:"created_at"`
-	UpdatedAt   string  `db:"updated_at" json:"updated_at"`
+	ID        int64  `db:"id" json:"id"`
+	GroupID   int64  `db:"group_id" json:"group_id"`
+	GroupKey  string `db:"group_key" json:"group_key"`
+	GroupName string `db:"group_name" json:"group_name"`
+	Name      string `db:"name" json:"name"`
+	Slug      string `db:"slug" json:"slug"`
+	ParentID  *int64 `db:"parent_id" json:"parent_id"`
+	SortOrder int    `db:"sort_order" json:"sort_order"`
+	IsActive  bool   `db:"is_active" json:"is_active"`
+	CreatedAt string `db:"created_at" json:"created_at"`
+	UpdatedAt string `db:"updated_at" json:"updated_at"`
 }
 
 type GameTagGroup struct {
-	ID            int64 `json:"id"`
+	ID            int64  `json:"id"`
 	Key           string `json:"key"`
 	Name          string `json:"name"`
-	AllowMultiple bool `json:"allow_multiple"`
-	IsFilterable  bool `json:"is_filterable"`
-	Tags          []Tag `json:"tags"`
+	AllowMultiple bool   `json:"allow_multiple"`
+	IsFilterable  bool   `json:"is_filterable"`
+	Tags          []Tag  `json:"tags"`
 }
 
 type TagGroupWriteInput struct {
@@ -119,9 +119,9 @@ type TagWriteInput struct {
 }
 
 type TagsListParams struct {
-	GroupID   int64
-	GroupKey  string
-	Active    *bool
+	GroupID  int64
+	GroupKey string
+	Active   *bool
 }
 
 type GamesListParams struct {
@@ -136,6 +136,27 @@ type GamesListParams struct {
 	IncludeAll  bool
 	Sort        string
 	Order       string
+	SortSeed    int64
+}
+
+type GamesTimelineParams struct {
+	Limit             int
+	FromDate          string
+	ToDate            string
+	CursorReleaseDate string
+	CursorID          int64
+	Visibility        string
+	IncludeAll        bool
+}
+
+type TimelineGame struct {
+	ID          int64   `db:"id"`
+	Title       string  `db:"title"`
+	ReleaseDate *string `db:"release_date"`
+	CoverImage  *string `db:"cover_image"`
+	BannerImage *string `db:"banner_image"`
+	CreatedAt   string  `db:"created_at"`
+	UpdatedAt   string  `db:"updated_at"`
 }
 
 type GameWriteInput struct {

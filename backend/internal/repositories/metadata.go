@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
@@ -31,6 +32,40 @@ func (r *MetadataRepository) List(table string) ([]domain.MetadataItem, error) {
 	return items, nil
 }
 
+func (r *MetadataRepository) Get(table string, id int64) (*domain.MetadataItem, error) {
+	query := fmt.Sprintf(`
+		SELECT id, name, slug, sort_order, created_at
+		FROM %s
+		WHERE id = ?
+	`, table)
+
+	var item domain.MetadataItem
+	if err := r.db.Get(&item, query, id); err != nil {
+		return nil, err
+	}
+
+	return &item, nil
+}
+
+func (r *MetadataRepository) FindSimpleByName(table string, name string) (*domain.MetadataItem, error) {
+	query := fmt.Sprintf(`
+		SELECT id, name, slug, sort_order, created_at
+		FROM %s
+		WHERE lower(trim(name)) = lower(trim(?))
+		LIMIT 1
+	`, table)
+
+	var item domain.MetadataItem
+	if err := r.db.Get(&item, query, name); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find metadata in %s by name: %w", table, err)
+	}
+
+	return &item, nil
+}
+
 func (r *MetadataRepository) CreateSeries(input domain.MetadataWriteInput, slug string, sortOrder int) (*domain.MetadataItem, error) {
 	var item domain.MetadataItem
 	err := r.db.Get(&item, `
@@ -58,9 +93,16 @@ func (r *MetadataRepository) CreateSimple(table string, input domain.MetadataWri
 	return &item, nil
 }
 
-func (r *MetadataRepository) ListSeriesGames(seriesID int64) ([]domain.Game, error) {
+func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([]domain.Game, error) {
+	where := "WHERE gs.series_id = ?"
+	args := []any{seriesID}
+	if !includeAll {
+		where += " AND g.visibility = ?"
+		args = append(args, domain.GameVisibilityPublic)
+	}
+
 	var games []domain.Game
-	if err := r.db.Select(&games, `
+	query := fmt.Sprintf(`
 		SELECT
 			g.id,
 			g.title,
@@ -93,9 +135,11 @@ func (r *MetadataRepository) ListSeriesGames(seriesID int64) ([]domain.Game, err
 			g.updated_at
 		FROM games g
 		INNER JOIN game_series gs ON gs.game_id = g.id
-		WHERE gs.series_id = ?
+		%s
 		ORDER BY g.updated_at DESC, gs.sort_order ASC, g.id DESC
-	`, seriesID); err != nil {
+	`, where)
+
+	if err := r.db.Select(&games, query, args...); err != nil {
 		return nil, fmt.Errorf("list series games: %w", err)
 	}
 

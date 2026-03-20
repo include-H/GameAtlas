@@ -1,9 +1,9 @@
 <template>
   <div class="series-library">
-    <div class="series-library__header">
-      <div>
-        <h1 class="series-library__title text-gradient">系列库</h1>
-        <p class="series-library__subtitle">按系列浏览，再进入对应作品集合。</p>
+    <div class="series-library__header page-hero">
+      <div class="page-hero__content">
+        <h1 class="series-library__title page-hero__title text-gradient">系列库</h1>
+        <p class="series-library__subtitle page-hero__subtitle">按系列浏览，再进入对应作品集合。</p>
       </div>
       <a-input-search
         v-model="searchQuery"
@@ -20,12 +20,12 @@
 
     <template v-else>
       <div class="series-library__meta">
-        共 {{ filteredSeries.length }} 个系列
+        共 {{ seriesCards.length }} 个系列
       </div>
 
-      <div v-if="filteredSeries.length > 0" class="series-library__grid">
+      <div v-if="seriesCards.length > 0" class="series-library__grid">
         <button
-          v-for="series in filteredSeries"
+          v-for="series in seriesCards"
           :key="series.id"
           type="button"
           class="series-card hover-lift"
@@ -59,7 +59,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { seriesService } from '@/services/series.service'
 import type { Series } from '@/services/types'
@@ -78,26 +78,22 @@ const router = useRouter()
 const isLoading = ref(false)
 const searchQuery = ref('')
 const seriesCards = ref<SeriesCardItem[]>([])
-
-const filteredSeries = computed(() => {
-  const keyword = searchQuery.value.trim().toLowerCase()
-  if (!keyword) return seriesCards.value
-  return seriesCards.value.filter((item) => item.name.toLowerCase().includes(keyword))
-})
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const loadSeries = async () => {
   isLoading.value = true
   try {
-    const allSeries = await seriesService.getAllSeries()
+    const allSeries = await seriesService.getAllSeries({
+      search: searchQuery.value.trim() || undefined,
+      sort: 'name',
+    })
     seriesCards.value = allSeries
-      .filter((item) => (item.game_count || 0) > 0)
       .map((item) => ({
         ...item,
         game_count: item.game_count || 0,
         cover_image: item.cover_image ?? null,
         latest_updated_at: item.latest_updated_at ?? null,
       }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
   } finally {
     isLoading.value = false
   }
@@ -119,6 +115,21 @@ const formatDate = (value: string) => {
 onMounted(() => {
   loadSeries()
 })
+
+watch(searchQuery, () => {
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+  }
+  searchTimer = setTimeout(() => {
+    loadSeries()
+  }, 250)
+})
+
+onBeforeUnmount(() => {
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+  }
+})
 </script>
 
 <style scoped>
@@ -127,22 +138,15 @@ onMounted(() => {
 }
 
 .series-library__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 16px;
   margin-bottom: 20px;
 }
 
 .series-library__title {
   margin: 0;
-  font-size: 32px;
-  font-weight: 800;
 }
 
 .series-library__subtitle {
-  margin: 6px 0 0;
-  color: var(--color-text-3);
+  margin: 0;
 }
 
 .series-library__search {
@@ -252,12 +256,6 @@ onMounted(() => {
   color: var(--color-text-3);
   font-size: 12px;
   line-height: 1.35;
-}
-
-.text-gradient {
-  background: linear-gradient(135deg, var(--color-primary-light-3), var(--color-primary-6));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
 
 @keyframes fadeInUp {

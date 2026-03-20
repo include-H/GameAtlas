@@ -268,13 +268,6 @@
     </div>
   </a-modal>
 
-  <!-- Ambient Background Effect (Subtle, Bottom) -->
-  <div 
-    class="game-detail__ambient-bg"
-    :style="heroBackgroundStyle"
-  >
-    <div class="ambient-overlay"></div>
-  </div>
 </template>
 
 <script setup lang="ts">
@@ -313,34 +306,6 @@ const versions = computed(() => gamesStore.currentVersions)
 const wiki = ref<WikiContent | null>(null)
 const showEditModal = ref(false)
 const showDownloadModal = ref(false)
-const ambientBackgroundUrl = ref('')
-
-const pickAmbientBackground = (currentGame: typeof game.value) => {
-  if (!currentGame) return ''
-
-  const screenshots = (currentGame.screenshots || []).filter(Boolean)
-  if (screenshots.length > 0) {
-    const index = Math.floor(Math.random() * screenshots.length)
-    return screenshots[index]
-  }
-
-  return currentGame.banner_image || currentGame.cover_image || ''
-}
-
-// Hero background style computed property
-const heroBackgroundStyle = computed(() => {
-  if (ambientBackgroundUrl.value) {
-    return {
-      backgroundImage: `url(${ambientBackgroundUrl.value})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-    }
-  }
-
-  return {
-    background: 'linear-gradient(to bottom, #1b2838, #2a475e)'
-  }
-})
 
 const developerNames = computed(() => (game.value?.developers || []).map((item) => item.name).join(' / '))
 const publisherNames = computed(() => (game.value?.publishers || []).map((item) => item.name).join(' / '))
@@ -423,6 +388,7 @@ const mainContentRef = ref<HTMLElement | null>(null)
 const sidebarContentHeight = ref(0)
 const mainBaseHeight = ref(0)
 const isDesktop = ref(true)
+const DESKTOP_SCREENSHOT_MIN_HEIGHT = 550
 let sidebarResizeObserver: ResizeObserver | null = null
 let mainResizeObserver: ResizeObserver | null = null
 
@@ -525,7 +491,8 @@ const updateBreakpoint = () => {
 const desktopTopSectionHeight = computed(() => {
   if (!isDesktop.value) return undefined
   const targetHeight = Math.max(mainBaseHeight.value, sidebarContentHeight.value)
-  return targetHeight > 0 ? Math.round(targetHeight) : undefined
+  if (targetHeight <= 0) return DESKTOP_SCREENSHOT_MIN_HEIGHT
+  return Math.max(Math.round(targetHeight), DESKTOP_SCREENSHOT_MIN_HEIGHT)
 })
 
 const desktopSidebarMinHeight = computed(() => {
@@ -535,11 +502,10 @@ const desktopSidebarMinHeight = computed(() => {
 
 const loadGameDetail = async (gameId: string) => {
   try {
-    const [loadedGame] = await Promise.all([
+    await Promise.all([
       gamesStore.fetchGame(gameId),
       gamesStore.fetchGameVersions(gameId),
     ])
-    ambientBackgroundUrl.value = pickAmbientBackground(loadedGame)
 
     wiki.value = null
     try {
@@ -619,31 +585,6 @@ watch(
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-/* Ambient Background - Subtle, Fixed Bottom */
-.game-detail__ambient-bg {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 60vh;
-  z-index: -1;
-  overflow: hidden;
-  opacity: 0.58;
-  filter: saturate(1.04) blur(0.35px);
-  pointer-events: none;
-  /* Use mask to fade out the top part */
-  -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
-  mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
-}
-
-.ambient-overlay {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at top right, rgba(26, 159, 255, 0.12), transparent 28%),
-    linear-gradient(180deg, rgba(15, 18, 25, 0.04), rgba(15, 18, 25, 0.24) 52%, rgba(15, 18, 25, 0.46));
 }
 
 /* Game Header (Title & Nav) */
@@ -869,6 +810,9 @@ watch(
 
 /* Sidebar Info */
 .sidebar-info {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
   padding: 12px;
   flex: 1;
 }
@@ -876,11 +820,7 @@ watch(
 .sidebar-info__item {
   display: flex;
   flex-direction: column;
-  margin-bottom: 12px;
-}
-
-.sidebar-info__item:last-child {
-  margin-bottom: 0;
+  min-width: 0;
 }
 
 .sidebar-info__label {
@@ -895,6 +835,32 @@ watch(
   font-size: 13px;
   color: var(--color-text-1);
   line-height: 1.4;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.sidebar-info__value :deep(.arco-space) {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  column-gap: 6px;
+}
+
+.sidebar-info__value :deep(.arco-space-item) {
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.sidebar-info__value :deep(.arco-tag) {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  height: auto;
+  min-height: 24px;
+  padding: 4px 8px;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: break-word;
 }
 
 /* Loading */
@@ -1012,6 +978,10 @@ watch(
   .sidebar-header-image {
     aspect-ratio: 21/9;
     max-height: 200px;
+  }
+
+  .sidebar-info {
+    grid-template-columns: 1fr;
   }
 
   .download-version-item {

@@ -3,16 +3,18 @@ package services
 import (
 	"bytes"
 	"crypto/sha1"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
-	"image/jpeg"
 	_ "image/gif"
+	"image/jpeg"
 	_ "image/png"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -32,6 +34,17 @@ type MetadataResource struct {
 	ResourceName string
 }
 
+type MetadataListOptions struct {
+	Search string
+	Limit  int
+	Sort   string
+}
+
+type SeriesDetail struct {
+	Series *domain.MetadataItem
+	Games  []domain.Game
+}
+
 func NewMetadataService(cfg config.Config, repo *repositories.MetadataRepository) *MetadataService {
 	return &MetadataService{
 		repo:      repo,
@@ -40,15 +53,21 @@ func NewMetadataService(cfg config.Config, repo *repositories.MetadataRepository
 	}
 }
 
-func (s *MetadataService) List(resource MetadataResource) ([]domain.MetadataItem, error) {
+func (s *MetadataService) List(resource MetadataResource, includeAll bool, options MetadataListOptions) ([]domain.MetadataItem, error) {
 	items, err := s.repo.List(resource.Table)
 	if err != nil {
 		return nil, err
 	}
 	if resource.Table == "series" {
+		filtered := make([]domain.MetadataItem, 0, len(items))
 		for index := range items {
-			s.enrichSeriesItem(&items[index])
+			s.enrichSeriesItem(&items[index], includeAll)
+			if includeAll || items[index].GameCount > 0 {
+				filtered = append(filtered, items[index])
+			}
 		}
+		filtered = filterSeriesItems(filtered, options)
+		items = filtered
 	}
 	if items == nil {
 		return []domain.MetadataItem{}, nil
@@ -89,10 +108,42 @@ func (s *MetadataService) Create(resource MetadataResource, input domain.Metadat
 	case "series":
 		return s.repo.CreateSeries(cleanInput, slugValue, sortOrder)
 	case "platforms", "developers", "publishers":
+		existing, err := s.repo.FindSimpleByName(resource.Table, name)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			return existing, nil
+		}
 		return s.repo.CreateSimple(resource.Table, cleanInput, slugValue, sortOrder)
 	default:
 		return nil, fmt.Errorf("unsupported metadata resource: %s", resource.Table)
 	}
+}
+
+func (s *MetadataService) GetSeriesDetail(id int64, includeAll bool) (*SeriesDetail, error) {
+	item, err := s.repo.Get("series", id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	s.enrichSeriesItem(item, includeAll)
+	if !includeAll && item.GameCount == 0 {
+		return nil, ErrNotFound
+	}
+
+	games, err := s.repo.ListSeriesGames(id, includeAll)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SeriesDetail{
+		Series: item,
+		Games:  games,
+	}, nil
 }
 
 func slugify(value string) string {
@@ -117,8 +168,42 @@ func slugify(value string) string {
 	return result
 }
 
-func (s *MetadataService) enrichSeriesItem(item *domain.MetadataItem) {
-	games, err := s.repo.ListSeriesGames(item.ID)
+func filterSeriesItems(items []domain.MetadataItem, options MetadataListOptions) []domain.MetadataItem {
+	search := strings.ToLower(strings.TrimSpace(options.Search))
+	if search != "" {
+		filtered := make([]domain.MetadataItem, 0, len(items))
+		for _, item := range items {
+			if strings.Contains(strings.ToLower(item.Name), search) {
+				filtered = append(filtered, item)
+			}
+		}
+		items = filtered
+	}
+
+	sortKey := strings.TrimSpace(strings.ToLower(options.Sort))
+	switch sortKey {
+	case "popular":
+		sort.SliceStable(items, func(i, j int) bool {
+			if items[i].GameCount != items[j].GameCount {
+				return items[i].GameCount > items[j].GameCount
+			}
+			return strings.Compare(items[i].Name, items[j].Name) < 0
+		})
+	default:
+		sort.SliceStable(items, func(i, j int) bool {
+			return strings.Compare(items[i].Name, items[j].Name) < 0
+		})
+	}
+
+	if options.Limit > 0 && len(items) > options.Limit {
+		items = items[:options.Limit]
+	}
+
+	return items
+}
+
+func (s *MetadataService) enrichSeriesItem(item *domain.MetadataItem, includeAll bool) {
+	games, err := s.repo.ListSeriesGames(item.ID, includeAll)
 	if err != nil {
 		return
 	}

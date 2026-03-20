@@ -1,9 +1,9 @@
 <template>
   <div class="series-detail">
-    <div class="series-detail__header">
-      <div>
-        <h1 class="series-detail__title">{{ seriesName }}</h1>
-        <p class="series-detail__subtitle">共 {{ games.length }} 部作品</p>
+    <div class="series-detail__header page-hero">
+      <div class="page-hero__content">
+        <h1 class="series-detail__title page-hero__title text-gradient">{{ seriesName }}</h1>
+        <p class="series-detail__subtitle page-hero__subtitle">共 {{ games.length }} 部作品</p>
       </div>
     </div>
 
@@ -70,17 +70,9 @@ const loadSeriesDetail = async () => {
 
   isLoading.value = true
   try {
-    const [allSeries, response] = await Promise.all([
-      seriesService.getAllSeries(),
-      gamesService.getGames({
-        page: 1,
-        pageSize: 96,
-        filter: { series: String(id) },
-        sort: { field: 'updated_at', order: 'desc' },
-      }),
-    ])
-    seriesName.value = allSeries.find((item) => item.id === id)?.name || `系列 ${id}`
-    games.value = response.data
+    const detail = await seriesService.getSeriesDetail(id)
+    seriesName.value = detail.series.name || `系列 ${id}`
+    games.value = detail.games
   } finally {
     isLoading.value = false
   }
@@ -123,21 +115,15 @@ onMounted(() => {
 }
 
 .series-detail__header {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
   margin-bottom: 20px;
 }
 
 .series-detail__title {
   margin: 0;
-  font-size: 32px;
-  font-weight: 800;
 }
 
 .series-detail__subtitle {
-  margin: 6px 0 0;
-  color: var(--color-text-3);
+  margin: 0;
 }
 
 .series-detail__floating-back {

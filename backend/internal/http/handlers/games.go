@@ -3,6 +3,8 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -28,6 +30,7 @@ func (h *GamesHandler) List(c *gin.Context) {
 		TagIDs:     parseQueryInt64List(c, "tag"),
 		Sort:       c.Query("sort"),
 		Order:      c.Query("order"),
+		SortSeed:   parseQueryInt64(c, "seed", 0),
 		IncludeAll: isAdminRequest(c),
 	}
 
@@ -56,6 +59,85 @@ func (h *GamesHandler) List(c *gin.Context) {
 			"limit":      result.Limit,
 			"total":      result.Total,
 			"totalPages": result.TotalPages,
+		},
+	})
+}
+
+func (h *GamesHandler) ListTimeline(c *gin.Context) {
+	years := parseQueryInt(c, "years", 2)
+	if years <= 0 {
+		years = 2
+	}
+	if years > 10 {
+		years = 10
+	}
+
+	now := time.Now().UTC()
+	fromDate := c.Query("from")
+	toDate := c.Query("to")
+	cursorReleaseDate, cursorID, ok := parseTimelineCursor(c.Query("cursor"))
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "invalid timeline cursor",
+		})
+		return
+	}
+
+	if strings.TrimSpace(toDate) == "" {
+		latestReleaseDate, ok, err := h.service.LatestTimelineReleaseDate(isAdminRequest(c))
+		if err != nil {
+			writeServiceError(c, err, "invalid timeline params")
+			return
+		}
+		if ok {
+			toDate = latestReleaseDate
+		} else {
+			toDate = now.Format("2006-01-02")
+		}
+	}
+	if strings.TrimSpace(fromDate) == "" {
+		baseDate, err := time.Parse("2006-01-02", toDate)
+		if err != nil {
+			baseDate = now
+		}
+		fromDate = baseDate.AddDate(-years, 0, 0).Format("2006-01-02")
+	}
+
+	params := domain.GamesTimelineParams{
+		Limit:             parseQueryInt(c, "limit", 60),
+		FromDate:          fromDate,
+		ToDate:            toDate,
+		CursorReleaseDate: cursorReleaseDate,
+		CursorID:          cursorID,
+		IncludeAll:        isAdminRequest(c),
+	}
+
+	result, err := h.service.ListTimeline(params)
+	if err != nil {
+		writeServiceError(c, err, "invalid timeline params")
+		return
+	}
+
+	data := make([]timelineGameItemResponse, 0, len(result.Games))
+	for _, game := range result.Games {
+		data = append(data, toTimelineGameItemResponse(game))
+	}
+
+	nextCursor := ""
+	if result.NextCursor != nil {
+		nextCursor = formatTimelineCursor(result.NextCursor.ReleaseDate, result.NextCursor.ID)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    data,
+		"pagination": gin.H{
+			"limit":      result.Limit,
+			"from":       result.FromDate,
+			"to":         result.ToDate,
+			"hasMore":    result.HasMore,
+			"nextCursor": nextCursor,
 		},
 	})
 }
@@ -229,6 +311,16 @@ type gameListItemResponse struct {
 	UpdatedAt         string  `json:"updated_at"`
 }
 
+type timelineGameItemResponse struct {
+	ID          int64   `json:"id"`
+	Title       string  `json:"title"`
+	ReleaseDate *string `json:"release_date"`
+	CoverImage  *string `json:"cover_image"`
+	BannerImage *string `json:"banner_image"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
+}
+
 type gameAssetResponse struct {
 	ID        int64  `json:"id"`
 	AssetUID  string `json:"asset_uid"`
@@ -286,17 +378,17 @@ type gameDetailResponse struct {
 }
 
 type tagResponse struct {
-	ID        int64   `json:"id"`
-	GroupID   int64   `json:"group_id"`
-	GroupKey  string  `json:"group_key"`
-	GroupName string  `json:"group_name"`
-	Name      string  `json:"name"`
-	Slug      string  `json:"slug"`
-	ParentID  *int64  `json:"parent_id"`
-	SortOrder int     `json:"sort_order"`
-	IsActive  bool    `json:"is_active"`
-	CreatedAt string  `json:"created_at"`
-	UpdatedAt string  `json:"updated_at"`
+	ID        int64  `json:"id"`
+	GroupID   int64  `json:"group_id"`
+	GroupKey  string `json:"group_key"`
+	GroupName string `json:"group_name"`
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	ParentID  *int64 `json:"parent_id"`
+	SortOrder int    `json:"sort_order"`
+	IsActive  bool   `json:"is_active"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 type gameTagGroupResponse struct {
@@ -333,12 +425,48 @@ func toGameListItemResponse(game domain.Game) gameListItemResponse {
 	}
 }
 
+func toTimelineGameItemResponse(game domain.TimelineGame) timelineGameItemResponse {
+	return timelineGameItemResponse{
+		ID:          game.ID,
+		Title:       game.Title,
+		ReleaseDate: game.ReleaseDate,
+		CoverImage:  game.CoverImage,
+		BannerImage: game.BannerImage,
+		CreatedAt:   game.CreatedAt,
+		UpdatedAt:   game.UpdatedAt,
+	}
+}
+
 func toGameListItemResponses(games []domain.Game) []gameListItemResponse {
 	result := make([]gameListItemResponse, 0, len(games))
 	for _, game := range games {
 		result = append(result, toGameListItemResponse(game))
 	}
 	return result
+}
+
+func parseTimelineCursor(raw string) (string, int64, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", 0, true
+	}
+
+	parts := strings.Split(trimmed, "|")
+	if len(parts) != 2 {
+		return "", 0, false
+	}
+
+	releaseDate := strings.TrimSpace(parts[0])
+	id, err := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
+	if err != nil || id <= 0 {
+		return "", 0, false
+	}
+
+	return releaseDate, id, true
+}
+
+func formatTimelineCursor(releaseDate string, id int64) string {
+	return releaseDate + "|" + strconv.FormatInt(id, 10)
 }
 
 func toGameDetailResponse(detail *services.GameDetail) gameDetailResponse {

@@ -26,6 +26,11 @@ export interface Series {
   latest_updated_at?: string | null
 }
 
+export interface SeriesDetail {
+  series: Series
+  games: Game[]
+}
+
 export interface Platform {
   id: number
   name: string
@@ -209,8 +214,9 @@ export interface GameFilter {
 }
 
 export interface GameSort {
-  field: 'title' | 'created_at' | 'updated_at' | 'views' | 'downloads'
+  field: 'title' | 'created_at' | 'updated_at' | 'release_date' | 'views' | 'downloads' | 'random'
   order: 'asc' | 'desc'
+  seed?: number
 }
 
 export interface FileInfo {

@@ -1,16 +1,25 @@
 <template>
   <div
     class="shared-ambient-bg"
-    :class="{ 'is-visible': isEnabled && isVisible }"
-    :style="backgroundStyle"
+    :class="{ 'is-enabled': isEnabled }"
     aria-hidden="true"
   >
-    <div class="shared-ambient-bg__overlay" />
+    <div
+      v-for="(style, index) in layerStyles"
+      :key="index"
+      class="shared-ambient-bg__layer"
+      :style="{
+        ...style,
+        opacity: isEnabled ? (activeLayerIndex === index ? 0.5 : 0) : 0,
+      }"
+    >
+      <div class="shared-ambient-bg__overlay" />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import gamesService from '@/services/games.service'
 import { resolveAssetUrl } from '@/utils/asset-url'
@@ -20,16 +29,23 @@ const route = useRoute()
 const SUPPORTED_ROUTE_NAMES = new Set([
   'dashboard',
   'games',
+  'games-timeline',
+  'game-detail',
   'pending-center',
   'series-library',
   'series-detail',
 ])
 
+const DEFAULT_BACKGROUND =
+  'radial-gradient(circle at top right, rgba(26, 159, 255, 0.12), transparent 40%), linear-gradient(180deg, rgba(15, 18, 25, 0.96), rgba(15, 18, 25, 0.88))'
+
 let cachedBackgroundUrl = ''
 let inflightBackgroundRequest: Promise<string> | null = null
 
-const isVisible = ref(false)
-const backgroundUrl = ref('')
+const layerUrls = ref<string[]>(['', ''])
+const activeLayerIndex = ref(0)
+const hasAppliedBackground = ref(false)
+const applyRequestId = ref(0)
 
 const LIST_CANDIDATE_LIMIT = 24
 const DETAIL_CANDIDATE_LIMIT = 8
@@ -39,20 +55,22 @@ const CUSTOM_BACKGROUND_PATH = '/data/bg.jpg'
 
 const isEnabled = computed(() => SUPPORTED_ROUTE_NAMES.has(String(route.name || '')))
 
-const backgroundStyle = computed(() => {
-  if (backgroundUrl.value) {
+const buildLayerStyle = (url: string) => {
+  if (url) {
     return {
-      backgroundImage: `url(${backgroundUrl.value})`,
+      backgroundImage: `url(${url})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
     }
   }
 
   return {
-    background:
-      'radial-gradient(circle at top right, rgba(26, 159, 255, 0.12), transparent 40%), linear-gradient(180deg, rgba(15, 18, 25, 0.96), rgba(15, 18, 25, 0.88))',
+    background: DEFAULT_BACKGROUND,
   }
-})
+}
+
+const layerStyles = computed(() => layerUrls.value.map((url) => buildLayerStyle(url)))
 
 const shuffleArray = <T,>(items: T[]) => {
   const copy = [...items]
@@ -72,6 +90,20 @@ const probeImageSize = (url: string) => {
   })
 }
 
+const preloadImage = (url: string) => {
+  return new Promise<boolean>((resolve) => {
+    if (!url) {
+      resolve(false)
+      return
+    }
+
+    const image = new Image()
+    image.onload = () => resolve(true)
+    image.onerror = () => resolve(false)
+    image.src = url
+  })
+}
+
 const isQualifiedBackground = (size: { width: number; height: number } | null) => {
   return Boolean(size && size.width >= MIN_BACKGROUND_WIDTH && size.height >= MIN_BACKGROUND_HEIGHT)
 }
@@ -87,7 +119,7 @@ const resolveCustomBackgroundUrl = () => {
       const url = new URL(apiBase)
       return `${url.origin}${CUSTOM_BACKGROUND_PATH}`
     } catch {
-      return `http://127.0.0.1:3000${CUSTOM_BACKGROUND_PATH}`
+      return 'http://127.0.0.1:3000/data/bg.jpg'
     }
   }
 
@@ -98,7 +130,7 @@ const resolveCustomBackgroundUrl = () => {
     return `${protocol}//${host}:${backendPort}${CUSTOM_BACKGROUND_PATH}`
   }
 
-  return `http://127.0.0.1:3000${CUSTOM_BACKGROUND_PATH}`
+  return 'http://127.0.0.1:3000/data/bg.jpg'
 }
 
 const loadCustomBackground = async () => {
@@ -111,11 +143,40 @@ const loadCustomBackground = async () => {
   return customBackgroundUrl
 }
 
-const pickFallbackBackground = (games: Awaited<ReturnType<typeof gamesService.getGames>>['data']) => {
-  return shuffleArray(games)
+const pickFallbackBackground = async (games: Awaited<ReturnType<typeof gamesService.getGames>>['data']) => {
+  const candidates = shuffleArray(games)
     .flatMap((game) => [game.banner_image, game.cover_image])
     .map((asset) => resolveAssetUrl(asset))
-    .filter(Boolean)[0] || ''
+    .filter(Boolean)
+
+  for (const candidate of candidates) {
+    if (await preloadImage(candidate)) {
+      return candidate
+    }
+  }
+
+  return ''
+}
+
+const pickGameDetailBackground = async (gameId: string) => {
+  try {
+    const detail = await gamesService.getGame(gameId)
+    const screenshots = shuffleArray(detail.screenshots || [])
+
+    for (const screenshot of screenshots) {
+      const resolvedUrl = resolveAssetUrl(screenshot)
+      if (!resolvedUrl) continue
+
+      const size = await probeImageSize(resolvedUrl)
+      if (isQualifiedBackground(size)) {
+        return resolvedUrl
+      }
+    }
+
+    return resolveAssetUrl(detail.banner_image || detail.cover_image) || ''
+  } catch {
+    return ''
+  }
 }
 
 const pickQualifiedScreenshotBackground = async (
@@ -156,16 +217,18 @@ const pickBackgroundFromGames = async () => {
     },
   })
 
-  const fallbackUrl = pickFallbackBackground(response.data)
-  if (fallbackUrl) {
-    backgroundUrl.value = fallbackUrl
-  }
-
+  const fallbackPromise = pickFallbackBackground(response.data)
   const qualifiedScreenshotUrl = await pickQualifiedScreenshotBackground(response.data)
+  const fallbackUrl = await fallbackPromise
   return qualifiedScreenshotUrl || fallbackUrl
 }
 
 const loadBackground = async () => {
+  if (route.name === 'game-detail') {
+    const gameId = String(route.params.id || '').trim()
+    return gameId ? pickGameDetailBackground(gameId) : ''
+  }
+
   if (cachedBackgroundUrl) {
     return cachedBackgroundUrl
   }
@@ -186,35 +249,57 @@ const loadBackground = async () => {
   return inflightBackgroundRequest
 }
 
-const refreshVisibility = async () => {
+const applyBackground = async () => {
+  const requestId = applyRequestId.value + 1
+  applyRequestId.value = requestId
+
   if (!isEnabled.value) {
-    isVisible.value = false
+    layerUrls.value = ['', '']
+    hasAppliedBackground.value = false
     return
   }
 
   const nextBackgroundUrl = await loadBackground()
-  if (nextBackgroundUrl) {
-    backgroundUrl.value = nextBackgroundUrl
+  if (requestId !== applyRequestId.value) {
+    return
   }
 
-  isVisible.value = false
+  const nextUrl = nextBackgroundUrl || ''
+  const currentUrl = layerUrls.value[activeLayerIndex.value]
+
+  if (!hasAppliedBackground.value) {
+    layerUrls.value = [nextUrl, nextUrl]
+    activeLayerIndex.value = 0
+    hasAppliedBackground.value = true
+    await nextTick()
+    return
+  }
+
+  if (nextUrl === currentUrl) {
+    if (!currentUrl) {
+      layerUrls.value[activeLayerIndex.value] = ''
+    }
+    return
+  }
+
+  const nextLayerIndex = activeLayerIndex.value === 0 ? 1 : 0
+  layerUrls.value[nextLayerIndex] = nextUrl
+
   requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      isVisible.value = true
-    })
+    if (requestId !== applyRequestId.value) {
+      return
+    }
+    activeLayerIndex.value = nextLayerIndex
   })
 }
 
 watch(
-  () => route.name,
+  [() => route.fullPath, isEnabled],
   async () => {
-    await refreshVisibility()
+    await applyBackground()
   },
+  { immediate: true },
 )
-
-onMounted(async () => {
-  await refreshVisibility()
-})
 </script>
 
 <style scoped>
@@ -223,20 +308,23 @@ onMounted(async () => {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0;
-  filter: saturate(1.04) blur(0.35px);
-  transition: opacity 0.6s ease;
 }
 
-.shared-ambient-bg.is-visible {
-  opacity: 0.58;
+.shared-ambient-bg__layer {
+  position: absolute;
+  inset: 0;
+  filter: saturate(1.04) blur(18px) brightness(1.08);
+  transform: scale(1.06);
+  transform-origin: center center;
+  transition: opacity 0.85s ease;
 }
 
 .shared-ambient-bg__overlay {
   width: 100%;
   height: 100%;
   background:
-    radial-gradient(circle at top right, rgba(26, 159, 255, 0.12), transparent 28%),
-    linear-gradient(180deg, rgba(15, 18, 25, 0.04), rgba(15, 18, 25, 0.24) 52%, rgba(15, 18, 25, 0.46));
+    radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.18), transparent 24%),
+    radial-gradient(circle at 82% 16%, rgba(255, 255, 255, 0.14), transparent 22%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.04) 42%, rgba(255, 255, 255, 0.08) 100%);
 }
 </style>

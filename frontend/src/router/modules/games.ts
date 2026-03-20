@@ -1,5 +1,5 @@
 import type { RouteRecordRaw } from 'vue-router'
-import { IconTrophy, IconExclamationCircle } from '@arco-design/web-vue/es/icon'
+import { IconTrophy, IconExclamationCircle, IconCalendarClock } from '@arco-design/web-vue/es/icon'
 
 /**
  * Games routes
@@ -12,6 +12,21 @@ export default {
     locale: 'menu.games',
     requiresAuth: true,
     icon: IconTrophy,
+    roles: ['*'],
+  },
+} as RouteRecordRaw
+
+/**
+ * Timeline route
+ */
+export const timelineRoute = {
+  path: '/games/timeline',
+  name: 'games-timeline',
+  component: () => import('@/views/GamesTimelineView.vue'),
+  meta: {
+    locale: 'menu.games.timeline',
+    requiresAuth: true,
+    icon: IconCalendarClock,
     roles: ['*'],
   },
 } as RouteRecordRaw

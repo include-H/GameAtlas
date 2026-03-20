@@ -1,13 +1,15 @@
 <template>
   <div class="dashboard" :class="{ 'is-ready': isDashboardReady }">
     <!-- Welcome Section (Slimmer Header) -->
-    <div v-show="isDashboardReady" class="dashboard-section-title">
-      <h1 class="text-gradient">
-        发现
-      </h1>
-      <p class="subtitle">
-        探索您的游戏库动态
-      </p>
+    <div v-show="isDashboardReady" class="dashboard-section-title page-hero">
+      <div class="page-hero__content">
+        <h1 class="page-hero__title text-gradient">
+          发现
+        </h1>
+        <p class="page-hero__subtitle">
+          探索您的游戏库动态
+        </p>
+      </div>
     </div>
 
     <!-- Top Hero Section -->
@@ -157,6 +159,18 @@ defineOptions({
   name: 'DashboardView',
 })
 
+const DASHBOARD_SPLASH_STORAGE_KEY = 'dashboard-splash-played'
+
+const hasPlayedDashboardSplash = () => {
+  if (typeof window === 'undefined') return false
+  return window.sessionStorage.getItem(DASHBOARD_SPLASH_STORAGE_KEY) === '1'
+}
+
+const markDashboardSplashPlayed = () => {
+  if (typeof window === 'undefined') return
+  window.sessionStorage.setItem(DASHBOARD_SPLASH_STORAGE_KEY, '1')
+}
+
 const route = useRoute()
 const router = useRouter()
 const gamesStore = useGamesStore()
@@ -164,7 +178,7 @@ const uiStore = useUiStore()
 
 const isLoading = ref(false)
 const isDashboardReady = ref(false)
-const showSplash = ref(true)
+const showSplash = ref(!hasPlayedDashboardSplash())
 const isSplashLeaving = ref(false)
 const splashStartedAt = ref(0)
 
@@ -248,6 +262,14 @@ const finishSplash = async () => {
 }
 
 onMounted(async () => {
+  if (hasPlayedDashboardSplash()) {
+    showSplash.value = false
+    isSplashLeaving.value = false
+    await loadDashboardData()
+    return
+  }
+
+  markDashboardSplashPlayed()
   splashStartedAt.value = Date.now()
   await Promise.all([
     loadDashboardData(),
@@ -313,7 +335,7 @@ onActivated(async () => {
   align-items: center;
   gap: 18px;
   width: min(520px, calc(100vw - 48px));
-  animation: splashReveal 1.6s ease both;
+  animation: splashReveal 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .dashboard-loading__eyebrow {
@@ -356,19 +378,19 @@ onActivated(async () => {
 @keyframes splashReveal {
   0% {
     opacity: 0;
-    transform: translateY(24px) scale(0.985);
+    transform: translateY(0);
   }
-  18% {
+  22% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
-  72% {
+  74% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
   100% {
     opacity: 0;
-    transform: translateY(-16px) scale(1.015);
+    transform: translateY(0);
   }
 }
 
@@ -399,27 +421,6 @@ onActivated(async () => {
 
 .dashboard-section-title {
   margin-bottom: 24px;
-  display: flex;
-  align-items: flex-end;
-  gap: 16px;
-}
-
-.dashboard-section-title .text-gradient {
-  font-size: 32px;
-  font-weight: 800;
-  margin: 0;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, var(--color-primary-light-3), var(--color-primary-6));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.dashboard-section-title .subtitle {
-  margin: 0;
-  padding-bottom: 6px;
-  color: var(--color-text-3);
-  font-size: 16px;
-  font-weight: 500;
 }
 
 .dashboard-hero-section {

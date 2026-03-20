@@ -1,5 +1,13 @@
 <template>
-  <a-layout class="app-layout">
+  <router-view v-if="isAuthPage" v-slot="{ Component, route }">
+    <transition name="route-fade" mode="out-in">
+      <div :key="String(route.name || route.path)" class="auth-route-shell">
+        <component :is="Component" />
+      </div>
+    </transition>
+  </router-view>
+
+  <a-layout v-else class="app-layout">
     <a-layout-header class="pro-header glass-header">
       <div class="header-left">
         <div class="logo hover-glow" @click="handleLogoClick">
@@ -10,6 +18,7 @@
 
       <div class="header-right">
         <a-space :size="20">
+          <span v-if="isAdmin" class="welcome-text">欢迎您，{{ adminDisplayName }}</span>
           <a-button type="text" @click="handleAuthAction">
             {{ isAdmin ? '退出' : '登录' }}
           </a-button>
@@ -86,10 +95,12 @@
         <shared-ambient-background />
 
         <a-layout-content class="content">
-          <router-view v-slot="{ Component }">
-            <keep-alive :include="['GamesView', 'DashboardView']">
-              <component :is="Component" />
-            </keep-alive>
+          <router-view v-slot="{ Component, route }">
+            <transition name="route-fade" mode="out-in">
+              <div :key="String(route.name || route.path)" class="route-fade-shell">
+                <component :is="Component" />
+              </div>
+            </transition>
           </router-view>
 
           <alert-banner />
@@ -102,15 +113,13 @@
     </a-layout>
   </a-layout>
 
-  <a-message v-model:visible="message.show" :type="message.type">
-    {{ message.content }}
-  </a-message>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { Message } from '@arco-design/web-vue'
 import useMenu from '@/hooks/useMenu'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
@@ -125,6 +134,7 @@ import {
 } from '@arco-design/web-vue/es/icon'
 
 const router = useRouter()
+const route = useRoute()
 const uiStore = useUiStore()
 const authStore = useAuthStore()
 const { menuList, activeKey, openKeys: routeOpenKeys } = useMenu()
@@ -132,21 +142,17 @@ const { sidebarCollapsed } = storeToRefs(uiStore)
 const { isAdmin } = storeToRefs(authStore)
 
 const appName = 'GameAtlas'
+const adminDisplayName = (import.meta.env.VITE_USERNAME || 'Admin').trim() || 'Admin'
 const sideWidth = 240
 const collapsedSideWidth = 48
 const compactNavigationBreakpoint = 992
+const isAuthPage = computed(() => route.name === 'login')
 
 const collapsed = computed({
   get: () => sidebarCollapsed.value,
   set: (value: boolean) => {
     uiStore.setSidebarCollapsed(value)
   },
-})
-
-const message = ref({
-  show: false,
-  content: '',
-  type: 'info',
 })
 
 const isCompactNavigation = ref(false)
@@ -165,6 +171,10 @@ const handleLogoClick = () => {
 
 const handleAuthAction = async () => {
   if (!isAdmin.value) {
+    if (router.currentRoute.value.name === 'login') {
+      return
+    }
+
     router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
     return
   }
@@ -205,11 +215,21 @@ const handleMobileOpenKeysChange = (keys: string[]) => {
   mobileOpenKeys.value = keys
 }
 
-const showMessage = (content: string, type = 'info') => {
-  message.value = { show: true, content, type }
-  setTimeout(() => {
-    message.value.show = false
-  }, 3000)
+const showMessage = (content: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+  switch (type) {
+    case 'success':
+      Message.success(content)
+      break
+    case 'warning':
+      Message.warning(content)
+      break
+    case 'error':
+      Message.error(content)
+      break
+    default:
+      Message.info(content)
+      break
+  }
 }
 
 const handleResize = () => {
@@ -311,6 +331,12 @@ provide('showMessage', showMessage)
   background: linear-gradient(135deg, var(--color-primary-light-3), var(--color-primary-6));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+.welcome-text {
+  color: var(--color-text-2);
+  font-size: 14px;
+  white-space: nowrap;
 }
 
 .app-sider__inner {

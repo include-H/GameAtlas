@@ -3,8 +3,11 @@ package services
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"math"
+	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/domain"
@@ -29,6 +32,20 @@ type GamesListResult struct {
 	Limit      int
 	Total      int
 	TotalPages int
+}
+
+type TimelineCursor struct {
+	ReleaseDate string
+	ID          int64
+}
+
+type GamesTimelineResult struct {
+	Games      []domain.TimelineGame
+	Limit      int
+	FromDate   string
+	ToDate     string
+	HasMore    bool
+	NextCursor *TimelineCursor
 }
 
 type GameDetail struct {
@@ -84,6 +101,66 @@ func (s *GamesService) List(params domain.GamesListParams) (*GamesListResult, er
 func (s *GamesService) Stats(params domain.GamesListParams) (*domain.GameStats, error) {
 	normalizeListParams(&params)
 	return s.gamesRepo.Stats(params)
+}
+
+func (s *GamesService) ListTimeline(params domain.GamesTimelineParams) (*GamesTimelineResult, error) {
+	if err := normalizeTimelineParams(&params); err != nil {
+		return nil, err
+	}
+
+	games, hasMoreInWindow, err := s.gamesRepo.ListTimeline(params)
+	if err != nil {
+		return nil, err
+	}
+
+	hasOlderWindow := false
+	if !hasMoreInWindow && params.CursorReleaseDate == "" && len(games) > 0 {
+		last := games[len(games)-1]
+		if last.ReleaseDate != nil {
+			exists, err := s.gamesRepo.HasOlderTimelineGame(params, *last.ReleaseDate, last.ID)
+			if err != nil {
+				return nil, err
+			}
+			hasOlderWindow = exists
+		}
+	}
+
+	var nextCursor *TimelineCursor
+	if hasMoreInWindow && len(games) > 0 {
+		last := games[len(games)-1]
+		if last.ReleaseDate != nil {
+			nextCursor = &TimelineCursor{
+				ReleaseDate: *last.ReleaseDate,
+				ID:          last.ID,
+			}
+		}
+	}
+
+	return &GamesTimelineResult{
+		Games:      games,
+		Limit:      params.Limit,
+		FromDate:   params.FromDate,
+		ToDate:     params.ToDate,
+		HasMore:    hasMoreInWindow || hasOlderWindow,
+		NextCursor: nextCursor,
+	}, nil
+}
+
+func (s *GamesService) LatestTimelineReleaseDate(includeAll bool) (string, bool, error) {
+	releaseDate, err := s.gamesRepo.LatestTimelineReleaseDate(includeAll, domain.GameVisibilityPublic)
+	if err != nil {
+		return "", false, err
+	}
+	if releaseDate == nil {
+		return "", false, nil
+	}
+
+	normalized, err := normalizeTimelineDate(*releaseDate)
+	if err != nil {
+		return "", false, nil
+	}
+
+	return normalized, true, nil
 }
 
 func (s *GamesService) GetDetail(id int64, includeAll bool) (*GameDetail, error) {
@@ -308,9 +385,84 @@ func normalizeListParams(params *domain.GamesListParams) {
 	if params.Order == "" {
 		params.Order = "desc"
 	}
+	if params.Sort == "random" && params.SortSeed == 0 {
+		params.SortSeed = rand.New(rand.NewSource(time.Now().UnixNano())).Int63n(2147483646) + 1
+	}
 	if !params.IncludeAll && strings.TrimSpace(params.Visibility) == "" {
 		params.Visibility = domain.GameVisibilityPublic
 	}
+}
+
+func normalizeTimelineParams(params *domain.GamesTimelineParams) error {
+	if params.Limit <= 0 {
+		params.Limit = 60
+	}
+	if params.Limit > 100 {
+		params.Limit = 100
+	}
+
+	if strings.TrimSpace(params.FromDate) == "" || strings.TrimSpace(params.ToDate) == "" {
+		return ErrValidation
+	}
+
+	fromDate, fromTime, err := parseTimelineDate(params.FromDate)
+	if err != nil {
+		return ErrValidation
+	}
+	toDate, toTime, err := parseTimelineDate(params.ToDate)
+	if err != nil {
+		return ErrValidation
+	}
+	if fromTime.After(toTime) {
+		return ErrValidation
+	}
+	params.FromDate = fromDate
+	params.ToDate = toDate
+
+	if params.CursorReleaseDate != "" {
+		cursorDate, _, err := parseTimelineDate(params.CursorReleaseDate)
+		if err != nil {
+			return ErrValidation
+		}
+		if params.CursorID <= 0 {
+			return ErrValidation
+		}
+		params.CursorReleaseDate = cursorDate
+		if params.CursorReleaseDate < params.FromDate || params.CursorReleaseDate > params.ToDate {
+			return fmt.Errorf("%w: cursor date out of range", ErrValidation)
+		}
+	}
+
+	if !params.IncludeAll && strings.TrimSpace(params.Visibility) == "" {
+		params.Visibility = domain.GameVisibilityPublic
+	}
+
+	return nil
+}
+
+func normalizeTimelineDate(value string) (string, error) {
+	normalized, _, err := parseTimelineDate(value)
+	return normalized, err
+}
+
+func parseTimelineDate(value string) (string, time.Time, error) {
+	trimmed := strings.TrimSpace(value)
+	layouts := []string{
+		"2006-01-02",
+		"2006-1-2",
+		"2006-01",
+		"2006-1",
+		"2006",
+	}
+
+	for _, layout := range layouts {
+		if parsed, err := time.Parse(layout, trimmed); err == nil {
+			normalized := parsed.Format("2006-01-02")
+			return normalized, parsed, nil
+		}
+	}
+
+	return "", time.Time{}, ErrValidation
 }
 
 func normalizeRepoError(err error) error {

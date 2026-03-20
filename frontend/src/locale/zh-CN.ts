@@ -17,6 +17,7 @@ export default {
     'series.detail': '系列详情',
     'wiki.edit': '编辑Wiki',
     'games.all': '所有游戏',
+    'games.timeline': '发售时间线',
   },
   // Common UI text
   common: {

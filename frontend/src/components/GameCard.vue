@@ -1,6 +1,7 @@
 <template>
   <div
-    :class="['game-card hover-lift', { 'game-card--list': isList }]"
+    :class="['game-card hover-lift', { 'game-card--list': isList, 'game-card--cover-only': coverOnly }]"
+    :title="game.title"
     @click="$emit('view', String(game.id))"
   >
     <!-- Cover Image -->
@@ -9,6 +10,8 @@
         :src="displayImage"
         :alt="game.title"
         class="game-card__image"
+        loading="lazy"
+        decoding="async"
       />
 
       <!-- Overlay with gradient -->
@@ -27,7 +30,7 @@
     </div>
 
     <!-- Card Content -->
-    <div class="game-card__content">
+    <div v-if="!coverOnly" class="game-card__content">
       <!-- Row 1: Title and Year -->
       <div class="game-card__row game-card__row--title">
         <div class="game-card__title" :title="game.title">
@@ -100,10 +103,12 @@ import {
 interface Props {
   game: Game
   isList?: boolean
+  coverOnly?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isList: false,
+  coverOnly: false,
 })
 
 const authStore = useAuthStore()
@@ -173,6 +178,30 @@ const displayImage = computed(() => {
 .game-card--list .game-card__content {
   flex: 1;
   padding: 12px 16px;
+}
+
+.game-card--cover-only {
+  margin-bottom: 0;
+  border-radius: 10px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
+}
+
+.game-card--cover-only .game-card__image-wrapper {
+  aspect-ratio: 3 / 4;
+}
+
+.game-card--cover-only .game-card__overlay {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.28) 0%, rgba(0, 0, 0, 0) 55%);
+  opacity: 1;
+}
+
+.game-card--cover-only:hover {
+  transform: translateY(-2px);
+}
+
+.game-card--cover-only .game-card__favorite {
+  top: 6px;
+  left: 6px;
 }
 
 .game-card__image-wrapper {

@@ -69,9 +69,17 @@ func (s *TagsService) ListTags(params domain.TagsListParams) ([]domain.Tag, erro
 }
 
 func (s *TagsService) CreateTag(input domain.TagWriteInput) (*domain.Tag, error) {
-	name := strings.TrimSpace(input.Name)
+	name := normalizeTagName(input.Name)
 	if input.GroupID <= 0 || name == "" {
 		return nil, ErrValidation
+	}
+
+	existing, err := s.repo.FindTagByGroupAndName(input.GroupID, name)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return existing, nil
 	}
 
 	slugValue := ""
@@ -102,6 +110,20 @@ func (s *TagsService) CreateTag(input domain.TagWriteInput) (*domain.Tag, error)
 		SortOrder: &sortOrder,
 		IsActive:  &isActive,
 	}, slugValue, sortOrder, isActive)
+}
+
+func normalizeTagName(value string) string {
+	name := strings.TrimSpace(value)
+
+	for strings.HasPrefix(name, "__new_tag__:") {
+		parts := strings.SplitN(name, ":", 3)
+		if len(parts) != 3 {
+			break
+		}
+		name = strings.TrimSpace(parts[2])
+	}
+
+	return name
 }
 
 func slugifyTagValue(value string) string {

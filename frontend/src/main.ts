@@ -8,7 +8,6 @@ import './assets/style.css' // Import custom premium overrides and utilities
 import App from './App.vue'
 import router from './router'
 import { useUiStore } from './stores/ui'
-import { useAuthStore } from './stores/auth'
 import registerDirectives from './directives'
 import { setRootPixel } from './utils/flexible'
 
@@ -35,12 +34,10 @@ registerDirectives(app)
 
 // Initialize UI store (theme, view mode, etc.)
 const uiStore = useUiStore()
-const authStore = useAuthStore()
 uiStore.initializeTheme()
 uiStore.initializeViewMode()
 uiStore.initializeCardSize()
 uiStore.initializeItemsPerPage()
 uiStore.initializeSidebarCollapsed()
-void authStore.fetchMe()
 
 app.mount('#app')

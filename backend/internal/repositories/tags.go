@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"database/sql"
 	"fmt"
 	"sort"
 	"strings"
@@ -123,6 +124,35 @@ func (r *TagsRepository) CreateTag(input domain.TagWriteInput, slug string, sort
 		if item.ID == tag.ID {
 			return &item, nil
 		}
+	}
+
+	return &tag, nil
+}
+
+func (r *TagsRepository) FindTagByGroupAndName(groupID int64, name string) (*domain.Tag, error) {
+	var tag domain.Tag
+	if err := r.db.Get(&tag, `
+		SELECT
+			t.id,
+			t.group_id,
+			g.key AS group_key,
+			g.name AS group_name,
+			t.name,
+			t.slug,
+			t.parent_id,
+			t.sort_order,
+			t.is_active,
+			t.created_at,
+			t.updated_at
+		FROM tags t
+		INNER JOIN tag_groups g ON g.id = t.group_id
+		WHERE t.group_id = ? AND lower(trim(t.name)) = lower(trim(?))
+		LIMIT 1
+	`, groupID, name); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find tag by group and name: %w", err)
 	}
 
 	return &tag, nil

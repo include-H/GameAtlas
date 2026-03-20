@@ -4,6 +4,7 @@
     <div class="view-header">
       <div class="view-header-title-group">
         <h1 class="view-title text-gradient">{{ pageTitle }}</h1>
+        <p class="view-subtitle">集中浏览、筛选并整理你的全部游戏收藏。</p>
       </div>
 
       <a-space>
@@ -88,7 +89,7 @@
           <span class="tag-filter-section__hint">同组多选为或，不同组之间为且</span>
         </div>
 
-        <a-row v-if="filterableTagGroups.length > 0" :gutter="12" class="mt-3">
+        <a-row v-if="filterableTagGroups.length > 0" :gutter="[12, 16]" class="mt-3">
           <a-col
             v-for="group in filterableTagGroups"
             :key="group.id"
@@ -322,8 +323,13 @@ const itemsPerPageOptions = ref([
 const sortOptions = ref([
   { label: '最新添加', value: 'created_desc' },
   { label: '最早添加', value: 'created_asc' },
+  { label: '名称 A-Z', value: 'title_asc' },
+  { label: '名称 Z-A', value: 'title_desc' },
+  { label: '年份新到旧', value: 'release_desc' },
+  { label: '年份旧到新', value: 'release_asc' },
   { label: '下载最多', value: 'downloads_desc' },
   { label: '浏览次数', value: 'views_desc' },
+  { label: '随机', value: 'random_desc' },
 ])
 
 const visibleGames = ref<any[]>([])
@@ -353,12 +359,21 @@ const selectedPlatform = computed({
 const sortBy = computed({
   get: () => {
     if (route.query.sort === 'newest' || route.query.sort === 'created_desc') return 'created_desc'
+    if (route.query.sort === 'title_asc') return 'title_asc'
+    if (route.query.sort === 'title_desc') return 'title_desc'
+    if (route.query.sort === 'release_asc') return 'release_asc'
+    if (route.query.sort === 'release_desc') return 'release_desc'
+    if (route.query.sort === 'random' || route.query.sort === 'random_desc') return 'random_desc'
     if (route.query.sort === 'downloads' || route.query.sort === 'downloads_desc') return 'downloads_desc'
     if (route.query.sort === 'views' || route.query.sort === 'views_desc') return 'views_desc'
     return (route.query.sort as string) || 'created_desc'
   },
   set: (sort: string) => {
-    updateRoute({ sort })
+    updateRoute({
+      sort,
+      seed: sort === 'random_desc' ? ((route.query.seed as string) || String(Date.now())) : undefined,
+      page: '1',
+    })
   },
 })
 const itemsPerPage = computed({
@@ -408,6 +423,11 @@ const platformLabelMap = computed<Record<string, string>>(() => {
 
 const tagLabelMap = computed<Record<string, string>>(() => {
   return Object.fromEntries(tags.value.map((item) => [String(item.id), item.name]))
+})
+
+const titleSorter = new Intl.Collator('zh-Hans-CN-u-co-pinyin', {
+  numeric: true,
+  sensitivity: 'base',
 })
 
 const updateRoute = (newParams: Record<string, any>) => {
@@ -568,8 +588,11 @@ const loadGames = async () => {
   const [field, order] = sortBy.value.split('_')
   const sortFieldMap: Record<string, string> = {
     created: 'created_at',
+    title: 'title',
+    release: 'release_date',
     downloads: 'downloads',
     views: 'views',
+    random: 'random',
   }
   const filter = {
     search: (route.query.search as string) || undefined,
@@ -581,6 +604,7 @@ const loadGames = async () => {
   const sort = {
     field: (sortFieldMap[field] || 'created_at') as any,
     order: (order || 'desc') as any,
+    seed: field === 'random' ? Number(route.query.seed) || Date.now() : undefined,
   }
 
   try {
@@ -610,6 +634,33 @@ const loadGames = async () => {
         page: 1,
         pageSize: filteredGames.length || itemsPerPage.value,
         totalPages: 1,
+      }
+    } else if (sort.field === 'title') {
+      const allGames = await gamesService.getAllGames({
+        pageSize: 200,
+        filter,
+      })
+      const sortedGames = [...allGames].sort((left, right) => {
+        const leftLabel = left.title.trim()
+        const rightLabel = right.title.trim()
+        const result = titleSorter.compare(leftLabel, rightLabel)
+        if (result !== 0) {
+          return sort.order === 'asc' ? result : -result
+        }
+        return sort.order === 'asc' ? left.id - right.id : right.id - left.id
+      })
+      const total = sortedGames.length
+      const totalPages = total > 0 ? Math.ceil(total / itemsPerPage.value) : 0
+      const safePage = Math.min(Math.max(page, 1), Math.max(totalPages, 1))
+      const start = (safePage - 1) * itemsPerPage.value
+      const end = start + itemsPerPage.value
+
+      visibleGames.value = sortedGames.slice(start, end)
+      visiblePagination.value = {
+        total,
+        page: safePage,
+        pageSize: itemsPerPage.value,
+        totalPages,
       }
     } else {
       const response = await gamesStore.fetchGames({
@@ -705,21 +756,42 @@ watch(viewMode, (value) => {
 .view-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
   margin-bottom: 16px;
+  gap: 16px;
 }
 
 .view-title {
+  margin: 0;
+  font-family: var(--font-family-base);
   font-size: 32px;
   font-weight: 800;
-  margin: 0;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
 }
 
-.text-gradient {
-  background: linear-gradient(135deg, var(--color-primary-light-3), var(--color-primary-6));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.view-subtitle {
+  margin: 8px 0 0;
+  font-family: var(--font-family-base);
+  color: var(--color-text-2);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+@media (max-width: 767px) {
+  .view-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .view-title {
+    font-size: 28px;
+  }
+
+  .view-subtitle {
+    margin-top: 6px;
+    font-size: 14px;
+  }
 }
 
 .mb-4 {
