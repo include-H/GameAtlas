@@ -203,9 +203,11 @@ onUnmounted(() => {
 
 <style scoped>
 .wiki-toc {
-  background: var(--color-bg-2);
-  border: 1px solid var(--color-border-1);
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
   border-radius: var(--radius-lg);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   padding: 12px;
   position: sticky;
   top: 80px;
@@ -287,5 +289,15 @@ onUnmounted(() => {
   color: var(--color-text-3);
   text-align: center;
   padding: 16px 0;
+}
+
+@media (max-width: 992px) {
+  .wiki-toc {
+    position: static;
+    top: auto;
+    max-height: none;
+    width: 100%;
+    flex: none;
+  }
 }
 </style>

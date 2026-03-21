@@ -281,12 +281,25 @@
                   />
                   <div class="media-overlay">
                     <div class="media-overlay-actions">
-                      <button class="media-action-button" type="button" @click.stop="showCoverSelector = true">
+                      <a-button
+                        class="media-action-button"
+                        type="secondary"
+                        shape="circle"
+                        size="small"
+                        @click.stop="showCoverSelector = true"
+                      >
                         <icon-settings />
-                      </button>
-                      <button class="media-action-button media-action-button--danger" type="button" @click.stop="removeCover">
+                      </a-button>
+                      <a-button
+                        class="media-action-button media-action-button--danger"
+                        type="secondary"
+                        status="danger"
+                        shape="circle"
+                        size="small"
+                        @click.stop="removeCover"
+                      >
                         <icon-delete />
-                      </button>
+                      </a-button>
                     </div>
                   </div>
                 </div>
@@ -322,12 +335,25 @@
                   />
                   <div class="media-overlay">
                     <div class="media-overlay-actions">
-                      <button class="media-action-button" type="button" @click.stop="showBannerSelector = true">
+                      <a-button
+                        class="media-action-button"
+                        type="secondary"
+                        shape="circle"
+                        size="small"
+                        @click.stop="showBannerSelector = true"
+                      >
                         <icon-settings />
-                      </button>
-                      <button class="media-action-button media-action-button--danger" type="button" @click.stop="removeBanner">
+                      </a-button>
+                      <a-button
+                        class="media-action-button media-action-button--danger"
+                        type="secondary"
+                        status="danger"
+                        shape="circle"
+                        size="small"
+                        @click.stop="removeBanner"
+                      >
                         <icon-delete />
-                      </button>
+                      </a-button>
                     </div>
                   </div>
                 </div>
@@ -364,9 +390,15 @@
 	                  </video>
 	                  <div class="media-overlay media-overlay--top-right">
 	                    <div class="media-overlay-actions">
-	                      <button class="media-action-button" type="button" @click.stop="openVideoSelector">
+	                      <a-button
+                          class="media-action-button"
+                          type="secondary"
+                          shape="circle"
+                          size="small"
+                          @click.stop="openVideoSelector"
+                        >
 	                        <icon-settings />
-	                      </button>
+	                      </a-button>
 	                    </div>
 	                  </div>
 	                </div>
@@ -426,9 +458,16 @@
                           hide-footer
                         />
                         <div class="screenshot-overlay">
-                          <button class="media-action-button media-action-button--danger" type="button" @click.stop="removeScreenshot(screenshot.client_key)">
+                          <a-button
+                            class="media-action-button media-action-button--danger"
+                            type="secondary"
+                            status="danger"
+                            shape="circle"
+                            size="small"
+                            @click.stop="removeScreenshot(screenshot.client_key)"
+                          >
                             <icon-delete />
-                          </button>
+                          </a-button>
                         </div>
                       </div>
                       <div
@@ -450,8 +489,8 @@
 
 		      <a-form-item>
 	        <a-space style="justify-content: flex-end; width: 100%">
-          <a-button class="app-secondary-cta" type="secondary" @click="handleCancel">取消</a-button>
-          <a-button class="app-primary-cta" type="primary" html-type="submit" :loading="isSubmitting">
+          <a-button type="secondary" @click="handleCancel">取消</a-button>
+          <a-button type="primary" html-type="submit" :loading="isSubmitting">
             保存
           </a-button>
         </a-space>
@@ -486,7 +525,7 @@
           <div v-if="selectedSteamSummaryGame" class="steam-summary-section">
             <div class="steam-search-title">
               {{ selectedSteamSummaryGame.name }} 的简介
-              <a-button class="app-text-compact" type="text" size="mini" @click="backToSummarySearch">返回</a-button>
+              <a-button type="text" size="mini" @click="backToSummarySearch">返回</a-button>
             </div>
 
             <div v-if="steamSummaryPreview" class="steam-summary-preview">
@@ -501,7 +540,6 @@
 
             <a-button
               v-if="steamSummaryPreview"
-              class="app-primary-cta"
               type="primary"
               long
               @click="confirmSummaryImport"
@@ -537,7 +575,7 @@
           <div v-if="selectedSteamGame && steamCoverImages.length > 0" class="steam-images-section">
             <div class="steam-search-title">
               {{ selectedSteamGame.name }} 的封面
-              <a-button class="app-text-compact" type="text" size="mini" @click="backToCoverGameSearch">返回</a-button>
+              <a-button type="text" size="mini" @click="backToCoverGameSearch">返回</a-button>
             </div>
             <div class="steam-images-grid">
               <div
@@ -552,7 +590,6 @@
             </div>
             <a-button
               v-if="selectedCoverImage"
-              class="app-primary-cta"
               type="primary"
               long
               :loading="isSearchingSteamCover"
@@ -575,7 +612,7 @@
           @success="handleCoverUploadSuccess"
           @error="handleCoverUploadError"
         >
-          <a-button class="app-secondary-cta" type="secondary" long>
+          <a-button type="secondary" long>
             <template #icon>
               <icon-upload />
             </template>
@@ -586,23 +623,23 @@
         <a-divider>或从 URL 加载</a-divider>
 
         <!-- URL 加载 -->
-        <a-input
-          v-model="coverSearchUrl"
-          placeholder="输入图片 URL..."
-          @press-enter="loadCoverFromUrl"
-        >
-          <template #append>
-            <a-button class="app-secondary-cta" type="secondary" @click="loadCoverFromUrl">
-              加载
-            </a-button>
-          </template>
-        </a-input>
+        <div class="url-input-row">
+          <a-input
+            v-model="coverSearchUrl"
+            class="url-input-row__field"
+            placeholder="输入图片 URL..."
+            @press-enter="loadCoverFromUrl"
+          />
+          <a-button class="url-input-row__action" type="secondary" @click="loadCoverFromUrl">
+            加载
+          </a-button>
+        </div>
         <div v-if="coverPreviewUrl" class="cover-preview-large">
           <img :src="coverPreviewUrl" @error="handleCoverError" />
         </div>
         <div class="cover-selector-actions">
-          <a-button class="app-secondary-cta" type="secondary" @click="showCoverSelector = false">取消</a-button>
-          <a-button class="app-primary-cta" type="primary" :disabled="!coverPreviewUrl" :loading="isDownloadingCover" @click="confirmCoverSelection">
+          <a-button type="secondary" @click="showCoverSelector = false">取消</a-button>
+          <a-button type="primary" :disabled="!coverPreviewUrl" :loading="isDownloadingCover" @click="confirmCoverSelection">
             确定
           </a-button>
         </div>
@@ -633,7 +670,7 @@
           <div v-if="selectedSteamBannerGame && steamBannerImages.length > 0" class="steam-images-section">
             <div class="steam-search-title">
               {{ selectedSteamBannerGame.name }} 的横幅
-              <a-button class="app-text-compact" type="text" size="mini" @click="backToBannerGameSearch">返回</a-button>
+              <a-button type="text" size="mini" @click="backToBannerGameSearch">返回</a-button>
             </div>
             <div class="steam-images-grid">
               <div
@@ -648,7 +685,6 @@
             </div>
             <a-button
               v-if="selectedBannerImage"
-              class="app-primary-cta"
               type="primary"
               long
               :loading="isSearchingSteamBanner"
@@ -671,7 +707,7 @@
           @success="handleBannerUploadSuccess"
           @error="handleBannerUploadError"
         >
-          <a-button class="app-secondary-cta" type="secondary" long>
+          <a-button type="secondary" long>
             <template #icon>
               <icon-upload />
             </template>
@@ -682,23 +718,23 @@
         <a-divider>或从 URL 加载</a-divider>
 
         <!-- URL 加载 -->
-        <a-input
-          v-model="bannerSearchUrl"
-          placeholder="输入图片 URL..."
-          @press-enter="loadBannerFromUrl"
-        >
-          <template #append>
-            <a-button class="app-secondary-cta" type="secondary" @click="loadBannerFromUrl">
-              加载
-            </a-button>
-          </template>
-        </a-input>
+        <div class="url-input-row">
+          <a-input
+            v-model="bannerSearchUrl"
+            class="url-input-row__field"
+            placeholder="输入图片 URL..."
+            @press-enter="loadBannerFromUrl"
+          />
+          <a-button class="url-input-row__action" type="secondary" @click="loadBannerFromUrl">
+            加载
+          </a-button>
+        </div>
         <div v-if="bannerPreviewUrl" class="cover-preview-large">
           <img :src="bannerPreviewUrl" @error="handleCoverError" />
         </div>
         <div class="cover-selector-actions">
-          <a-button class="app-secondary-cta" type="secondary" @click="showBannerSelector = false">取消</a-button>
-          <a-button class="app-primary-cta" type="primary" :disabled="!bannerPreviewUrl" :loading="isDownloadingBanner" @click="confirmBannerSelection">
+          <a-button type="secondary" @click="showBannerSelector = false">取消</a-button>
+          <a-button type="primary" :disabled="!bannerPreviewUrl" :loading="isDownloadingBanner" @click="confirmBannerSelection">
             确定
           </a-button>
         </div>
@@ -730,7 +766,7 @@
             <div class="steam-game-info">
               <img :src="steamScreenshotsData.cover" :alt="steamScreenshotsData.name" />
               <span>{{ steamScreenshotsData.name }}</span>
-              <a-button class="app-text-compact" type="text" size="mini" @click="backToScreenshotGameSearch">返回</a-button>
+              <a-button type="text" size="mini" @click="backToScreenshotGameSearch">返回</a-button>
             </div>
 
             <div v-if="steamScreenshotsData.usedFallbackAssets" class="steam-screenshot-hint">
@@ -760,7 +796,6 @@
 
             <a-button
               v-if="selectedSteamScreenshots.size > 0"
-              class="app-primary-cta"
               type="primary"
               long
               :loading="isDownloadingSteamScreenshots"
@@ -783,7 +818,7 @@
           @success="handleScreenshotUploadSuccess"
           @error="handleScreenshotUploadError"
         >
-          <a-button class="app-secondary-cta" type="secondary" long>
+          <a-button type="secondary" long>
             <template #icon>
               <icon-upload />
             </template>
@@ -795,17 +830,17 @@
 
         <!-- URL 下载 -->
         <div class="url-input-section">
-          <a-input
-            v-model="screenshotSearchUrl"
-            placeholder="输入图片 URL..."
-            @press-enter="loadScreenshotPreview"
-          >
-            <template #append>
-              <a-button class="app-secondary-cta" type="secondary" @click="loadScreenshotPreview">
-                加载
-              </a-button>
-            </template>
-          </a-input>
+          <div class="url-input-row">
+            <a-input
+              v-model="screenshotSearchUrl"
+              class="url-input-row__field"
+              placeholder="输入图片 URL..."
+              @press-enter="loadScreenshotPreview"
+            />
+            <a-button class="url-input-row__action" type="secondary" @click="loadScreenshotPreview">
+              加载
+            </a-button>
+          </div>
 
           <!-- 预览区域 -->
           <div v-if="screenshotPreviewUrl" class="cover-preview-section">
@@ -815,8 +850,8 @@
 
         <!-- 操作按钮 -->
         <div class="cover-selector-actions">
-          <a-button class="app-secondary-cta" type="secondary" @click="showScreenshotSelector = false">取消</a-button>
-          <a-button class="app-primary-cta" type="primary" :disabled="!screenshotPreviewUrl" :loading="isDownloadingScreenshot" @click="confirmScreenshotSelection">
+          <a-button type="secondary" @click="showScreenshotSelector = false">取消</a-button>
+          <a-button type="primary" :disabled="!screenshotPreviewUrl" :loading="isDownloadingScreenshot" @click="confirmScreenshotSelection">
             确定
           </a-button>
 	        </div>
@@ -840,7 +875,7 @@
 	          class="hidden-file-input"
 	          @change="handleVideoFileChange"
 	        />
-	        <a-button class="app-secondary-cta" type="secondary" long :loading="isUploadingVideo" @click="openVideoFilePicker">
+	        <a-button type="secondary" long :loading="isUploadingVideo" @click="openVideoFilePicker">
 	          <template #icon>
 	            <icon-upload />
 	          </template>
@@ -865,7 +900,11 @@
 	              class="video-library-item"
 	              :class="{ 'is-primary': form.primary_preview_video_uid === video.asset_uid }"
 	            >
-	              <button class="video-library-item__preview" type="button" @click="setPrimaryPreviewVideo(video.asset_uid)">
+	              <a-button
+                  class="video-library-item__preview"
+                  type="text"
+                  @click="setPrimaryPreviewVideo(video.asset_uid)"
+                >
 	                <div class="video-library-item__thumb">
 	                  <img
 	                    v-if="form.banner_image || form.cover_image"
@@ -883,11 +922,10 @@
 	                  </div>
 	                  <div class="video-library-item__path">{{ video.asset_uid || video.path }}</div>
 	                </div>
-	              </button>
+	              </a-button>
 	              <div class="video-library-item__actions">
 	                <a-button
 	                  size="mini"
-	                  class="app-text-compact"
 	                  type="text"
 	                  :disabled="index === 0"
 	                  @click="reorderEditableVideos(video.asset_uid || video.path, -1)"
@@ -896,7 +934,6 @@
 	                </a-button>
 	                <a-button
 	                  size="mini"
-	                  class="app-text-compact"
 	                  type="text"
 	                  :disabled="index === form.preview_videos.length - 1"
 	                  @click="reorderEditableVideos(video.asset_uid || video.path, 1)"
@@ -906,13 +943,12 @@
 	                <a-button
 	                  v-if="form.primary_preview_video_uid !== video.asset_uid"
 	                  size="mini"
-	                  class="app-text-compact"
 	                  type="text"
 	                  @click="setPrimaryPreviewVideo(video.asset_uid)"
 	                >
 	                  设为主预告
 	                </a-button>
-	                <a-button class="app-text-compact" size="mini" type="text" status="danger" @click="removePreviewVideo(video.asset_uid)">
+	                <a-button size="mini" type="text" status="danger" @click="removePreviewVideo(video.asset_uid)">
 	                  删除
 	                </a-button>
 	              </div>
@@ -925,7 +961,7 @@
 	          class="video-library-empty"
 	        />
 	        <div class="cover-selector-actions">
-	          <a-button class="app-secondary-cta" type="secondary" @click="showVideoSelector = false">完成</a-button>
+	          <a-button type="secondary" @click="showVideoSelector = false">完成</a-button>
 	        </div>
 	      </div>
 	    </a-modal>
@@ -2680,10 +2716,6 @@ const handleSubmit = async () => {
   min-width: 0;
 }
 
-.file-path-row :deep(.arco-btn) {
-  flex-shrink: 0;
-}
-
 .file-path-item :deep(.arco-input-prepend) {
   background: var(--color-fill-2);
   border-right: 1px solid var(--color-border-2);
@@ -2726,8 +2758,10 @@ const handleSubmit = async () => {
   width: 100%;
   overflow: hidden;
   border-radius: 8px;
-  border: 1px solid var(--color-border-2);
-  background: var(--color-fill-2);
+  border: 1px solid var(--app-card-border);
+  background: color-mix(in srgb, var(--app-card-surface) 90%, transparent);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2744,7 +2778,9 @@ const handleSubmit = async () => {
   height: 100%;
   border: 1px dashed rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.015) 100%);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-3);
   display: flex;
   flex-direction: column;
@@ -2808,6 +2844,21 @@ const handleSubmit = async () => {
   pointer-events: auto;
 }
 
+.media-action-button {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  padding: 0;
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  transition: transform 0.2s ease;
+}
+
+.media-action-button:hover {
+  transform: scale(1.06);
+}
+
 .media-preview:hover .media-overlay,
 .screenshot-thumb:hover .screenshot-overlay {
   opacity: 1;
@@ -2839,9 +2890,11 @@ const handleSubmit = async () => {
 .video-upload-progress {
   margin-top: 14px;
   padding: 12px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--app-card-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  background: color-mix(in srgb, var(--app-card-surface) 84%, transparent);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .video-upload-progress__meta {
@@ -2855,38 +2908,6 @@ const handleSubmit = async () => {
 
 .media-actions {
   margin-top: 4px;
-}
-
-.media-action-button {
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  background: rgba(36, 43, 61, 0.9);
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 18px;
-  cursor: pointer;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(8px);
-  transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
-}
-
-.media-action-button:hover {
-  background: rgba(45, 54, 77, 0.96);
-  transform: scale(1.06);
-}
-
-.media-action-button--danger {
-  border-color: rgba(255, 77, 79, 0.28);
-  background: rgba(255, 77, 79, 0.2);
-  color: #fff;
-}
-
-.media-action-button--danger:hover {
-  background: rgba(255, 77, 79, 0.28);
 }
 
 /* Screenshots Grid */
@@ -2912,10 +2933,10 @@ const handleSubmit = async () => {
   aspect-ratio: 16/9;
   border-radius: 6px;
   overflow: hidden;
-  background: var(--color-fill-2);
+  background: color-mix(in srgb, var(--app-card-surface) 86%, transparent);
   cursor: grab;
   position: relative;
-  border: 1px solid var(--color-border-2);
+  border: 1px solid var(--app-card-border);
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
 }
 
@@ -2943,7 +2964,9 @@ const handleSubmit = async () => {
   overflow: hidden;
   position: relative;
   border: 1px dashed rgba(255, 255, 255, 0.1);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.015) 100%);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-3);
   display: flex;
   align-items: center;
@@ -3012,7 +3035,10 @@ const handleSubmit = async () => {
   max-height: 400px;
   border-radius: 8px;
   overflow: hidden;
-  background: var(--color-fill-2);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3030,7 +3056,10 @@ const handleSubmit = async () => {
   max-height: 300px;
   border-radius: 8px;
   overflow: hidden;
-  background: var(--color-fill-2);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3041,6 +3070,22 @@ const handleSubmit = async () => {
   max-width: 100%;
   max-height: 300px;
   object-fit: contain;
+}
+
+.url-input-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.url-input-row__field {
+  flex: 1;
+  min-width: 0;
+}
+
+.url-input-row__action {
+  flex-shrink: 0;
+  min-width: 72px;
 }
 
 .cover-selector-actions {
@@ -3067,8 +3112,10 @@ const handleSubmit = async () => {
   overflow-y: auto;
   padding: 14px 16px;
   border-radius: 8px;
-  background: var(--color-fill-1);
-  border: 1px solid var(--color-border-2);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-2);
   line-height: 1.75;
   white-space: pre-wrap;
@@ -3077,8 +3124,10 @@ const handleSubmit = async () => {
 .steam-video-source-card {
   padding: 12px;
   border-radius: 8px;
-  background: var(--color-fill-1);
-  border: 1px solid var(--color-border-2);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-video-source-card__label {
@@ -3103,8 +3152,10 @@ const handleSubmit = async () => {
 .steam-video-debug {
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid var(--color-border-2);
-  background: var(--color-fill-1);
+  border: 1px solid var(--app-card-border);
+  background: color-mix(in srgb, var(--app-card-surface) 84%, transparent);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-2);
   font-size: 12px;
 }
@@ -3126,8 +3177,10 @@ const handleSubmit = async () => {
   margin-top: 14px;
   padding: 14px;
   border-radius: 12px;
-  background: var(--color-fill-1);
-  border: 1px solid var(--color-border-2);
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .video-library-card__header {
@@ -3153,8 +3206,8 @@ const handleSubmit = async () => {
   gap: 12px;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid var(--color-border-2);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--app-card-border);
+  background: color-mix(in srgb, var(--app-card-surface) 84%, transparent);
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
@@ -3166,15 +3219,17 @@ const handleSubmit = async () => {
 .video-library-item__preview {
   flex: 1;
   min-width: 0;
+  padding: 0;
+  text-align: left;
+  justify-content: flex-start;
+}
+
+.video-library-item__preview:deep(.arco-btn-content) {
+  width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
 .video-library-item__thumb {
@@ -3183,7 +3238,7 @@ const handleSubmit = async () => {
   flex-shrink: 0;
   border-radius: 8px;
   overflow: hidden;
-  background: #0f172a;
+  background: color-mix(in srgb, var(--app-card-surface) 82%, black 18%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3238,7 +3293,10 @@ const handleSubmit = async () => {
   margin-top: 14px;
   padding: 20px 0;
   border-radius: 12px;
-  background: var(--color-fill-1);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-images-grid {
@@ -3247,6 +3305,12 @@ const handleSubmit = async () => {
   gap: 12px;
   max-height: 300px;
   overflow-y: auto;
+  padding: 10px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--app-card-surface) 90%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-image-item {
@@ -3254,7 +3318,7 @@ const handleSubmit = async () => {
   border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
-  border: 2px solid var(--color-border-2);
+  border: 2px solid var(--app-card-border);
   transition: all 0.2s;
 }
 
@@ -3283,7 +3347,10 @@ const handleSubmit = async () => {
 .steam-screenshot-hint {
   padding: 10px 12px;
   border-radius: 6px;
-  background: rgba(var(--primary-6), 0.08);
+  background: color-mix(in srgb, rgba(var(--primary-6), 0.08) 60%, var(--app-card-surface));
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-2);
   font-size: 12px;
 }
@@ -3293,8 +3360,11 @@ const handleSubmit = async () => {
   align-items: center;
   gap: 8px;
   padding: 8px;
-  background: var(--color-fill-2);
-  border-radius: 6px;
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  border: 1px solid var(--app-card-border);
+  border-radius: 8px;
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-game-info img {
@@ -3314,12 +3384,21 @@ const handleSubmit = async () => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--app-card-surface) 90%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-screenshots-empty {
   padding: 20px 0;
   border-radius: 8px;
-  background: var(--color-fill-1);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-screenshot-item {
@@ -3328,7 +3407,7 @@ const handleSubmit = async () => {
   overflow: hidden;
   cursor: pointer;
   position: relative;
-  border: 2px solid var(--color-border-2);
+  border: 2px solid var(--app-card-border);
   transition: all 0.2s;
 }
 

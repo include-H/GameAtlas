@@ -11,7 +11,6 @@ import (
 
 	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/domain"
-	"github.com/hao/game/internal/files"
 	"github.com/hao/game/internal/repositories"
 )
 
@@ -23,7 +22,6 @@ type GamesService struct {
 	gameFilesRepo *repositories.GameFilesRepository
 	metadataRepo  *repositories.MetadataRepository
 	tagsRepo      *repositories.TagsRepository
-	fileGuard     *files.Guard
 }
 
 type GamesListResult struct {
@@ -63,17 +61,11 @@ type GameDetail struct {
 }
 
 func NewGamesService(cfg config.Config, gamesRepo *repositories.GamesRepository, gameFilesRepo *repositories.GameFilesRepository, metadataRepo *repositories.MetadataRepository, tagsRepo *repositories.TagsRepository) *GamesService {
-	roots := cfg.AllowedRoots
-	if len(roots) == 0 && strings.TrimSpace(cfg.PrimaryROMRoot) != "" {
-		roots = append(roots, cfg.PrimaryROMRoot)
-	}
-
 	return &GamesService{
 		gamesRepo:     gamesRepo,
 		gameFilesRepo: gameFilesRepo,
 		metadataRepo:  metadataRepo,
 		tagsRepo:      tagsRepo,
-		fileGuard:     files.NewGuard(roots),
 	}
 }
 
@@ -203,9 +195,6 @@ func (s *GamesService) GetDetail(id int64, includeAll bool) (*GameDetail, error)
 	files, err := s.gameFilesRepo.ListByGameID(id)
 	if err != nil {
 		return nil, err
-	}
-	for index := range files {
-		_ = s.refreshFileSize(id, &files[index])
 	}
 
 	var previewVideo *domain.GameAsset
@@ -555,18 +544,4 @@ func trimStringPtr(value *string) *string {
 
 func sqlxErrNotFound() error {
 	return sql.ErrNoRows
-}
-
-func (s *GamesService) refreshFileSize(gameID int64, file *domain.GameFile) error {
-	resolved, err := s.fileGuard.ValidateFile(file.FilePath)
-	if err != nil {
-		return nil
-	}
-
-	if file.SizeBytes != nil && *file.SizeBytes == resolved.SizeBytes {
-		return nil
-	}
-
-	file.SizeBytes = &resolved.SizeBytes
-	return s.gameFilesRepo.UpdateSizeBytes(gameID, file.ID, resolved.SizeBytes)
 }

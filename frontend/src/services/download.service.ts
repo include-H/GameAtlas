@@ -1,3 +1,6 @@
+import { post } from './api'
+import type { ApiResponse } from './types'
+
 const downloadService = {
   getDownloadUrl(gameId: string): string {
     return `/api/games/${gameId}`
@@ -29,6 +32,10 @@ const downloadService = {
     document.body.removeChild(link)
   },
 
+  async recordDownload(gameId: string, fileId: string): Promise<void> {
+    await post<ApiResponse<{ recorded: boolean }>>(`/games/${gameId}/files/${fileId}/downloads`)
+  },
+
   async startDownload(gameId: string, versionId?: string): Promise<{
     id: string
     gameId: string
@@ -37,6 +44,7 @@ const downloadService = {
     progress: 0
   }> {
     if (versionId) {
+      await this.recordDownload(gameId, versionId)
       this.downloadGameVersion(gameId, versionId)
     }
 

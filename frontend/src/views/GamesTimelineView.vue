@@ -5,17 +5,6 @@
         <h1 class="page-hero__title text-gradient">发售时间轴</h1>
         <p class="page-hero__subtitle">默认展示近两年，继续下滑可追溯更早年份，按年与月份查看游戏发售记录。</p>
       </div>
-
-      <div class="games-timeline__hero-side">
-        <div class="games-timeline__stat glass-panel">
-          <span class="games-timeline__stat-value">{{ datedGames.length }}</span>
-          <span class="games-timeline__stat-label">已归档游戏</span>
-        </div>
-        <div class="games-timeline__stat glass-panel">
-          <span class="games-timeline__stat-value">{{ monthGroups.length }}</span>
-          <span class="games-timeline__stat-label">时间分组</span>
-        </div>
-      </div>
     </div>
 
     <div v-if="isLoading" class="games-timeline__loading">
@@ -25,57 +14,47 @@
 
     <a-empty v-else-if="datedGames.length === 0" description="暂无带发售日期的游戏" />
 
-    <div
-      v-else
-      ref="timelineShellRef"
-      class="timeline-shell"
-    >
-      <div
-        v-if="virtualPaddingTop > 0"
-        class="timeline-shell__spacer"
-        :style="{ height: `${virtualPaddingTop}px` }"
-      />
-      <section
-        v-for="row in visibleTimelineRows"
-        :key="row.key"
-        class="timeline-year"
-        :ref="(el) => setRowRef(row.key, el)"
+    <template v-else>
+      <a-timeline
+        class="timeline-shell"
+        label-position="relative"
       >
-        <div class="timeline-year__rail">
-          <div v-if="row.showYearBadge" class="timeline-year__badge">{{ row.year }}</div>
-        </div>
+        <a-timeline-item
+          v-for="row in timelineRows"
+          :key="row.key"
+          class="timeline-item"
+        >
+          <template v-if="row.showYearBadge" #label>
+            <div class="timeline-item__year">{{ row.year }}</div>
+          </template>
 
-        <div class="timeline-year__content">
-          <section class="timeline-month glass-panel">
-            <div class="timeline-month__header">
-              <div>
-                <h2 class="timeline-month__title">{{ row.month.monthLabel }}</h2>
-                <p class="timeline-month__subtitle">{{ row.month.games.length }} 个游戏</p>
+          <div class="timeline-item__content">
+            <a-card class="timeline-month">
+              <div class="timeline-month__header">
+                <div>
+                  <h2 class="timeline-month__title">{{ row.month.monthLabel }}</h2>
+                  <p class="timeline-month__subtitle">{{ row.month.games.length }} 个游戏</p>
+                </div>
+                <a-tag color="orangered">{{ row.month.fullLabel }}</a-tag>
               </div>
-              <a-tag color="orangered">{{ row.month.fullLabel }}</a-tag>
-            </div>
 
-            <div class="timeline-month__grid">
-              <div
-                v-for="game in row.month.games"
-                :key="game.id"
-                class="timeline-month__grid-item"
-              >
-                <game-card
-                  :game="game"
-                  cover-only
-                  @view="openGame"
-                />
+              <div class="timeline-month__grid">
+                <div
+                  v-for="game in row.month.games"
+                  :key="game.id"
+                  class="timeline-month__grid-item"
+                >
+                  <game-card
+                    :game="game"
+                    cover-only
+                    @view="openGame"
+                  />
+                </div>
               </div>
-            </div>
-          </section>
-        </div>
-      </section>
-      <div
-        v-if="virtualPaddingBottom > 0"
-        class="timeline-shell__spacer"
-        :style="{ height: `${virtualPaddingBottom}px` }"
-      />
+            </a-card>
+          </div>
+        </a-timeline-item>
+      </a-timeline>
 
       <div v-if="hasMore" class="timeline-shell__loading-more">
         <template v-if="isLoadingMore">
@@ -92,12 +71,12 @@
       <div v-else class="timeline-shell__end">
         时间线已经到底了
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import GameCard from '@/components/GameCard.vue'
 import gamesService from '@/services/games.service'
@@ -127,10 +106,6 @@ interface TimelineRow {
 
 const TIMELINE_YEARS = 2
 const TIMELINE_PAGE_SIZE = 60
-const VIRTUAL_ENABLE_THRESHOLD = 24
-const VIRTUAL_OVERSCAN_PX = 2000
-const DEFAULT_ROW_HEIGHT = 320
-const ROW_VERTICAL_GAP = 28
 
 const route = useRoute()
 const router = useRouter()
@@ -142,14 +117,7 @@ const hasMore = ref(false)
 const nextCursor = ref<string | null>(null)
 const currentWindowFrom = ref<string | null>(null)
 const currentWindowTo = ref<string | null>(null)
-const timelineShellRef = ref<HTMLElement | null>(null)
 const scrollRootRef = ref<HTMLElement | null>(null)
-const scrollTop = ref(0)
-const viewportHeight = ref(720)
-const shellWidth = ref(1200)
-const rowHeightMap = ref<Record<string, number>>({})
-const isScrollingUp = ref(false)
-const lastKnownScrollTop = ref(0)
 const hasLoadedTimeline = ref(false)
 
 const parseDateParts = (value?: string | null) => {
@@ -229,188 +197,6 @@ const timelineRows = computed<TimelineRow[]>(() => {
   return rows
 })
 
-const timelineColumns = computed(() => {
-  const width = shellWidth.value
-  if (width <= 520) return 3
-  if (width <= 768) return 4
-  if (width <= 900) return 6
-  if (width <= 1200) return 7
-  if (width <= 1400) return 8
-  return 10
-})
-
-const estimatedCardHeight = computed(() => {
-  const columns = Math.max(1, timelineColumns.value)
-  const effectiveWidth = Math.max(shellWidth.value - 140, 320)
-  const cardWidth = effectiveWidth / columns
-  return Math.max(96, Math.min(190, Math.round(cardWidth * (4 / 3))))
-})
-
-const estimateRowHeight = (gameCount: number) => {
-  const columns = Math.max(1, timelineColumns.value)
-  const rows = Math.max(1, Math.ceil(gameCount / columns))
-  const gridHeight = rows * estimatedCardHeight.value + Math.max(0, rows - 1) * 6
-  return 72 + gridHeight + ROW_VERTICAL_GAP
-}
-
-const getRowHeight = (row: TimelineRow) => {
-  return rowHeightMap.value[row.key] || Math.max(DEFAULT_ROW_HEIGHT, estimateRowHeight(row.month.games.length))
-}
-
-const getRowHeightFromMap = (row: TimelineRow, map: Record<string, number>) => {
-  return map[row.key] || Math.max(DEFAULT_ROW_HEIGHT, estimateRowHeight(row.month.games.length))
-}
-
-const shouldVirtualize = computed(() => timelineRows.value.length >= VIRTUAL_ENABLE_THRESHOLD)
-
-const virtualRowsState = computed(() => {
-  const rows = timelineRows.value
-  if (!shouldVirtualize.value || rows.length === 0) {
-    return {
-      rows,
-      paddingTop: 0,
-      paddingBottom: 0,
-    }
-  }
-
-  const topBoundary = Math.max(0, scrollTop.value - VIRTUAL_OVERSCAN_PX)
-  const bottomBoundary = scrollTop.value + Math.max(viewportHeight.value, 600) + VIRTUAL_OVERSCAN_PX
-
-  let startIndex = 0
-  let topOffset = 0
-
-  for (let i = 0; i < rows.length; i += 1) {
-    const rowHeight = getRowHeight(rows[i])
-    if (topOffset + rowHeight >= topBoundary) {
-      startIndex = i
-      break
-    }
-    topOffset += rowHeight
-  }
-
-  let endIndex = startIndex
-  let consumedHeight = topOffset
-  while (endIndex < rows.length && consumedHeight < bottomBoundary) {
-    consumedHeight += getRowHeight(rows[endIndex])
-    endIndex += 1
-  }
-
-  endIndex = Math.max(endIndex, Math.min(startIndex + 1, rows.length))
-
-  let totalHeight = 0
-  for (const row of rows) {
-    totalHeight += getRowHeight(row)
-  }
-
-  return {
-    rows: rows.slice(startIndex, endIndex),
-    paddingTop: topOffset,
-    paddingBottom: Math.max(0, totalHeight - consumedHeight),
-  }
-})
-
-const visibleTimelineRows = computed(() => virtualRowsState.value.rows)
-const virtualPaddingTop = computed(() => virtualRowsState.value.paddingTop)
-const virtualPaddingBottom = computed(() => virtualRowsState.value.paddingBottom)
-
-const syncViewportMetrics = () => {
-  const root = scrollRootRef.value
-  if (root) {
-    const nextTop = root.scrollTop
-    isScrollingUp.value = nextTop < lastKnownScrollTop.value - 0.5
-    lastKnownScrollTop.value = nextTop
-    scrollTop.value = root.scrollTop
-    viewportHeight.value = root.clientHeight
-  }
-
-  const shell = timelineShellRef.value
-  if (shell) {
-    shellWidth.value = shell.clientWidth
-  } else if (root) {
-    shellWidth.value = root.clientWidth
-  }
-}
-
-const getPrefixHeight = (rows: TimelineRow[], map: Record<string, number>, endIndexExclusive: number) => {
-  let total = 0
-  for (let index = 0; index < endIndexExclusive; index += 1) {
-    total += getRowHeightFromMap(rows[index], map)
-  }
-  return total
-}
-
-const locateAnchorByScrollTop = (rows: TimelineRow[], map: Record<string, number>, currentTop: number) => {
-  let accumulated = 0
-  for (let index = 0; index < rows.length; index += 1) {
-    const rowHeight = getRowHeightFromMap(rows[index], map)
-    if (accumulated + rowHeight > currentTop) {
-      return {
-        index,
-        offsetWithin: currentTop - accumulated,
-      }
-    }
-    accumulated += rowHeight
-  }
-
-  if (rows.length === 0) return null
-  return {
-    index: rows.length - 1,
-    offsetWithin: 0,
-  }
-}
-
-const resolveElementRef = (el: unknown): HTMLElement | null => {
-  if (el instanceof HTMLElement) return el
-  if (el && typeof el === 'object' && '$el' in el) {
-    const candidate = (el as { $el?: unknown }).$el
-    return candidate instanceof HTMLElement ? candidate : null
-  }
-  return null
-}
-
-const setRowRef = (key: string, el: unknown) => {
-  const element = resolveElementRef(el)
-  if (!element) return
-
-  window.requestAnimationFrame(() => {
-    const measured = Math.max(DEFAULT_ROW_HEIGHT, element.offsetHeight + ROW_VERTICAL_GAP)
-    const current = rowHeightMap.value[key]
-    if (current && Math.abs(current - measured) < 4) return
-
-    const root = scrollRootRef.value
-    const rows = timelineRows.value
-    const previousMap = rowHeightMap.value
-    const nextMap = {
-      ...previousMap,
-      [key]: measured,
-    }
-
-    let compensatedTop: number | null = null
-    if (root && shouldVirtualize.value && isScrollingUp.value && rows.length > 0) {
-      const anchor = locateAnchorByScrollTop(rows, previousMap, root.scrollTop)
-      if (anchor) {
-        const newPrefix = getPrefixHeight(rows, nextMap, anchor.index)
-        compensatedTop = Math.max(0, newPrefix + anchor.offsetWithin)
-      }
-    }
-
-    rowHeightMap.value = nextMap
-
-    if (root && compensatedTop !== null) {
-      const targetTop = compensatedTop
-      void nextTick(() => {
-        root.scrollTop = targetTop
-        syncViewportMetrics()
-      })
-    }
-  })
-}
-
-const handleWindowResize = () => {
-  rowHeightMap.value = {}
-  syncViewportMetrics()
-}
-
 const appendTimelineChunk = (games: Game[]) => {
   if (games.length === 0) return
   const existingIDs = new Set(allGames.value.map((game) => String(game.id)))
@@ -471,7 +257,6 @@ const handleScrollLoadMore = () => {
   const root = scrollRootRef.value
   if (!root) return
 
-  syncViewportMetrics()
   if (!hasMore.value || isLoadingMore.value) return
   if (root.scrollTop <= 0) return
 
@@ -491,14 +276,11 @@ const loadTimeline = async () => {
       limit: TIMELINE_PAGE_SIZE,
     })
     allGames.value = []
-    rowHeightMap.value = {}
     appendTimelineChunk(response.data)
     hasMore.value = response.hasMore
     nextCursor.value = response.nextCursor
     currentWindowFrom.value = response.from
     currentWindowTo.value = response.to
-    await nextTick()
-    syncViewportMetrics()
     hasLoadedTimeline.value = true
   } finally {
     isLoading.value = false
@@ -516,14 +298,11 @@ const openGame = (id: string | number) => {
 onMounted(() => {
   scrollRootRef.value = resolveScrollRoot()
   scrollRootRef.value?.addEventListener('scroll', handleScrollLoadMore, { passive: true })
-  window.addEventListener('resize', handleWindowResize, { passive: true })
-  syncViewportMetrics()
   loadTimeline()
 })
 
 onBeforeUnmount(() => {
   scrollRootRef.value?.removeEventListener('scroll', handleScrollLoadMore)
-  window.removeEventListener('resize', handleWindowResize)
 })
 </script>
 
@@ -533,40 +312,11 @@ onBeforeUnmount(() => {
 }
 
 .games-timeline__hero {
-  margin-bottom: 20px;
-}
-
-.games-timeline__hero-side {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.games-timeline__stat {
-  min-width: 132px;
-  padding: 16px 18px;
-  border-radius: var(--radius-lg);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  box-shadow: var(--shadow-soft);
-}
-
-.games-timeline__stat-value {
-  font-size: 28px;
-  line-height: 1;
-  font-weight: 800;
-  color: var(--color-text-1);
-}
-
-.games-timeline__stat-label {
-  font-size: 12px;
-  color: var(--color-text-3);
+  margin-bottom: 10px;
 }
 
 .games-timeline__intro {
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   border-radius: var(--radius-xl);
 }
 
@@ -574,7 +324,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 10px;
 }
 
 .games-timeline__intro-title {
@@ -599,54 +349,34 @@ onBeforeUnmount(() => {
 }
 
 .timeline-shell {
-  position: relative;
-  padding-left: 24px;
+  margin-top: 4px;
 }
 
-.timeline-shell::before {
-  content: '';
-  position: absolute;
-  left: 10px;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: linear-gradient(180deg, rgba(26, 159, 255, 0.55), rgba(26, 159, 255, 0.08));
+.timeline-shell :deep(.arco-timeline-item) {
+  padding-bottom: 28px;
 }
 
-.timeline-year {
-  position: relative;
-  display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
-  gap: 20px;
-  margin-bottom: 28px;
+.timeline-shell :deep(.arco-timeline-item-content) {
+  min-width: 0;
 }
 
-.timeline-year__badge {
-  position: sticky;
-  top: 84px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 72px;
-  padding: 10px 14px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, rgba(26, 159, 255, 0.95), rgba(0, 132, 240, 0.85));
-  color: white;
+.timeline-item__year {
   font-size: 16px;
-  font-weight: 800;
-  box-shadow: 0 12px 30px rgba(26, 159, 255, 0.28);
+  font-weight: 700;
+  color: var(--color-text-1);
 }
 
-.timeline-year__content {
+.timeline-item__content {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  min-width: 0;
 }
 
 .timeline-month {
-  padding: 10px;
-  border-radius: 14px;
-  border: 1px solid var(--color-border-2);
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .timeline-month__header {
@@ -679,15 +409,6 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-.timeline-shell__sentinel {
-  height: 1px;
-}
-
-.timeline-shell__spacer {
-  width: 100%;
-  pointer-events: none;
-}
-
 .timeline-shell__loading-more,
 .timeline-shell__end {
   display: flex;
@@ -712,22 +433,8 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 900px) {
-  .timeline-shell {
-    padding-left: 0;
-  }
-
-  .timeline-shell::before {
-    display: none;
-  }
-
-  .timeline-year {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  .timeline-year__badge {
-    position: relative;
-    top: 0;
+  .timeline-shell :deep(.arco-timeline-item-label) {
+    width: 72px;
   }
 
   .timeline-month__grid {
@@ -743,9 +450,13 @@ onBeforeUnmount(() => {
     align-items: flex-start;
   }
 
-  .games-timeline__hero-side {
-    width: 100%;
-    justify-content: flex-start;
+  .timeline-shell :deep(.arco-timeline-item-label) {
+    width: auto;
+    margin-bottom: 10px;
+  }
+
+  .timeline-item__year {
+    font-size: 14px;
   }
 
   .timeline-month__grid {
@@ -753,12 +464,17 @@ onBeforeUnmount(() => {
     gap: 6px;
   }
 
-  .timeline-month {
-    padding: 8px;
-  }
 }
 
 @media (max-width: 520px) {
+  .timeline-month__header {
+    gap: 8px;
+  }
+
+  .timeline-month__header :deep(.arco-tag) {
+    align-self: flex-start;
+  }
+
   .timeline-month__grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }

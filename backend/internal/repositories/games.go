@@ -12,12 +12,12 @@ import (
 )
 
 var allowedGameSortFields = map[string]string{
-	"title":      "g.title",
-	"created_at": "g.created_at",
-	"updated_at": "g.updated_at",
+	"title":        "g.title",
+	"created_at":   "g.created_at",
+	"updated_at":   "g.updated_at",
 	"release_date": "g.release_date",
-	"views":      "g.views",
-	"downloads":  "g.downloads",
+	"views":        "g.views",
+	"downloads":    "g.downloads",
 }
 
 type GamesRepository struct {
@@ -244,10 +244,7 @@ func (r *GamesRepository) ListTimeline(params domain.GamesTimelineParams) ([]dom
 			g.id,
 			g.title,
 			g.release_date,
-			g.cover_image,
-			g.banner_image,
-			g.created_at,
-			g.updated_at
+			g.cover_image
 		FROM games g
 		WHERE %s
 		ORDER BY g.release_date DESC, g.id DESC
@@ -602,7 +599,7 @@ func (r *GamesRepository) Delete(id int64) (bool, error) {
 func (r *GamesRepository) IncrementDownloads(id int64) error {
 	_, err := r.db.Exec(`
 		UPDATE games
-		SET downloads = downloads + 1, updated_at = CURRENT_TIMESTAMP
+		SET downloads = downloads + 1
 		WHERE id = ?
 	`, id)
 	if err != nil {

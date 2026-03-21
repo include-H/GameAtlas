@@ -98,19 +98,21 @@
           <router-view v-slot="{ Component, route }">
             <template v-if="route.meta?.keepAlive !== false">
               <keep-alive>
-                <component
-                  :is="Component"
+                <div
                   :key="String(route.name || route.path)"
                   class="route-fade-shell"
-                />
+                >
+                  <component :is="Component" />
+                </div>
               </keep-alive>
             </template>
             <template v-else>
-              <component
-                :is="Component"
+              <div
                 :key="String(route.name || route.path)"
                 class="route-fade-shell"
-              />
+              >
+                <component :is="Component" />
+              </div>
             </template>
           </router-view>
 
@@ -381,20 +383,6 @@ provide('showMessage', showMessage)
   z-index: 1;
 }
 
-.mobile-menu-btn {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 99;
-  width: 56px;
-  height: 56px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.mobile-menu-btn :deep(.arco-btn-icon) {
-  font-size: 24px;
-}
-
 .mobile-drawer-header {
   display: flex;
   align-items: center;
@@ -419,6 +407,29 @@ provide('showMessage', showMessage)
 
   .content {
     padding: 16px;
+  }
+}
+
+@media (max-width: 576px) {
+  .pro-header {
+    padding: 0 12px;
+  }
+
+  .pro-header .logo {
+    gap: 8px;
+    padding: 4px 8px;
+  }
+
+  .pro-header .logo-text {
+    font-size: 16px;
+  }
+
+  .welcome-text {
+    display: none;
+  }
+
+  .content {
+    padding: 12px;
   }
 }
 </style>
@@ -459,7 +470,7 @@ body {
 }
 
 .app-sider.arco-layout-sider {
-  background: rgba(22, 26, 37, 0.4);
+  background: rgba(22, 26, 37, 0.28);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-right: 1px solid var(--color-border-1);

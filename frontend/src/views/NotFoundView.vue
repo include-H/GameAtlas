@@ -6,7 +6,7 @@
           <p class="not-found-message">
             你访问的页面不存在，或者已经被移动。
           </p>
-          <a-button class="app-primary-cta app-primary-cta--large" type="primary" size="large" @click="goHome">
+          <a-button type="primary" size="large" @click="goHome">
             返回首页
           </a-button>
         </div>
@@ -40,5 +40,17 @@ const goHome = () => {
 .not-found-message {
   margin-bottom: 24px;
   color: var(--color-text-3);
+}
+
+@media (max-width: 576px) {
+  .not-found {
+    min-height: 50vh;
+    padding: 12px 0;
+  }
+
+  .not-found-message {
+    margin-bottom: 16px;
+    font-size: 13px;
+  }
 }
 </style>

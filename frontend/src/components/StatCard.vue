@@ -101,10 +101,11 @@ const iconComponent = computed(() => {
 .stat-card {
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  border: none;
+  border: 1px solid var(--app-card-border);
+  background: var(--app-card-surface);
   overflow: hidden;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .stat-card:hover {

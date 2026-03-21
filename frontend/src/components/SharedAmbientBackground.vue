@@ -10,7 +10,7 @@
       class="shared-ambient-bg__layer"
       :style="{
         ...style,
-        opacity: isEnabled ? (activeLayerIndex === index ? 0.5 : 0) : 0,
+        opacity: isEnabled ? (activeLayerIndex === index ? 0.36 : 0) : 0,
       }"
     >
       <div class="shared-ambient-bg__overlay" />
@@ -21,10 +21,12 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { getRouteParamString, useNamedRouteGuard } from '@/composables/useNamedRouteGuard'
 import gamesService from '@/services/games.service'
 import { resolveAssetUrl } from '@/utils/asset-url'
 
 const route = useRoute()
+const gameDetailRouteGuard = useNamedRouteGuard(route, 'game-detail')
 
 const SUPPORTED_ROUTE_NAMES = new Set([
   'dashboard',
@@ -224,9 +226,12 @@ const pickBackgroundFromGames = async () => {
 }
 
 const loadBackground = async () => {
-  if (route.name === 'game-detail') {
-    const gameId = String(route.params.id || '').trim()
+  const detailBackground = await gameDetailRouteGuard.runWhenActive(async () => {
+    const gameId = getRouteParamString(route, 'id')
     return gameId ? pickGameDetailBackground(gameId) : ''
+  })
+  if (typeof detailBackground === 'string') {
+    return detailBackground
   }
 
   if (cachedBackgroundUrl) {
@@ -313,7 +318,7 @@ watch(
 .shared-ambient-bg__layer {
   position: absolute;
   inset: 0;
-  filter: saturate(1.04) blur(18px) brightness(1.08);
+  filter: saturate(1.06) blur(18px) brightness(1.16);
   transform: scale(1.06);
   transform-origin: center center;
   transition: opacity 0.85s ease;
@@ -323,8 +328,8 @@ watch(
   width: 100%;
   height: 100%;
   background:
-    radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.18), transparent 24%),
-    radial-gradient(circle at 82% 16%, rgba(255, 255, 255, 0.14), transparent 22%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.04) 42%, rgba(255, 255, 255, 0.08) 100%);
+    radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.16), transparent 24%),
+    radial-gradient(circle at 82% 16%, rgba(255, 255, 255, 0.12), transparent 22%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.03) 42%, rgba(255, 255, 255, 0.055) 100%);
 }
 </style>

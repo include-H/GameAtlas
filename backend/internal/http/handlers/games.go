@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -183,7 +184,7 @@ func (h *GamesHandler) Get(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    toGameDetailResponse(detail),
+		"data":    toGameDetailResponse(detail, isAdminRequest(c)),
 	})
 }
 
@@ -316,9 +317,6 @@ type timelineGameItemResponse struct {
 	Title       string  `json:"title"`
 	ReleaseDate *string `json:"release_date"`
 	CoverImage  *string `json:"cover_image"`
-	BannerImage *string `json:"banner_image"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
 }
 
 type gameAssetResponse struct {
@@ -337,15 +335,17 @@ type metadataItemResponse struct {
 }
 
 type gameFileResponse struct {
-	ID        int64   `json:"id"`
-	GameID    int64   `json:"game_id"`
-	FilePath  string  `json:"file_path"`
-	Label     *string `json:"label"`
-	Notes     *string `json:"notes"`
-	SizeBytes *int64  `json:"size_bytes"`
-	SortOrder int     `json:"sort_order"`
-	CreatedAt string  `json:"created_at"`
-	UpdatedAt string  `json:"updated_at"`
+	ID              int64   `json:"id"`
+	GameID          int64   `json:"game_id"`
+	FileName        string  `json:"file_name"`
+	FilePath        string  `json:"file_path,omitempty"`
+	Label           *string `json:"label"`
+	Notes           *string `json:"notes"`
+	SizeBytes       *int64  `json:"size_bytes"`
+	SortOrder       int     `json:"sort_order"`
+	CreatedAt       string  `json:"created_at"`
+	UpdatedAt       string  `json:"updated_at"`
+	SourceCreatedAt *string `json:"source_created_at"`
 }
 
 type gameDetailResponse struct {
@@ -431,9 +431,6 @@ func toTimelineGameItemResponse(game domain.TimelineGame) timelineGameItemRespon
 		Title:       game.Title,
 		ReleaseDate: game.ReleaseDate,
 		CoverImage:  game.CoverImage,
-		BannerImage: game.BannerImage,
-		CreatedAt:   game.CreatedAt,
-		UpdatedAt:   game.UpdatedAt,
 	}
 }
 
@@ -469,7 +466,7 @@ func formatTimelineCursor(releaseDate string, id int64) string {
 	return releaseDate + "|" + strconv.FormatInt(id, 10)
 }
 
-func toGameDetailResponse(detail *services.GameDetail) gameDetailResponse {
+func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDetailResponse {
 	screenshots := make([]gameAssetResponse, 0, len(detail.Screenshots))
 	for _, asset := range detail.Screenshots {
 		screenshots = append(screenshots, gameAssetResponse{
@@ -524,7 +521,7 @@ func toGameDetailResponse(detail *services.GameDetail) gameDetailResponse {
 		Publishers:      toMetadataResponses(detail.Publishers),
 		Tags:            toTagResponses(detail.Tags),
 		TagGroups:       toGameTagGroupResponses(detail.TagGroups),
-		Files:           toGameFileResponses(detail.Files),
+		Files:           toGameFileResponses(detail.Files, includePaths),
 		CreatedAt:       detail.Game.CreatedAt,
 		UpdatedAt:       detail.Game.UpdatedAt,
 	}
@@ -544,20 +541,25 @@ func toMetadataResponses(items []domain.MetadataItem) []metadataItemResponse {
 	return result
 }
 
-func toGameFileResponses(items []domain.GameFile) []gameFileResponse {
+func toGameFileResponses(items []domain.GameFile, includePaths bool) []gameFileResponse {
 	result := make([]gameFileResponse, 0, len(items))
 	for _, item := range items {
-		result = append(result, gameFileResponse{
-			ID:        item.ID,
-			GameID:    item.GameID,
-			FilePath:  item.FilePath,
-			Label:     item.Label,
-			Notes:     item.Notes,
-			SizeBytes: item.SizeBytes,
-			SortOrder: item.SortOrder,
-			CreatedAt: item.CreatedAt,
-			UpdatedAt: item.UpdatedAt,
-		})
+		response := gameFileResponse{
+			ID:              item.ID,
+			GameID:          item.GameID,
+			FileName:        filepath.Base(item.FilePath),
+			Label:           item.Label,
+			Notes:           item.Notes,
+			SizeBytes:       item.SizeBytes,
+			SortOrder:       item.SortOrder,
+			CreatedAt:       item.CreatedAt,
+			UpdatedAt:       item.UpdatedAt,
+			SourceCreatedAt: item.SourceCreatedAt,
+		}
+		if includePaths {
+			response.FilePath = item.FilePath
+		}
+		result = append(result, response)
 	}
 	return result
 }

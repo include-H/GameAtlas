@@ -31,7 +31,7 @@ func (h *GameFilesHandler) List(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    toGameFileResponses(files),
+		"data":    toGameFileResponses(files, isAdminRequest(c)),
 	})
 }
 
@@ -61,7 +61,7 @@ func (h *GameFilesHandler) Create(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
-		"data":    toGameFileResponses([]domain.GameFile{*file})[0],
+		"data":    toGameFileResponses([]domain.GameFile{*file}, true)[0],
 	})
 }
 
@@ -95,7 +95,7 @@ func (h *GameFilesHandler) Update(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    toGameFileResponses([]domain.GameFile{*file})[0],
+		"data":    toGameFileResponses([]domain.GameFile{*file}, true)[0],
 	})
 }
 

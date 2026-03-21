@@ -23,6 +23,7 @@ export interface Series {
   created_at: string
   game_count?: number
   cover_image?: string | null
+  cover_candidates?: string[]
   latest_updated_at?: string | null
 }
 
@@ -93,11 +94,13 @@ export interface GameTagGroup {
 export interface GameFileEntry {
   id: number
   game_id: number
-  file_path: string
+  file_name: string
+  file_path?: string
   label?: string | null
   notes?: string | null
   size_bytes?: number | null
   sort_order: number
+  source_created_at: string | null
   created_at: string
   updated_at: string
 }
@@ -188,6 +191,7 @@ export interface GameVersion {
   size: number
   checksum?: string
   isLatest: boolean
+  canLaunch?: boolean
   downloadUrl?: string
   launchScriptUrl?: string
   changelog?: string

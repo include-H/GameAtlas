@@ -75,6 +75,9 @@
   --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   --font-family-base: 'CustomDataFont', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --app-card-surface: rgba(255, 255, 255, 0.8);
+  --app-card-border: rgba(0, 0, 0, 0.05);
+  --app-card-backdrop-blur: 12px;
 }
 
 /* -----------------------------------------------------------------------
@@ -86,6 +89,7 @@ body[arco-theme='dark'] {
   --color-bg-2: #161a25; /* Content/card background */
   --color-bg-3: #1c2230; /* Component background */
   --color-bg-4: #242b3d; /* Hover background */
+  --color-bg-popup: rgba(22, 26, 37, 0.82);
   --color-fill-1: #1c2230;
   --color-fill-2: #242b3d;
   --color-fill-3: #2d364d;
@@ -99,6 +103,8 @@ body[arco-theme='dark'] {
   --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.2);
   --shadow-hover: 0 12px 30px rgba(0, 0, 0, 0.4);
   --shadow-float: 0 20px 40px rgba(0, 0, 0, 0.6);
+  --app-card-surface: rgba(22, 26, 37, 0.58);
+  --app-card-border: rgba(255, 255, 255, 0.05);
 }
 
 /* -----------------------------------------------------------------------
@@ -197,19 +203,45 @@ body[arco-theme='dark'] #app {
    Utility Classes (Glassmorphism & Layouts)
    ----------------------------------------------------------------------- */
 .glass-panel {
-  background: rgba(22, 26, 37, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--app-card-surface);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  border: 1px solid var(--app-card-border);
+}
+
+.app-input-action-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+
+.app-input-action-row__field {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-input-action-row__action {
+  flex-shrink: 0;
+}
+
+@media (max-width: 576px) {
+  .app-input-action-row {
+    flex-direction: column;
+  }
+
+  .app-input-action-row__action {
+    width: 100%;
+  }
 }
 
 body[arco-theme='light'] .glass-panel {
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
 }
 
 .glass-header {
-  background: rgba(15, 18, 25, 0.85) !important;
+  background: rgba(15, 18, 25, 0.72) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
@@ -248,50 +280,18 @@ body[arco-theme='light'] .glass-header {
   color: transparent;
 }
 
-.app-carousel-nav-button {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 46px;
-  height: 46px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 50%;
-  background: rgba(7, 13, 22, 0.42);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  color: rgba(255, 255, 255, 0.92);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 11;
-  transition:
-    background var(--transition-fast),
-    border-color var(--transition-fast),
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast),
-    color var(--transition-fast);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.24);
+.app-page-back {
+  align-self: flex-start;
 }
 
-.app-carousel-nav-button:hover {
-  background: rgba(18, 32, 54, 0.72);
-  border-color: rgba(144, 209, 255, 0.5);
-  color: #fff;
-  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.3);
+.app-page-back.arco-btn {
+  padding-inline: 10px;
 }
 
-.app-carousel-nav-button:active {
-  transform: translateY(-50%) scale(0.96);
+.app-page-back :is(.arco-icon, .arco-btn-icon) {
+  font-size: 14px;
 }
 
-.app-carousel-nav-button:focus-visible {
-  outline: none;
-  border-color: rgba(170, 222, 255, 0.9);
-  box-shadow:
-    0 0 0 3px rgba(112, 193, 255, 0.22),
-    0 18px 34px rgba(0, 0, 0, 0.3);
-}
 
 .page-hero {
   display: flex;
@@ -379,7 +379,10 @@ body[arco-theme='light'] .glass-header {
 /* Cards */
 .arco-card {
   border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border-1);
+  border: 1px solid var(--app-card-border);
+  background: var(--app-card-surface);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   box-shadow: var(--shadow-soft);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
@@ -388,179 +391,81 @@ body[arco-theme='light'] .glass-header {
   border-color: var(--color-border-2);
 }
 
-/* Buttons */
-.arco-btn {
-  border-radius: var(--radius-md);
-  font-weight: 500;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
-  box-shadow: none;
+body[arco-theme='light'] .arco-card {
+  background: var(--app-card-surface);
+  border-color: var(--app-card-border);
 }
 
-.arco-btn:not(.arco-btn-primary):not(.arco-btn-secondary):not(.arco-btn-outline):not(.arco-btn-text) {
-  background: var(--color-bg-3);
-  border-color: var(--color-border-2);
-  color: var(--color-text-1);
+.arco-modal {
+  background: var(--app-card-surface);
+  background-color: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  box-shadow: var(--shadow-float);
 }
 
-.arco-btn:not(.arco-btn-primary):not(.arco-btn-secondary):not(.arco-btn-outline):not(.arco-btn-text):hover {
-  background: var(--color-fill-3);
-  border-color: var(--color-border-3);
-  color: var(--color-text-1);
+.arco-trigger-popup,
+.arco-select-dropdown,
+.arco-tree-select-popup,
+.arco-cascader-panel,
+.arco-picker-container,
+.arco-picker-range-container,
+.arco-timepicker-container {
+  background: var(--color-bg-popup);
+  background-color: var(--color-bg-popup);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  box-shadow: var(--shadow-float);
 }
 
-.arco-btn-size-mini {
-  font-size: 12px;
+.arco-select-dropdown .arco-select-option,
+.arco-select-dropdown .arco-select-option-selected,
+.arco-select-dropdown .arco-select-option-disabled {
+  background-color: transparent;
 }
 
-.arco-btn-size-small {
-  font-size: 13px;
+.arco-select-dropdown .arco-select-option-active,
+.arco-select-dropdown .arco-select-option:not(.arco-select-dropdown .arco-select-option-disabled):hover {
+  background-color: var(--color-bg-3);
 }
 
-.arco-btn-size-default {
-  font-size: 14px;
+.arco-cascader-option:hover,
+.arco-cascader-search-option-hover,
+.arco-cascader-option-active,
+.arco-cascader-option-active:hover,
+.arco-cascader-option-active.arco-cascader-option-disabled,
+.arco-cascader-option-active.arco-cascader-option-disabled:hover {
+  background-color: var(--color-bg-3);
 }
 
-.arco-btn-size-large {
-  font-size: 15px;
+.arco-tree-select-popup .arco-tree-node-title:hover,
+.arco-tree-select-popup .arco-tree-node-selected .arco-tree-node-title,
+.arco-tree-select-popup .arco-tree-node-selected .arco-tree-node-title:hover {
+  background-color: var(--color-bg-3);
 }
 
-.arco-btn-primary {
-  background: linear-gradient(135deg, var(--color-primary-6), #007aff);
-  border: 1px solid transparent;
-  box-shadow: 0 4px 10px rgba(26, 159, 255, 0.24);
+.arco-picker-header-icon {
+  background-color: transparent;
 }
 
-.arco-btn-primary:hover {
-  background: linear-gradient(135deg, var(--color-primary-5), #3395ff);
-  box-shadow: 0 6px 14px rgba(26, 159, 255, 0.3);
-  transform: translateY(-1px);
-}
-
-.arco-btn-secondary {
-  background: var(--color-fill-2);
-  border-color: var(--color-border-2);
-  color: var(--color-text-1);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
-}
-
-.arco-btn-secondary:hover {
-  background: var(--color-fill-3);
-  border-color: var(--color-border-3);
-}
-
-.arco-btn-outline {
-  background: transparent;
-  border-color: var(--color-border-2);
-  color: var(--color-text-2);
-}
-
-.arco-btn-outline:hover {
-  background: var(--color-fill-2);
-  border-color: var(--color-primary-light-4);
-  color: var(--color-text-1);
-}
-
-.arco-btn-text {
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
-}
-
-.arco-btn-text:hover {
-  background: var(--color-fill-2);
-}
-
-.arco-btn-status-danger.arco-btn-primary,
-.arco-btn-status-danger.arco-btn-secondary {
-  border-color: transparent;
-  color: #fff;
-}
-
-.arco-btn-status-danger.arco-btn-primary {
-  background: linear-gradient(135deg, #d94355, #ff4d4f);
-  box-shadow: 0 4px 10px rgba(255, 77, 79, 0.24);
-}
-
-.arco-btn-status-danger.arco-btn-primary:hover {
-  background: linear-gradient(135deg, #e85768, #ff6163);
-  box-shadow: 0 6px 14px rgba(255, 77, 79, 0.3);
-}
-
-.arco-btn-status-danger.arco-btn-secondary {
-  background: rgba(255, 77, 79, 0.14);
-  border-color: rgba(255, 77, 79, 0.28);
-}
-
-.arco-btn-status-danger.arco-btn-secondary:hover {
-  background: rgba(255, 77, 79, 0.2);
-  border-color: rgba(255, 77, 79, 0.4);
-}
-
-.arco-btn-status-danger.arco-btn-outline,
-.arco-btn-status-danger.arco-btn-text {
-  color: var(--color-danger-6);
-}
-
-.app-primary-cta {
-  min-height: 36px;
-  padding-inline: 18px;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  box-shadow: 0 8px 18px rgba(26, 159, 255, 0.22);
-}
-
-.app-primary-cta:hover {
-  box-shadow: 0 10px 22px rgba(26, 159, 255, 0.28);
-}
-
-.app-primary-cta .arco-icon,
-.app-primary-cta :deep(.arco-icon) {
-  font-size: 16px;
-}
-
-.app-primary-cta--large {
-  min-height: 40px;
-  border-radius: 14px;
-  font-size: 15px;
-  padding-inline: 20px;
-}
-
-.app-secondary-cta {
-  min-height: 36px;
-  padding-inline: 18px;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.app-secondary-cta--large {
-  min-height: 40px;
-  border-radius: 14px;
-  font-size: 15px;
-  padding-inline: 20px;
-}
-
-.app-secondary-compact {
-  min-height: 32px;
-  padding-inline: 12px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.app-text-compact {
-  min-height: 32px;
-  padding-inline: 10px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 500;
+.arco-picker-header-icon:not(.arco-picker-header-icon-hidden):hover,
+.arco-picker-header-label:hover,
+.arco-picker-cell-in-view:not(.arco-picker-cell-selected):not(.arco-picker-cell-range-start):not(.arco-picker-cell-range-end):not(.arco-picker-cell-disabled):not(.arco-picker-cell-week) .arco-picker-date-value:hover {
+  background-color: var(--color-bg-3);
 }
 
 /* Inputs / Selects */
 .arco-input-wrapper,
-.arco-select-view {
+.arco-select-view,
+.arco-cascader-view,
+.arco-tree-select-view,
+.arco-input-tag,
+.arco-picker,
+.arco-textarea,
+.arco-textarea-wrapper,
+.arco-radio-group-button {
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border-2);
   background-color: var(--color-bg-2);
@@ -568,16 +473,44 @@ body[arco-theme='light'] .glass-header {
 }
 
 .arco-input-wrapper:hover,
-.arco-select-view:hover {
+.arco-select-view:hover,
+.arco-cascader:hover .arco-cascader-view,
+.arco-tree-select:hover .arco-tree-select-view,
+.arco-input-tag:hover,
+.arco-picker:hover,
+.arco-textarea:hover,
+.arco-textarea-wrapper:hover,
+.arco-radio-group-button:hover {
   border-color: var(--color-primary-6);
   background-color: var(--color-bg-3);
 }
 
 .arco-input-wrapper.arco-input-focus,
-.arco-select-view.arco-select-view-focus {
+.arco-select-view.arco-select-view-focus,
+.arco-cascader.arco-cascader-focus .arco-cascader-view,
+.arco-tree-select.arco-tree-select-focus .arco-tree-select-view,
+.arco-input-tag:focus-within,
+.arco-input-tag.arco-input-tag-focus,
+.arco-picker-focused,
+.arco-picker-focused:hover,
+.arco-textarea:focus,
+.arco-textarea:focus-visible,
+.arco-textarea-wrapper:focus-within,
+.arco-radio-group-button:focus-within {
   border-color: var(--color-primary-6);
   box-shadow: 0 0 0 2px rgba(26, 159, 255, 0.2);
   background-color: var(--color-bg-1);
+}
+
+.arco-textarea {
+  background-color: transparent;
+}
+
+.arco-radio-button:hover,
+.arco-radio-button.arco-radio-checked,
+body[arco-theme='dark'] .arco-radio-button.arco-radio-checked,
+body[arco-theme='dark'] .arco-radio-button:not(.arco-radio-disabled):hover {
+  background-color: var(--color-bg-3);
 }
 
 /* Tags */

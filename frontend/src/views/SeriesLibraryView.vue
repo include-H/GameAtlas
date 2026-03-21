@@ -5,12 +5,22 @@
         <h1 class="series-library__title page-hero__title text-gradient">系列库</h1>
         <p class="series-library__subtitle page-hero__subtitle">按系列浏览，再进入对应作品集合。</p>
       </div>
-      <a-input-search
-        v-model="searchQuery"
-        class="series-library__search"
-        placeholder="搜索系列"
-        allow-clear
-      />
+      <div class="series-library__search app-input-action-row">
+        <a-input
+          v-model="searchQuery"
+          class="app-input-action-row__field"
+          placeholder="搜索系列"
+          allow-clear
+          @press-enter="loadSeries"
+        >
+          <template #prefix>
+            <icon-search />
+          </template>
+        </a-input>
+        <a-button class="app-input-action-row__action" type="secondary" @click="loadSeries">
+          搜索
+        </a-button>
+      </div>
     </div>
 
     <div v-if="isLoading" class="series-library__loading">
@@ -24,16 +34,35 @@
       </div>
 
       <div v-if="seriesCards.length > 0" class="series-library__grid">
-        <button
+        <div
           v-for="series in seriesCards"
           :key="series.id"
-          type="button"
           class="series-card hover-lift"
+          role="button"
+          tabindex="0"
           @click="openSeries(series.id)"
+          @keydown.enter="openSeries(series.id)"
+          @keydown.space.prevent="openSeries(series.id)"
         >
           <div class="series-card__cover">
+            <div
+              v-if="(series.game_count || 0) > 4 && series.cover_candidates && series.cover_candidates.length >= 4"
+              class="series-card__collage"
+            >
+              <div
+                v-for="(cover, index) in series.cover_candidates.slice(0, 4)"
+                :key="`${series.id}-${index}`"
+                class="series-card__collage-tile"
+              >
+                <img
+                  :src="cover"
+                  :alt="`${series.name}-${index + 1}`"
+                  class="series-card__collage-image"
+                />
+              </div>
+            </div>
             <img
-              v-if="series.cover_image"
+              v-else-if="series.cover_image"
               :src="series.cover_image"
               :alt="series.name"
               class="series-card__image"
@@ -50,7 +79,7 @@
               <span v-if="series.latest_updated_at">{{ formatDate(series.latest_updated_at) }}</span>
             </div>
           </div>
-        </button>
+        </div>
       </div>
 
       <a-empty v-else description="暂无系列数据" />
@@ -60,6 +89,7 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { IconSearch } from '@arco-design/web-vue/es/icon'
 import { useRouter } from 'vue-router'
 import { seriesService } from '@/services/series.service'
 import type { Series } from '@/services/types'
@@ -71,6 +101,7 @@ defineOptions({
 interface SeriesCardItem extends Series {
   game_count: number
   cover_image?: string | null
+  cover_candidates?: string[]
   latest_updated_at?: string | null
 }
 
@@ -92,6 +123,7 @@ const loadSeries = async () => {
         ...item,
         game_count: item.game_count || 0,
         cover_image: item.cover_image ?? null,
+        cover_candidates: (item.cover_candidates || []).filter((value) => value.trim().length > 0).slice(0, 4),
         latest_updated_at: item.latest_updated_at ?? null,
       }))
   } finally {
@@ -138,7 +170,7 @@ onBeforeUnmount(() => {
 }
 
 .series-library__header {
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 
 .series-library__title {
@@ -154,7 +186,7 @@ onBeforeUnmount(() => {
 }
 
 .series-library__meta {
-  margin-bottom: 16px;
+  margin-bottom: 10px;
   color: var(--color-text-3);
   font-size: 14px;
 }
@@ -176,9 +208,11 @@ onBeforeUnmount(() => {
 .series-card {
   position: relative;
   padding: 0;
-  border: 1px solid var(--color-border-2);
+  border: 1px solid var(--app-card-border);
   border-radius: var(--radius-lg);
-  background: var(--color-bg-2);
+  background: var(--app-card-surface);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   overflow: hidden;
   cursor: pointer;
   text-align: left;
@@ -187,6 +221,7 @@ onBeforeUnmount(() => {
   height: 100%;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   transition: all var(--transition-fast);
+  text-align: left;
 }
 
 .series-card:hover {
@@ -209,6 +244,30 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
+.series-card__collage {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  background: linear-gradient(135deg, rgba(12, 18, 30, 0.96), rgba(16, 20, 30, 0.82));
+}
+
+.series-card__collage-tile {
+  position: relative;
+  overflow: hidden;
+}
+
+.series-card__collage-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center 22%;
+  transform: scale(1.02);
+}
+
 .series-card__image {
   object-fit: cover;
   object-position: center 22%;
@@ -226,7 +285,7 @@ onBeforeUnmount(() => {
 .series-card__overlay {
   position: absolute;
   inset: 0;
-  background: transparent;
+  background: linear-gradient(180deg, rgba(6, 12, 22, 0.02), rgba(6, 12, 22, 0.34));
 }
 
 .series-card__body {
@@ -234,8 +293,9 @@ onBeforeUnmount(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 4px;
+  text-align: left;
 }
 
 .series-card__title {
@@ -246,11 +306,13 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
 }
 
 .series-card__meta-row {
   margin-top: auto;
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   color: var(--color-text-3);
@@ -281,14 +343,32 @@ onBeforeUnmount(() => {
     align-items: stretch;
   }
 
+  .series-library__search {
+    width: 100%;
+  }
+
   .series-library__grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 767px) {
+  .series-library__meta {
+    font-size: 13px;
+  }
+
   .series-library__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .series-card__body {
+    padding: 10px 12px;
+  }
+
+  .series-card__meta-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
   }
 }
 

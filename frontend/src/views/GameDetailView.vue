@@ -4,7 +4,7 @@
       <!-- Game Header Navigation & Title -->
       <div class="game-detail__header">
         <div class="header-content">
-        <a-button class="app-text-compact header-back-btn" type="text" @click="handleGoBack">
+        <a-button class="app-page-back" type="secondary" @click="handleGoBack">
           <template #icon>
             <icon-left />
           </template>
@@ -15,7 +15,7 @@
           <h1 class="header-title">{{ game.title }}</h1>
           <div class="header-actions">
             <a-button 
-              class="app-text-compact header-favorite-btn"
+              class="header-favorite-btn"
               type="text" 
               :class="{ 'is-favorite': game.isFavorite }"
               @click="handleToggleFavorite"
@@ -29,7 +29,7 @@
 
             <a-button 
               v-if="canEdit"
-              class="app-text-compact header-edit-btn"
+              class="header-edit-btn"
               type="text" 
               @click="showEditModal = true"
             >
@@ -80,21 +80,6 @@
             <div v-if="game.summary" class="sidebar-summary">
               {{ game.summary }}
             </div>
-
-            <div class="sidebar-actions">
-              <a-button
-                class="app-primary-cta app-primary-cta--large"
-                type="primary"
-                size="large"
-                long
-                @click="showDownloadModal = true"
-              >
-                <template #icon>
-                  <icon-download />
-                </template>
-                下载游戏
-              </a-button>
-            </div>
           </div>
 
           <div class="sidebar-card sidebar-card--meta">
@@ -119,7 +104,13 @@
                 <span class="sidebar-info__label">游戏引擎</span>
                 <span class="sidebar-info__value">{{ game.engine }}</span>
               </div>
-              <div v-if="game.platforms && game.platforms.length > 0" class="sidebar-info__item">
+              <div
+                v-if="game.platforms && game.platforms.length > 0"
+                :class="[
+                  'sidebar-info__item',
+                  { 'sidebar-info__item--wide': shouldSpanMetadataRow(game.platforms) }
+                ]"
+              >
                 <span class="sidebar-info__label">平台</span>
                 <div class="sidebar-info__value">
                   <a-space wrap>
@@ -136,7 +127,10 @@
               <div
                 v-for="group in game.tag_groups || []"
                 :key="group.id"
-                class="sidebar-info__item"
+                :class="[
+                  'sidebar-info__item',
+                  { 'sidebar-info__item--wide': shouldSpanMetadataRow(group.tags) }
+                ]"
               >
                 <span class="sidebar-info__label">{{ group.name }}</span>
                 <div class="sidebar-info__value">
@@ -152,9 +146,62 @@
         </div>
       </div>
 
+      <div class="game-detail__download-section">
+        <div v-if="versions.length > 0" class="download-version-panel">
+          <div class="download-version-list">
+            <div
+              v-for="version in versions"
+              :key="version.id"
+              class="download-version-item"
+            >
+              <div class="version-info">
+                <div class="version-name">
+                  <span class="version-name__text">{{ version.version }}</span>
+                  <span v-if="version.isLatest" class="version-badge version-badge--latest">最新版本</span>
+                </div>
+                <div class="version-meta">
+                  <span class="version-meta-pill">
+                    <span class="version-meta-pill__label">大小</span>
+                    <span class="version-size">{{ formatSize(version.size) }}</span>
+                  </span>
+                  <span v-if="version.releaseDate" class="version-meta-pill">
+                    <span class="version-meta-pill__label">日期</span>
+                    <span class="version-date">{{ formatDate(version.releaseDate) }}</span>
+                  </span>
+                </div>
+              </div>
+              <div class="version-actions">
+                <a-button
+                  class="version-action-btn version-action-btn--primary"
+                  type="primary"
+                  @click="handleDownloadVersion(version)"
+                >
+                  <template #icon>
+                    <icon-download />
+                  </template>
+                  下载
+                </a-button>
+                <a-button
+                  v-if="version.canLaunch"
+                  class="version-action-btn version-action-btn--secondary"
+                  type="secondary"
+                  @click.stop="handleDownloadLaunchScript(version)"
+                >
+                  开始游玩
+                </a-button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="download-empty">
+          <p class="download-empty-title">暂无可下载版本</p>
+        </div>
+      </div>
+
       <div class="game-detail__wiki-section">
         <!-- Wiki Content with TOC -->
-        <div v-if="wiki" class="game-detail__wiki-wrapper">
+        <div v-if="hasWikiContent" class="game-detail__wiki-wrapper">
           <!-- Wiki TOC Sidebar -->
           <wiki-toc />
 
@@ -165,10 +212,9 @@
                 <span>关于这款游戏</span>
                 <a-button
                   v-if="canEdit"
-                  class="app-text-compact"
                   type="text"
                   size="small"
-                  @click="router.push({ name: 'wiki-edit', params: { gameId: String(game.id) } })"
+                  @click="openWikiEditor"
                 >
                   <template #icon>
                     <icon-edit />
@@ -177,20 +223,19 @@
                 </a-button>
               </div>
             </template>
-            <markdown-renderer :content="wiki.content || ''" />
+            <markdown-renderer :content="wiki?.content || ''" />
           </a-card>
         </div>
 
         <!-- No Wiki Placeholder -->
         <a-card v-else class="game-detail__card game-detail__wiki-placeholder">
           <div class="game-detail__no-wiki">
-            <icon-file class="game-detail__no-wiki-icon" />
-            <p class="game-detail__no-wiki-text">暂无游戏介绍</p>
+            <p class="game-detail__no-wiki-text">暂无 Wiki</p>
             <a-button
               v-if="canEdit"
-              class="app-primary-cta"
-              type="primary"
-              @click="router.push({ name: 'wiki-edit', params: { gameId: String(game.id) } })"
+              type="text"
+              size="small"
+              @click="openWikiEditor"
             >
               创建Wiki页面
             </a-button>
@@ -213,54 +258,6 @@
     @success="handleEditSuccess"
   />
 
-  <!-- Download Version Modal -->
-  <a-modal
-    v-model:visible="showDownloadModal"
-    title="选择游戏版本"
-    :footer="false"
-    :width="620"
-  >
-    <div v-if="versions.length > 0" class="download-version-list">
-      <div
-        v-for="version in versions"
-        :key="version.id"
-        class="download-version-item"
-        @click="handleDownloadVersion(version)"
-      >
-        <div class="version-info">
-          <div class="version-name">
-            {{ version.version }}
-            <a-tag v-if="version.isLatest" size="small" color="arcoblue">最新</a-tag>
-          </div>
-          <div class="version-meta">
-            <span class="version-size">{{ formatSize(version.size) }}</span>
-            <span v-if="version.releaseDate" class="version-date">{{ formatDate(version.releaseDate) }}</span>
-          </div>
-        </div>
-        <div class="version-actions">
-          <a-button class="app-primary-cta version-action-btn version-action-btn--primary" type="primary">
-            <template #icon>
-              <icon-download />
-            </template>
-            下载
-          </a-button>
-          <a-button
-            v-if="canEdit"
-            class="app-secondary-cta version-action-btn version-action-btn--secondary"
-            type="secondary"
-            @click.stop="handleDownloadLaunchScript(version)"
-          >
-            启动脚本
-          </a-button>
-        </div>
-      </div>
-    </div>
-    <div v-else class="download-empty">
-      <icon-file class="download-empty-icon" />
-      <p class="download-empty-text">暂无可下载版本</p>
-    </div>
-  </a-modal>
-
 </template>
 
 <script setup lang="ts">
@@ -277,11 +274,11 @@ import ScreenshotCarousel from '@/components/ScreenshotCarousel.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import EditGameModal from '@/components/EditGameModal.vue'
 import WikiToc from '@/components/WikiToc.vue'
-import { resolveReturnRoute } from '@/utils/navigation'
+import { useNamedRouteGuard, watchRouteParamWhenActive } from '@/composables/useNamedRouteGuard'
+import { createDetailRouteQuery, resolveReturnRoute } from '@/utils/navigation'
 import {
   IconEdit,
   IconLeft,
-  IconFile,
   IconDownload,
   IconHeart,
   IconHeartFill
@@ -292,19 +289,21 @@ const router = useRouter()
 const gamesStore = useGamesStore()
 const authStore = useAuthStore()
 const uiStore = useUiStore()
+const { runWhenActive } = useNamedRouteGuard(route, 'game-detail')
 const { isAdmin } = storeToRefs(authStore)
 
 const game = computed(() => gamesStore.currentGame)
 const versions = computed(() => gamesStore.currentVersions)
 const wiki = ref<WikiContent | null>(null)
 const showEditModal = ref(false)
-const showDownloadModal = ref(false)
 const topSectionRef = ref<HTMLElement | null>(null)
 const topSectionHeight = ref<number | undefined>(undefined)
+const isDesktopTopLayout = ref(false)
 let topSectionObserver: ResizeObserver | null = null
 
 const developerNames = computed(() => (game.value?.developers || []).map((item) => item.name).join(' / '))
 const publisherNames = computed(() => (game.value?.publishers || []).map((item) => item.name).join(' / '))
+const hasWikiContent = computed(() => Boolean(wiki.value?.content?.trim()))
 
 const canEdit = computed(() => isAdmin.value)
 
@@ -330,13 +329,16 @@ const formatSize = (bytes: number) => {
   return `${size.toFixed(1)} ${units[unitIndex]}`
 }
 
+const shouldSpanMetadataRow = (items?: ArrayLike<unknown> | null) => {
+  return (items?.length || 0) > 2
+}
+
 const handleDownloadVersion = async (version: GameVersion) => {
   if (!game.value) return
 
   try {
     await downloadService.startDownload(String(game.value.id), version.id)
     uiStore.addAlert(`已开始下载 ${version.version}`, 'success')
-    showDownloadModal.value = false
   } catch {
     uiStore.addAlert('下载启动失败', 'error')
   }
@@ -347,9 +349,9 @@ const handleDownloadLaunchScript = (version: GameVersion) => {
 
   try {
     downloadService.downloadLaunchScript(String(game.value.id), version.id)
-    uiStore.addAlert(`已下载 ${version.version} 的启动脚本`, 'success')
+    uiStore.addAlert(`已为 ${version.version} 生成启动脚本`, 'success')
   } catch {
-    uiStore.addAlert('启动脚本下载失败', 'error')
+    uiStore.addAlert('开始游玩失败', 'error')
   }
 }
 
@@ -367,6 +369,15 @@ const handleGoBack = () => {
   router.push(resolveReturnRoute(route, { name: 'games' }))
 }
 
+const openWikiEditor = () => {
+  if (!game.value) return
+  router.push({
+    name: 'wiki-edit',
+    params: { gameId: String(game.value.id) },
+    query: createDetailRouteQuery(route),
+  })
+}
+
 const handleToggleFavorite = async () => {
   if (!game.value) return
   try {
@@ -378,6 +389,7 @@ const handleToggleFavorite = async () => {
 }
 
 const carouselHeight = computed(() => {
+  if (!isDesktopTopLayout.value) return undefined
   if (!topSectionHeight.value) return undefined
   return Math.max(Math.round(topSectionHeight.value), 420)
 })
@@ -390,37 +402,38 @@ const disconnectTopSectionObserver = () => {
 }
 
 const loadGameDetail = async (gameId: string) => {
-  try {
-    await Promise.all([
-      gamesStore.fetchGame(gameId),
-      gamesStore.fetchGameVersions(gameId),
-    ])
-
-    wiki.value = null
+  await runWhenActive(async () => {
     try {
-      wiki.value = await wikiService.getWikiPage(gameId)
-    } catch {
-      // Wiki doesn't exist
+      await Promise.all([
+        gamesStore.fetchGame(gameId),
+        gamesStore.fetchGameVersions(gameId),
+      ])
+
+      wiki.value = null
+      try {
+        wiki.value = await wikiService.getWikiPage(gameId)
+      } catch {
+        // Wiki doesn't exist
+      }
+    } catch (error) {
+      const status = (error as any)?.response?.status
+      if (status === 404) {
+        router.replace({ name: 'not-found' })
+        return
+      }
+      uiStore.addAlert('加载游戏详情失败', 'error')
     }
-  } catch (error) {
-    const status = (error as any)?.response?.status
-    if (status === 404) {
-      router.replace({ name: 'not-found' })
-      return
-    }
-    uiStore.addAlert('加载游戏详情失败', 'error')
-  }
+  })
 }
 
-watch(
-  () => route.params.id,
+watchRouteParamWhenActive(
+  route,
+  'game-detail',
+  'id',
   async (gameId) => {
-    if (!gameId || typeof gameId !== 'string') return
     showEditModal.value = false
-    showDownloadModal.value = false
     await loadGameDetail(gameId)
   },
-  { immediate: true },
 )
 
 const syncTopSectionHeight = () => {
@@ -429,6 +442,15 @@ const syncTopSectionHeight = () => {
     topSectionHeight.value = undefined
     return
   }
+
+  if (typeof window !== 'undefined') {
+    isDesktopTopLayout.value = window.innerWidth > 992
+  }
+  if (!isDesktopTopLayout.value) {
+    topSectionHeight.value = undefined
+    return
+  }
+
   const nextHeight = Math.round(element.getBoundingClientRect().height)
   topSectionHeight.value = nextHeight > 0 ? nextHeight : undefined
 }
@@ -447,6 +469,10 @@ const setupTopSectionObserver = async () => {
 }
 
 onMounted(() => {
+  if (typeof window !== 'undefined') {
+    isDesktopTopLayout.value = window.innerWidth > 992
+    window.addEventListener('resize', syncTopSectionHeight, { passive: true })
+  }
   void setupTopSectionObserver()
 })
 
@@ -460,6 +486,9 @@ watch(
 
 onUnmounted(() => {
   disconnectTopSectionObserver()
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', syncTopSectionHeight)
+  }
 })
 
 </script>
@@ -485,9 +514,9 @@ onUnmounted(() => {
 .game-detail__top {
   display: grid;
   grid-template-columns: minmax(0, 68fr) minmax(280px, 30fr);
-  column-gap: 16px;
+  column-gap: 10px;
   align-items: stretch;
-  margin-top: 16px;
+  margin-top: 10px;
 }
 
 @keyframes fadeIn {
@@ -514,12 +543,6 @@ onUnmounted(() => {
   gap: 12px;
 }
 
-.header-back-btn {
-  align-self: flex-start;
-  padding-left: 0;
-  color: var(--color-text-3);
-}
-
 .header-info {
   display: flex;
   align-items: center;
@@ -528,15 +551,20 @@ onUnmounted(() => {
 }
 
 .header-title {
-  font-size: 2.25rem;
+  font-size: clamp(28px, 3.2vw, 36px);
   font-weight: 700;
   color: #fff;
   margin: 0;
   letter-spacing: -0.5px;
+  line-height: 1.15;
 }
 
 .header-actions {
-  display: flex; gap: 8px; } .header-favorite-btn, .header-edit-btn { color: var(--color-text-2); } .header-favorite-btn.is-favorite { color: #ff4d4f !important; } /* Main Content Layout - 固定比例: 左侧70%, 右侧30% */
+  display: flex;
+  gap: 8px;
+}
+
+/* Main Content Layout - 固定比例: 左侧70%, 右侧30% */
 .game-detail__content {
   width: 100%;
   display: flex;
@@ -587,14 +615,19 @@ onUnmounted(() => {
 
 /* Wiki Section - Full Width */
 .game-detail__wiki-section {
-  padding: 16px 0;
+  padding: 12px 0;
+  min-width: 0;
+}
+
+.game-detail__download-section {
+  padding: 10px 0 0;
   min-width: 0;
 }
 
 .game-detail__wiki-wrapper {
   display: flex;
   align-items: start;
-  align-items: start;
+  gap: 10px;
   max-width: 100%;
   margin: 0;
   padding: 0;
@@ -603,10 +636,10 @@ onUnmounted(() => {
 }
 
 .game-detail__wiki-card {
-  flex: 0 0 70%;
+  flex: 1 1 auto;
+  min-width: 0;
   border-radius: var(--radius-lg);
-  width: 100%;
-  margin-left: 16px;
+  width: auto;
 }
 
 .game-detail__wiki-placeholder {
@@ -615,6 +648,10 @@ onUnmounted(() => {
   border-radius: var(--radius-lg);
   width: 100%;
   box-sizing: border-box;
+}
+
+.game-detail__wiki-placeholder :deep(.arco-card-body) {
+  padding: 0;
 }
 
 /* Wiki Card Styling */
@@ -643,32 +680,36 @@ onUnmounted(() => {
 /* No Wiki */
 .game-detail__no-wiki {
   text-align: center;
-  padding: 24px 16px;
-}
-
-.game-detail__no-wiki-icon {
-  font-size: 40px;
-  color: var(--color-text-3);
+  padding: 10px 12px;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .game-detail__no-wiki-text {
   color: var(--color-text-3);
-  margin: 12px 0 16px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1;
 }
 
 /* Sidebar - Steam Style - 固定占30%宽度 */
 .game-detail__sidebar {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
   min-width: 0;
   height: 100%;
 }
 
 .sidebar-card {
-  background: var(--color-bg-2);
-  border: 1px solid var(--color-border-1);
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
   border-radius: var(--radius-lg);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -719,31 +760,34 @@ onUnmounted(() => {
 
 /* Sidebar Summary */
 .sidebar-summary {
-  padding: 12px 12px 0;
+  padding: 12px;
   font-size: 13px;
   color: var(--color-text-2);
   line-height: 1.5;
-}
-
-/* Sidebar Actions */
-.sidebar-actions {
-  padding: 12px;
-  border-bottom: 1px solid var(--color-border-1);
 }
 
 /* Sidebar Info */
 .sidebar-info {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: min-content;
+  align-content: start;
   gap: 12px 16px;
   padding: 12px;
-  flex: 1;
 }
 
 .sidebar-info__item {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+.sidebar-info__item--wide {
+  grid-column: 1 / -1;
+}
+
+.sidebar-info__item:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 
 .sidebar-info__label {
@@ -797,112 +841,198 @@ onUnmounted(() => {
   color: var(--color-text-3);
 }
 
-/* Download Version Modal */
+.download-version-panel {
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  box-shadow: var(--shadow-soft);
+}
+
 .download-version-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
+  max-height: 156px;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .download-version-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 16px 18px;
-  background: var(--color-fill-2);
-  border-radius: 12px;
+  gap: 8px;
+  padding: 3px 8px;
+  min-height: 24px;
+  background: var(--color-fill-1);
+  border: 1px solid var(--color-border-1);
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
 }
 
 .download-version-item:hover {
-  background: var(--color-fill-3);
+  transform: translateY(-2px);
+  border-color: var(--color-border-2);
+  background: var(--color-fill-2);
+  box-shadow: var(--shadow-soft);
 }
 
 .version-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .version-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--color-text-1);
-  margin-bottom: 6px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
+  margin-bottom: 0;
+}
+
+.version-name__text {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-1);
+  line-height: 1;
+}
+
+.version-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 14px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.version-badge--latest {
+  background: var(--color-fill-2);
+  color: var(--color-text-2);
 }
 
 .version-meta {
-  font-size: 13px;
-  color: var(--color-text-3);
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.version-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 14px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-fill-2);
+  color: var(--color-text-2);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.version-meta-pill__label {
+  color: var(--color-text-3);
 }
 
 .version-size {
-  color: var(--color-text-2);
+  color: inherit;
 }
 
 .version-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
   flex-shrink: 0;
-}
-
-.version-action-btn {
-  min-width: 96px;
-  min-height: 42px;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.version-action-btn--primary {
-  box-shadow: none;
-}
-
-.version-action-btn--secondary {
-  box-shadow: none;
 }
 
 /* Download Empty State */
 .download-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  padding: 24px 16px;
+  min-height: 46px;
+  padding: 8px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  box-shadow: var(--shadow-soft);
+  gap: 4px;
 }
 
-.download-empty-icon {
-  font-size: 40px;
-  color: var(--color-text-3);
-}
-
-.download-empty-text {
-  color: var(--color-text-3);
-  margin-top: 12px;
+.download-empty-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-1);
+  line-height: 1;
 }
 
 /* Responsive - Arco Design Breakpoints */
 /* lg: 992px */
 @media (max-width: 992px) {
+  .header-info {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .header-title {
+    font-size: 28px;
+  }
+
   .game-detail__top {
     display: flex;
     flex-direction: column;
+    gap: 10px;
   }
 
   .game-detail__sidebar {
     width: 100%;
     height: auto;
+    gap: 10px;
   }
 
   .game-detail__content,
   .game-detail__main,
+  .game-detail__download-section,
   .game-detail__wiki-section {
     width: 100%;
+  }
+
+  .game-detail__content,
+  .game-detail__main {
+    min-height: auto;
+    height: auto;
+  }
+
+  .game-detail__main > :deep(.screenshot-carousel) {
+    height: auto;
+  }
+
+  .game-detail__wiki-wrapper {
+    flex-direction: column;
+  }
+
+  .game-detail__download-section {
+    padding-top: 10px;
+  }
+
+  .game-detail__wiki-section {
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
 
   .game-detail__main > :deep(.screenshot-carousel__viewport) {
@@ -922,17 +1052,35 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
   }
 
+  .download-version-panel {
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .download-empty {
+    min-height: 46px;
+    padding: 8px 10px;
+  }
+
   .download-version-item {
     align-items: flex-start;
     flex-direction: column;
+    gap: 6px;
+    padding: 8px;
   }
 
   .version-actions {
     width: 100%;
   }
+  .download-version-list {
+    max-height: 220px;
+  }
 
-  .version-action-btn {
-    flex: 1;
+  .version-info {
+    width: 100%;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
   }
 }
 </style>

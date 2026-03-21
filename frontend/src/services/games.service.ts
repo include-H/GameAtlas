@@ -36,11 +36,13 @@ interface MetadataApiItem {
 interface GameFileApiItem {
   id: number
   game_id: number
-  file_path: string
+  file_name: string
+  file_path?: string
   label: string | null
   notes: string | null
   size_bytes: number | null
   sort_order: number
+  source_created_at: string | null
   created_at: string
   updated_at: string
 }
@@ -82,9 +84,6 @@ interface TimelineGameApiItem {
   title: string
   release_date: string | null
   cover_image: string | null
-  banner_image: string | null
-  created_at: string
-  updated_at: string
 }
 
 interface TimelinePaginationApi {
@@ -116,9 +115,14 @@ function mapFile(file: GameFileApiItem): GameFileEntry {
   return { ...file }
 }
 
+function hasResolvedFilePath(file: GameFileApiItem): file is GameFileApiItem & { file_path: string } {
+  return typeof file.file_path === 'string' && file.file_path.trim().length > 0
+}
+
 function mapGameDetail(item: GameDetailApiItem): Game {
   const screenshots = [...item.screenshots].sort((a, b) => a.sort_order - b.sort_order)
   const files = [...item.files].sort((a, b) => a.sort_order - b.sort_order)
+  const editableFiles = files.filter(hasResolvedFilePath)
   const favoriteIds = new Set(readFavorites())
 
   return applyFavorite({
@@ -137,15 +141,17 @@ function mapGameDetail(item: GameDetailApiItem): Game {
     screenshot_items: screenshots,
     screenshots: screenshots.map((shot) => shot.path),
     files: files.map(mapFile),
-    file_path: files[0]?.file_path,
-    file_paths: files.map((file) => ({
+    file_path: editableFiles[0]?.file_path,
+    file_paths: editableFiles.length > 0
+      ? editableFiles.map((file) => ({
       id: file.id,
       path: file.file_path,
       label: file.label || '',
       notes: file.notes || '',
       size: file.size_bytes,
       sort_order: file.sort_order,
-    })),
+    }))
+      : undefined,
   }, favoriteIds)
 }
 
@@ -160,7 +166,29 @@ function getFileName(filePath?: string | null): string {
   const normalized = (filePath || '').trim()
   if (!normalized) return ''
   const segments = normalized.split(/[\\/]/)
-  return segments[segments.length - 1] || normalized
+  const fileName = segments[segments.length - 1] || normalized
+  return fileName.replace(/\.[^./\\]+$/, '')
+}
+
+function canLaunchFromFileName(fileName?: string | null): boolean {
+  const normalized = (fileName || '').trim().toLowerCase()
+  return normalized.endsWith('.vhd') || normalized.endsWith('.vhdx')
+}
+
+type GameFileReleaseSource = Pick<GameFileEntry, 'source_created_at' | 'created_at'>
+
+function getGameFileReleaseDate(file: GameFileReleaseSource): string {
+  return file.source_created_at || file.created_at || ''
+}
+
+function getLatestGameFileTimestamp(files: GameFileReleaseSource[]): number {
+  return files.reduce((latest, file) => {
+    const timestamp = Date.parse(getGameFileReleaseDate(file))
+    if (Number.isNaN(timestamp)) {
+      return latest
+    }
+    return Math.max(latest, timestamp)
+  }, Number.NEGATIVE_INFINITY)
 }
 
 function mapTimelineItem(item: TimelineGameApiItem, favoriteIds?: Set<string>): Game {
@@ -169,11 +197,10 @@ function mapTimelineItem(item: TimelineGameApiItem, favoriteIds?: Set<string>): 
     title: item.title,
     release_date: item.release_date,
     cover_image: item.cover_image,
-    banner_image: item.banner_image,
     views: 0,
     downloads: 0,
-    created_at: item.created_at,
-    updated_at: item.updated_at,
+    created_at: '',
+    updated_at: '',
     screenshots: [],
     file_paths: [],
   }, favoriteIds)
@@ -358,14 +385,16 @@ const gamesService = {
   async getGameVersions(gameId: string): Promise<GameVersion[]> {
     const game = await this.getGame(gameId)
     const files = [...(game.files || [])].sort((a, b) => a.sort_order - b.sort_order)
+    const latestTimestamp = getLatestGameFileTimestamp(files)
 
     return files.map((file, index) => ({
       id: String(file.id),
       gameId,
-      version: file.label?.trim() || getFileName(file.file_path) || `文件 ${index + 1}`,
-      releaseDate: file.updated_at || file.created_at,
+      version: file.label?.trim() || getFileName(file.file_name) || `文件 ${index + 1}`,
+      releaseDate: getGameFileReleaseDate(file),
       size: file.size_bytes ?? 0,
-      isLatest: index === 0,
+      isLatest: !Number.isNaN(Date.parse(getGameFileReleaseDate(file))) && Date.parse(getGameFileReleaseDate(file)) === latestTimestamp,
+      canLaunch: canLaunchFromFileName(file.file_name),
       downloadUrl: `/api/games/${gameId}/files/${file.id}/download`,
       launchScriptUrl: `/api/games/${gameId}/files/${file.id}/launch-script`,
       changelog: file.notes || undefined,

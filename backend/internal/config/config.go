@@ -2,6 +2,7 @@ package config
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -74,6 +75,16 @@ func Load() Config {
 		ReadHeaderTimeout: getEnvAsDuration("READ_HEADER_TIMEOUT", 5*time.Second),
 		ShutdownTimeout:   getEnvAsDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
 	}
+}
+
+func (c Config) Validate() error {
+	if strings.TrimSpace(c.AdminPassword) == "" {
+		return fmt.Errorf("ADMIN_PASSWORD must be configured")
+	}
+	if strings.TrimSpace(c.SessionSecret) == "" || strings.TrimSpace(c.SessionSecret) == "change-me" {
+		return fmt.Errorf("SESSION_SECRET must be configured with a non-default value")
+	}
+	return nil
 }
 
 func loadDotEnv(path string) {

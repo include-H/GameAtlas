@@ -62,9 +62,6 @@ func (s *GameFilesService) List(gameID int64, includeAll bool) ([]domain.GameFil
 	if err != nil {
 		return nil, err
 	}
-	for index := range files {
-		_ = s.refreshFileSize(gameID, &files[index])
-	}
 	if files == nil {
 		return []domain.GameFile{}, nil
 	}
@@ -158,15 +155,6 @@ func (s *GameFilesService) GetDownloadFile(gameID, fileID int64, includeAll bool
 		return nil, normalizeFileError(err)
 	}
 
-	if file.SizeBytes == nil || *file.SizeBytes != resolved.SizeBytes {
-		if err := s.gameFilesRepo.UpdateSizeBytes(gameID, fileID, resolved.SizeBytes); err != nil {
-			return nil, err
-		}
-	}
-	if err := s.gamesRepo.IncrementDownloads(gameID); err != nil {
-		return nil, err
-	}
-
 	return &DownloadFile{
 		GameID:       gameID,
 		FileID:       fileID,
@@ -174,6 +162,22 @@ func (s *GameFilesService) GetDownloadFile(gameID, fileID int64, includeAll bool
 		SizeBytes:    resolved.SizeBytes,
 		ModTime:      resolved.ModTime,
 	}, nil
+}
+
+func (s *GameFilesService) RecordDownload(gameID, fileID int64, includeAll bool) error {
+	game, err := s.gamesRepo.GetByID(gameID)
+	if err != nil {
+		return normalizeRepoError(err)
+	}
+	if !includeAll && game.Visibility == domain.GameVisibilityPrivate {
+		return ErrNotFound
+	}
+
+	if _, err := s.gameFilesRepo.GetByID(gameID, fileID); err != nil {
+		return normalizeRepoError(err)
+	}
+
+	return s.gamesRepo.IncrementDownloads(gameID)
 }
 
 func (s *GameFilesService) BuildLaunchScript(gameID, fileID int64, includeAll bool) (string, string, error) {
@@ -233,20 +237,6 @@ func trimGameFileInput(input domain.GameFileWriteInput) domain.GameFileWriteInpu
 	input.Label = trimStringPtr(input.Label)
 	input.Notes = trimStringPtr(input.Notes)
 	return input
-}
-
-func (s *GameFilesService) refreshFileSize(gameID int64, file *domain.GameFile) error {
-	resolved, err := s.fileGuard.ValidateFile(file.FilePath)
-	if err != nil {
-		return normalizeFileError(err)
-	}
-
-	if file.SizeBytes != nil && *file.SizeBytes == resolved.SizeBytes {
-		return nil
-	}
-
-	file.SizeBytes = &resolved.SizeBytes
-	return s.gameFilesRepo.UpdateSizeBytes(gameID, file.ID, resolved.SizeBytes)
 }
 
 func normalizeFileError(err error) error {

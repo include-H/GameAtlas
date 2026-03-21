@@ -41,7 +41,6 @@
 
         <a-button
           v-if="showViewAll"
-          class="app-text-compact"
           type="text"
           size="small"
           @click="router.push(viewAllRoute)"
@@ -298,5 +297,34 @@ onUnmounted(() => {
 .card-row__controls {
   display: flex;
   gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .card-row {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+  }
+
+  .card-row__header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .card-row__header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 576px) {
+  .card-row__header-right {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .card-row__controls {
+    display: none;
+  }
 }
 </style>

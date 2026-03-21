@@ -2,9 +2,7 @@ package services
 
 import (
 	"bytes"
-	"crypto/sha1"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
 	"image"
 	"image/color"
@@ -214,26 +212,26 @@ func (s *MetadataService) enrichSeriesItem(item *domain.MetadataItem, includeAll
 	}
 
 	item.LatestUpdatedAt = &games[0].UpdatedAt
-	coverCandidates := make([]string, 0, len(games))
+	coverCandidates := make([]string, 0, 4)
+	seen := make(map[string]struct{}, 4)
 	for _, game := range games {
-		if path := pickSeriesCoverSource(game); path != "" {
-			coverCandidates = append(coverCandidates, path)
+		path := pickSeriesCoverSource(game)
+		if path == "" {
+			continue
 		}
-		if len(coverCandidates) >= 4 {
+		if _, exists := seen[path]; exists {
+			continue
+		}
+		seen[path] = struct{}{}
+		coverCandidates = append(coverCandidates, path)
+		if len(coverCandidates) == 4 {
 			break
 		}
 	}
 
-	if len(coverCandidates) >= 4 {
-		if generated, err := s.ensureSeriesCompositeCover(item.ID, coverCandidates[:4]); err == nil && strings.TrimSpace(generated) != "" {
-			item.CoverImage = &generated
-			return
-		}
-	}
-
-	fallback := pickSeriesCoverSource(games[0])
-	if fallback != "" {
-		item.CoverImage = &fallback
+	if len(coverCandidates) > 0 {
+		item.CoverCandidates = coverCandidates
+		item.CoverImage = &coverCandidates[0]
 	}
 }
 
@@ -255,7 +253,7 @@ func (s *MetadataService) ensureSeriesCompositeCover(seriesID int64, assetPaths 
 		return "", nil
 	}
 
-	filename := seriesCompositeFilename(seriesID, assetPaths)
+	filename := seriesCompositeFilename(seriesID)
 	targetDir := filepath.Join(s.dataDir, "series")
 	targetPath := filepath.Join(targetDir, filename)
 	publicPath := "/data/series/" + filename
@@ -308,11 +306,8 @@ func (s *MetadataService) ensureSeriesCompositeCover(seriesID int64, assetPaths 
 	return publicPath, nil
 }
 
-func seriesCompositeFilename(seriesID int64, assetPaths []string) string {
-	key := fmt.Sprintf("%d|%s", seriesID, strings.Join(assetPaths, "|"))
-	sum := sha1.Sum([]byte(key))
-	shortID := hex.EncodeToString(sum[:3])
-	return shortID + ".jpg"
+func seriesCompositeFilename(seriesID int64) string {
+	return fmt.Sprintf("series-%d.jpg", seriesID)
 }
 
 func (s *MetadataService) loadLocalAssetImage(publicPath string) (image.Image, error) {

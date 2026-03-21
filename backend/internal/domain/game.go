@@ -37,15 +37,16 @@ type GameAsset struct {
 }
 
 type GameFile struct {
-	ID        int64   `db:"id"`
-	GameID    int64   `db:"game_id"`
-	FilePath  string  `db:"file_path"`
-	Label     *string `db:"label"`
-	Notes     *string `db:"notes"`
-	SizeBytes *int64  `db:"size_bytes"`
-	SortOrder int     `db:"sort_order"`
-	CreatedAt string  `db:"created_at"`
-	UpdatedAt string  `db:"updated_at"`
+	ID              int64   `db:"id"`
+	GameID          int64   `db:"game_id"`
+	FilePath        string  `db:"file_path"`
+	Label           *string `db:"label"`
+	Notes           *string `db:"notes"`
+	SizeBytes       *int64  `db:"size_bytes"`
+	SortOrder       int     `db:"sort_order"`
+	CreatedAt       string  `db:"created_at"`
+	UpdatedAt       string  `db:"updated_at"`
+	SourceCreatedAt *string `db:"-" json:"source_created_at"`
 }
 
 type MetadataItem struct {
@@ -56,6 +57,7 @@ type MetadataItem struct {
 	CreatedAt       string  `db:"created_at" json:"created_at"`
 	GameCount       int     `json:"game_count,omitempty"`
 	CoverImage      *string `json:"cover_image,omitempty"`
+	CoverCandidates []string `json:"cover_candidates,omitempty"`
 	LatestUpdatedAt *string `json:"latest_updated_at,omitempty"`
 }
 
@@ -154,9 +156,6 @@ type TimelineGame struct {
 	Title       string  `db:"title"`
 	ReleaseDate *string `db:"release_date"`
 	CoverImage  *string `db:"cover_image"`
-	BannerImage *string `db:"banner_image"`
-	CreatedAt   string  `db:"created_at"`
-	UpdatedAt   string  `db:"updated_at"`
 }
 
 type GameWriteInput struct {

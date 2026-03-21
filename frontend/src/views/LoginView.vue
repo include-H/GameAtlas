@@ -108,15 +108,16 @@
 
     <section class="login-panel">
       <div class="login-card" :class="{ 'login-card--success': showSuccessTransition }">
-        <button
-          type="button"
+        <a-button
           class="login-stage__close"
+          type="text"
+          shape="circle"
           aria-label="关闭登录页"
           :disabled="showSuccessTransition"
           @click="handleClose"
         >
           <icon-close />
-        </button>
+        </a-button>
         <div class="login-card__header">
           <h2>欢迎您，{{ adminDisplayName }}</h2>
           <p>请输入访问密码，继续进入你的游戏库与私有内容。</p>
@@ -139,16 +140,17 @@
                 @focus="isTyping = true"
                 @blur="isTyping = false"
               />
-              <button
-                type="button"
+              <a-button
                 class="login-field__toggle"
+                type="text"
+                shape="circle"
                 :aria-label="showPassword ? '隐藏密码' : '显示密码'"
                 :disabled="showSuccessTransition"
                 @click="togglePasswordVisibility"
               >
                 <icon-eye-invisible v-if="showPassword" />
                 <icon-eye v-else />
-              </button>
+              </a-button>
             </div>
           </label>
           <p v-if="remainingAttempts !== null && !isCooldownActive" class="login-feedback">
@@ -694,6 +696,8 @@ watchEffect(() => {
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
   cursor: pointer;
   transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+  padding: 0;
+  min-width: 42px;
 }
 
 .login-stage__close:hover {
@@ -1555,10 +1559,9 @@ watchEffect(() => {
 }
 
 .login-field__toggle {
-  border: 0;
-  background: transparent;
-  cursor: pointer;
   transition: color 0.2s ease, transform 0.2s ease;
+  padding: 0;
+  min-width: 44px;
 }
 
 .login-field__toggle:hover {
@@ -1770,6 +1773,36 @@ watchEffect(() => {
 
   .login-card__header h2 {
     font-size: 28px;
+  }
+}
+
+@media (max-width: 576px) {
+  .login-stage {
+    padding: 20px 12px 8px;
+  }
+
+  .login-stage__close {
+    top: 12px;
+    right: 12px;
+  }
+
+  .character-scene {
+    height: 280px;
+    transform: scale(0.64);
+    margin-top: 8px;
+  }
+
+  .login-panel {
+    padding: 12px 0 20px;
+  }
+
+  .login-card {
+    padding: 22px 16px 18px;
+    border-radius: 18px;
+  }
+
+  .login-card__header h2 {
+    font-size: 24px;
   }
 }
 </style>

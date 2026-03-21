@@ -7,7 +7,7 @@
       </div>
 
       <a-space>
-        <a-button class="app-secondary-cta" type="secondary" @click="loadPendingGames">
+        <a-button type="secondary" @click="loadPendingGames">
           <template #icon>
             <icon-refresh />
           </template>
@@ -39,11 +39,22 @@
     <a-card class="pending-center__filters" :bordered="false">
       <a-row :gutter="[12, 12]">
         <a-col :xs="24" :sm="12" :md="8" :lg="8">
-          <a-input-search
-            v-model="searchQuery"
-            placeholder="搜索待处理游戏"
-            allow-clear
-          />
+          <div class="app-input-action-row">
+            <a-input
+              v-model="searchQuery"
+              class="app-input-action-row__field"
+              placeholder="搜索待处理游戏"
+              allow-clear
+              @press-enter="loadPendingGames"
+            >
+              <template #prefix>
+                <icon-search />
+              </template>
+            </a-input>
+            <a-button class="app-input-action-row__action" type="secondary" @click="loadPendingGames">
+              搜索
+            </a-button>
+          </div>
         </a-col>
         <a-col :xs="24" :sm="12" :md="6" :lg="5">
           <a-select v-model="selectedIssue" placeholder="问题类型" allow-clear>
@@ -91,7 +102,7 @@
       </span>
       <div class="pending-center__result-actions">
         <a-select v-model="itemsPerPage" :options="pageSizeOptions" size="small" />
-        <a-button class="app-text-compact" type="text" size="small" @click="resetFilters">重置筛选</a-button>
+        <a-button type="text" size="small" @click="resetFilters">重置筛选</a-button>
       </div>
     </div>
 
@@ -235,7 +246,6 @@
                   <span class="detail-checklist__group">{{ getPendingIssueLabel(detail.group) }}</span>
                   <a-button
                     v-if="!detail.ignored"
-                    class="app-text-compact"
                     size="mini"
                     type="text"
                     status="warning"
@@ -245,7 +255,6 @@
                   </a-button>
                   <a-button
                     v-else
-                    class="app-text-compact"
                     size="mini"
                     type="text"
                     @click="restoreIssue(activeGame, detail.key)"
@@ -282,19 +291,19 @@
           <div class="detail-panel__section">
             <div class="detail-panel__section-title">快捷处理</div>
             <a-space wrap>
-              <a-button class="app-primary-cta" type="primary" @click="openEdit(activeGame)">
+              <a-button type="primary" @click="openEdit(activeGame)">
                 <template #icon>
                   <icon-edit />
                 </template>
                 编辑资料
               </a-button>
-              <a-button class="app-secondary-cta" type="secondary" @click="openWiki(activeGame)">
+              <a-button type="secondary" @click="openWiki(activeGame)">
                 <template #icon>
                   <icon-book />
                 </template>
                 编辑 Wiki
               </a-button>
-              <a-button class="app-secondary-cta" type="secondary" @click="viewGame(activeGame)">
+              <a-button type="secondary" @click="viewGame(activeGame)">
                 <template #icon>
                   <icon-right />
                 </template>
@@ -342,6 +351,7 @@ import {
   IconEdit,
   IconRefresh,
   IconRight,
+  IconSearch,
 } from '@arco-design/web-vue/es/icon'
 
 defineOptions({
@@ -628,7 +638,11 @@ const openEdit = async (game: Game) => {
 }
 
 const openWiki = (game: Game) => {
-  router.push({ name: 'wiki-edit', params: { gameId: String(game.id) } })
+  router.push({
+    name: 'wiki-edit',
+    params: { gameId: String(game.id) },
+    query: createDetailRouteQuery(route),
+  })
 }
 
 const viewGame = (game: Game) => {
@@ -709,11 +723,16 @@ onMounted(async () => {
 
 .stat-card--total {
   cursor: default;
-  background: linear-gradient(135deg, rgba(26, 159, 255, 0.14), rgba(0, 180, 42, 0.1));
+  background:
+    linear-gradient(135deg, rgba(26, 159, 255, 0.14), rgba(0, 180, 42, 0.1)),
+    var(--app-card-surface);
 }
 
 .stat-card--issue {
-  background: var(--color-bg-2);
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .stat-card--active {
@@ -779,7 +798,7 @@ onMounted(async () => {
 .pending-center__content {
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(360px, 28vw, 460px);
-  gap: 16px;
+  gap: 10px;
   align-items: start;
 }
 
@@ -798,11 +817,13 @@ onMounted(async () => {
 .pending-game {
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
-  gap: 16px;
+  gap: 10px;
   padding: 14px;
   border-radius: 18px;
-  border: 1px solid var(--color-border-2);
-  background: var(--color-bg-2);
+  border: 1px solid var(--app-card-border);
+  background: var(--app-card-surface);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   cursor: pointer;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
@@ -882,7 +903,7 @@ onMounted(async () => {
 .detail-panel {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 10px;
 }
 
 .detail-panel__hero {
@@ -993,6 +1014,10 @@ onMounted(async () => {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .pending-center__filters :deep(.arco-row) {
+    row-gap: 8px;
+  }
+
   .pending-center__content {
     grid-template-columns: 1fr;
   }
@@ -1011,6 +1036,10 @@ onMounted(async () => {
     align-items: stretch;
   }
 
+  .pending-center__filters {
+    border-radius: 16px;
+  }
+
   .pending-center__result-actions {
     justify-content: space-between;
   }
@@ -1023,9 +1052,42 @@ onMounted(async () => {
     grid-template-columns: 88px minmax(0, 1fr);
   }
 
+  .pending-game__top,
+  .pending-center__detail-title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .filter-toggle {
+    min-height: 36px;
+    padding: 0;
+  }
+
   .pending-game__media {
     width: 88px;
     height: 118px;
+  }
+}
+
+@media (max-width: 576px) {
+  .pending-center__stats {
+    grid-template-columns: 1fr;
+  }
+
+  .pending-game {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .pending-game__media {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+  }
+
+  .pending-center__result-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

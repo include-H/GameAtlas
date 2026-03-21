@@ -114,7 +114,7 @@
       <a-button
         type="primary"
         size="large"
-        class="app-primary-cta app-primary-cta--large dashboard-empty-button"
+        class="dashboard-empty-button"
         @click="router.push('/games')"
       >
         浏览游戏
@@ -492,10 +492,6 @@ onActivated(async () => {
 .dashboard-empty-text {
   color: var(--color-text-3);
   margin: 0 0 24px;
-}
-
-.dashboard-empty-button {
-  margin-top: 8px;
 }
 
 /* Responsive - Arco Design Breakpoints */

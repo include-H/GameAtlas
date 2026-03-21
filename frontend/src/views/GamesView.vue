@@ -8,7 +8,7 @@
       </div>
 
       <a-space>
-        <a-radio-group v-model="viewMode" type="button" size="small">
+        <a-radio-group v-model="viewMode" type="button" size="medium">
           <a-radio value="grid">
             <icon-apps />
           </a-radio>
@@ -17,7 +17,7 @@
           </a-radio>
         </a-radio-group>
 
-        <a-button v-if="isAdmin" class="app-primary-cta" type="primary" @click="handleAddGame">
+        <a-button v-if="isAdmin" type="primary" @click="handleAddGame">
           <template #icon>
             <icon-plus />
           </template>
@@ -28,19 +28,29 @@
 
     <!-- Search and Filters -->
     <a-card class="mb-4 search-card glass-panel" :bordered="false">
-      <a-row :gutter="12">
+      <a-row :gutter="[12, 12]" class="games-filters-row">
         <!-- Search -->
-        <a-col :xs="24" :sm="12" :md="6" :lg="6" :xl="6" :xxl="5">
-          <a-input-search
-            v-model="searchQuery"
-            placeholder="搜索游戏"
-            allow-clear
-            @search="handleSearch"
-          />
+        <a-col :xs="24" :sm="12" :md="6" :lg="6" :xl="6" :xxl="5" class="games-filters-col games-filters-col--search">
+          <div class="app-input-action-row">
+            <a-input
+              v-model="searchQuery"
+              class="app-input-action-row__field"
+              placeholder="搜索游戏"
+              allow-clear
+              @press-enter="handleSearch"
+            >
+              <template #prefix>
+                <icon-search />
+              </template>
+            </a-input>
+            <a-button class="app-input-action-row__action" type="secondary" @click="handleSearch">
+              搜索
+            </a-button>
+          </div>
         </a-col>
 
         <!-- Platform Filter -->
-        <a-col :xs="12" :sm="8" :md="4" :lg="4" :xl="4" :xxl="4">
+        <a-col :xs="12" :sm="8" :md="4" :lg="4" :xl="4" :xxl="4" class="games-filters-col games-filters-col--platform">
           <a-select
             v-model="selectedPlatform"
             :options="platformOptions"
@@ -50,7 +60,7 @@
         </a-col>
 
         <!-- Sort -->
-        <a-col :xs="24" :sm="8" :md="6" :lg="6" :xl="6" :xxl="6">
+        <a-col :xs="24" :sm="8" :md="6" :lg="6" :xl="6" :xxl="6" class="games-filters-col games-filters-col--sort">
           <a-select
             v-model="sortBy"
             :options="sortOptions"
@@ -63,14 +73,14 @@
         </a-col>
 
         <!-- Items Per Page -->
-        <a-col :xs="24" :sm="8" :md="3" :lg="3" :xl="3" :xxl="3">
+        <a-col :xs="24" :sm="8" :md="3" :lg="3" :xl="3" :xxl="3" class="games-filters-col games-filters-col--page-size">
           <a-select
             v-model="itemsPerPage"
             :options="itemsPerPageOptions"
           />
         </a-col>
 
-        <a-col :xs="24" :sm="8" :md="4" :lg="4" :xl="4" :xxl="4">
+        <a-col :xs="24" :sm="8" :md="4" :lg="4" :xl="4" :xxl="4" class="games-filters-col games-filters-col--tags">
           <a-button class="games-filter-drawer-btn" type="secondary" long @click="showTagFilters = !showTagFilters">
             <template #icon>
               <icon-filter />
@@ -285,7 +295,7 @@ import type { Tag, TagGroup } from '@/services/types'
 import GameCard from '@/components/GameCard.vue'
 import AddGameModal from '@/components/AddGameModal.vue'
 import { Modal, Message } from '@arco-design/web-vue'
-import { IconApps, IconList, IconSort, IconTrophy, IconPlus, IconFilter } from '@arco-design/web-vue/es/icon'
+import { IconApps, IconFilter, IconList, IconPlus, IconSearch, IconSort, IconTrophy } from '@arco-design/web-vue/es/icon'
 
 defineOptions({
   name: 'GamesView',
@@ -746,7 +756,7 @@ watch(viewMode, (value) => {
 
 .search-card {
   border-radius: var(--radius-lg);
-  margin-bottom: 24px;
+  margin-bottom: 10px;
 }
 
 .search-card :deep(.arco-card-body) {
@@ -757,8 +767,8 @@ watch(viewMode, (value) => {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  margin-bottom: 16px;
-  gap: 16px;
+  margin-bottom: 10px;
+  gap: 10px;
 }
 
 .view-title {
@@ -802,12 +812,17 @@ watch(viewMode, (value) => {
   margin-top: 12px;
 }
 
-.games-filter-drawer-btn {
-  justify-content: center;
+.games-filters-col {
+  min-width: 0;
+}
+
+.games-filters-col :deep(.arco-input-wrapper),
+.games-filters-col :deep(.arco-select-view) {
+  width: 100%;
 }
 
 .tag-filter-section {
-  margin-top: 16px;
+  margin-top: 10px;
   padding-top: 12px;
   border-top: 1px solid var(--color-border-2);
 }
@@ -830,20 +845,6 @@ watch(viewMode, (value) => {
 .tag-filter-section__empty {
   font-size: 12px;
   color: var(--color-text-3);
-}
-
-.games-filter-drawer-btn__count {
-  display: inline-flex;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 999px;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-primary-light-1);
-  color: rgb(var(--primary-6));
-  font-size: 12px;
-  font-weight: 700;
 }
 
 .tag-filter-drawer {
@@ -935,6 +936,25 @@ watch(viewMode, (value) => {
 @media (max-width: 1199px) {
   .games-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1100px) {
+  .games-filters-row {
+    row-gap: 8px;
+  }
+
+  .games-filters-col--search,
+  .games-filters-col--sort {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+
+  .games-filters-col--platform,
+  .games-filters-col--page-size,
+  .games-filters-col--tags {
+    flex: 0 0 33.3333%;
+    max-width: 33.3333%;
   }
 }
 

@@ -13,15 +13,13 @@
 
       <div class="wiki-edit-actions">
         <a-button
-          class="app-secondary-cta"
           type="secondary"
           :disabled="isSaving"
-          @click="router.back()"
+          @click="handleCancel"
         >
           取消
         </a-button>
         <a-button
-          class="app-primary-cta"
           type="primary"
           :loading="isSaving"
           @click="handleSave"
@@ -69,17 +67,17 @@
           </div>
 
           <div v-else class="wiki-edit-history">
-            <button
+            <a-button
               v-for="entry in historyEntries"
               :key="entry.id"
               class="wiki-edit-history-item"
               :class="{ 'wiki-edit-history-item--active': selectedHistory?.id === entry.id }"
-              type="button"
+              type="text"
               @click="selectedHistory = entry"
             >
               <strong>{{ entry.change_summary || '未填写修改说明' }}</strong>
               <span class="wiki-edit-history-label">{{ formatDateTime(entry.created_at) }}</span>
-            </button>
+            </a-button>
           </div>
         </a-card>
 
@@ -113,11 +111,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
 import wikiService, { type WikiContent, type WikiHistoryEntry } from '@/services/wiki.service'
+import { useNamedRouteGuard, watchRouteParamWhenActive } from '@/composables/useNamedRouteGuard'
+import { resolveReturnRoute } from '@/utils/navigation'
 import {
   IconSave
 } from '@arco-design/web-vue/es/icon'
@@ -128,6 +128,7 @@ const route = useRoute()
 const router = useRouter()
 const gamesStore = useGamesStore()
 const uiStore = useUiStore()
+const { runWhenActive } = useNamedRouteGuard(route, 'wiki-edit')
 
 const game = computed(() => gamesStore.currentGame)
 const wiki = ref<WikiContent | null>(null)
@@ -145,6 +146,21 @@ const wikiData = ref({
 
 const isExisting = computed(() => Boolean(wiki.value?.content))
 
+const getGameDetailRoute = () => {
+  if (!game.value) {
+    return { name: 'games' as const }
+  }
+
+  return {
+    name: 'game-detail' as const,
+    params: { id: String(game.value.id) },
+  }
+}
+
+const handleCancel = () => {
+  router.push(resolveReturnRoute(route, getGameDetailRoute()))
+}
+
 const handleSave = async () => {
   if (!game.value) return
 
@@ -161,7 +177,7 @@ const handleSave = async () => {
     wikiData.value.change_summary = ''
     await loadHistory(String(game.value.id))
 
-    router.push({ name: 'game-detail', params: { id: String(game.value.id) } })
+    router.push(resolveReturnRoute(route, getGameDetailRoute()))
   } catch (error: any) {
     const errorMessage = error?.response?.data?.error || error?.message || '保存 Wiki 失败'
     uiStore.addAlert(errorMessage, 'error')
@@ -199,44 +215,46 @@ const formatDateTime = (value?: string) => {
 }
 
 const loadWikiEditorData = async (gameId: string) => {
-  try {
-    await gamesStore.fetchGame(gameId)
-    wiki.value = null
-    wikiData.value = {
-      content: '',
-      change_summary: '',
-    }
-    historyEntries.value = []
-    selectedHistory.value = null
-
-    // Try to load existing wiki
+  await runWhenActive(async () => {
     try {
-      const wikiContent = await wikiService.getWikiPage(gameId)
-      if (wikiContent && wikiContent.content) {
-        wiki.value = wikiContent
-        wikiData.value = {
-          content: wikiContent.content,
-          change_summary: '',
-        }
+      await gamesStore.fetchGame(gameId)
+      wiki.value = null
+      wikiData.value = {
+        content: '',
+        change_summary: '',
       }
-    } catch {
-      // Wiki doesn't exist yet
-    }
+      historyEntries.value = []
+      selectedHistory.value = null
 
-    await loadHistory(gameId)
-  } catch {
-    uiStore.addAlert('Failed to load game', 'error')
-    router.push({ name: 'games' })
-  }
+      // Try to load existing wiki
+      try {
+        const wikiContent = await wikiService.getWikiPage(gameId)
+        if (wikiContent && wikiContent.content) {
+          wiki.value = wikiContent
+          wikiData.value = {
+            content: wikiContent.content,
+            change_summary: '',
+          }
+        }
+      } catch {
+        // Wiki doesn't exist yet
+      }
+
+      await loadHistory(gameId)
+    } catch {
+      uiStore.addAlert('Failed to load game', 'error')
+      router.push({ name: 'games' })
+    }
+  })
 }
 
-watch(
-  () => route.params.gameId,
+watchRouteParamWhenActive(
+  route,
+  'wiki-edit',
+  'gameId',
   async (gameId) => {
-    if (!gameId || typeof gameId !== 'string') return
     await loadWikiEditorData(gameId)
   },
-  { immediate: true },
 )
 </script>
 
@@ -396,18 +414,25 @@ watch(
 }
 
 .wiki-edit-history-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   font-size: 12px;
   text-align: left;
   padding: 12px;
-  border: 1px solid var(--color-border-2);
+  border: 1px solid var(--app-card-border);
   border-radius: 10px;
-  background: var(--color-fill-1);
+  background: color-mix(in srgb, var(--app-card-surface) 86%, transparent);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-1);
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.wiki-edit-history-item:deep(.arco-btn-content) {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
 }
 
 .wiki-edit-history-item:hover,
@@ -452,7 +477,10 @@ watch(
   margin: 0;
   padding: 12px;
   border-radius: 10px;
-  background: var(--color-fill-1);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .wiki-edit-history-preview-source {
@@ -471,6 +499,54 @@ watch(
 
   .wiki-edit-history-preview-card {
     max-height: none;
+  }
+}
+
+@media (max-width: 992px) {
+  .wiki-edit {
+    min-height: auto;
+  }
+
+  .wiki-edit-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .wiki-edit-actions {
+    width: 100%;
+  }
+
+  .wiki-edit-card :deep(.arco-card-body) {
+    padding: 16px;
+  }
+
+  .wiki-edit-card {
+    min-height: 460px;
+  }
+
+  .wiki-edit-history-preview-actions {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 768px) {
+  .wiki-edit-title {
+    font-size: 22px;
+  }
+
+  .wiki-edit-actions {
+    flex-direction: column;
+  }
+
+  .wiki-edit-history {
+    max-height: 240px;
+  }
+
+  .wiki-edit-history-preview-rendered,
+  .wiki-edit-history-preview-source {
+    max-height: 240px;
   }
 }
 </style>

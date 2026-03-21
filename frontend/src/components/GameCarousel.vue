@@ -29,7 +29,6 @@
         <a-button
           type="primary"
           size="large"
-          class="app-primary-cta app-primary-cta--large"
           @click="viewGame(game.id)"
         >
           查看详情
@@ -39,29 +38,23 @@
 
     <!-- Indicators -->
     <div class="carousel-indicators">
-      <button
+      <a-button
         v-for="(game, index) in games"
         :key="game.id"
         class="indicator"
         :class="{ active: currentIndex === index }"
+        type="text"
+        shape="circle"
         @click="goToSlide(index)"
       />
     </div>
 
-    <!-- Navigation Arrows -->
-    <button class="carousel-arrow app-carousel-nav-button carousel-arrow-prev" @click="prevSlide" aria-label="上一张">
-      <icon-left />
-    </button>
-    <button class="carousel-arrow app-carousel-nav-button carousel-arrow-next" @click="nextSlide" aria-label="下一张">
-      <icon-right />
-    </button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { IconLeft, IconRight } from '@arco-design/web-vue/es/icon'
 import type { Game } from '@/services/types'
 import { resolveAssetUrl } from '@/utils/asset-url'
 import { createDetailRouteQuery } from '@/utils/navigation'
@@ -124,10 +117,6 @@ const viewGame = (id: number) => {
 
 const nextSlide = () => {
   currentIndex.value = (currentIndex.value + 1) % games.value.length
-}
-
-const prevSlide = () => {
-  currentIndex.value = (currentIndex.value - 1 + games.value.length) % games.value.length
 }
 
 const goToSlide = (index: number) => {
@@ -283,11 +272,15 @@ onUnmounted(() => {
 .indicator {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
   background: rgba(255, 255, 255, 0.4);
-  border: none;
-  cursor: pointer;
   transition: all 0.3s ease;
+  padding: 0;
+  min-width: 8px;
+  color: transparent;
+}
+
+.indicator:deep(.arco-btn-content) {
+  display: none;
 }
 
 .indicator.active {
@@ -300,19 +293,6 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.8);
 }
 
-.carousel-arrow {
-  position: absolute;
-  z-index: 11;
-}
-
-.carousel-arrow-prev {
-  left: 16px;
-}
-
-.carousel-arrow-next {
-  right: 16px;
-}
-
 /* Responsive - Arco Design Breakpoints */
 /* md: 768px */
 @media (max-width: 768px) {
@@ -322,6 +302,7 @@ onUnmounted(() => {
 
   .carousel-content {
     padding: 0 24px;
+    padding-left: 64px;
   }
 
   .carousel-title {
@@ -334,6 +315,46 @@ onUnmounted(() => {
 
   .carousel-indicators {
     left: 24px;
+  }
+}
+
+@media (max-width: 576px) {
+  .game-carousel {
+    min-height: 280px;
+    height: 280px;
+  }
+
+  .carousel-content {
+    padding: 0 16px;
+    padding-left: 16px;
+    align-items: flex-end;
+    padding-bottom: 44px;
+  }
+
+  .carousel-info {
+    max-width: 100%;
+  }
+
+  .carousel-title {
+    font-size: 22px;
+    margin-bottom: 8px;
+  }
+
+  .carousel-meta {
+    margin-bottom: 8px;
+  }
+
+  .carousel-description {
+    margin-bottom: 16px;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    display: -webkit-box;
+    overflow: hidden;
+  }
+
+  .carousel-indicators {
+    left: 16px;
+    bottom: 16px;
   }
 }
 </style>

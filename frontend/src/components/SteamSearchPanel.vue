@@ -1,19 +1,31 @@
 <template>
   <div class="steam-search-section">
-    <a-input-search
-      :model-value="query"
-      :placeholder="placeholder"
-      :loading="loading"
-      allow-clear
-      @update:model-value="emit('update:query', $event)"
-      @search="emit('search')"
-      @press-enter="emit('search')"
-      @clear="emit('clear')"
-    >
-      <template #prepend>
-        <icon-cloud-download />
-      </template>
-    </a-input-search>
+    <div class="app-input-action-row">
+      <a-input
+        :model-value="query"
+        class="app-input-action-row__field"
+        :placeholder="placeholder"
+        allow-clear
+        @update:model-value="emit('update:query', $event)"
+        @press-enter="emit('search')"
+        @clear="emit('clear')"
+      >
+        <template #prefix>
+          <icon-cloud-download />
+        </template>
+      </a-input>
+      <a-button
+        class="app-input-action-row__action"
+        type="secondary"
+        :loading="loading"
+        @click="emit('search')"
+      >
+        <template #icon>
+          <icon-search />
+        </template>
+        搜索
+      </a-button>
+    </div>
 
     <div
       v-if="results.length > 0 && !selectedGame"
@@ -39,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { IconCloudDownload } from '@arco-design/web-vue/es/icon'
+import { IconCloudDownload, IconSearch } from '@arco-design/web-vue/es/icon'
 import type { SteamGameSearchResult } from '@/services/types'
 
 defineProps<{
@@ -81,9 +93,11 @@ const emit = defineEmits<{
   max-height: 300px;
   overflow-y: auto;
   padding: 8px;
-  background: var(--color-fill-1);
-  border: 1px solid var(--color-border-2);
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
   border-radius: 10px;
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-search-result-item {
@@ -94,8 +108,8 @@ const emit = defineEmits<{
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
-  border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--app-card-border);
+  background: color-mix(in srgb, var(--app-card-surface) 84%, transparent);
 }
 
 .steam-search-result-item:hover {
@@ -131,5 +145,26 @@ const emit = defineEmits<{
   margin-top: 2px;
   font-size: 12px;
   color: var(--color-text-3);
+}
+
+@media (max-width: 576px) {
+  .steam-search-results {
+    max-height: 240px;
+    padding: 6px;
+  }
+
+  .steam-search-result-item {
+    gap: 10px;
+    padding: 6px;
+  }
+
+  .steam-search-result-item img {
+    width: 52px;
+    height: 28px;
+  }
+
+  .steam-result-name {
+    font-size: 13px;
+  }
 }
 </style>

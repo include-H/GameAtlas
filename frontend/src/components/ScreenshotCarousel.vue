@@ -1,18 +1,18 @@
 <template>
   <div class="screenshot-carousel" v-if="mediaItems.length > 0" ref="carouselRef">
     <div class="screenshot-carousel__viewport" :style="viewportStyle" ref="viewportRef">
-      <button
+      <a-button
         v-if="mediaItems.length > 1"
-        class="screenshot-carousel__arrow app-carousel-nav-button screenshot-carousel__arrow--prev"
+        class="screenshot-carousel__arrow screenshot-carousel__arrow--prev"
+        type="secondary"
+        shape="circle"
         @click="prevImage"
-        @mouseenter="hoverArrow = 'prev'"
-        @mouseleave="hoverArrow = null"
         aria-label="上一张"
       >
-        <svg viewBox="0 0 24 24" width="24" height="24">
-          <path fill="currentColor" d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
-        </svg>
-      </button>
+        <template #icon>
+          <icon-left />
+        </template>
+      </a-button>
 
       <div class="screenshot-carousel__main">
         <div class="screenshot-carousel__media-shell">
@@ -34,28 +34,28 @@
             :poster="videoPoster || undefined"
             autoplay
             controls
-            loop
             muted
             playsinline
             preload="metadata"
             @canplay="tryPlayVideo"
             @loadedmetadata="onVideoLoaded"
+            @ended="handleVideoEnded"
           />
         </div>
       </div>
 
-      <button
+      <a-button
         v-if="mediaItems.length > 1"
-        class="screenshot-carousel__arrow app-carousel-nav-button screenshot-carousel__arrow--next"
+        class="screenshot-carousel__arrow screenshot-carousel__arrow--next"
+        type="secondary"
+        shape="circle"
         @click="nextImage"
-        @mouseenter="hoverArrow = 'next'"
-        @mouseleave="hoverArrow = null"
         aria-label="下一张"
       >
-        <svg viewBox="0 0 24 24" width="24" height="24">
-          <path fill="currentColor" d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-        </svg>
-      </button>
+        <template #icon>
+          <icon-right />
+        </template>
+      </a-button>
 
       <div v-if="mediaItems.length > 1" class="screenshot-carousel__counter">
         {{ currentIndex + 1 }} / {{ mediaItems.length }}
@@ -99,6 +99,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { IconLeft, IconRight } from '@arco-design/web-vue/es/icon'
 import { resolveAssetUrl } from '@/utils/asset-url'
 
 interface Props {
@@ -127,7 +128,6 @@ interface MediaItem {
 }
 
 const currentIndex = ref(0)
-const hoverArrow = ref<'prev' | 'next' | null>(null)
 const carouselRef = ref<HTMLElement | null>(null)
 const viewportRef = ref<HTMLElement | null>(null)
 const videoRef = ref<HTMLVideoElement | null>(null)
@@ -137,6 +137,7 @@ const brokenImages = ref<string[]>([])
 const aspectResolved = ref(false)
 const imageLoaded = ref(false)
 let resizeObserver: ResizeObserver | null = null
+let imageAutoplayTimer: number | null = null
 
 const visibleScreenshots = computed(() => {
   const brokenSet = new Set(brokenImages.value)
@@ -229,6 +230,7 @@ watch(() => [props.screenshots, props.previewVideo, props.previewVideos], () => 
 watch(mediaItems, (items) => {
   if (items.length === 0) {
     currentIndex.value = 0
+    stopImageAutoplay()
     return
   }
   if (currentIndex.value >= items.length) {
@@ -239,18 +241,21 @@ watch(mediaItems, (items) => {
 watch(currentMedia, (nextMedia, previousMedia) => {
   if (!nextMedia) {
     imageLoaded.value = false
+    stopImageAutoplay()
     return
   }
   if (nextMedia.type === 'video') {
     imageLoaded.value = true
     aspectResolved.value = true
     viewportAspect.value = '16 / 9'
+    stopImageAutoplay()
     nextTick(() => {
       tryPlayVideo()
     })
     return
   }
   imageLoaded.value = nextMedia.url === previousMedia?.url
+  startImageAutoplay()
 })
 
 onMounted(() => {
@@ -265,6 +270,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  stopImageAutoplay()
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null
@@ -304,12 +310,33 @@ const tryPlayVideo = () => {
   }
 }
 
+const stopImageAutoplay = () => {
+  if (imageAutoplayTimer !== null) {
+    window.clearTimeout(imageAutoplayTimer)
+    imageAutoplayTimer = null
+  }
+}
+
+const startImageAutoplay = () => {
+  stopImageAutoplay()
+  if (mediaItems.value.length <= 1 || currentMedia.value?.type !== 'image') return
+
+  imageAutoplayTimer = window.setTimeout(() => {
+    nextImage()
+  }, 5000)
+}
+
 const prevImage = () => {
   currentIndex.value = currentIndex.value > 0 ? currentIndex.value - 1 : mediaItems.value.length - 1
 }
 
 const nextImage = () => {
   currentIndex.value = currentIndex.value < mediaItems.value.length - 1 ? currentIndex.value + 1 : 0
+}
+
+const handleVideoEnded = () => {
+  if (mediaItems.value.length <= 1) return
+  nextImage()
 }
 
 const handleImageError = (url: string) => {

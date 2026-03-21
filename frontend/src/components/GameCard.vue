@@ -50,7 +50,6 @@
         <!-- Card Actions moved inside metadata row -->
         <div v-if="!isList" class="game-card__actions">
           <a-button
-            class="app-text-compact"
             type="text"
             size="small"
             :class="{ 'is-favorite': game.isFavorite }"
@@ -63,7 +62,6 @@
           </a-button>
           <a-dropdown v-if="isAdmin">
             <a-button
-              class="app-text-compact"
               type="text"
               size="small"
               @click.stop
@@ -136,11 +134,13 @@ const displayImage = computed(() => {
 .game-card {
   position: relative;
   cursor: pointer;
-  background: var(--color-bg-2);
+  background: var(--app-card-surface);
   border-radius: var(--radius-lg);
   overflow: hidden;
   margin-bottom: 5px;
-  border: 1px solid var(--color-border-1);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   transition: all var(--transition-fast);
   display: flex;
@@ -281,14 +281,43 @@ const displayImage = computed(() => {
   display: flex;
   gap: 0;
   flex-shrink: 0;
-  margin-right: -8px; /* Offset Arco button default padding */
-}
-
-.game-card__actions .arco-btn {
-  padding: 0 4px;
 }
 
 .game-card__actions .is-favorite {
   color: rgb(var(--danger-6));
+}
+
+@media (max-width: 768px) {
+  .game-card--list {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .game-card--list .game-card__image-wrapper {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+  }
+
+  .game-card--list .game-card__content {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 576px) {
+  .game-card__content {
+    padding: 10px 12px;
+  }
+
+  .game-card__row--title {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .game-card__actions {
+    margin-right: -4px;
+  }
 }
 </style>

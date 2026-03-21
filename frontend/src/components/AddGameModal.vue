@@ -27,10 +27,10 @@
     </a-form>
 
     <div class="add-game-modal__actions">
-      <a-button class="app-secondary-cta" type="secondary" @click="handleCancel">
+      <a-button type="secondary" @click="handleCancel">
         取消
       </a-button>
-      <a-button class="app-primary-cta" type="primary" :loading="isSubmitting" @click="handleSubmit">
+      <a-button type="primary" :loading="isSubmitting" @click="handleSubmit">
         添加
       </a-button>
     </div>
