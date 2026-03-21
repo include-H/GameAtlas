@@ -1,6 +1,7 @@
 <template>
   <div
-    :class="['game-card hover-lift', { 'game-card--list': isList }]"
+    :class="['game-card hover-lift', { 'game-card--list': isList, 'game-card--cover-only': coverOnly }]"
+    :title="game.title"
     @click="$emit('view', String(game.id))"
   >
     <!-- Cover Image -->
@@ -9,6 +10,8 @@
         :src="displayImage"
         :alt="game.title"
         class="game-card__image"
+        loading="lazy"
+        decoding="async"
       />
 
       <!-- Overlay with gradient -->
@@ -27,7 +30,7 @@
     </div>
 
     <!-- Card Content -->
-    <div class="game-card__content">
+    <div v-if="!coverOnly" class="game-card__content">
       <!-- Row 1: Title and Year -->
       <div class="game-card__row game-card__row--title">
         <div class="game-card__title" :title="game.title">
@@ -47,7 +50,6 @@
         <!-- Card Actions moved inside metadata row -->
         <div v-if="!isList" class="game-card__actions">
           <a-button
-            class="app-text-compact"
             type="text"
             size="small"
             :class="{ 'is-favorite': game.isFavorite }"
@@ -58,9 +60,8 @@
               <icon-heart-fill v-else />
             </template>
           </a-button>
-          <a-dropdown>
+          <a-dropdown v-if="isAdmin">
             <a-button
-              class="app-text-compact"
               type="text"
               size="small"
               @click.stop
@@ -87,7 +88,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import type { Game } from '@/services/types'
+import { useAuthStore } from '@/stores/auth'
 import {
   IconHeartFill,
   IconHeart,
@@ -98,11 +101,16 @@ import {
 interface Props {
   game: Game
   isList?: boolean
+  coverOnly?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isList: false,
+  coverOnly: false,
 })
+
+const authStore = useAuthStore()
+const { isAdmin } = storeToRefs(authStore)
 
 defineEmits<{
   view: [id: string]
@@ -126,11 +134,13 @@ const displayImage = computed(() => {
 .game-card {
   position: relative;
   cursor: pointer;
-  background: var(--color-bg-2);
+  background: var(--app-card-surface);
   border-radius: var(--radius-lg);
   overflow: hidden;
   margin-bottom: 5px;
-  border: 1px solid var(--color-border-1);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   transition: all var(--transition-fast);
   display: flex;
@@ -168,6 +178,30 @@ const displayImage = computed(() => {
 .game-card--list .game-card__content {
   flex: 1;
   padding: 12px 16px;
+}
+
+.game-card--cover-only {
+  margin-bottom: 0;
+  border-radius: 10px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
+}
+
+.game-card--cover-only .game-card__image-wrapper {
+  aspect-ratio: 3 / 4;
+}
+
+.game-card--cover-only .game-card__overlay {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.28) 0%, rgba(0, 0, 0, 0) 55%);
+  opacity: 1;
+}
+
+.game-card--cover-only:hover {
+  transform: translateY(-2px);
+}
+
+.game-card--cover-only .game-card__favorite {
+  top: 6px;
+  left: 6px;
 }
 
 .game-card__image-wrapper {
@@ -247,14 +281,43 @@ const displayImage = computed(() => {
   display: flex;
   gap: 0;
   flex-shrink: 0;
-  margin-right: -8px; /* Offset Arco button default padding */
-}
-
-.game-card__actions .arco-btn {
-  padding: 0 4px;
 }
 
 .game-card__actions .is-favorite {
   color: rgb(var(--danger-6));
+}
+
+@media (max-width: 768px) {
+  .game-card--list {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .game-card--list .game-card__image-wrapper {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+  }
+
+  .game-card--list .game-card__content {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 576px) {
+  .game-card__content {
+    padding: 10px 12px;
+  }
+
+  .game-card__row--title {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .game-card__actions {
+    margin-right: -4px;
+  }
 }
 </style>

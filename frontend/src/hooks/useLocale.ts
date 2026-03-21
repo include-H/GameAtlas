@@ -1,7 +1,7 @@
 import { computed } from 'vue'
 import zhCN from '@/locale/zh-CN'
 
-export type Locale = 'zh-CN' | 'en-US'
+type Locale = 'zh-CN' | 'en-US'
 
 const locales: Record<Locale, any> = {
   'zh-CN': zhCN,
@@ -18,6 +18,7 @@ const locales: Record<Locale, any> = {
       'game.detail': 'Game Detail',
       'wiki.edit': 'Edit Wiki',
       'games.all': 'All Games',
+      'games.timeline': 'Timeline',
     },
     common: {
       logout: 'Logout',
@@ -61,12 +62,35 @@ export default function useLocale() {
     const keys = key.split('.')
     let value: any = locales[currentLocale.value]
 
-    for (const k of keys) {
-      if (value && typeof value === 'object') {
-        value = value[k]
-      } else {
+    for (let index = 0; index < keys.length; index += 1) {
+      const segment = keys[index]
+      if (!value || typeof value !== 'object') {
         return key // Return key if translation not found
       }
+
+      if (segment in value) {
+        const next = value[segment]
+        const remaining = keys.slice(index).join('.')
+        // Support flat keys like "games.timeline" under menu while keeping "menu.games" usable.
+        if (
+          index < keys.length - 1 &&
+          (next === null || typeof next !== 'object') &&
+          remaining in value
+        ) {
+          value = value[remaining]
+          return value || key
+        }
+        value = next
+        continue
+      }
+
+      const remaining = keys.slice(index).join('.')
+      if (remaining in value) {
+        value = value[remaining]
+        return value || key
+      }
+
+      return key
     }
 
     return value || key

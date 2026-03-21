@@ -1,7 +1,7 @@
 import { del, get, put } from './api'
 import type { ApiResponse, ReviewIssueOverride } from './types'
 
-export const reviewIssuesService = {
+const reviewIssuesService = {
   async list(gameIds?: Array<number | string>): Promise<ReviewIssueOverride[]> {
     const params = gameIds && gameIds.length > 0
       ? { game_ids: gameIds.map(String).join(',') }

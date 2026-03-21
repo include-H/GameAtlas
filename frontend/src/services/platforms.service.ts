@@ -1,7 +1,7 @@
 import { get, post } from './api'
 import type { ApiResponse, Platform } from './types'
 
-export const platformService = {
+const platformService = {
   async getAllPlatforms(): Promise<Platform[]> {
     const response = await get<ApiResponse<Platform[]>>('/platforms')
     return response.data || []

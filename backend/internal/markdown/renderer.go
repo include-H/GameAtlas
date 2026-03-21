@@ -23,7 +23,6 @@ func NewRenderer() *Renderer {
 			),
 			goldmark.WithRendererOptions(
 				html.WithHardWraps(),
-				html.WithUnsafe(),
 			),
 		),
 	}

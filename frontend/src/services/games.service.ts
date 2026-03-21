@@ -6,6 +6,7 @@ import type {
   GameFileEntry,
   GameFilter,
   GameInput,
+  GameTagGroup,
   GameSort,
   GameStats,
   GameVersion,
@@ -13,31 +14,16 @@ import type {
   Platform,
   Publisher,
   Series,
+  Tag,
 } from './types'
-
-const FAVORITES_KEY = 'game-library-favorites'
-
-interface GameListApiItem {
-  id: number
-  title: string
-  title_alt: string | null
-  summary: string | null
-  release_date: string | null
-  engine: string | null
-  cover_image: string | null
-  banner_image: string | null
-  needs_review: boolean
-  views: number
-  downloads: number
-  primary_screenshot?: string | null
-  screenshot_count?: number
-  file_count?: number
-  developer_count?: number
-  publisher_count?: number
-  platform_count?: number
-  created_at: string
-  updated_at: string
-}
+import {
+  applyFavorite,
+  getFavoriteCount,
+  mapGameListItem,
+  readFavorites,
+  type GameListApiItem,
+  writeFavorites,
+} from './game-list-helpers'
 
 interface MetadataApiItem {
   id: number
@@ -50,11 +36,13 @@ interface MetadataApiItem {
 interface GameFileApiItem {
   id: number
   game_id: number
-  file_path: string
+  file_name: string
+  file_path?: string
   label: string | null
   notes: string | null
   size_bytes: number | null
   sort_order: number
+  source_created_at: string | null
   created_at: string
   updated_at: string
 }
@@ -76,31 +64,47 @@ interface GameDetailApiItem extends GameListApiItem {
   platforms: MetadataApiItem[]
   developers: MetadataApiItem[]
   publishers: MetadataApiItem[]
+  tags: Tag[]
+  tag_groups: GameTagGroup[]
   files: GameFileApiItem[]
 }
 
-function readFavorites(): string[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = window.localStorage.getItem(FAVORITES_KEY)
-    if (!raw) return []
-    const ids = JSON.parse(raw)
-    return Array.isArray(ids) ? ids.map(String) : []
-  } catch {
-    return []
-  }
+interface GameStatsApiResponse {
+  total_games: number
+  total_downloads: number
+  total_views: number
+  total_size: number
+  recent_games: GameListApiItem[]
+  popular_games: GameListApiItem[]
+  pending_reviews: number
 }
 
-function writeFavorites(ids: string[]) {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(ids))
+interface TimelineGameApiItem {
+  id: number
+  title: string
+  release_date: string | null
+  cover_image: string | null
 }
 
-function applyFavorite(game: Game): Game {
-  return {
-    ...game,
-    isFavorite: readFavorites().includes(String(game.id)),
-  }
+interface TimelinePaginationApi {
+  limit: number
+  from: string
+  to: string
+  hasMore: boolean
+  nextCursor: string
+}
+
+interface TimelineGamesApiResponse {
+  data: TimelineGameApiItem[]
+  pagination: TimelinePaginationApi
+}
+
+type TimelineGamesResult = {
+  data: Game[]
+  hasMore: boolean
+  nextCursor: string | null
+  from: string | null
+  to: string | null
 }
 
 function mapMetadataItem<T extends Series | Platform | Developer | Publisher>(item: MetadataApiItem): T {
@@ -111,41 +115,23 @@ function mapFile(file: GameFileApiItem): GameFileEntry {
   return { ...file }
 }
 
-function mapGameListItem(item: GameListApiItem): Game {
-  return applyFavorite({
-    id: item.id,
-    title: item.title,
-    title_alt: item.title_alt,
-    summary: item.summary,
-    release_date: item.release_date,
-    engine: item.engine,
-    cover_image: item.cover_image,
-    banner_image: item.banner_image,
-    needs_review: item.needs_review,
-    primary_screenshot: item.primary_screenshot ?? null,
-    screenshot_count: item.screenshot_count ?? 0,
-    file_count: item.file_count ?? 0,
-    developer_count: item.developer_count ?? 0,
-    publisher_count: item.publisher_count ?? 0,
-    platform_count: item.platform_count ?? 0,
-    views: item.views,
-    downloads: item.downloads,
-    created_at: item.created_at,
-    updated_at: item.updated_at,
-    screenshots: [],
-    file_paths: [],
-  })
+function hasResolvedFilePath(file: GameFileApiItem): file is GameFileApiItem & { file_path: string } {
+  return typeof file.file_path === 'string' && file.file_path.trim().length > 0
 }
 
 function mapGameDetail(item: GameDetailApiItem): Game {
   const screenshots = [...item.screenshots].sort((a, b) => a.sort_order - b.sort_order)
   const files = [...item.files].sort((a, b) => a.sort_order - b.sort_order)
+  const editableFiles = files.filter(hasResolvedFilePath)
+  const favoriteIds = new Set(readFavorites())
 
   return applyFavorite({
-    ...mapGameListItem(item),
+    ...mapGameListItem(item, favoriteIds),
     series: item.series.map((value) => mapMetadataItem<Series>(value)),
     developers: item.developers.map((value) => mapMetadataItem<Developer>(value)),
     publishers: item.publishers.map((value) => mapMetadataItem<Publisher>(value)),
+    tags: item.tags || [],
+    tag_groups: item.tag_groups || [],
     platforms: item.platforms.map((value) => value.name),
     platform: item.platforms[0]?.name,
     wiki_content: item.wiki_content,
@@ -155,16 +141,18 @@ function mapGameDetail(item: GameDetailApiItem): Game {
     screenshot_items: screenshots,
     screenshots: screenshots.map((shot) => shot.path),
     files: files.map(mapFile),
-    file_path: files[0]?.file_path,
-    file_paths: files.map((file) => ({
+    file_path: editableFiles[0]?.file_path,
+    file_paths: editableFiles.length > 0
+      ? editableFiles.map((file) => ({
       id: file.id,
       path: file.file_path,
       label: file.label || '',
       notes: file.notes || '',
       size: file.size_bytes,
       sort_order: file.sort_order,
-    })),
-  })
+    }))
+      : undefined,
+  }, favoriteIds)
 }
 
 function mapPlatformValues(values?: Array<number | string>): number[] {
@@ -178,7 +166,44 @@ function getFileName(filePath?: string | null): string {
   const normalized = (filePath || '').trim()
   if (!normalized) return ''
   const segments = normalized.split(/[\\/]/)
-  return segments[segments.length - 1] || normalized
+  const fileName = segments[segments.length - 1] || normalized
+  return fileName.replace(/\.[^./\\]+$/, '')
+}
+
+function canLaunchFromFileName(fileName?: string | null): boolean {
+  const normalized = (fileName || '').trim().toLowerCase()
+  return normalized.endsWith('.vhd') || normalized.endsWith('.vhdx')
+}
+
+type GameFileReleaseSource = Pick<GameFileEntry, 'source_created_at' | 'created_at'>
+
+function getGameFileReleaseDate(file: GameFileReleaseSource): string {
+  return file.source_created_at || file.created_at || ''
+}
+
+function getLatestGameFileTimestamp(files: GameFileReleaseSource[]): number {
+  return files.reduce((latest, file) => {
+    const timestamp = Date.parse(getGameFileReleaseDate(file))
+    if (Number.isNaN(timestamp)) {
+      return latest
+    }
+    return Math.max(latest, timestamp)
+  }, Number.NEGATIVE_INFINITY)
+}
+
+function mapTimelineItem(item: TimelineGameApiItem, favoriteIds?: Set<string>): Game {
+  return applyFavorite({
+    id: item.id,
+    title: item.title,
+    release_date: item.release_date,
+    cover_image: item.cover_image,
+    views: 0,
+    downloads: 0,
+    created_at: '',
+    updated_at: '',
+    screenshots: [],
+    file_paths: [],
+  }, favoriteIds)
 }
 
 async function listMetadata<T extends Series | Platform | Developer | Publisher>(resource: string): Promise<T[]> {
@@ -186,33 +211,35 @@ async function listMetadata<T extends Series | Platform | Developer | Publisher>
   return (response.data || []).map((item) => mapMetadataItem<T>(item))
 }
 
-export const gamesService = {
+const gamesService = {
   async getGames(params?: {
     page?: number
     pageSize?: number
     filter?: GameFilter
     sort?: GameSort
   }): Promise<PaginatedResponse<Game>> {
-    const queryParams: Record<string, any> = {
-      page: params?.page,
-      limit: params?.pageSize,
+    const queryParams = new URLSearchParams()
+    if (params?.page) queryParams.append('page', String(params.page))
+    if (params?.pageSize) queryParams.append('limit', String(params.pageSize))
+    if (params?.filter?.search) queryParams.append('search', params.filter.search)
+    if (params?.filter?.series) queryParams.append('series', params.filter.series)
+    if (params?.filter?.platform) queryParams.append('platform', params.filter.platform)
+    if (params?.filter?.status === 'pending-review') queryParams.append('needs_review', 'true')
+    if (params?.filter?.tag_ids?.length) {
+      params.filter.tag_ids.forEach((tagId) => {
+        queryParams.append('tag', String(tagId))
+      })
     }
-
-    if (params?.filter?.search) queryParams.search = params.filter.search
-    if (params?.filter?.series) queryParams.series = params.filter.series
-    if (params?.filter?.platform) queryParams.platform = params.filter.platform
-    if (params?.filter?.status === 'pending-review') queryParams.needs_review = true
     if (params?.sort) {
-      queryParams.sort = params.sort.field
-      queryParams.order = params.sort.order
+      queryParams.append('sort', params.sort.field)
+      queryParams.append('order', params.sort.order)
+      if (typeof params.sort.seed === 'number') {
+        queryParams.append('seed', String(params.sort.seed))
+      }
     }
-
-    Object.keys(queryParams).forEach((key) => {
-      if (queryParams[key] === undefined) delete queryParams[key]
-    })
 
     const response = await get<PaginatedResponse<GameListApiItem>>('/games', { params: queryParams })
-    let games = response.data.map(mapGameListItem)
+    let games = response.data.map((item) => mapGameListItem(item))
 
     if (params?.filter?.favorite) {
       const favoriteIds = new Set(readFavorites())
@@ -225,15 +252,70 @@ export const gamesService = {
     }
   },
 
+  async getAllGames(params?: {
+    filter?: GameFilter
+    sort?: GameSort
+    pageSize?: number
+  }): Promise<Game[]> {
+    const pageSize = Math.max(1, Math.min(params?.pageSize || 100, 200))
+    const allGames: Game[] = []
+    let page = 1
+
+    while (true) {
+      const response = await this.getGames({
+        page,
+        pageSize,
+        filter: params?.filter,
+        sort: params?.sort,
+      })
+
+      allGames.push(...response.data)
+      const totalPages = response.pagination?.totalPages || 1
+      if (page >= totalPages) {
+        break
+      }
+      page += 1
+    }
+
+    return allGames
+  },
+
+  async getTimelineGames(params?: {
+    years?: number
+    limit?: number
+    cursor?: string | null
+    from?: string | null
+    to?: string | null
+  }): Promise<TimelineGamesResult> {
+    const queryParams = new URLSearchParams()
+    const years = Math.max(1, Math.min(params?.years || 2, 10))
+    const limit = Math.max(1, Math.min(params?.limit || 60, 100))
+    queryParams.append('years', String(years))
+    queryParams.append('limit', String(limit))
+    if (params?.cursor) queryParams.append('cursor', params.cursor)
+    if (params?.from) queryParams.append('from', params.from)
+    if (params?.to) queryParams.append('to', params.to)
+    const response = await get<TimelineGamesApiResponse>('/games/timeline', { params: queryParams })
+    const favoriteIds = new Set(readFavorites())
+    return {
+      data: (response.data || []).map((item) => mapTimelineItem(item, favoriteIds)),
+      hasMore: Boolean(response.pagination?.hasMore),
+      nextCursor: response.pagination?.nextCursor || null,
+      from: response.pagination?.from || null,
+      to: response.pagination?.to || null,
+    }
+  },
+
   async getGame(id: string): Promise<Game> {
     const response = await get<ApiResponse<GameDetailApiItem>>(`/games/${id}`)
     return mapGameDetail(response.data)
   },
 
-  async createGame(data: { title: string; file_path?: string }): Promise<Game> {
+  async createGame(data: { title: string; visibility?: 'public' | 'private'; file_path?: string }): Promise<Game> {
     const payload = {
       title: data.title,
       title_alt: null,
+      visibility: data.visibility ?? 'public',
       summary: null,
       release_date: null,
       engine: null,
@@ -244,6 +326,7 @@ export const gamesService = {
       platform_ids: [],
       developer_ids: [],
       publisher_ids: [],
+      tag_ids: [],
     }
     const response = await post<ApiResponse<GameListApiItem>>('/games', payload)
     return mapGameListItem(response.data)
@@ -253,6 +336,7 @@ export const gamesService = {
     const payload = {
       title: data.title || '',
       title_alt: data.title_alt ?? null,
+      visibility: data.visibility ?? 'public',
       summary: data.summary ?? null,
       release_date: data.release_date ?? null,
       engine: data.engine ?? null,
@@ -264,6 +348,7 @@ export const gamesService = {
       platform_ids: mapPlatformValues(data.platforms),
       developer_ids: data.developers || [],
       publisher_ids: data.publishers || [],
+      tag_ids: data.tag_ids || [],
     }
     const response = await put<ApiResponse<GameListApiItem>>(`/games/${id}`, payload)
     return mapGameListItem(response.data)
@@ -300,14 +385,16 @@ export const gamesService = {
   async getGameVersions(gameId: string): Promise<GameVersion[]> {
     const game = await this.getGame(gameId)
     const files = [...(game.files || [])].sort((a, b) => a.sort_order - b.sort_order)
+    const latestTimestamp = getLatestGameFileTimestamp(files)
 
     return files.map((file, index) => ({
       id: String(file.id),
       gameId,
-      version: file.label?.trim() || getFileName(file.file_path) || `文件 ${index + 1}`,
-      releaseDate: file.updated_at || file.created_at,
+      version: file.label?.trim() || getFileName(file.file_name) || `文件 ${index + 1}`,
+      releaseDate: getGameFileReleaseDate(file),
       size: file.size_bytes ?? 0,
-      isLatest: index === 0,
+      isLatest: !Number.isNaN(Date.parse(getGameFileReleaseDate(file))) && Date.parse(getGameFileReleaseDate(file)) === latestTimestamp,
+      canLaunch: canLaunchFromFileName(file.file_name),
       downloadUrl: `/api/games/${gameId}/files/${file.id}/download`,
       launchScriptUrl: `/api/games/${gameId}/files/${file.id}/launch-script`,
       changelog: file.notes || undefined,
@@ -327,25 +414,16 @@ export const gamesService = {
   },
 
   async getStats(): Promise<GameStats> {
-    const response = await this.getGames({
-      page: 1,
-      pageSize: 200,
-      sort: { field: 'updated_at', order: 'desc' },
-    })
-    const allGames = response.data
-    const favorites = new Set(readFavorites())
-    const sortedByCreated = [...allGames].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-    const sortedByDownloads = [...allGames].sort((a, b) => (b.downloads || 0) - (a.downloads || 0))
-
+    const response = await get<ApiResponse<GameStatsApiResponse>>('/games/stats')
     return {
-      total_games: response.pagination.total,
-      total_downloads: allGames.reduce((sum, game) => sum + (game.downloads || 0), 0),
-      total_views: allGames.reduce((sum, game) => sum + (game.views || 0), 0),
-      total_size: 0,
-      recent_games: sortedByCreated.slice(0, 12),
-      popular_games: sortedByDownloads.slice(0, 12),
-      favorite_games: allGames.filter((game) => favorites.has(String(game.id))),
-      pending_reviews: allGames.filter((game) => game.needs_review).length,
+      total_games: response.data.total_games,
+      total_downloads: response.data.total_downloads,
+      total_views: response.data.total_views,
+      total_size: response.data.total_size,
+      recent_games: response.data.recent_games.map((item) => mapGameListItem(item)),
+      popular_games: response.data.popular_games.map((item) => mapGameListItem(item)),
+      favorite_count: getFavoriteCount(),
+      pending_reviews: response.data.pending_reviews,
     }
   },
 

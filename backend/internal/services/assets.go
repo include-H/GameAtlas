@@ -299,6 +299,16 @@ func (s *AssetsService) ReorderScreenshots(input domain.ScreenshotOrderUpdateInp
 	return normalizeRepoError(s.assetsRepo.UpdateScreenshotSortOrders(input.GameID, input.AssetUIDs))
 }
 
+func (s *AssetsService) ReorderVideos(input domain.VideoOrderUpdateInput) error {
+	if _, err := s.gamesRepo.GetByID(input.GameID); err != nil {
+		return normalizeRepoError(err)
+	}
+	if len(input.AssetUIDs) == 0 {
+		return ErrValidation
+	}
+	return normalizeRepoError(s.assetsRepo.UpdateVideoSortOrders(input.GameID, input.AssetUIDs))
+}
+
 func normalizeAssetError(err error) error {
 	switch {
 	case errors.Is(err, files.ErrInvalidImageType):

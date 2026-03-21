@@ -8,13 +8,16 @@ export default {
     register: '注册',
     dashboard: '首页',
     games: '游戏库',
+    series: '系列库',
     pending: {
       center: '待处理中心',
     },
     notFound: '未找到页面',
     'game.detail': '游戏详情',
+    'series.detail': '系列详情',
     'wiki.edit': '编辑Wiki',
     'games.all': '所有游戏',
+    'games.timeline': '发售时间线',
   },
   // Common UI text
   common: {

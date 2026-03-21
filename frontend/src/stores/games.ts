@@ -36,7 +36,6 @@ export const useGamesStore = defineStore('games', () => {
       || (currentGame.value && String(currentGame.value.id) === gameId ? currentGame.value : null)
       || stats.value?.recent_games.find(game => String(game.id) === gameId)
       || stats.value?.popular_games.find(game => String(game.id) === gameId)
-      || stats.value?.favorite_games.find(game => String(game.id) === gameId)
       || null
 
     games.value.forEach(game => {
@@ -65,13 +64,14 @@ export const useGamesStore = defineStore('games', () => {
       }
     })
 
-    stats.value.favorite_games = stats.value.favorite_games.filter(game => String(game.id) !== gameId)
-
-    if (isFavorite && sourceGame) {
-      stats.value.favorite_games.unshift({
-        ...sourceGame,
-        isFavorite: true,
-      })
+    if (typeof stats.value.favorite_count === 'number') {
+      if (isFavorite) {
+        stats.value.favorite_count += 1
+      } else {
+        stats.value.favorite_count = Math.max(0, stats.value.favorite_count - 1)
+      }
+    } else if (isFavorite && sourceGame) {
+      stats.value.favorite_count = 1
     }
   }
 

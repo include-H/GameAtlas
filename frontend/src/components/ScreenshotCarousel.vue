@@ -1,56 +1,61 @@
 <template>
   <div class="screenshot-carousel" v-if="mediaItems.length > 0" ref="carouselRef">
     <div class="screenshot-carousel__viewport" :style="viewportStyle" ref="viewportRef">
-      <button
+      <a-button
         v-if="mediaItems.length > 1"
         class="screenshot-carousel__arrow screenshot-carousel__arrow--prev"
+        type="secondary"
+        shape="circle"
         @click="prevImage"
-        @mouseenter="hoverArrow = 'prev'"
-        @mouseleave="hoverArrow = null"
+        aria-label="上一张"
       >
-        <svg viewBox="0 0 24 24" width="24" height="24">
-          <path fill="currentColor" d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
-        </svg>
-      </button>
+        <template #icon>
+          <icon-left />
+        </template>
+      </a-button>
 
       <div class="screenshot-carousel__main">
-        <img
-          v-if="currentMedia?.type === 'image'"
-          :key="currentMedia.url"
-          :src="currentMedia.url"
-          :alt="alt"
-          :class="['screenshot-carousel__image', { 'is-loaded': imageLoaded }]"
-          @load="onImageLoad"
-          @error="handleImageError(currentMedia.url)"
-        />
-        <video
-          v-else-if="currentMedia?.type === 'video'"
-          :key="currentMedia.url"
-          ref="videoRef"
-          :src="currentMedia.url"
-          class="screenshot-carousel__video"
-          :poster="videoPoster || undefined"
-          autoplay
-          controls
-          loop
-          playsinline
-          preload="metadata"
-          @canplay="tryPlayVideo"
-          @loadedmetadata="onVideoLoaded"
-        />
+        <div class="screenshot-carousel__media-shell">
+          <img
+            v-if="currentMedia?.type === 'image'"
+            :key="currentMedia.url"
+            :src="currentMedia.url"
+            :alt="alt"
+            :class="['screenshot-carousel__image', { 'is-loaded': imageLoaded }]"
+            @load="onImageLoad"
+            @error="handleImageError(currentMedia.url)"
+          />
+          <video
+            v-else-if="currentMedia?.type === 'video'"
+            :key="currentMedia.url"
+            ref="videoRef"
+            :src="currentMedia.url"
+            class="screenshot-carousel__video"
+            :poster="videoPoster || undefined"
+            autoplay
+            controls
+            muted
+            playsinline
+            preload="metadata"
+            @canplay="tryPlayVideo"
+            @loadedmetadata="onVideoLoaded"
+            @ended="handleVideoEnded"
+          />
+        </div>
       </div>
 
-      <button
+      <a-button
         v-if="mediaItems.length > 1"
         class="screenshot-carousel__arrow screenshot-carousel__arrow--next"
+        type="secondary"
+        shape="circle"
         @click="nextImage"
-        @mouseenter="hoverArrow = 'next'"
-        @mouseleave="hoverArrow = null"
+        aria-label="下一张"
       >
-        <svg viewBox="0 0 24 24" width="24" height="24">
-          <path fill="currentColor" d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-        </svg>
-      </button>
+        <template #icon>
+          <icon-right />
+        </template>
+      </a-button>
 
       <div v-if="mediaItems.length > 1" class="screenshot-carousel__counter">
         {{ currentIndex + 1 }} / {{ mediaItems.length }}
@@ -94,6 +99,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { IconLeft, IconRight } from '@arco-design/web-vue/es/icon'
 import { resolveAssetUrl } from '@/utils/asset-url'
 
 interface Props {
@@ -122,7 +128,6 @@ interface MediaItem {
 }
 
 const currentIndex = ref(0)
-const hoverArrow = ref<'prev' | 'next' | null>(null)
 const carouselRef = ref<HTMLElement | null>(null)
 const viewportRef = ref<HTMLElement | null>(null)
 const videoRef = ref<HTMLVideoElement | null>(null)
@@ -132,6 +137,7 @@ const brokenImages = ref<string[]>([])
 const aspectResolved = ref(false)
 const imageLoaded = ref(false)
 let resizeObserver: ResizeObserver | null = null
+let imageAutoplayTimer: number | null = null
 
 const visibleScreenshots = computed(() => {
   const brokenSet = new Set(brokenImages.value)
@@ -140,11 +146,24 @@ const visibleScreenshots = computed(() => {
 
 const mediaItems = computed<MediaItem[]>(() => {
   const items: MediaItem[] = []
-  const previewVideos = props.previewVideos.length > 0
+  const rawVideoList = props.previewVideos.length > 0
     ? props.previewVideos
     : (props.previewVideo ? [props.previewVideo] : [])
-  previewVideos.filter(Boolean).forEach((previewVideo, index) => {
-    const videoUrl = resolveAssetUrl(previewVideo)
+  const resolvedVideoList = rawVideoList
+    .filter(Boolean)
+    .map((video) => resolveAssetUrl(video))
+  const resolvedPrimaryVideo = props.previewVideo ? resolveAssetUrl(props.previewVideo) : ''
+  const orderedVideoList: string[] = []
+
+  if (resolvedPrimaryVideo) {
+    orderedVideoList.push(resolvedPrimaryVideo)
+  }
+  for (const videoUrl of resolvedVideoList) {
+    if (!videoUrl || orderedVideoList.includes(videoUrl)) continue
+    orderedVideoList.push(videoUrl)
+  }
+
+  orderedVideoList.forEach((videoUrl, index) => {
     items.push({
       key: `video:${index}:${videoUrl}`,
       type: 'video',
@@ -211,6 +230,7 @@ watch(() => [props.screenshots, props.previewVideo, props.previewVideos], () => 
 watch(mediaItems, (items) => {
   if (items.length === 0) {
     currentIndex.value = 0
+    stopImageAutoplay()
     return
   }
   if (currentIndex.value >= items.length) {
@@ -221,18 +241,21 @@ watch(mediaItems, (items) => {
 watch(currentMedia, (nextMedia, previousMedia) => {
   if (!nextMedia) {
     imageLoaded.value = false
+    stopImageAutoplay()
     return
   }
   if (nextMedia.type === 'video') {
     imageLoaded.value = true
     aspectResolved.value = true
     viewportAspect.value = '16 / 9'
+    stopImageAutoplay()
     nextTick(() => {
       tryPlayVideo()
     })
     return
   }
   imageLoaded.value = nextMedia.url === previousMedia?.url
+  startImageAutoplay()
 })
 
 onMounted(() => {
@@ -247,6 +270,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  stopImageAutoplay()
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null
@@ -277,6 +301,7 @@ const onVideoLoaded = () => {
 const tryPlayVideo = () => {
   const video = videoRef.value
   if (!video) return
+  video.muted = true
   const playPromise = video.play()
   if (playPromise && typeof playPromise.catch === 'function') {
     playPromise.catch(() => {
@@ -285,12 +310,33 @@ const tryPlayVideo = () => {
   }
 }
 
+const stopImageAutoplay = () => {
+  if (imageAutoplayTimer !== null) {
+    window.clearTimeout(imageAutoplayTimer)
+    imageAutoplayTimer = null
+  }
+}
+
+const startImageAutoplay = () => {
+  stopImageAutoplay()
+  if (mediaItems.value.length <= 1 || currentMedia.value?.type !== 'image') return
+
+  imageAutoplayTimer = window.setTimeout(() => {
+    nextImage()
+  }, 5000)
+}
+
 const prevImage = () => {
   currentIndex.value = currentIndex.value > 0 ? currentIndex.value - 1 : mediaItems.value.length - 1
 }
 
 const nextImage = () => {
   currentIndex.value = currentIndex.value < mediaItems.value.length - 1 ? currentIndex.value + 1 : 0
+}
+
+const handleVideoEnded = () => {
+  if (mediaItems.value.length <= 1) return
+  nextImage()
 }
 
 const handleImageError = (url: string) => {
@@ -306,12 +352,19 @@ const handleImageError = (url: string) => {
   width: 100%;
   display: flex;
   flex-direction: column;
+  gap: 10px;
 }
 
 .screenshot-carousel--empty {
-  background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  width: 100%;
+  min-height: 420px;
+  aspect-ratio: 16 / 9;
+  background:
+    radial-gradient(circle at 20% 18%, rgba(40, 52, 84, 0.36), transparent 30%),
+    linear-gradient(180deg, #090b10 0%, #05070b 100%);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.34);
 }
 
 .screenshot-carousel__empty {
@@ -336,12 +389,13 @@ const handleImageError = (url: string) => {
 /* Viewport - 固定高度，宽度自适应 */
 .screenshot-carousel__viewport {
   position: relative;
-  border-radius: 4px;
+  border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.38);
   width: 100%;
   display: flex;
   flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* Main Image Area */
@@ -349,23 +403,35 @@ const handleImageError = (url: string) => {
   position: relative;
   width: 100%;
   height: 100%;
+  min-height: 420px;
   overflow: hidden;
+  z-index: 1;
+}
+
+.screenshot-carousel__media-shell {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .screenshot-carousel__image {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
   opacity: 0;
   transition: opacity 0.16s ease;
+  object-position: center center;
 }
 
 .screenshot-carousel__video {
   width: 100%;
   height: 100%;
   display: block;
-  background: #000;
+  object-fit: cover;
+  background: transparent;
+  object-position: center center;
 }
 
 .screenshot-carousel__image.is-loaded {
@@ -377,41 +443,15 @@ const handleImageError = (url: string) => {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 48px;
-  height: 48px;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 100%);
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.6);
-  transition: all 0.2s ease;
   z-index: 10;
-  border-radius: 0;
 }
 
 .screenshot-carousel__arrow--prev {
-  left: 0;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
+  left: 16px;
 }
 
 .screenshot-carousel__arrow--next {
-  right: 0;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.8) 100%);
-}
-
-.screenshot-carousel__arrow:hover {
-  color: #fff;
-  background: rgba(0, 0, 0, 0.6);
-}
-
-.screenshot-carousel__arrow--prev:hover {
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.3) 100%);
-}
-
-.screenshot-carousel__arrow--next:hover {
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.9) 100%);
+  right: 16px;
 }
 
 /* Counter */
@@ -419,7 +459,7 @@ const handleImageError = (url: string) => {
   position: absolute;
   bottom: 12px;
   right: 16px;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(5, 10, 18, 0.78);
   padding: 6px 14px;
   border-radius: 20px;
   font-size: 12px;
@@ -432,18 +472,20 @@ const handleImageError = (url: string) => {
 
 /* Filmstrip (Thumbnail Navigation) - Steam Style */
 .screenshot-carousel__filmstrip {
-  margin-top: 4px;
-  padding: 8px 0;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 0 0 4px 4px;
+  padding: 10px 0;
+  background:
+    linear-gradient(180deg, rgba(14, 18, 28, 0.92) 0%, rgba(6, 8, 12, 0.96) 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .screenshot-carousel__filmstrip-inner {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   justify-content: flex-start;
   overflow-x: auto;
-  padding: 0 8px;
+  padding: 0 10px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
@@ -466,14 +508,15 @@ const handleImageError = (url: string) => {
   width: auto;
   height: 65px;
   aspect-ratio: 16/9;
-  border-radius: 2px;
+  border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
   transition: all 0.2s ease;
-  border: 2px solid transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
-  background: #1a1a1a;
-  opacity: 0.6;
+  background: #0a0d12;
+  opacity: 0.72;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .screenshot-carousel__film img {
@@ -505,8 +548,9 @@ const handleImageError = (url: string) => {
 }
 
 .screenshot-carousel__film:hover {
-  border-color: rgba(255, 255, 255, 0.5);
+  border-color: rgba(147, 204, 255, 0.46);
   opacity: 1;
+  transform: translateY(-1px);
 }
 
 .screenshot-carousel__film:hover img {
@@ -514,7 +558,8 @@ const handleImageError = (url: string) => {
 }
 
 .screenshot-carousel__film.active {
-  border-color: #fff;
+  border-color: rgba(170, 222, 255, 0.95);
   opacity: 1;
+  box-shadow: 0 0 0 1px rgba(170, 222, 255, 0.22), 0 10px 20px rgba(0, 0, 0, 0.25);
 }
 </style>

@@ -50,16 +50,17 @@ func NewGameFilesService(cfg config.Config, gamesRepo *repositories.GamesReposit
 	}
 }
 
-func (s *GameFilesService) List(gameID int64) ([]domain.GameFile, error) {
-	if _, err := s.gamesRepo.GetByID(gameID); err != nil {
+func (s *GameFilesService) List(gameID int64, includeAll bool) ([]domain.GameFile, error) {
+	game, err := s.gamesRepo.GetByID(gameID)
+	if err != nil {
 		return nil, normalizeRepoError(err)
+	}
+	if !includeAll && game.Visibility == domain.GameVisibilityPrivate {
+		return nil, ErrNotFound
 	}
 	files, err := s.gameFilesRepo.ListByGameID(gameID)
 	if err != nil {
 		return nil, err
-	}
-	for index := range files {
-		_ = s.refreshFileSize(gameID, &files[index])
 	}
 	if files == nil {
 		return []domain.GameFile{}, nil
@@ -135,9 +136,13 @@ func (s *GameFilesService) Delete(gameID, fileID int64) error {
 	return nil
 }
 
-func (s *GameFilesService) GetDownloadFile(gameID, fileID int64) (*DownloadFile, error) {
-	if _, err := s.gamesRepo.GetByID(gameID); err != nil {
+func (s *GameFilesService) GetDownloadFile(gameID, fileID int64, includeAll bool) (*DownloadFile, error) {
+	game, err := s.gamesRepo.GetByID(gameID)
+	if err != nil {
 		return nil, normalizeRepoError(err)
+	}
+	if !includeAll && game.Visibility == domain.GameVisibilityPrivate {
+		return nil, ErrNotFound
 	}
 
 	file, err := s.gameFilesRepo.GetByID(gameID, fileID)
@@ -150,15 +155,6 @@ func (s *GameFilesService) GetDownloadFile(gameID, fileID int64) (*DownloadFile,
 		return nil, normalizeFileError(err)
 	}
 
-	if file.SizeBytes == nil || *file.SizeBytes != resolved.SizeBytes {
-		if err := s.gameFilesRepo.UpdateSizeBytes(gameID, fileID, resolved.SizeBytes); err != nil {
-			return nil, err
-		}
-	}
-	if err := s.gamesRepo.IncrementDownloads(gameID); err != nil {
-		return nil, err
-	}
-
 	return &DownloadFile{
 		GameID:       gameID,
 		FileID:       fileID,
@@ -168,7 +164,23 @@ func (s *GameFilesService) GetDownloadFile(gameID, fileID int64) (*DownloadFile,
 	}, nil
 }
 
-func (s *GameFilesService) BuildLaunchScript(gameID, fileID int64) (string, string, error) {
+func (s *GameFilesService) RecordDownload(gameID, fileID int64, includeAll bool) error {
+	game, err := s.gamesRepo.GetByID(gameID)
+	if err != nil {
+		return normalizeRepoError(err)
+	}
+	if !includeAll && game.Visibility == domain.GameVisibilityPrivate {
+		return ErrNotFound
+	}
+
+	if _, err := s.gameFilesRepo.GetByID(gameID, fileID); err != nil {
+		return normalizeRepoError(err)
+	}
+
+	return s.gamesRepo.IncrementDownloads(gameID)
+}
+
+func (s *GameFilesService) BuildLaunchScript(gameID, fileID int64, includeAll bool) (string, string, error) {
 	if strings.TrimSpace(s.cfg.SMBShareRoot) == "" ||
 		strings.TrimSpace(s.cfg.SMBUsername) == "" ||
 		strings.TrimSpace(s.cfg.SMBPassword) == "" {
@@ -178,6 +190,9 @@ func (s *GameFilesService) BuildLaunchScript(gameID, fileID int64) (string, stri
 	game, err := s.gamesRepo.GetByID(gameID)
 	if err != nil {
 		return "", "", normalizeRepoError(err)
+	}
+	if !includeAll && game.Visibility == domain.GameVisibilityPrivate {
+		return "", "", ErrNotFound
 	}
 
 	file, err := s.gameFilesRepo.GetByID(gameID, fileID)
@@ -222,20 +237,6 @@ func trimGameFileInput(input domain.GameFileWriteInput) domain.GameFileWriteInpu
 	input.Label = trimStringPtr(input.Label)
 	input.Notes = trimStringPtr(input.Notes)
 	return input
-}
-
-func (s *GameFilesService) refreshFileSize(gameID int64, file *domain.GameFile) error {
-	resolved, err := s.fileGuard.ValidateFile(file.FilePath)
-	if err != nil {
-		return normalizeFileError(err)
-	}
-
-	if file.SizeBytes != nil && *file.SizeBytes == resolved.SizeBytes {
-		return nil
-	}
-
-	file.SizeBytes = &resolved.SizeBytes
-	return s.gameFilesRepo.UpdateSizeBytes(gameID, file.ID, resolved.SizeBytes)
 }
 
 func normalizeFileError(err error) error {
@@ -308,7 +309,7 @@ func (s *GameFilesService) renderLaunchScript(gameID, fileID int64, baseVHDPath 
 	script.WriteString("set \"SMB_USER=" + escapeBatchValue(s.cfg.SMBUsername) + "\"\r\n")
 	script.WriteString("set \"SMB_PASS=" + escapeBatchValue(s.cfg.SMBPassword) + "\"\r\n")
 	script.WriteString("set \"BASE_VHD=" + escapeBatchValue(baseVHDPath) + "\"\r\n")
-	script.WriteString("set \"DIFF_VHD=C:\\" + escapeBatchValue(diffFileName) + "\"\r\n")
+	script.WriteString("set \"DIFF_VHD=" + escapeBatchValue(buildDiffVHDPath(s.cfg.VHDDiffRoot, diffFileName)) + "\"\r\n")
 	script.WriteString("\r\n")
 	script.WriteString(":: 当前配置\r\n")
 	script.WriteString("echo SMB 主机: %SMB_HOST%\r\n")
@@ -408,4 +409,20 @@ func sanitizeBatchFileName(value string) string {
 func escapeBatchValue(value string) string {
 	replacer := strings.NewReplacer("^", "^^", "&", "^&", "|", "^|", "<", "^<", ">", "^>", "%", "%%")
 	return replacer.Replace(value)
+}
+
+func buildDiffVHDPath(root string, fileName string) string {
+	drive := normalizeDriveRoot(root)
+	return drive + `\` + strings.TrimLeft(strings.TrimSpace(fileName), `\`)
+}
+
+func normalizeDriveRoot(root string) string {
+	value := strings.TrimSpace(root)
+	if len(value) >= 2 {
+		letter := value[0]
+		if ((letter >= 'A' && letter <= 'Z') || (letter >= 'a' && letter <= 'z')) && value[1] == ':' {
+			return strings.ToUpper(string(letter)) + ":"
+		}
+	}
+	return "C:"
 }

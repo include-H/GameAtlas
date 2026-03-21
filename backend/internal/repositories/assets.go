@@ -203,29 +203,37 @@ func (r *AssetsRepository) DeleteAssetByUID(gameID int64, assetUID string, asset
 }
 
 func (r *AssetsRepository) UpdateScreenshotSortOrders(gameID int64, assetUIDs []string) error {
+	return r.updateAssetSortOrders(gameID, "screenshot", assetUIDs)
+}
+
+func (r *AssetsRepository) UpdateVideoSortOrders(gameID int64, assetUIDs []string) error {
+	return r.updateAssetSortOrders(gameID, "video", assetUIDs)
+}
+
+func (r *AssetsRepository) updateAssetSortOrders(gameID int64, assetType string, assetUIDs []string) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
-		return fmt.Errorf("begin screenshot reorder tx: %w", err)
+		return fmt.Errorf("begin %s reorder tx: %w", assetType, err)
 	}
 	defer tx.Rollback()
 
 	for index, assetUID := range assetUIDs {
 		trimmed := strings.TrimSpace(assetUID)
 		if trimmed == "" {
-			return fmt.Errorf("empty screenshot asset uid")
+			return fmt.Errorf("empty %s asset uid", assetType)
 		}
 
 		result, err := tx.Exec(`
 			UPDATE game_assets
 			SET sort_order = ?
-			WHERE game_id = ? AND asset_type = 'screenshot' AND asset_uid = ?
-		`, index, gameID, trimmed)
+			WHERE game_id = ? AND asset_type = ? AND asset_uid = ?
+		`, index, gameID, assetType, trimmed)
 		if err != nil {
-			return fmt.Errorf("update screenshot sort order: %w", err)
+			return fmt.Errorf("update %s sort order: %w", assetType, err)
 		}
 		rows, err := result.RowsAffected()
 		if err != nil {
-			return fmt.Errorf("read screenshot reorder rows: %w", err)
+			return fmt.Errorf("read %s reorder rows: %w", assetType, err)
 		}
 		if rows == 0 {
 			return sql.ErrNoRows
@@ -233,7 +241,7 @@ func (r *AssetsRepository) UpdateScreenshotSortOrders(gameID int64, assetUIDs []
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit screenshot reorder tx: %w", err)
+		return fmt.Errorf("commit %s reorder tx: %w", assetType, err)
 	}
 	return nil
 }

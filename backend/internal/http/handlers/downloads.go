@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,11 +15,20 @@ import (
 )
 
 type DownloadsHandler struct {
-	service *services.GameFilesService
+	service          *services.GameFilesService
+	authService      *services.AuthService
+	downloadDedupeMu sync.Mutex
+	downloadDedupe   map[string]time.Time
 }
 
-func NewDownloadsHandler(service *services.GameFilesService) *DownloadsHandler {
-	return &DownloadsHandler{service: service}
+const downloadRecordWindow = 10 * time.Minute
+
+func NewDownloadsHandler(service *services.GameFilesService, authService *services.AuthService) *DownloadsHandler {
+	return &DownloadsHandler{
+		service:        service,
+		authService:    authService,
+		downloadDedupe: make(map[string]time.Time),
+	}
 }
 
 func (h *DownloadsHandler) Download(c *gin.Context) {
@@ -31,7 +41,7 @@ func (h *DownloadsHandler) Download(c *gin.Context) {
 		return
 	}
 
-	downloadFile, err := h.service.GetDownloadFile(gameID, fileID)
+	downloadFile, err := h.service.GetDownloadFile(gameID, fileID, isAdminRequest(c))
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrNotFound):
@@ -64,6 +74,62 @@ func (h *DownloadsHandler) Download(c *gin.Context) {
 	http.ServeContent(c.Writer, c.Request, filename, time.Unix(downloadFile.ModTime, 0), file)
 }
 
+func (h *DownloadsHandler) RecordDownload(c *gin.Context) {
+	gameID, ok := parseIDParam(c, "id")
+	if !ok {
+		return
+	}
+	fileID, ok := parseIDParam(c, "fileId")
+	if !ok {
+		return
+	}
+
+	sourceKey := h.authService.SourceKey(c.ClientIP(), c.Request.UserAgent())
+	if !h.shouldRecordDownload(gameID, fileID, sourceKey, time.Now().UTC()) {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data":    gin.H{"recorded": false},
+		})
+		return
+	}
+
+	if err := h.service.RecordDownload(gameID, fileID, isAdminRequest(c)); err != nil {
+		switch {
+		case errors.Is(err, services.ErrNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "resource not found"})
+		case errors.Is(err, services.ErrValidation), errors.Is(err, services.ErrMissingConfig):
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "internal server error"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    gin.H{"recorded": true},
+	})
+}
+
+func (h *DownloadsHandler) shouldRecordDownload(gameID, fileID int64, sourceKey string, now time.Time) bool {
+	h.downloadDedupeMu.Lock()
+	defer h.downloadDedupeMu.Unlock()
+
+	for key, expiresAt := range h.downloadDedupe {
+		if !expiresAt.After(now) {
+			delete(h.downloadDedupe, key)
+		}
+	}
+
+	recordKey := sourceKey + ":" + int64ToString(gameID) + ":" + int64ToString(fileID)
+	if expiresAt, exists := h.downloadDedupe[recordKey]; exists && expiresAt.After(now) {
+		return false
+	}
+
+	h.downloadDedupe[recordKey] = now.Add(downloadRecordWindow)
+	return true
+}
+
 func (h *DownloadsHandler) LaunchScript(c *gin.Context) {
 	gameID, ok := parseIDParam(c, "id")
 	if !ok {
@@ -74,7 +140,7 @@ func (h *DownloadsHandler) LaunchScript(c *gin.Context) {
 		return
 	}
 
-	script, filename, err := h.service.BuildLaunchScript(gameID, fileID)
+	script, filename, err := h.service.BuildLaunchScript(gameID, fileID, isAdminRequest(c))
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrNotFound):

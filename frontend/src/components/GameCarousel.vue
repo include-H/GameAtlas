@@ -1,6 +1,5 @@
 <template>
   <div class="game-carousel">
-    <!-- Background Images -->
     <div class="carousel-background">
       <div
         v-for="(game, index) in games"
@@ -8,12 +7,6 @@
         class="carousel-slide"
         :class="{ active: currentIndex === index }"
       >
-        <!-- Layer 1: Blurred Backdrop (fills 21:9) -->
-        <div 
-          class="slide-backdrop" 
-          :style="{ backgroundImage: `url(${getBackgroundImage(game)})` }"
-        />
-        <!-- Layer 2: Clear Foreground (centered, preserves aspect ratio) -->
         <div 
           class="slide-foreground" 
           :style="{ backgroundImage: `url(${getBackgroundImage(game)})` }"
@@ -36,7 +29,6 @@
         <a-button
           type="primary"
           size="large"
-          class="app-primary-cta app-primary-cta--large"
           @click="viewGame(game.id)"
         >
           查看详情
@@ -46,31 +38,26 @@
 
     <!-- Indicators -->
     <div class="carousel-indicators">
-      <button
+      <a-button
         v-for="(game, index) in games"
         :key="game.id"
         class="indicator"
         :class="{ active: currentIndex === index }"
+        type="text"
+        shape="circle"
         @click="goToSlide(index)"
       />
     </div>
 
-    <!-- Navigation Arrows -->
-    <button class="carousel-arrow carousel-arrow-prev" @click="prevSlide">
-      <icon-left />
-    </button>
-    <button class="carousel-arrow carousel-arrow-next" @click="nextSlide">
-      <icon-right />
-    </button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { IconLeft, IconRight } from '@arco-design/web-vue/es/icon'
+import { useRoute, useRouter } from 'vue-router'
 import type { Game } from '@/services/types'
 import { resolveAssetUrl } from '@/utils/asset-url'
+import { createDetailRouteQuery } from '@/utils/navigation'
 
 interface Props {
   games: Game[]
@@ -83,27 +70,20 @@ const props = withDefaults(defineProps<Props>(), {
   interval: 5000,
 })
 
+const route = useRoute()
 const router = useRouter()
 const currentIndex = ref(0)
 let autoPlayTimer: number | null = null
 
-// 缓存每个游戏的截图索引，确保同一游戏每次显示相同的截图
-const screenshotIndexCache = new Map<number, number>()
-
 const games = computed(() => props.games.slice(0, 5))
 
 const getBackgroundImage = (game: Game) => {
-  const screenshots = (game.screenshots || []).filter(Boolean)
-  if (screenshots.length > 0) {
-    if (!screenshotIndexCache.has(game.id)) {
-      const randomIndex = Math.floor(Math.random() * screenshots.length)
-      screenshotIndexCache.set(game.id, randomIndex)
-    }
-    const index = screenshotIndexCache.get(game.id)!
-    return resolveAssetUrl(screenshots[index])
-  }
-
-  return resolveAssetUrl(game.banner_image || game.cover_image || '/placeholder-game.jpg')
+  return resolveAssetUrl(
+    game.primary_screenshot
+      || game.banner_image
+      || game.cover_image
+      || '/placeholder-game.jpg',
+  )
 }
 
 const getDescription = (game: Game) => {
@@ -128,15 +108,15 @@ const getMetaInfo = (game: Game) => {
 }
 
 const viewGame = (id: number) => {
-  router.push({ name: 'game-detail', params: { id: String(id) } })
+  router.push({
+    name: 'game-detail',
+    params: { id: String(id) },
+    query: createDetailRouteQuery(route),
+  })
 }
 
 const nextSlide = () => {
   currentIndex.value = (currentIndex.value + 1) % games.value.length
-}
-
-const prevSlide = () => {
-  currentIndex.value = (currentIndex.value - 1 + games.value.length) % games.value.length
 }
 
 const goToSlide = (index: number) => {
@@ -163,7 +143,6 @@ watch(
     if (currentIndex.value >= games.value.length) {
       currentIndex.value = 0
     }
-    screenshotIndexCache.clear()
     stopAutoPlay()
     startAutoPlay()
   },
@@ -212,24 +191,11 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-.slide-backdrop {
-  position: absolute;
-  inset: -4%;
-  background-size: cover;
-  background-position: center;
-  opacity: 0.88;
-  filter: blur(26px) saturate(0.95) brightness(0.55);
-  z-index: 1;
-  transform: scale(1.08);
-  will-change: transform, opacity, filter;
-}
-
 .slide-foreground {
   position: absolute;
   inset: 0;
-  background-size: contain;
+  background-size: cover;
   background-position: center;
-  background-repeat: no-repeat;
   z-index: 2;
   filter: drop-shadow(0 24px 42px rgba(0, 0, 0, 0.48));
   will-change: transform, opacity;
@@ -306,11 +272,15 @@ onUnmounted(() => {
 .indicator {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
   background: rgba(255, 255, 255, 0.4);
-  border: none;
-  cursor: pointer;
   transition: all 0.3s ease;
+  padding: 0;
+  min-width: 8px;
+  color: transparent;
+}
+
+.indicator:deep(.arco-btn-content) {
+  display: none;
 }
 
 .indicator.active {
@@ -323,37 +293,6 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.8);
 }
 
-.carousel-arrow {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 11;
-  transition: all 0.3s ease;
-}
-
-.carousel-arrow:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.carousel-arrow-prev {
-  left: 16px;
-}
-
-.carousel-arrow-next {
-  right: 16px;
-}
-
 /* Responsive - Arco Design Breakpoints */
 /* md: 768px */
 @media (max-width: 768px) {
@@ -363,6 +302,7 @@ onUnmounted(() => {
 
   .carousel-content {
     padding: 0 24px;
+    padding-left: 64px;
   }
 
   .carousel-title {
@@ -375,6 +315,46 @@ onUnmounted(() => {
 
   .carousel-indicators {
     left: 24px;
+  }
+}
+
+@media (max-width: 576px) {
+  .game-carousel {
+    min-height: 280px;
+    height: 280px;
+  }
+
+  .carousel-content {
+    padding: 0 16px;
+    padding-left: 16px;
+    align-items: flex-end;
+    padding-bottom: 44px;
+  }
+
+  .carousel-info {
+    max-width: 100%;
+  }
+
+  .carousel-title {
+    font-size: 22px;
+    margin-bottom: 8px;
+  }
+
+  .carousel-meta {
+    margin-bottom: 8px;
+  }
+
+  .carousel-description {
+    margin-bottom: 16px;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    display: -webkit-box;
+    overflow: hidden;
+  }
+
+  .carousel-indicators {
+    left: 16px;
+    bottom: 16px;
   }
 }
 </style>

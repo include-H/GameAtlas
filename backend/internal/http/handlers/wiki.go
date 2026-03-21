@@ -23,7 +23,7 @@ func (h *WikiHandler) Get(c *gin.Context) {
 		return
 	}
 
-	document, err := h.service.Get(gameID)
+	document, err := h.service.Get(gameID, isAdminRequest(c))
 	if err != nil {
 		writeServiceError(c, err, "invalid wiki payload")
 		return
@@ -38,6 +38,9 @@ func (h *WikiHandler) Get(c *gin.Context) {
 func (h *WikiHandler) Update(c *gin.Context) {
 	gameID, ok := parseIDParam(c, "id")
 	if !ok {
+		return
+	}
+	if !requireAdmin(c) {
 		return
 	}
 
@@ -63,12 +66,15 @@ func (h *WikiHandler) Update(c *gin.Context) {
 }
 
 func (h *WikiHandler) History(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	gameID, ok := parseIDParam(c, "id")
 	if !ok {
 		return
 	}
 
-	items, err := h.service.History(gameID)
+	items, err := h.service.History(gameID, isAdminRequest(c))
 	if err != nil {
 		writeServiceError(c, err, "invalid wiki payload")
 		return

@@ -1,5 +1,5 @@
 import type { RouteRecordRaw } from 'vue-router'
-import { IconTrophy, IconExclamationCircle } from '@arco-design/web-vue/es/icon'
+import { IconTrophy, IconExclamationCircle, IconCalendarClock } from '@arco-design/web-vue/es/icon'
 
 /**
  * Games routes
@@ -11,7 +11,24 @@ export default {
   meta: {
     locale: 'menu.games',
     requiresAuth: true,
+    keepAlive: true,
     icon: IconTrophy,
+    roles: ['*'],
+  },
+} as RouteRecordRaw
+
+/**
+ * Timeline route
+ */
+export const timelineRoute = {
+  path: '/games/timeline',
+  name: 'games-timeline',
+  component: () => import('@/views/GamesTimelineView.vue'),
+  meta: {
+    locale: 'menu.games.timeline',
+    requiresAuth: true,
+    keepAlive: true,
+    icon: IconCalendarClock,
     roles: ['*'],
   },
 } as RouteRecordRaw
@@ -26,6 +43,7 @@ export const gameDetailRoute = {
   meta: {
     locale: 'menu.game.detail',
     requiresAuth: true,
+    keepAlive: true,
     roles: ['*'],
     hideInMenu: true,
     activeMenu: 'games',
@@ -42,6 +60,8 @@ export const pendingCenterRoute = {
   meta: {
     locale: 'menu.pending.center',
     requiresAuth: true,
+    requiresAdmin: true,
+    keepAlive: true,
     roles: ['*'],
     icon: IconExclamationCircle,
   },
@@ -57,6 +77,8 @@ export const wikiEditRoute = {
   meta: {
     locale: 'menu.wiki.edit',
     requiresAuth: true,
+    requiresAdmin: true,
+    keepAlive: true,
     roles: ['*'],
     hideInMenu: true,
     activeMenu: 'games',

@@ -23,7 +23,7 @@ func (h *GameFilesHandler) List(c *gin.Context) {
 		return
 	}
 
-	files, err := h.service.List(gameID)
+	files, err := h.service.List(gameID, isAdminRequest(c))
 	if err != nil {
 		writeServiceError(c, err, "file_path is required")
 		return
@@ -31,13 +31,16 @@ func (h *GameFilesHandler) List(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    toGameFileResponses(files),
+		"data":    toGameFileResponses(files, isAdminRequest(c)),
 	})
 }
 
 func (h *GameFilesHandler) Create(c *gin.Context) {
 	gameID, ok := parseIDParam(c, "id")
 	if !ok {
+		return
+	}
+	if !requireAdmin(c) {
 		return
 	}
 
@@ -58,13 +61,16 @@ func (h *GameFilesHandler) Create(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
-		"data":    toGameFileResponses([]domain.GameFile{*file})[0],
+		"data":    toGameFileResponses([]domain.GameFile{*file}, true)[0],
 	})
 }
 
 func (h *GameFilesHandler) Update(c *gin.Context) {
 	gameID, ok := parseIDParam(c, "id")
 	if !ok {
+		return
+	}
+	if !requireAdmin(c) {
 		return
 	}
 	fileID, ok := parseIDParam(c, "fileId")
@@ -89,13 +95,16 @@ func (h *GameFilesHandler) Update(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    toGameFileResponses([]domain.GameFile{*file})[0],
+		"data":    toGameFileResponses([]domain.GameFile{*file}, true)[0],
 	})
 }
 
 func (h *GameFilesHandler) Delete(c *gin.Context) {
 	gameID, ok := parseIDParam(c, "id")
 	if !ok {
+		return
+	}
+	if !requireAdmin(c) {
 		return
 	}
 	fileID, ok := parseIDParam(c, "fileId")

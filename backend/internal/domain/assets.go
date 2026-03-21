@@ -13,6 +13,11 @@ type ScreenshotOrderUpdateInput struct {
 	AssetUIDs []string `json:"asset_uids"`
 }
 
+type VideoOrderUpdateInput struct {
+	GameID    int64    `json:"game_id"`
+	AssetUIDs []string `json:"asset_uids"`
+}
+
 type PrimaryVideoUpdateInput struct {
 	GameID   int64  `json:"game_id"`
 	AssetUID string `json:"asset_uid"`

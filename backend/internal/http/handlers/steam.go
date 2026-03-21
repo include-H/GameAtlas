@@ -20,6 +20,9 @@ func NewSteamHandler(service *services.SteamService) *SteamHandler {
 }
 
 func (h *SteamHandler) Search(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	query := strings.TrimSpace(c.Query("q"))
 	proxy := strings.TrimSpace(c.Query("proxy"))
 	if query == "" {
@@ -35,6 +38,9 @@ func (h *SteamHandler) Search(c *gin.Context) {
 }
 
 func (h *SteamHandler) Preview(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	appID, ok := parseIDParam(c, "appId")
 	if !ok {
 		return
@@ -49,6 +55,9 @@ func (h *SteamHandler) Preview(c *gin.Context) {
 }
 
 func (h *SteamHandler) Apply(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	appID, ok := parseIDParam(c, "appId")
 	if !ok {
 		return
@@ -76,6 +85,9 @@ func (h *SteamHandler) Apply(c *gin.Context) {
 }
 
 func (h *SteamHandler) Proxy(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	rawURL := strings.TrimSpace(c.Query("url"))
 	proxy := strings.TrimSpace(c.Query("proxy"))
 	if rawURL == "" {

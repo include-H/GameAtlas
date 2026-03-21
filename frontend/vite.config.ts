@@ -4,6 +4,7 @@ import path from 'node:path'
 
 export default defineConfig({
   plugins: [vue()],
+  envDir: path.resolve(__dirname, '../backend'),
   build: {
     assetsDir: 'ui',
   },

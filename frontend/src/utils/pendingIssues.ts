@@ -17,19 +17,19 @@ export type PendingIssueDetailKey =
   | 'missing-platform'
   | 'missing-summary'
 
-export interface PendingIssueDefinition {
+interface PendingIssueDefinition {
   key: PendingIssueKey
   label: string
   description: string
 }
 
-export interface PendingIssueDetailDefinition {
+interface PendingIssueDetailDefinition {
   key: PendingIssueDetailKey
   label: string
   group: PendingIssueKey
 }
 
-export interface PendingIssueEvaluation {
+interface PendingIssueEvaluation {
   groups: PendingIssueKey[]
   details: PendingIssueDetailKey[]
   ignoredDetails: PendingIssueDetailKey[]
@@ -114,7 +114,7 @@ export function getPendingIssueDetailLabel(key?: string | null) {
   return pendingIssueDetailDefinitions.find((item) => item.key === key)?.label || '待补充'
 }
 
-export function evaluatePendingIssues(game: Game, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueEvaluation {
+function evaluatePendingIssues(game: Game, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueEvaluation {
   const details: PendingIssueDetailKey[] = []
   const ignoredSet = new Set(ignoredDetails)
 

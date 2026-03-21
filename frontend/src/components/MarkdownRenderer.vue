@@ -20,17 +20,94 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const md = new MarkdownIt({
-  html: true,
+  html: false,
   linkify: true,
   typographer: true,
   breaks: true,
 })
 
+const epigraphBlockPattern = /(^|\n):::epigraph[ \t]*\n([\s\S]*?)\n:::(?=\n|$)/g
+const epigraphTokenPrefix = '@@EPIGRAPH_BLOCK_'
+
+function classifyEpigraphLine(line: string): 'cn' | 'en' {
+  const asciiLetters = (line.match(/[A-Za-z]/g) || []).length
+  const cjkChars = (line.match(/[\u3400-\u9fff]/g) || []).length
+
+  if (asciiLetters > cjkChars) {
+    return 'en'
+  }
+
+  return 'cn'
+}
+
+function buildEpigraphHtml(blockContent: string): string {
+  const lines = blockContent
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+
+  if (lines.length === 0) {
+    return ''
+  }
+
+  let author = ''
+  const authorLine = lines[lines.length - 1]
+  const authorMatch = authorLine.match(/^(?:--|---|——)\s*(.+)$/)
+
+  if (authorMatch) {
+    author = authorMatch[1].trim()
+    lines.pop()
+  }
+
+  if (lines.length === 0) {
+    return ''
+  }
+
+  const body = lines
+    .map((line) => {
+      const lineType = classifyEpigraphLine(line)
+      return `<p class="epigraph__line epigraph__line--${lineType}">${md.renderInline(line)}</p>`
+    })
+    .join('')
+
+  const caption = author
+    ? `<figcaption class="epigraph__author">—— ${md.renderInline(author)}</figcaption>`
+    : ''
+
+  return `<figure class="epigraph"><blockquote class="epigraph__body">${body}</blockquote>${caption}</figure>`
+}
+
+function renderEpigraphBlocks(content: string): string {
+  const replacements: Array<{ token: string; html: string }> = []
+  let index = 0
+
+  const markdownWithTokens = content.replace(epigraphBlockPattern, (_, leadingBreak: string, blockContent: string) => {
+    const html = buildEpigraphHtml(blockContent)
+    if (!html) {
+      return leadingBreak
+    }
+
+    const token = `${epigraphTokenPrefix}${index}@@`
+    index += 1
+    replacements.push({ token, html })
+    return `${leadingBreak}${token}\n`
+  })
+
+  let rendered = md.render(markdownWithTokens)
+  for (const replacement of replacements) {
+    rendered = rendered.split(`<p>${replacement.token}</p>\n`).join(`${replacement.html}\n`)
+    rendered = rendered.split(`<p>${replacement.token}</p>`).join(replacement.html)
+    rendered = rendered.split(replacement.token).join(replacement.html)
+  }
+
+  return rendered
+}
+
 const renderedHtml = computed(() => {
   if (!props.content) return ''
 
   try {
-    return md.render(props.content)
+    return renderEpigraphBlocks(props.content)
   } catch {
     return props.content
   }
@@ -129,6 +206,71 @@ const renderedHtml = computed(() => {
   opacity: 0.8;
 }
 
+.markdown-renderer :deep(.epigraph) {
+  position: relative;
+  margin: 2em auto;
+  padding: 1.8em 3.4em 1.2em;
+  max-width: 900px;
+  text-align: center;
+  color: color-mix(in srgb, var(--color-text-1) 78%, #6f7f93 22%);
+}
+
+.markdown-renderer :deep(.epigraph::before),
+.markdown-renderer :deep(.epigraph::after) {
+  position: absolute;
+  font-size: clamp(2.75rem, 5vw, 4.2rem);
+  line-height: 1;
+  color: rgba(140, 154, 255, 0.7);
+  font-family: Georgia, 'Times New Roman', serif;
+  pointer-events: none;
+}
+
+.markdown-renderer :deep(.epigraph::before) {
+  content: '“';
+  top: 0.15em;
+  left: 0.1em;
+}
+
+.markdown-renderer :deep(.epigraph::after) {
+  content: '”';
+  right: 0.1em;
+  bottom: 0.45em;
+}
+
+.markdown-renderer :deep(.epigraph__body) {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 1;
+}
+
+.markdown-renderer :deep(.epigraph__line) {
+  margin: 0.1em 0;
+}
+
+.markdown-renderer :deep(.epigraph__line--cn) {
+  font-size: clamp(1rem, 1.2vw + 0.7rem, 1.35rem);
+  letter-spacing: 0.32em;
+  text-indent: 0.32em;
+  line-height: 1.7;
+}
+
+.markdown-renderer :deep(.epigraph__line--en) {
+  font-size: clamp(0.82rem, 0.72vw + 0.58rem, 1rem);
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--color-text-1) 58%, #8b97a8 42%);
+}
+
+.markdown-renderer :deep(.epigraph__author) {
+  margin-top: 1rem;
+  text-align: right;
+  font-size: clamp(0.84rem, 0.62vw + 0.7rem, 1.02rem);
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--color-text-1) 56%, #8a96a6 44%);
+  opacity: 0.9;
+}
+
 .markdown-renderer :deep(ul),
 .markdown-renderer :deep(ol) {
   padding-left: 1.5em;
@@ -209,5 +351,16 @@ body.arco-layout-sidemenu-dark .markdown-renderer :deep(th) {
 
 body.arco-layout-sidemenu-dark .markdown-renderer :deep(hr) {
   border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 768px) {
+  .markdown-renderer :deep(.epigraph) {
+    padding: 1.4em 2.3em 1em;
+  }
+
+  .markdown-renderer :deep(.epigraph__line--cn) {
+    letter-spacing: 0.14em;
+    text-indent: 0.14em;
+  }
 }
 </style>

@@ -4,6 +4,7 @@
     title="编辑游戏信息"
     :width="800"
     :footer="false"
+    :align-center="false"
     @cancel="handleCancel"
   >
     <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" @submit="handleSubmit">
@@ -90,6 +91,17 @@
           </a-form-item>
         </a-col>
         <a-col :span="8">
+          <a-form-item label="可见性">
+            <a-radio-group v-model="form.visibility" type="button">
+              <a-radio value="public">公开</a-radio>
+              <a-radio value="private">私有</a-radio>
+            </a-radio-group>
+          </a-form-item>
+        </a-col>
+      </a-row>
+
+      <a-row :gutter="16">
+        <a-col :span="12">
           <a-form-item label="平台">
             <a-select
               v-model="form.platform"
@@ -110,28 +122,74 @@
             </a-select>
           </a-form-item>
         </a-col>
+        <a-col :span="12">
+          <a-form-item label="系列">
+            <a-select
+              v-model="form.series"
+              placeholder="选择系列"
+              allow-clear
+              allow-search
+              allow-create
+              :loading="isSearchingSeries"
+              :remote-search="true"
+              :on-search="handleSeriesSearch"
+            >
+              <a-option
+                v-for="s in filteredSeriesOptions"
+                :key="s.id"
+                :value="s.id"
+                :label="s.name"
+              >
+                {{ s.name }}
+              </a-option>
+            </a-select>
+          </a-form-item>
+        </a-col>
       </a-row>
 
-      <a-form-item label="系列">
-        <a-select
-          v-model="form.series"
-          placeholder="选择系列"
-          allow-clear
-          allow-search
-          allow-create
-          :loading="isSearchingSeries"
-          :remote-search="true"
-          :on-search="handleSeriesSearch"
-        >
-          <a-option
-            v-for="s in filteredSeriesOptions"
-            :key="s.id"
-            :value="s.id"
-            :label="s.name"
+      <a-form-item label="标签">
+        <div v-if="tagGroups.length > 0" class="tag-group-grid">
+          <div
+            v-for="group in tagGroups"
+            :key="group.id"
+            class="tag-group-field"
           >
-            {{ s.name }}
-          </a-option>
-        </a-select>
+            <div class="tag-group-field__label">
+              <span>{{ group.name }}</span>
+            </div>
+            <a-select
+              class="tag-group-select"
+              :model-value="tagSelectionsByGroup[group.id]"
+              :multiple="group.allow_multiple"
+              allow-clear
+              allow-search
+              allow-create
+              :max-tag-count="group.allow_multiple ? 2 : 1"
+              :placeholder="`选择${group.name}`"
+              @change="handleTagSelectionChange(group.id, $event)"
+            >
+              <a-option
+                v-for="pendingTag in pendingTagOptionsByGroup[group.id] || []"
+                :key="pendingTag.value"
+                :value="pendingTag.value"
+                :label="pendingTag.label"
+              >
+                {{ pendingTag.label }}
+              </a-option>
+              <a-option
+                v-for="tag in tagOptionsByGroup[group.id] || []"
+                :key="tag.id"
+                :value="tag.id"
+                :label="tag.name"
+              >
+                {{ tag.name }}
+              </a-option>
+            </a-select>
+          </div>
+        </div>
+        <div v-else class="tag-group-empty">
+          暂无可用标签。重启后端完成 migration 后，这里会显示可选标签组。
+        </div>
       </a-form-item>
 
       <a-form-item>
@@ -223,12 +281,25 @@
                   />
                   <div class="media-overlay">
                     <div class="media-overlay-actions">
-                      <button class="media-action-button" type="button" @click.stop="showCoverSelector = true">
+                      <a-button
+                        class="media-action-button"
+                        type="secondary"
+                        shape="circle"
+                        size="small"
+                        @click.stop="showCoverSelector = true"
+                      >
                         <icon-settings />
-                      </button>
-                      <button class="media-action-button media-action-button--danger" type="button" @click.stop="removeCover">
+                      </a-button>
+                      <a-button
+                        class="media-action-button media-action-button--danger"
+                        type="secondary"
+                        status="danger"
+                        shape="circle"
+                        size="small"
+                        @click.stop="removeCover"
+                      >
                         <icon-delete />
-                      </button>
+                      </a-button>
                     </div>
                   </div>
                 </div>
@@ -264,12 +335,25 @@
                   />
                   <div class="media-overlay">
                     <div class="media-overlay-actions">
-                      <button class="media-action-button" type="button" @click.stop="showBannerSelector = true">
+                      <a-button
+                        class="media-action-button"
+                        type="secondary"
+                        shape="circle"
+                        size="small"
+                        @click.stop="showBannerSelector = true"
+                      >
                         <icon-settings />
-                      </button>
-                      <button class="media-action-button media-action-button--danger" type="button" @click.stop="removeBanner">
+                      </a-button>
+                      <a-button
+                        class="media-action-button media-action-button--danger"
+                        type="secondary"
+                        status="danger"
+                        shape="circle"
+                        size="small"
+                        @click.stop="removeBanner"
+                      >
                         <icon-delete />
-                      </button>
+                      </a-button>
                     </div>
                   </div>
                 </div>
@@ -306,9 +390,15 @@
 	                  </video>
 	                  <div class="media-overlay media-overlay--top-right">
 	                    <div class="media-overlay-actions">
-	                      <button class="media-action-button" type="button" @click.stop="openVideoSelector">
+	                      <a-button
+                          class="media-action-button"
+                          type="secondary"
+                          shape="circle"
+                          size="small"
+                          @click.stop="openVideoSelector"
+                        >
 	                        <icon-settings />
-	                      </button>
+	                      </a-button>
 	                    </div>
 	                  </div>
 	                </div>
@@ -321,7 +411,7 @@
 	                >
 	                  <icon-upload class="media-empty-icon" />
 	                  <span class="media-empty-title">未设置预告片</span>
-	                  <span class="media-empty-subtitle">从 Steam 获取或上传本地视频</span>
+	                  <span class="media-empty-subtitle">点击上传本地视频</span>
 	                </div>
 	              </div>
 	            </div>
@@ -368,9 +458,16 @@
                           hide-footer
                         />
                         <div class="screenshot-overlay">
-                          <button class="media-action-button media-action-button--danger" type="button" @click.stop="removeScreenshot(screenshot.client_key)">
+                          <a-button
+                            class="media-action-button media-action-button--danger"
+                            type="secondary"
+                            status="danger"
+                            shape="circle"
+                            size="small"
+                            @click.stop="removeScreenshot(screenshot.client_key)"
+                          >
                             <icon-delete />
-                          </button>
+                          </a-button>
                         </div>
                       </div>
                       <div
@@ -392,8 +489,8 @@
 
 		      <a-form-item>
 	        <a-space style="justify-content: flex-end; width: 100%">
-          <a-button class="app-secondary-cta" type="secondary" @click="handleCancel">取消</a-button>
-          <a-button class="app-primary-cta" type="primary" html-type="submit" :loading="isSubmitting">
+          <a-button type="secondary" @click="handleCancel">取消</a-button>
+          <a-button type="primary" html-type="submit" :loading="isSubmitting">
             保存
           </a-button>
         </a-space>
@@ -415,43 +512,20 @@
       :footer="false"
     >
       <div class="cover-selector-content">
-        <div class="steam-search-section">
-          <a-input-search
-            v-model="steamSummarySearchQuery"
-            placeholder="搜索 Steam 游戏..."
-            :loading="isSearchingSteamSummary"
-            @search="searchSteamForSummary"
-            @clear="handleSummarySearchClear"
-            allow-clear
-          >
-            <template #prepend>
-              <icon-cloud-download />
-            </template>
-          </a-input-search>
-
-          <div
-            v-if="steamSummarySearchResults.length > 0 && !selectedSteamSummaryGame"
-            class="steam-search-results"
-          >
-            <div class="steam-search-title">选择游戏</div>
-            <div
-              v-for="game in steamSummarySearchResults"
-              :key="game.id"
-              class="steam-search-result-item"
-              @click="selectSteamSummaryGame(game)"
-            >
-              <img :src="game.tinyImage" :alt="game.name" />
-              <div class="steam-result-info">
-                <div class="steam-result-name">{{ game.name }}</div>
-                <div class="steam-result-meta">{{ game.releaseDate || '' }}</div>
-              </div>
-            </div>
-          </div>
-
+        <steam-search-panel
+          v-model:query="steamSummarySearchQuery"
+          placeholder="搜索 Steam 游戏..."
+          :loading="isSearchingSteamSummary"
+          :results="steamSummarySearchResults"
+          :selected-game="selectedSteamSummaryGame"
+          @search="searchSteamForSummary"
+          @clear="handleSummarySearchClear"
+          @select="selectSteamSummaryGame"
+        >
           <div v-if="selectedSteamSummaryGame" class="steam-summary-section">
             <div class="steam-search-title">
               {{ selectedSteamSummaryGame.name }} 的简介
-              <a-button class="app-text-compact" type="text" size="mini" @click="backToSummarySearch">返回</a-button>
+              <a-button type="text" size="mini" @click="backToSummarySearch">返回</a-button>
             </div>
 
             <div v-if="steamSummaryPreview" class="steam-summary-preview">
@@ -466,7 +540,6 @@
 
             <a-button
               v-if="steamSummaryPreview"
-              class="app-primary-cta"
               type="primary"
               long
               @click="confirmSummaryImport"
@@ -474,7 +547,7 @@
               导入这段简介
             </a-button>
           </div>
-        </div>
+        </steam-search-panel>
       </div>
     </a-modal>
 
@@ -488,42 +561,21 @@
 	      <div class="cover-selector-content">
 	        <a-divider>从 Steam 获取</a-divider>
 	        <!-- Steam 搜索 -->
-	        <div class="steam-search-section">
-          <a-input-search
-            v-model="steamCoverSearchQuery"
-            placeholder="搜索 Steam 游戏..."
-            :loading="isSearchingSteamCover"
-            @search="searchSteamForCover"
-            @clear="handleCoverSearchClear"
-            allow-clear
-          >
-            <template #prepend>
-              <icon-cloud-download />
-            </template>
-          </a-input-search>
-
-          <!-- Steam 搜索结果 -->
-          <div v-if="steamCoverSearchResults.length > 0 && !selectedSteamGame" class="steam-search-results">
-            <div class="steam-search-title">选择游戏</div>
-            <div
-              v-for="game in steamCoverSearchResults"
-              :key="game.id"
-              class="steam-search-result-item"
-              @click="selectSteamCoverGame(game)"
-            >
-              <img :src="game.tinyImage" :alt="game.name" />
-              <div class="steam-result-info">
-                <div class="steam-result-name">{{ game.name }}</div>
-                <div class="steam-result-meta">{{ game.releaseDate || '' }}</div>
-              </div>
-            </div>
-          </div>
-
+	        <steam-search-panel
+          v-model:query="steamCoverSearchQuery"
+          placeholder="搜索 Steam 游戏..."
+          :loading="isSearchingSteamCover"
+          :results="steamCoverSearchResults"
+          :selected-game="selectedSteamGame"
+          @search="searchSteamForCover"
+          @clear="handleCoverSearchClear"
+          @select="selectSteamCoverGame"
+        >
           <!-- Steam 封面图片选择 -->
           <div v-if="selectedSteamGame && steamCoverImages.length > 0" class="steam-images-section">
             <div class="steam-search-title">
               {{ selectedSteamGame.name }} 的封面
-              <a-button class="app-text-compact" type="text" size="mini" @click="backToCoverGameSearch">返回</a-button>
+              <a-button type="text" size="mini" @click="backToCoverGameSearch">返回</a-button>
             </div>
             <div class="steam-images-grid">
               <div
@@ -538,7 +590,6 @@
             </div>
             <a-button
               v-if="selectedCoverImage"
-              class="app-primary-cta"
               type="primary"
               long
               :loading="isSearchingSteamCover"
@@ -547,7 +598,7 @@
               下载选中的封面
             </a-button>
           </div>
-        </div>
+        </steam-search-panel>
 
 	        <a-divider>本地上传</a-divider>
 
@@ -561,7 +612,7 @@
           @success="handleCoverUploadSuccess"
           @error="handleCoverUploadError"
         >
-          <a-button class="app-secondary-cta" type="secondary" long>
+          <a-button type="secondary" long>
             <template #icon>
               <icon-upload />
             </template>
@@ -572,23 +623,23 @@
         <a-divider>或从 URL 加载</a-divider>
 
         <!-- URL 加载 -->
-        <a-input
-          v-model="coverSearchUrl"
-          placeholder="输入图片 URL..."
-          @press-enter="loadCoverFromUrl"
-        >
-          <template #append>
-            <a-button class="app-secondary-cta" type="secondary" @click="loadCoverFromUrl">
-              加载
-            </a-button>
-          </template>
-        </a-input>
+        <div class="url-input-row">
+          <a-input
+            v-model="coverSearchUrl"
+            class="url-input-row__field"
+            placeholder="输入图片 URL..."
+            @press-enter="loadCoverFromUrl"
+          />
+          <a-button class="url-input-row__action" type="secondary" @click="loadCoverFromUrl">
+            加载
+          </a-button>
+        </div>
         <div v-if="coverPreviewUrl" class="cover-preview-large">
           <img :src="coverPreviewUrl" @error="handleCoverError" />
         </div>
         <div class="cover-selector-actions">
-          <a-button class="app-secondary-cta" type="secondary" @click="showCoverSelector = false">取消</a-button>
-          <a-button class="app-primary-cta" type="primary" :disabled="!coverPreviewUrl" :loading="isDownloadingCover" @click="confirmCoverSelection">
+          <a-button type="secondary" @click="showCoverSelector = false">取消</a-button>
+          <a-button type="primary" :disabled="!coverPreviewUrl" :loading="isDownloadingCover" @click="confirmCoverSelection">
             确定
           </a-button>
         </div>
@@ -605,42 +656,21 @@
 	      <div class="cover-selector-content">
 	        <a-divider>从 Steam 获取</a-divider>
 	        <!-- Steam 搜索 -->
-	        <div class="steam-search-section">
-          <a-input-search
-            v-model="steamBannerSearchQuery"
-            placeholder="搜索 Steam 游戏..."
-            :loading="isSearchingSteamBanner"
-            @search="searchSteamForBanner"
-            @clear="handleBannerSearchClear"
-            allow-clear
-          >
-            <template #prepend>
-              <icon-cloud-download />
-            </template>
-          </a-input-search>
-
-          <!-- Steam 搜索结果 -->
-          <div v-if="steamBannerSearchResults.length > 0 && !selectedSteamBannerGame" class="steam-search-results">
-            <div class="steam-search-title">选择游戏</div>
-            <div
-              v-for="game in steamBannerSearchResults"
-              :key="game.id"
-              class="steam-search-result-item"
-              @click="selectSteamBannerGame(game)"
-            >
-              <img :src="game.tinyImage" :alt="game.name" />
-              <div class="steam-result-info">
-                <div class="steam-result-name">{{ game.name }}</div>
-                <div class="steam-result-meta">{{ game.releaseDate || '' }}</div>
-              </div>
-            </div>
-          </div>
-
+	        <steam-search-panel
+          v-model:query="steamBannerSearchQuery"
+          placeholder="搜索 Steam 游戏..."
+          :loading="isSearchingSteamBanner"
+          :results="steamBannerSearchResults"
+          :selected-game="selectedSteamBannerGame"
+          @search="searchSteamForBanner"
+          @clear="handleBannerSearchClear"
+          @select="selectSteamBannerGame"
+        >
           <!-- Steam 横幅图片选择 -->
           <div v-if="selectedSteamBannerGame && steamBannerImages.length > 0" class="steam-images-section">
             <div class="steam-search-title">
               {{ selectedSteamBannerGame.name }} 的横幅
-              <a-button class="app-text-compact" type="text" size="mini" @click="backToBannerGameSearch">返回</a-button>
+              <a-button type="text" size="mini" @click="backToBannerGameSearch">返回</a-button>
             </div>
             <div class="steam-images-grid">
               <div
@@ -655,7 +685,6 @@
             </div>
             <a-button
               v-if="selectedBannerImage"
-              class="app-primary-cta"
               type="primary"
               long
               :loading="isSearchingSteamBanner"
@@ -664,7 +693,7 @@
               下载选中的横幅
             </a-button>
           </div>
-        </div>
+        </steam-search-panel>
 
 	        <a-divider>本地上传</a-divider>
 
@@ -678,7 +707,7 @@
           @success="handleBannerUploadSuccess"
           @error="handleBannerUploadError"
         >
-          <a-button class="app-secondary-cta" type="secondary" long>
+          <a-button type="secondary" long>
             <template #icon>
               <icon-upload />
             </template>
@@ -689,23 +718,23 @@
         <a-divider>或从 URL 加载</a-divider>
 
         <!-- URL 加载 -->
-        <a-input
-          v-model="bannerSearchUrl"
-          placeholder="输入图片 URL..."
-          @press-enter="loadBannerFromUrl"
-        >
-          <template #append>
-            <a-button class="app-secondary-cta" type="secondary" @click="loadBannerFromUrl">
-              加载
-            </a-button>
-          </template>
-        </a-input>
+        <div class="url-input-row">
+          <a-input
+            v-model="bannerSearchUrl"
+            class="url-input-row__field"
+            placeholder="输入图片 URL..."
+            @press-enter="loadBannerFromUrl"
+          />
+          <a-button class="url-input-row__action" type="secondary" @click="loadBannerFromUrl">
+            加载
+          </a-button>
+        </div>
         <div v-if="bannerPreviewUrl" class="cover-preview-large">
           <img :src="bannerPreviewUrl" @error="handleCoverError" />
         </div>
         <div class="cover-selector-actions">
-          <a-button class="app-secondary-cta" type="secondary" @click="showBannerSelector = false">取消</a-button>
-          <a-button class="app-primary-cta" type="primary" :disabled="!bannerPreviewUrl" :loading="isDownloadingBanner" @click="confirmBannerSelection">
+          <a-button type="secondary" @click="showBannerSelector = false">取消</a-button>
+          <a-button type="primary" :disabled="!bannerPreviewUrl" :loading="isDownloadingBanner" @click="confirmBannerSelection">
             确定
           </a-button>
         </div>
@@ -722,43 +751,22 @@
 	      <div class="screenshot-selector-content">
 	        <a-divider>从 Steam 获取</a-divider>
 	        <!-- Steam 搜索 -->
-	        <div class="steam-search-section">
-          <a-input-search
-            v-model="steamScreenshotSearchQuery"
-            placeholder="搜索 Steam 游戏..."
-            :loading="isSearchingSteamScreenshots"
-            @search="searchSteamForScreenshots"
-            @clear="handleScreenshotSearchClear"
-            allow-clear
-          >
-            <template #prepend>
-              <icon-cloud-download />
-            </template>
-          </a-input-search>
-
-          <!-- Steam 游戏搜索结果 -->
-          <div v-if="steamScreenshotSearchResults.length > 0 && !selectedSteamScreenshotGame" class="steam-search-results">
-            <div class="steam-search-title">选择游戏</div>
-            <div
-              v-for="game in steamScreenshotSearchResults"
-              :key="game.id"
-              class="steam-search-result-item"
-              @click="selectSteamScreenshotGame(game)"
-            >
-              <img :src="game.tinyImage" :alt="game.name" />
-              <div class="steam-result-info">
-                <div class="steam-result-name">{{ game.name }}</div>
-                <div class="steam-result-meta">{{ game.releaseDate || '' }}</div>
-              </div>
-            </div>
-          </div>
-
+	        <steam-search-panel
+          v-model:query="steamScreenshotSearchQuery"
+          placeholder="搜索 Steam 游戏..."
+          :loading="isSearchingSteamScreenshots"
+          :results="steamScreenshotSearchResults"
+          :selected-game="selectedSteamScreenshotGame"
+          @search="searchSteamForScreenshots"
+          @clear="handleScreenshotSearchClear"
+          @select="selectSteamScreenshotGame"
+        >
           <!-- Steam 截图选择 -->
           <div v-if="steamScreenshotsData" class="steam-screenshots-section">
             <div class="steam-game-info">
               <img :src="steamScreenshotsData.cover" :alt="steamScreenshotsData.name" />
               <span>{{ steamScreenshotsData.name }}</span>
-              <a-button class="app-text-compact" type="text" size="mini" @click="backToScreenshotGameSearch">返回</a-button>
+              <a-button type="text" size="mini" @click="backToScreenshotGameSearch">返回</a-button>
             </div>
 
             <div v-if="steamScreenshotsData.usedFallbackAssets" class="steam-screenshot-hint">
@@ -788,7 +796,6 @@
 
             <a-button
               v-if="selectedSteamScreenshots.size > 0"
-              class="app-primary-cta"
               type="primary"
               long
               :loading="isDownloadingSteamScreenshots"
@@ -797,7 +804,7 @@
               下载选中的 {{ selectedSteamScreenshots.size }} 张截图
             </a-button>
           </div>
-        </div>
+        </steam-search-panel>
 
 	        <a-divider>本地上传</a-divider>
 
@@ -811,7 +818,7 @@
           @success="handleScreenshotUploadSuccess"
           @error="handleScreenshotUploadError"
         >
-          <a-button class="app-secondary-cta" type="secondary" long>
+          <a-button type="secondary" long>
             <template #icon>
               <icon-upload />
             </template>
@@ -823,17 +830,17 @@
 
         <!-- URL 下载 -->
         <div class="url-input-section">
-          <a-input
-            v-model="screenshotSearchUrl"
-            placeholder="输入图片 URL..."
-            @press-enter="loadScreenshotPreview"
-          >
-            <template #append>
-              <a-button class="app-secondary-cta" type="secondary" @click="loadScreenshotPreview">
-                加载
-              </a-button>
-            </template>
-          </a-input>
+          <div class="url-input-row">
+            <a-input
+              v-model="screenshotSearchUrl"
+              class="url-input-row__field"
+              placeholder="输入图片 URL..."
+              @press-enter="loadScreenshotPreview"
+            />
+            <a-button class="url-input-row__action" type="secondary" @click="loadScreenshotPreview">
+              加载
+            </a-button>
+          </div>
 
           <!-- 预览区域 -->
           <div v-if="screenshotPreviewUrl" class="cover-preview-section">
@@ -843,8 +850,8 @@
 
         <!-- 操作按钮 -->
         <div class="cover-selector-actions">
-          <a-button class="app-secondary-cta" type="secondary" @click="showScreenshotSelector = false">取消</a-button>
-          <a-button class="app-primary-cta" type="primary" :disabled="!screenshotPreviewUrl" :loading="isDownloadingScreenshot" @click="confirmScreenshotSelection">
+          <a-button type="secondary" @click="showScreenshotSelector = false">取消</a-button>
+          <a-button type="primary" :disabled="!screenshotPreviewUrl" :loading="isDownloadingScreenshot" @click="confirmScreenshotSelection">
             确定
           </a-button>
 	        </div>
@@ -858,89 +865,9 @@
 	      :footer="false"
 	    >
 	      <div class="cover-selector-content">
-	        <a-divider>从 Steam 获取</a-divider>
-	        <div class="steam-search-section">
-	          <a-input-search
-	            v-model="steamVideoSearchQuery"
-	            placeholder="搜索 Steam 游戏..."
-	            :loading="isSearchingSteamVideo"
-	            @search="searchSteamForVideo"
-	            @clear="handleVideoSearchClear"
-	            allow-clear
-	          />
-
-	          <div v-if="steamVideoSearchResults.length > 0 && !selectedSteamVideoGame" class="steam-search-results">
-	            <div class="steam-search-title">选择游戏</div>
-	            <div
-	              v-for="game in steamVideoSearchResults"
-	              :key="game.id"
-	              class="steam-search-result-item"
-	              @click="selectSteamVideoGame(game)"
-	            >
-	              <img :src="game.tinyImage || '/placeholder-cover.jpg'" :alt="game.name" />
-	              <div class="steam-result-info">
-	                <div class="steam-result-name">{{ game.name }}</div>
-	                <div class="steam-result-meta">{{ game.releaseDate || '' }}</div>
-	              </div>
-	            </div>
-	          </div>
-
-	          <div v-if="selectedSteamVideoGame" class="steam-summary-section">
-	            <div class="steam-search-title">
-	              {{ selectedSteamVideoGame.name }} 的预告片
-	              <a-button class="app-text-compact" type="text" size="mini" @click="backToVideoSearch">返回</a-button>
-	            </div>
-	            <div v-if="steamVideoCandidates.length > 0" class="steam-video-source-card">
-	              <div class="steam-video-source-card__label">可下载源（{{ steamVideoCandidates.length }}）</div>
-	              <a-radio-group v-model="selectedSteamVideoCandidate" class="steam-video-source-list">
-	                <a-radio
-	                  v-for="candidate in steamVideoCandidates"
-	                  :key="candidate.url"
-	                  :value="candidate.url"
-	                  class="steam-video-source-item"
-	                >
-	                  <span>{{ getSteamVideoCandidateLabel(candidate.url) }}</span>
-	                  <a-tag v-if="candidate.isDash" size="small" color="arcoblue">流媒体</a-tag>
-	                </a-radio>
-	              </a-radio-group>
-	            </div>
-	            <a-empty
-	              v-else-if="!isSearchingSteamVideo"
-	              description="Steam 未返回可下载预告片"
-	              class="steam-summary-empty"
-	            />
-	            <div v-if="steamVideoCandidates.length === 0 && steamVideoDebug.length > 0" class="steam-video-debug">
-	              <div class="steam-video-debug__title">调试信息</div>
-	              <div v-for="(line, index) in steamVideoDebug" :key="`dbg-${index}`" class="steam-video-debug__line">
-	                {{ line }}
-	              </div>
-	            </div>
-		            <a-button
-		              v-if="steamVideoPreviewUrl"
-		              class="app-primary-cta"
-		              type="primary"
-		              long
-		              :loading="isDownloadingSteamVideo"
-	              @click="downloadSteamPreviewVideo"
-	            >
-	              下载预告片
-	            </a-button>
-	            <div v-if="steamVideoDownloadState !== 'idle'" class="video-upload-progress">
-	              <div class="video-upload-progress__meta">
-	                <span>{{ steamVideoDownloadStatus }}</span>
-	                <span>{{ steamVideoDownloadProgress }}%</span>
-	              </div>
-	              <a-progress
-	                :percent="steamVideoDownloadProgress"
-	                :show-text="false"
-	                size="small"
-	                :status="steamVideoDownloadState === 'error' ? 'danger' : steamVideoDownloadState === 'success' ? 'success' : 'normal'"
-	              />
-	            </div>
-	          </div>
-	        </div>
-
-	        <a-divider>本地上传</a-divider>
+	        <a-alert class="video-upload-tip" type="warning" show-icon>
+	          Steam 预告片下载已暂时移除，请先使用本地上传。
+	        </a-alert>
 	        <input
 	          ref="videoFileInput"
 	          type="file"
@@ -948,7 +875,7 @@
 	          class="hidden-file-input"
 	          @change="handleVideoFileChange"
 	        />
-	        <a-button class="app-secondary-cta" type="secondary" long :loading="isUploadingVideo" @click="openVideoFilePicker">
+	        <a-button type="secondary" long :loading="isUploadingVideo" @click="openVideoFilePicker">
 	          <template #icon>
 	            <icon-upload />
 	          </template>
@@ -973,7 +900,11 @@
 	              class="video-library-item"
 	              :class="{ 'is-primary': form.primary_preview_video_uid === video.asset_uid }"
 	            >
-	              <button class="video-library-item__preview" type="button" @click="setPrimaryPreviewVideo(video.asset_uid)">
+	              <a-button
+                  class="video-library-item__preview"
+                  type="text"
+                  @click="setPrimaryPreviewVideo(video.asset_uid)"
+                >
 	                <div class="video-library-item__thumb">
 	                  <img
 	                    v-if="form.banner_image || form.cover_image"
@@ -991,18 +922,33 @@
 	                  </div>
 	                  <div class="video-library-item__path">{{ video.asset_uid || video.path }}</div>
 	                </div>
-	              </button>
+	              </a-button>
 	              <div class="video-library-item__actions">
+	                <a-button
+	                  size="mini"
+	                  type="text"
+	                  :disabled="index === 0"
+	                  @click="reorderEditableVideos(video.asset_uid || video.path, -1)"
+	                >
+	                  上移
+	                </a-button>
+	                <a-button
+	                  size="mini"
+	                  type="text"
+	                  :disabled="index === form.preview_videos.length - 1"
+	                  @click="reorderEditableVideos(video.asset_uid || video.path, 1)"
+	                >
+	                  下移
+	                </a-button>
 	                <a-button
 	                  v-if="form.primary_preview_video_uid !== video.asset_uid"
 	                  size="mini"
-	                  class="app-text-compact"
 	                  type="text"
 	                  @click="setPrimaryPreviewVideo(video.asset_uid)"
 	                >
 	                  设为主预告
 	                </a-button>
-	                <a-button class="app-text-compact" size="mini" type="text" status="danger" @click="removePreviewVideo(video.asset_uid)">
+	                <a-button size="mini" type="text" status="danger" @click="removePreviewVideo(video.asset_uid)">
 	                  删除
 	                </a-button>
 	              </div>
@@ -1011,11 +957,11 @@
 	        </div>
 	        <a-empty
 	          v-else
-	          description="还没有添加预告片，可从上方 Steam 获取或上传本地视频"
+	          description="还没有添加预告片，可上传本地视频"
 	          class="video-library-empty"
 	        />
 	        <div class="cover-selector-actions">
-	          <a-button class="app-secondary-cta" type="secondary" @click="showVideoSelector = false">完成</a-button>
+	          <a-button type="secondary" @click="showVideoSelector = false">完成</a-button>
 	        </div>
 	      </div>
 	    </a-modal>
@@ -1025,11 +971,12 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useUiStore } from '@/stores/ui'
-import { deleteAsset, reorderScreenshots, uploadAsset, type UploadedAssetResult } from '@/services/assets'
+import { deleteAsset, reorderScreenshots, reorderVideos, uploadAsset, type UploadedAssetResult } from '@/services/assets'
 import { directoryService } from '@/services/directory.service'
 import type { Game } from '@/services/types'
 import gamesService from '@/services/games.service'
 import FileBrowserModal from '@/components/FileBrowserModal.vue'
+import SteamSearchPanel from '@/components/SteamSearchPanel.vue'
 import {
   IconFolder,
   IconPlus,
@@ -1037,17 +984,22 @@ import {
   IconImage,
   IconDelete,
   IconUpload,
-  IconCloudDownload,
-  IconCheck,
   IconVideoCamera,
   IconSettings,
 } from '@arco-design/web-vue/es/icon'
 import steamService from '@/services/steam.service'
 import { seriesService } from '@/services/series.service'
-import { platformService } from '@/services/platforms.service'
+import platformService from '@/services/platforms.service'
+import tagsService from '@/services/tags.service'
 import { resolveAssetCandidates } from '@/utils/asset-url'
-import { importSteamVideoAsFile } from '@/utils/steam-video-import'
-import type { Developer, Platform, Publisher, ScreenshotItem, Series, SteamGameDetails, VideoAssetItem } from '@/services/types'
+import { useSteamPicker } from '@/composables/useSteamPicker'
+import {
+  normalizeOptionId,
+  resolveCreatableSelections,
+  searchCreatableOptions,
+  sortCreatableOptionsByName,
+} from '@/utils/creatable-select'
+import type { Developer, Platform, Publisher, ScreenshotItem, Series, SteamGameDetails, Tag, TagGroup, VideoAssetItem } from '@/services/types'
 
 interface Props {
   visible: boolean
@@ -1078,12 +1030,14 @@ interface EditableVideo {
 interface GameForm {
   title: string
   title_alt: string
+  visibility: 'public' | 'private'
   developers: Array<string | number>
   publishers: Array<string | number>
   release_date: string | undefined
   engine: string
   platform: (string | number)[]
   series: string | number | null
+  tag_ids: Array<string | number>
   summary: string
   cover_image: string
   banner_image: string
@@ -1110,16 +1064,9 @@ const rules = {
 }
 
 // Steam 搜索状态
-const steamCoverSearchQuery = ref('')
-const steamCoverSearchResults = ref<any[]>([])
-const isSearchingSteamCover = ref(false)
-const selectedSteamGame = ref<any>(null)
 const steamCoverImages = ref<string[]>([])
 const selectedCoverImage = ref('')
 
-const steamScreenshotSearchQuery = ref('')
-const steamScreenshotSearchResults = ref<any[]>([])
-const selectedSteamScreenshotGame = ref<any>(null)
 const steamScreenshotsData = ref<{
   name: string
   cover: string
@@ -1128,10 +1075,11 @@ const steamScreenshotsData = ref<{
   usedFallbackAssets: boolean
 } | null>(null)
 const selectedSteamScreenshots = ref<Set<number>>(new Set())
-const isSearchingSteamScreenshots = ref(false)
 const isDownloadingSteamScreenshots = ref(false)
 const seriesOptions = ref<Series[]>([])
 const platformOptions = ref<Platform[]>([])
+const tagGroups = ref<TagGroup[]>([])
+const tagOptions = ref<Tag[]>([])
 const developerOptions = ref<Developer[]>([])
 const publisherOptions = ref<Publisher[]>([])
 const isSearchingSeries = ref(false)
@@ -1139,32 +1087,159 @@ const isSearchingDevelopers = ref(false)
 const isSearchingPublishers = ref(false)
 
 const showSummarySelector = ref(false)
-const steamSummarySearchQuery = ref('')
-const steamSummarySearchResults = ref<any[]>([])
-const selectedSteamSummaryGame = ref<any>(null)
 const steamSummaryPreview = ref('')
 const steamSummaryDetails = ref<SteamGameDetails | null>(null)
-const isSearchingSteamSummary = ref(false)
-const steamVideoSearchQuery = ref('')
-const steamVideoSearchResults = ref<any[]>([])
-const selectedSteamVideoGame = ref<any>(null)
-const steamVideoCandidates = ref<Array<{ url: string; name: string; isDash: boolean }>>([])
-const selectedSteamVideoCandidate = ref('')
-const steamVideoPreviewUrl = ref('')
-const steamVideoPreviewName = ref('')
-const steamVideoDebug = ref<string[]>([])
-const isSearchingSteamVideo = ref(false)
-const isDownloadingSteamVideo = ref(false)
-const steamVideoDownloadProgress = ref(0)
-const steamVideoDownloadStatus = ref('准备下载预告片')
-const steamVideoDownloadState = ref<'idle' | 'running' | 'success' | 'error'>('idle')
 
-const steamBannerSearchQuery = ref('')
-const steamBannerSearchResults = ref<any[]>([])
-const isSearchingSteamBanner = ref(false)
-const selectedSteamBannerGame = ref<any>(null)
 const steamBannerImages = ref<string[]>([])
 const selectedBannerImage = ref('')
+const pendingTagDraftsByGroup = ref<Record<number, string[]>>({})
+
+const summarySteamPicker = useSteamPicker<SteamGameDetails>({
+  onSelect: async (game) => {
+    const details = await steamService.getGameDetails(game.id)
+    steamSummaryDetails.value = details
+    steamSummaryPreview.value = stripHtmlToText(details.description || '')
+    return details
+  },
+  onError: (message) => {
+    uiStore.addAlert('Steam 简介处理失败：' + message, 'error')
+  },
+})
+
+const coverSteamPicker = useSteamPicker<string[]>({
+  onSelect: async (game) => {
+    const coverUrl = `https://steamcdn-a.akamaihd.net/steam/apps/${game.id}/library_600x900_2x.jpg`
+    steamCoverImages.value = [coverUrl]
+    selectedCoverImage.value = ''
+    return [coverUrl]
+  },
+  onError: (message) => {
+    uiStore.addAlert('Steam 封面处理失败：' + message, 'error')
+  },
+})
+
+const bannerSteamPicker = useSteamPicker<string[]>({
+  onSelect: async (game) => {
+    const details = await steamService.getGameDetails(game.id)
+    const libraryHero = details.libraryHero
+    const background = details.background
+    const headerImage = details.headerImage
+    const images = Array.from(new Set([libraryHero, background, headerImage].filter(Boolean) as string[]))
+    const finalImages = images.length < 2 && details.screenshots && details.screenshots.length > 0
+      ? [...images, ...details.screenshots.slice(0, 5)]
+      : images
+    steamBannerImages.value = finalImages
+    selectedBannerImage.value = ''
+    return finalImages
+  },
+  onError: (message) => {
+    uiStore.addAlert('Steam 横幅处理失败：' + message, 'error')
+  },
+})
+
+const screenshotSteamPicker = useSteamPicker<NonNullable<typeof steamScreenshotsData.value>>({
+  onSelect: async (game) => {
+    const details = await steamService.getGameDetails(game.id)
+    const screenshotCandidates = (details.screenshots || []).filter(Boolean)
+    const fallbackAssets = [details.libraryHero, details.background, details.headerImage].filter(
+      (value): value is string => !!value,
+    )
+    const finalAssets =
+      screenshotCandidates.length > 0
+        ? screenshotCandidates
+        : Array.from(new Set(fallbackAssets))
+
+    const data = {
+      name: game.name,
+      cover: game.tinyImage || '',
+      screenshots: finalAssets,
+      appId: game.id,
+      usedFallbackAssets: screenshotCandidates.length === 0 && finalAssets.length > 0,
+    }
+    steamScreenshotsData.value = data
+    selectedSteamScreenshots.value.clear()
+    return data
+  },
+  onError: (message) => {
+    uiStore.addAlert('Steam 截图处理失败：' + message, 'error')
+  },
+})
+
+const steamSummarySearchQuery = summarySteamPicker.query
+const steamSummarySearchResults = summarySteamPicker.results
+const selectedSteamSummaryGame = summarySteamPicker.selectedGame
+const isSearchingSteamSummary = summarySteamPicker.isSearching
+
+const steamCoverSearchQuery = coverSteamPicker.query
+const steamCoverSearchResults = coverSteamPicker.results
+const selectedSteamGame = coverSteamPicker.selectedGame
+const isSearchingSteamCover = coverSteamPicker.isSearching
+
+const steamBannerSearchQuery = bannerSteamPicker.query
+const steamBannerSearchResults = bannerSteamPicker.results
+const selectedSteamBannerGame = bannerSteamPicker.selectedGame
+const isSearchingSteamBanner = bannerSteamPicker.isSearching
+
+const steamScreenshotSearchQuery = screenshotSteamPicker.query
+const steamScreenshotSearchResults = screenshotSteamPicker.results
+const selectedSteamScreenshotGame = screenshotSteamPicker.selectedGame
+const isSearchingSteamScreenshots = screenshotSteamPicker.isSearching
+
+const tagGroupIdByTagId = computed(() => {
+  return new Map(tagOptions.value.map((tag) => [tag.id, tag.group_id]))
+})
+
+const tagOptionsByGroup = computed<Record<number, Tag[]>>(() => {
+  const grouped: Record<number, Tag[]> = {}
+
+  for (const tag of tagOptions.value) {
+    if (!tag.is_active) continue
+    if (!grouped[tag.group_id]) {
+      grouped[tag.group_id] = []
+    }
+    grouped[tag.group_id].push(tag)
+  }
+
+  for (const groupId of Object.keys(grouped)) {
+    grouped[Number(groupId)].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)
+  }
+
+  return grouped
+})
+
+const tagSelectionsByGroup = computed<Record<number, string | number | Array<string | number> | undefined>>(() => {
+  const grouped: Record<number, Array<string | number>> = {}
+
+  for (const tagId of form.value.tag_ids) {
+    if (typeof tagId !== 'number') continue
+    const groupId = tagGroupIdByTagId.value.get(tagId)
+
+    if (!groupId) continue
+
+    if (!grouped[groupId]) {
+      grouped[groupId] = []
+    }
+
+    grouped[groupId].push(tagId)
+  }
+
+  for (const [groupId, drafts] of Object.entries(pendingTagDraftsByGroup.value)) {
+    const normalizedGroupId = Number(groupId)
+    if (!grouped[normalizedGroupId]) {
+      grouped[normalizedGroupId] = []
+    }
+    grouped[normalizedGroupId].push(...drafts)
+  }
+
+  const selections: Record<number, string | number | Array<string | number> | undefined> = {}
+
+  for (const group of tagGroups.value) {
+    const values = grouped[group.id] || []
+    selections[group.id] = group.allow_multiple ? values : values[0]
+  }
+
+  return selections
+})
 
 // Files to delete only after successful submit
 const pendingDeleteAssets = ref<Array<{ type: 'cover' | 'banner' | 'screenshot' | 'video'; path: string; assetId?: number; assetUid?: string }>>([])
@@ -1196,7 +1271,7 @@ const handleSeriesSearch = async (query: string) => {
 }
 
 const filteredDeveloperOptions = computed(() => {
-  return [...developerOptions.value].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
+  return sortCreatableOptionsByName(developerOptions.value)
 })
 
 const handleDeveloperSearch = async (query: string) => {
@@ -1204,26 +1279,19 @@ const handleDeveloperSearch = async (query: string) => {
   isSearchingDevelopers.value = true
   try {
     const { developersService } = await import('@/services/developers.service')
-    const results = await developersService.searchDevelopers(query)
-    const selectedIds = new Set(
-      form.value.developers
-        .map((item) => normalizeOptionId(item))
-        .filter((item): item is number => item !== null),
-    )
-    const selectedItems = developerOptions.value.filter((item) => selectedIds.has(item.id))
-    developerOptions.value = results
-    for (const selectedItem of selectedItems) {
-      if (!developerOptions.value.find((item) => item.id === selectedItem.id)) {
-        developerOptions.value.push(selectedItem)
-      }
-    }
+    developerOptions.value = await searchCreatableOptions({
+      query,
+      selectedValues: form.value.developers,
+      currentOptions: developerOptions.value,
+      search: (keyword) => developersService.searchDevelopers(keyword),
+    })
   } finally {
     isSearchingDevelopers.value = false
   }
 }
 
 const filteredPublisherOptions = computed(() => {
-  return [...publisherOptions.value].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
+  return sortCreatableOptionsByName(publisherOptions.value)
 })
 
 const handlePublisherSearch = async (query: string) => {
@@ -1231,19 +1299,12 @@ const handlePublisherSearch = async (query: string) => {
   isSearchingPublishers.value = true
   try {
     const { publishersService } = await import('@/services/publishers.service')
-    const results = await publishersService.searchPublishers(query)
-    const selectedIds = new Set(
-      form.value.publishers
-        .map((item) => normalizeOptionId(item))
-        .filter((item): item is number => item !== null),
-    )
-    const selectedItems = publisherOptions.value.filter((item) => selectedIds.has(item.id))
-    publisherOptions.value = results
-    for (const selectedItem of selectedItems) {
-      if (!publisherOptions.value.find((item) => item.id === selectedItem.id)) {
-        publisherOptions.value.push(selectedItem)
-      }
-    }
+    publisherOptions.value = await searchCreatableOptions({
+      query,
+      selectedValues: form.value.publishers,
+      currentOptions: publisherOptions.value,
+      search: (keyword) => publishersService.searchPublishers(keyword),
+    })
   } finally {
     isSearchingPublishers.value = false
   }
@@ -1252,12 +1313,14 @@ const handlePublisherSearch = async (query: string) => {
 const form = ref<GameForm>({
   title: '',
   title_alt: '',
+  visibility: 'public',
   developers: [],
   publishers: [],
   release_date: undefined,
   engine: '',
   platform: [],
   series: null,
+  tag_ids: [],
   summary: '',
   cover_image: '',
   banner_image: '',
@@ -1365,6 +1428,25 @@ const createEditableVideo = (asset: VideoAssetItem | UploadedAssetResult | strin
   }
 }
 
+const getEditableVideoKey = (video: EditableVideo) => {
+  return video.asset_uid || video.path
+}
+
+const reorderEditableVideos = (targetKey: string, direction: -1 | 1) => {
+  const videos = [...form.value.preview_videos]
+  const index = videos.findIndex((item) => getEditableVideoKey(item) === targetKey)
+  if (index === -1) return
+  const nextIndex = index + direction
+  if (nextIndex < 0 || nextIndex >= videos.length) return
+
+  const [moved] = videos.splice(index, 1)
+  videos.splice(nextIndex, 0, moved)
+  form.value.preview_videos = videos.map((item, order) => ({
+    ...item,
+    sort_order: order,
+  }))
+}
+
 const reorderEditableScreenshots = (fromKey: string, toKey: string) => {
   const screenshots = [...form.value.screenshots]
   const fromIndex = screenshots.findIndex((item) => item.client_key === fromKey)
@@ -1395,12 +1477,14 @@ const visible = computed({
 const createEmptyForm = (): GameForm => ({
   title: '',
   title_alt: '',
+  visibility: 'public',
   developers: [],
   publishers: [],
   release_date: undefined,
   engine: '',
   platform: [],
   series: null,
+  tag_ids: [],
   summary: '',
   cover_image: '',
   banner_image: '',
@@ -1411,6 +1495,7 @@ const createEmptyForm = (): GameForm => ({
 })
 
 const resetTransientState = () => {
+  pendingTagDraftsByGroup.value = {}
   pendingDeleteAssets.value = []
   showFileBrowser.value = false
   showSummarySelector.value = false
@@ -1423,19 +1508,6 @@ const resetTransientState = () => {
   selectedSteamSummaryGame.value = null
   steamSummaryPreview.value = ''
   steamSummaryDetails.value = null
-  steamVideoSearchQuery.value = ''
-  steamVideoSearchResults.value = []
-  selectedSteamVideoGame.value = null
-  steamVideoCandidates.value = []
-  selectedSteamVideoCandidate.value = ''
-  steamVideoPreviewUrl.value = ''
-  steamVideoPreviewName.value = ''
-  steamVideoDebug.value = []
-  isSearchingSteamVideo.value = false
-  isDownloadingSteamVideo.value = false
-  steamVideoDownloadProgress.value = 0
-  steamVideoDownloadStatus.value = '准备下载预告片'
-  steamVideoDownloadState.value = 'idle'
 
   steamCoverSearchQuery.value = ''
   steamCoverSearchResults.value = []
@@ -1512,12 +1584,14 @@ const hydrateFormFromGame = (game: Game | null) => {
   form.value = {
     title: game.title || '',
     title_alt: game.title_alt || '',
+    visibility: game.visibility || 'public',
     developers: developerIds,
     publishers: publisherIds,
     release_date: game.release_date || undefined,
     engine: game.engine || '',
     platform: platformList,
     series: seriesId,
+    tag_ids: (game.tags || []).map((item) => item.id),
     summary: game.summary || '',
     cover_image: game.cover_image || '',
     banner_image: game.banner_image || '',
@@ -1528,6 +1602,7 @@ const hydrateFormFromGame = (game: Game | null) => {
     ),
     file_paths: filePaths,
   }
+  pendingTagDraftsByGroup.value = {}
 
   if (game.release_date) {
     const parts = game.release_date.split('-')
@@ -1597,6 +1672,17 @@ const initializeOptions = async (currentGame?: Game | null) => {
     platformOptions.value = allPlatforms
   } catch (error) {
     console.error('Failed to load platforms:', error)
+  }
+
+  try {
+    const [loadedGroups, loadedTags] = await Promise.all([
+      tagsService.getTagGroups(),
+      tagsService.getTags({ active: true }),
+    ])
+    tagGroups.value = loadedGroups.sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)
+    tagOptions.value = loadedTags
+  } catch (error) {
+    console.error('Failed to load tags:', error)
   }
 }
 
@@ -1792,28 +1878,15 @@ const applySteamMetadataToForm = (details: { releaseDate?: string; developers?: 
 }
 
 const handleSummarySearchClear = () => {
-  steamSummarySearchQuery.value = ''
-  steamSummarySearchResults.value = []
-  selectedSteamSummaryGame.value = null
+  summarySteamPicker.clear()
   steamSummaryPreview.value = ''
   steamSummaryDetails.value = null
 }
 
 const searchSteamForSummary = async () => {
-  if (!steamSummarySearchQuery.value.trim()) return
-
-  isSearchingSteamSummary.value = true
-  try {
-    const results = await steamService.searchGames(steamSummarySearchQuery.value.trim())
-    steamSummarySearchResults.value = results
-    selectedSteamSummaryGame.value = null
-    steamSummaryPreview.value = ''
-    steamSummaryDetails.value = null
-  } catch (error: any) {
-    uiStore.addAlert('搜索失败：' + (error?.message || '未知错误'), 'error')
-  } finally {
-    isSearchingSteamSummary.value = false
-  }
+  steamSummaryPreview.value = ''
+  steamSummaryDetails.value = null
+  await summarySteamPicker.search()
 }
 
 watch(showSummarySelector, (isOpen) => {
@@ -1831,23 +1904,13 @@ watch(showSummarySelector, (isOpen) => {
 })
 
 const selectSteamSummaryGame = async (game: any) => {
-  selectedSteamSummaryGame.value = game
   steamSummaryPreview.value = ''
   steamSummaryDetails.value = null
-  isSearchingSteamSummary.value = true
-  try {
-    const details = await steamService.getGameDetails(game.id)
-    steamSummaryDetails.value = details
-    steamSummaryPreview.value = stripHtmlToText(details.description || '')
-  } catch (error: any) {
-    uiStore.addAlert('获取简介失败：' + (error?.message || '未知错误'), 'error')
-  } finally {
-    isSearchingSteamSummary.value = false
-  }
+  await summarySteamPicker.select(game)
 }
 
 const backToSummarySearch = () => {
-  selectedSteamSummaryGame.value = null
+  summarySteamPicker.back()
   steamSummaryPreview.value = ''
   steamSummaryDetails.value = null
 }
@@ -1907,59 +1970,6 @@ const handleScreenshotUploadError = () => {
   uiStore.addAlert('截图上传失败', 'error')
 }
 
-const handleVideoSearchClear = () => {
-  steamVideoSearchQuery.value = ''
-  steamVideoSearchResults.value = []
-  selectedSteamVideoGame.value = null
-  steamVideoCandidates.value = []
-  selectedSteamVideoCandidate.value = ''
-  steamVideoPreviewUrl.value = ''
-  steamVideoPreviewName.value = ''
-  steamVideoDebug.value = []
-}
-
-const searchSteamForVideo = async () => {
-  if (!steamVideoSearchQuery.value.trim()) return
-  isSearchingSteamVideo.value = true
-  try {
-    const results = await steamService.searchGames(steamVideoSearchQuery.value.trim())
-    steamVideoSearchResults.value = results
-    selectedSteamVideoGame.value = null
-    steamVideoCandidates.value = []
-    selectedSteamVideoCandidate.value = ''
-    steamVideoPreviewUrl.value = ''
-    steamVideoPreviewName.value = ''
-    steamVideoDebug.value = []
-  } catch (error: any) {
-    uiStore.addAlert('搜索失败：' + (error?.message || '未知错误'), 'error')
-  } finally {
-    isSearchingSteamVideo.value = false
-  }
-}
-
-watch(showVideoSelector, (isOpen) => {
-  if (!isOpen) return
-  const query = pickSteamSearchQuery()
-  if (!query) return
-  steamVideoSearchQuery.value = query
-  searchSteamForVideo()
-})
-
-watch(selectedSteamVideoCandidate, (value) => {
-  const selected = steamVideoCandidates.value.find((item) => item.url === value)
-  if (!selected) return
-  steamVideoPreviewUrl.value = selected.url
-  steamVideoPreviewName.value = selected.name
-})
-
-const getSteamVideoCandidateLabel = (candidateUrl: string) => {
-  const index = steamVideoCandidates.value.findIndex((item) => item.url === candidateUrl)
-  if (index === -1) {
-    return '预告片'
-  }
-  return `预告片 ${index + 1}`
-}
-
 const appendPreviewVideo = (video: EditableVideo) => {
   form.value.preview_videos.push(video)
   if (!form.value.primary_preview_video_uid && video.asset_uid) {
@@ -1974,88 +1984,6 @@ const openVideoSelector = () => {
 const setPrimaryPreviewVideo = (assetUid?: string) => {
   if (!assetUid) return
   form.value.primary_preview_video_uid = assetUid
-}
-
-const selectSteamVideoGame = async (game: any) => {
-  selectedSteamVideoGame.value = game
-  steamVideoCandidates.value = []
-  selectedSteamVideoCandidate.value = ''
-  steamVideoPreviewUrl.value = ''
-  steamVideoPreviewName.value = ''
-  steamVideoDebug.value = []
-  isSearchingSteamVideo.value = true
-  try {
-    const details = await steamService.getGameDetails(game.id)
-    steamVideoCandidates.value = details.previewVideos || []
-    if (steamVideoCandidates.value.length > 0) {
-      selectedSteamVideoCandidate.value = steamVideoCandidates.value[0].url
-      steamVideoPreviewUrl.value = steamVideoCandidates.value[0].url
-      steamVideoPreviewName.value = steamVideoCandidates.value[0].name
-    } else {
-      steamVideoPreviewUrl.value = details.previewVideoUrl || ''
-      steamVideoPreviewName.value = details.previewVideoName || ''
-      if (steamVideoPreviewUrl.value) {
-        steamVideoCandidates.value = [{
-          url: steamVideoPreviewUrl.value,
-          name: steamVideoPreviewName.value || 'trailer-source',
-          isDash: steamVideoPreviewUrl.value.includes('.mpd') || steamVideoPreviewUrl.value.includes('.m3u8'),
-        }]
-        selectedSteamVideoCandidate.value = steamVideoPreviewUrl.value
-      }
-    }
-    steamVideoDebug.value = details.previewVideoDebug || []
-  } catch (error: any) {
-    uiStore.addAlert('获取预告片失败：' + (error?.message || '未知错误'), 'error')
-  } finally {
-    isSearchingSteamVideo.value = false
-  }
-}
-
-const backToVideoSearch = () => {
-  selectedSteamVideoGame.value = null
-  steamVideoCandidates.value = []
-  selectedSteamVideoCandidate.value = ''
-  steamVideoPreviewUrl.value = ''
-  steamVideoPreviewName.value = ''
-  steamVideoDebug.value = []
-}
-
-const downloadSteamPreviewVideo = async () => {
-  if (!props.game?.id || !selectedSteamVideoGame.value || !steamVideoPreviewUrl.value) return
-  isDownloadingSteamVideo.value = true
-  steamVideoDownloadState.value = 'running'
-  steamVideoDownloadProgress.value = 3
-  steamVideoDownloadStatus.value = '正在准备预告片导入'
-  try {
-    const trailerLabel = getSteamVideoCandidateLabel(steamVideoPreviewUrl.value).replace(/\s+/g, '_').toLowerCase()
-    const file = await importSteamVideoAsFile({
-      url: steamVideoPreviewUrl.value,
-      gameName: selectedSteamVideoGame.value.name || form.value.title || 'Steam',
-      label: trailerLabel,
-      onProgress: (percent, status) => {
-        steamVideoDownloadProgress.value = Math.max(1, Math.min(100, Math.round(percent)))
-        steamVideoDownloadStatus.value = status
-      },
-    })
-
-    const uploaded = await uploadAsset('video', props.game.id, file, form.value.preview_videos.length, (percent) => {
-      const blended = 92 + Math.round(percent * 0.08)
-      steamVideoDownloadProgress.value = Math.min(100, blended)
-      steamVideoDownloadStatus.value = '正在上传到素材库'
-    })
-    appendPreviewVideo(createEditableVideo(uploaded))
-    steamVideoDownloadProgress.value = 100
-    steamVideoDownloadStatus.value = '预告片已完成导入'
-    steamVideoDownloadState.value = 'success'
-    await new Promise((resolve) => setTimeout(resolve, 700))
-    uiStore.addAlert('预告片下载成功', 'success')
-  } catch (error: any) {
-    steamVideoDownloadState.value = 'error'
-    steamVideoDownloadStatus.value = '下载失败（可重试）'
-    uiStore.addAlert('预告片下载失败：' + (error?.message || '未知错误'), 'error')
-  } finally {
-    isDownloadingSteamVideo.value = false
-  }
 }
 
 const openVideoFilePicker = () => {
@@ -2150,83 +2078,36 @@ const openFileBrowser = async (index: number) => {
 
 // Steam 封面搜索
 const handleCoverSearchClear = () => {
-  steamCoverSearchQuery.value = ''
-  steamCoverSearchResults.value = []
-  selectedSteamGame.value = null
+  coverSteamPicker.clear()
   steamCoverImages.value = []
   selectedCoverImage.value = ''
 }
 
 const searchSteamForCover = async () => {
-  if (!steamCoverSearchQuery.value.trim()) return
-
-  isSearchingSteamCover.value = true
-  try {
-    const results = await steamService.searchGames(steamCoverSearchQuery.value.trim())
-    steamCoverSearchResults.value = results
-    selectedSteamGame.value = null
-    steamCoverImages.value = []
-    selectedCoverImage.value = ''
-  } catch (error: any) {
-    uiStore.addAlert('搜索失败：' + error.message, 'error')
-  } finally {
-    isSearchingSteamCover.value = false
-  }
+  steamCoverImages.value = []
+  selectedCoverImage.value = ''
+  await coverSteamPicker.search()
 }
 
 // Steam 横幅搜索
 const handleBannerSearchClear = () => {
-  steamBannerSearchQuery.value = ''
-  steamBannerSearchResults.value = []
-  selectedSteamBannerGame.value = null
+  bannerSteamPicker.clear()
   steamBannerImages.value = []
   selectedBannerImage.value = ''
 }
 
 const searchSteamForBanner = async () => {
-  if (!steamBannerSearchQuery.value.trim()) return
-
-  isSearchingSteamBanner.value = true
-  try {
-    const results = await steamService.searchGames(steamBannerSearchQuery.value.trim())
-    steamBannerSearchResults.value = results
-    selectedSteamBannerGame.value = null
-    steamBannerImages.value = []
-    selectedBannerImage.value = ''
-  } catch (error: any) {
-    uiStore.addAlert('搜索失败：' + error.message, 'error')
-  } finally {
-    isSearchingSteamBanner.value = false
-  }
+  steamBannerImages.value = []
+  selectedBannerImage.value = ''
+  await bannerSteamPicker.search()
 }
 
 const selectSteamBannerGame = async (game: any) => {
-  selectedSteamBannerGame.value = game
-  isSearchingSteamBanner.value = true
-  try {
-    const details = await steamService.getGameDetails(game.id)
-    // Steam 专用的横幅资产
-    const libraryHero = details.libraryHero
-    const background = details.background
-    const headerImage = details.headerImage
-    
-    steamBannerImages.value = Array.from(
-      new Set([libraryHero, background, headerImage].filter(Boolean) as string[])
-    )
-    
-    // 如果没有这些，再回退到截图
-    if (steamBannerImages.value.length < 2 && details.screenshots && details.screenshots.length > 0) {
-      steamBannerImages.value = [...steamBannerImages.value, ...details.screenshots.slice(0, 5)]
-    }
-  } catch (error: any) {
-    uiStore.addAlert('获取详情失败：' + error.message, 'error')
-  } finally {
-    isSearchingSteamBanner.value = false
-  }
+  await bannerSteamPicker.select(game)
 }
 
 const backToBannerGameSearch = () => {
-  selectedSteamBannerGame.value = null
+  bannerSteamPicker.back()
   steamBannerImages.value = []
 }
 
@@ -2301,22 +2182,11 @@ watch(showBannerSelector, (isOpen) => {
 })
 
 const selectSteamCoverGame = async (game: any) => {
-  selectedSteamGame.value = game
-  isSearchingSteamCover.value = true
-  try {
-    // 获取游戏的封面图 URL
-    const coverUrl = `https://steamcdn-a.akamaihd.net/steam/apps/${game.id}/library_600x900_2x.jpg`
-    // 暂时只显示一个封面，Steam 通常只有一个版本
-    steamCoverImages.value = [coverUrl]
-  } catch (error: any) {
-    uiStore.addAlert('获取封面失败：' + error.message, 'error')
-  } finally {
-    isSearchingSteamCover.value = false
-  }
+  await coverSteamPicker.select(game)
 }
 
 const backToCoverGameSearch = () => {
-  selectedSteamGame.value = null
+  coverSteamPicker.back()
   steamCoverImages.value = []
   selectedCoverImage.value = ''
 }
@@ -2345,28 +2215,15 @@ const downloadSelectedSteamCover = async () => {
 
 // Steam 截图搜索
 const handleScreenshotSearchClear = () => {
-  steamScreenshotSearchQuery.value = ''
-  steamScreenshotSearchResults.value = []
-  selectedSteamScreenshotGame.value = null
+  screenshotSteamPicker.clear()
   steamScreenshotsData.value = null
   selectedSteamScreenshots.value.clear()
 }
 
 const searchSteamForScreenshots = async () => {
-  if (!steamScreenshotSearchQuery.value.trim()) return
-
-  isSearchingSteamScreenshots.value = true
-  try {
-    const results = await steamService.searchGames(steamScreenshotSearchQuery.value.trim())
-    steamScreenshotSearchResults.value = results
-    selectedSteamScreenshotGame.value = null
-    steamScreenshotsData.value = null
-    selectedSteamScreenshots.value.clear()
-  } catch (error: any) {
-    uiStore.addAlert('搜索失败：' + error.message, 'error')
-  } finally {
-    isSearchingSteamScreenshots.value = false
-  }
+  steamScreenshotsData.value = null
+  selectedSteamScreenshots.value.clear()
+  await screenshotSteamPicker.search()
 }
 
 // 当截图选择器打开时，自动使用英文名搜索
@@ -2379,36 +2236,11 @@ watch(showScreenshotSelector, (isOpen) => {
 })
 
 const selectSteamScreenshotGame = async (game: any) => {
-  selectedSteamScreenshotGame.value = game
-  isSearchingSteamScreenshots.value = true
-  try {
-    const details = await steamService.getGameDetails(game.id)
-    const screenshotCandidates = (details.screenshots || []).filter(Boolean)
-    const fallbackAssets = [details.libraryHero, details.background, details.headerImage].filter(
-      (value): value is string => !!value
-    )
-    const finalAssets =
-      screenshotCandidates.length > 0
-        ? screenshotCandidates
-        : Array.from(new Set(fallbackAssets))
-
-    steamScreenshotsData.value = {
-      name: game.name,
-      cover: game.tinyImage || '',
-      screenshots: finalAssets,
-      appId: game.id,
-      usedFallbackAssets: screenshotCandidates.length === 0 && finalAssets.length > 0,
-    }
-    selectedSteamScreenshots.value.clear()
-  } catch (error: any) {
-    uiStore.addAlert('获取截图失败：' + error.message, 'error')
-  } finally {
-    isSearchingSteamScreenshots.value = false
-  }
+  await screenshotSteamPicker.select(game)
 }
 
 const backToScreenshotGameSearch = () => {
-  selectedSteamScreenshotGame.value = null
+  screenshotSteamPicker.back()
   steamScreenshotsData.value = null
   selectedSteamScreenshots.value.clear()
 }
@@ -2456,11 +2288,6 @@ const handleFileSelect = (path: string) => {
   }
 }
 
-const normalizeOptionId = (value: unknown): number | null => {
-  if (typeof value === 'number' && !Number.isNaN(value)) return value
-  return null
-}
-
 const slugifyMetadataName = (name: string) => {
   return name
     .trim()
@@ -2469,73 +2296,106 @@ const slugifyMetadataName = (name: string) => {
     .replace(/^-+|-+$/g, '')
 }
 
-const resolveMetadataSelections = async <T extends { id: number; name: string }>(
-  values: Array<string | number>,
-  options: { value: T[] },
-  createItem: (payload: { name: string; slug?: string }) => Promise<T>,
-) => {
-  const ids: number[] = []
-  for (const value of values) {
-    const normalizedId = normalizeOptionId(value)
-    if (normalizedId !== null) {
-      ids.push(normalizedId)
-      continue
-    }
+const pendingTagOptionsByGroup = computed<Record<number, Array<{ value: string; label: string }>>>(() => {
+  const grouped: Record<number, Array<{ value: string; label: string }>> = {}
 
-    if (typeof value !== 'string' || !value.trim()) {
-      continue
-    }
-
-    const name = value.trim()
-    const existing = options.value.find((item) => item.name.trim().toLowerCase() === name.toLowerCase())
-    if (existing) {
-      ids.push(existing.id)
-      continue
-    }
-
-    const created = await createItem({
-      name,
-      slug: slugifyMetadataName(name),
-    })
-    options.value = [...options.value, created]
-    ids.push(created.id)
+  for (const [groupId, names] of Object.entries(pendingTagDraftsByGroup.value)) {
+    const normalizedGroupId = Number(groupId)
+    grouped[normalizedGroupId] = names.map((name) => ({
+      value: name,
+      label: name,
+    }))
   }
 
-  return Array.from(new Set(ids))
+  return grouped
+})
+
+const resolveTagSelections = async () => {
+  const idsByGroup = new Map<number, number[]>()
+
+  for (const tagId of form.value.tag_ids) {
+    const normalizedId = normalizeOptionId(tagId)
+    if (normalizedId === null) continue
+    const groupId = tagGroupIdByTagId.value.get(normalizedId)
+    if (!groupId) continue
+    const current = idsByGroup.get(groupId) || []
+    current.push(normalizedId)
+    idsByGroup.set(groupId, current)
+  }
+
+  for (const group of tagGroups.value) {
+    const values: Array<string | number> = [
+      ...(idsByGroup.get(group.id) || []),
+      ...(pendingTagDraftsByGroup.value[group.id] || []),
+    ]
+    if (values.length === 0) continue
+
+    const result = await resolveCreatableSelections({
+      values,
+      options: tagOptions.value,
+      findExisting: (name, options) =>
+        options.find((item) => item.group_id === group.id && item.name.trim().toLowerCase() === name.toLowerCase()),
+      createItem: (name) =>
+        tagsService.createTag({
+          group_id: group.id,
+          name,
+          slug: slugifyMetadataName(name),
+        }),
+    })
+
+    tagOptions.value = result.options
+    idsByGroup.set(group.id, result.ids)
+  }
+
+  pendingTagDraftsByGroup.value = {}
+  return Array.from(idsByGroup.values()).flat()
 }
 
-const resolvePlatformSelections = async (values: Array<string | number>) => {
-  const ids: number[] = []
+const handleFormTagChange = (groupId: number, value: number | number[] | string | string[] | undefined) => {
+  const rawValues = Array.isArray(value) ? value : value === undefined || value === null || value === '' ? [] : [value]
+  const nextIds: number[] = []
+  const nextDrafts: string[] = []
 
-  for (const value of values) {
-    const normalizedId = normalizeOptionId(value)
+  for (const item of rawValues) {
+    const normalizedId = normalizeOptionId(item)
     if (normalizedId !== null) {
-      ids.push(normalizedId)
+      nextIds.push(normalizedId)
       continue
     }
 
-    if (typeof value !== 'string' || !value.trim()) {
-      continue
-    }
+    if (typeof item !== 'string') continue
 
-    const name = value.trim()
-    const existing = platformOptions.value.find(
-      (item) => item.name.trim().toLowerCase() === name.toLowerCase(),
+    const name = item.trim()
+    if (!name) continue
+
+    const existing = tagOptions.value.find(
+      (tag) => tag.group_id === groupId && tag.name.trim().toLowerCase() === name.toLowerCase(),
     )
     if (existing) {
-      ids.push(existing.id)
+      nextIds.push(existing.id)
       continue
     }
 
-    const created = await platformService.createPlatform({
-      name,
-      slug: slugifyMetadataName(name),
-    })
-    platformOptions.value = [...platformOptions.value, created]
-    ids.push(created.id)
+    if (!nextDrafts.some((draft) => draft.toLowerCase() === name.toLowerCase())) {
+      nextDrafts.push(name)
+    }
   }
 
-  return ids
+  const preserved = form.value.tag_ids.filter((tagId) => {
+    const normalizedId = normalizeOptionId(tagId)
+    if (normalizedId === null) return false
+    return tagGroupIdByTagId.value.get(normalizedId) !== groupId
+  })
+
+  form.value.tag_ids = [...preserved, ...nextIds]
+  pendingTagDraftsByGroup.value = {
+    ...pendingTagDraftsByGroup.value,
+    [groupId]: nextDrafts,
+  }
+}
+
+const handleTagSelectionChange = (groupId: number, value: number | number[] | string | string[] | undefined) => {
+  handleFormTagChange(groupId, value)
 }
 
 const handleCancel = () => {
@@ -2594,11 +2454,16 @@ const handleSubmit = async () => {
     let developerIds: number[] | undefined = undefined
     try {
       const { developersService } = await import('@/services/developers.service')
-      developerIds = await resolveMetadataSelections(
-        form.value.developers,
-        developerOptions,
-        (payload) => developersService.createDeveloper(payload),
-      )
+      const result = await resolveCreatableSelections({
+        values: form.value.developers,
+        options: developerOptions.value,
+        createItem: (name) => developersService.createDeveloper({
+          name,
+          slug: slugifyMetadataName(name),
+        }),
+      })
+      developerOptions.value = result.options
+      developerIds = result.ids
       form.value.developers = [...developerIds]
     } catch (error: any) {
       console.error('Failed to process developers:', form.value.developers, error)
@@ -2609,11 +2474,16 @@ const handleSubmit = async () => {
     let publisherIds: number[] | undefined = undefined
     try {
       const { publishersService } = await import('@/services/publishers.service')
-      publisherIds = await resolveMetadataSelections(
-        form.value.publishers,
-        publisherOptions,
-        (payload) => publishersService.createPublisher(payload),
-      )
+      const result = await resolveCreatableSelections({
+        values: form.value.publishers,
+        options: publisherOptions.value,
+        createItem: (name) => publishersService.createPublisher({
+          name,
+          slug: slugifyMetadataName(name),
+        }),
+      })
+      publisherOptions.value = result.options
+      publisherIds = result.ids
       form.value.publishers = [...publisherIds]
     } catch (error: any) {
       console.error('Failed to process publishers:', form.value.publishers, error)
@@ -2622,23 +2492,43 @@ const handleSubmit = async () => {
 
     let platformIds: number[] = []
     try {
-      platformIds = await resolvePlatformSelections(form.value.platform)
+      const result = await resolveCreatableSelections({
+        values: form.value.platform,
+        options: platformOptions.value,
+        createItem: (name) => platformService.createPlatform({
+          name,
+          slug: slugifyMetadataName(name),
+        }),
+      })
+      platformOptions.value = result.options
+      platformIds = result.ids
       form.value.platform = [...platformIds]
     } catch (error: any) {
       console.error('Failed to process platform:', form.value.platform, error)
       uiStore.addAlert('平台处理失败', 'warning')
     }
 
+    let tagIds: number[] = []
+    try {
+      tagIds = await resolveTagSelections()
+      form.value.tag_ids = [...tagIds]
+    } catch (error: any) {
+      console.error('Failed to process tags:', form.value.tag_ids, error)
+      uiStore.addAlert('标签处理失败', 'warning')
+    }
+
     // Submit game update with series, developers, publishers
     await gamesService.updateGame(String(props.game.id), {
       title: form.value.title,
       title_alt: form.value.title_alt,
+      visibility: form.value.visibility,
       release_date: form.value.release_date || undefined,
       engine: form.value.engine,
       platforms: platformIds,
       series: seriesIds,
       developers: developerIds,
       publishers: publisherIds,
+      tag_ids: tagIds,
       summary: form.value.summary,
       cover_image: form.value.cover_image,
       banner_image: form.value.banner_image,
@@ -2694,6 +2584,16 @@ const handleSubmit = async () => {
       await reorderScreenshots(props.game.id, orderedScreenshotUids)
     }
 
+    const orderedVideoUids = form.value.preview_videos
+      .map((item, index) => {
+        item.sort_order = index
+        return item.asset_uid
+      })
+      .filter((assetUid): assetUid is string => !!assetUid)
+    if (orderedVideoUids.length > 0) {
+      await reorderVideos(props.game.id, orderedVideoUids)
+    }
+
     // Refresh series options after successful save (load popular)
     try {
       const popularSeries = await seriesService.getPopularSeries(50)
@@ -2714,6 +2614,14 @@ const handleSubmit = async () => {
 </script>
 
 <style scoped>
+:deep(.arco-modal-header .arco-modal-title) {
+  font-weight: 700;
+}
+
+:deep(.arco-form-item-label-col > label) {
+  font-weight: 700;
+}
+
 .file-paths-container {
   display: flex;
   flex-direction: column;
@@ -2727,6 +2635,62 @@ const handleSubmit = async () => {
   justify-content: space-between;
   width: 100%;
   gap: 12px;
+  font-weight: 700;
+}
+
+.tag-group-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.tag-group-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tag-group-select {
+  width: 100%;
+}
+
+.tag-group-select :deep(.arco-select-view) {
+  min-height: 36px;
+  align-items: flex-start;
+}
+
+.tag-group-select :deep(.arco-select-view-value) {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag-group-select :deep(.arco-select-view-tag) {
+  max-width: 100%;
+}
+
+.tag-group-field__label {
+  display: flex;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-2);
+}
+
+.tag-group-empty {
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+@media (max-width: 1200px) {
+  .tag-group-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .tag-group-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .file-path-item {
@@ -2750,10 +2714,6 @@ const handleSubmit = async () => {
 .file-label-input {
   flex: 4;
   min-width: 0;
-}
-
-.file-path-row :deep(.arco-btn) {
-  flex-shrink: 0;
 }
 
 .file-path-item :deep(.arco-input-prepend) {
@@ -2798,8 +2758,10 @@ const handleSubmit = async () => {
   width: 100%;
   overflow: hidden;
   border-radius: 8px;
-  border: 1px solid var(--color-border-2);
-  background: var(--color-fill-2);
+  border: 1px solid var(--app-card-border);
+  background: color-mix(in srgb, var(--app-card-surface) 90%, transparent);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2816,7 +2778,9 @@ const handleSubmit = async () => {
   height: 100%;
   border: 1px dashed rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.015) 100%);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-3);
   display: flex;
   flex-direction: column;
@@ -2844,7 +2808,7 @@ const handleSubmit = async () => {
 
 .media-empty-title {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 .media-empty-subtitle {
@@ -2880,6 +2844,21 @@ const handleSubmit = async () => {
   pointer-events: auto;
 }
 
+.media-action-button {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  padding: 0;
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  transition: transform 0.2s ease;
+}
+
+.media-action-button:hover {
+  transform: scale(1.06);
+}
+
 .media-preview:hover .media-overlay,
 .screenshot-thumb:hover .screenshot-overlay {
   opacity: 1;
@@ -2911,9 +2890,11 @@ const handleSubmit = async () => {
 .video-upload-progress {
   margin-top: 14px;
   padding: 12px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--app-card-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  background: color-mix(in srgb, var(--app-card-surface) 84%, transparent);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .video-upload-progress__meta {
@@ -2927,38 +2908,6 @@ const handleSubmit = async () => {
 
 .media-actions {
   margin-top: 4px;
-}
-
-.media-action-button {
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  background: rgba(36, 43, 61, 0.9);
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 18px;
-  cursor: pointer;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(8px);
-  transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
-}
-
-.media-action-button:hover {
-  background: rgba(45, 54, 77, 0.96);
-  transform: scale(1.06);
-}
-
-.media-action-button--danger {
-  border-color: rgba(255, 77, 79, 0.28);
-  background: rgba(255, 77, 79, 0.2);
-  color: #fff;
-}
-
-.media-action-button--danger:hover {
-  background: rgba(255, 77, 79, 0.28);
 }
 
 /* Screenshots Grid */
@@ -2984,10 +2933,10 @@ const handleSubmit = async () => {
   aspect-ratio: 16/9;
   border-radius: 6px;
   overflow: hidden;
-  background: var(--color-fill-2);
+  background: color-mix(in srgb, var(--app-card-surface) 86%, transparent);
   cursor: grab;
   position: relative;
-  border: 1px solid var(--color-border-2);
+  border: 1px solid var(--app-card-border);
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
 }
 
@@ -3015,7 +2964,9 @@ const handleSubmit = async () => {
   overflow: hidden;
   position: relative;
   border: 1px dashed rgba(255, 255, 255, 0.1);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.015) 100%);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-3);
   display: flex;
   align-items: center;
@@ -3028,7 +2979,7 @@ const handleSubmit = async () => {
 
 .screenshot-add-tile__label {
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 .screenshot-add-tile:hover {
@@ -3084,7 +3035,10 @@ const handleSubmit = async () => {
   max-height: 400px;
   border-radius: 8px;
   overflow: hidden;
-  background: var(--color-fill-2);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3102,7 +3056,10 @@ const handleSubmit = async () => {
   max-height: 300px;
   border-radius: 8px;
   overflow: hidden;
-  background: var(--color-fill-2);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3115,79 +3072,26 @@ const handleSubmit = async () => {
   object-fit: contain;
 }
 
-.cover-selector-actions {
+.url-input-row {
   display: flex;
-  justify-content: flex-end;
+  align-items: stretch;
   gap: 8px;
 }
 
-/* Steam 搜索区域 */
-.steam-search-section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.steam-search-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text-1);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.steam-search-results {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 300px;
-  overflow-y: auto;
-  padding: 8px;
-  background: var(--color-fill-1);
-  border-radius: 6px;
-}
-
-.steam-search-result-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid var(--color-border-2);
-}
-
-.steam-search-result-item:hover {
-  background: var(--color-fill-2);
-  border-color: rgb(var(--primary-6));
-}
-
-.steam-search-result-item img {
-  width: 60px;
-  height: 32px;
-  object-fit: cover;
-  border-radius: 4px;
-}
-
-.steam-result-info {
+.url-input-row__field {
   flex: 1;
   min-width: 0;
 }
 
-.steam-result-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text-1);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.url-input-row__action {
+  flex-shrink: 0;
+  min-width: 72px;
 }
 
-.steam-result-meta {
-  font-size: 12px;
-  color: var(--color-text-3);
+.cover-selector-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* Steam 图片选择 */
@@ -3208,8 +3112,10 @@ const handleSubmit = async () => {
   overflow-y: auto;
   padding: 14px 16px;
   border-radius: 8px;
-  background: var(--color-fill-1);
-  border: 1px solid var(--color-border-2);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-2);
   line-height: 1.75;
   white-space: pre-wrap;
@@ -3218,14 +3124,17 @@ const handleSubmit = async () => {
 .steam-video-source-card {
   padding: 12px;
   border-radius: 8px;
-  background: var(--color-fill-1);
-  border: 1px solid var(--color-border-2);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-video-source-card__label {
   margin-bottom: 8px;
   color: var(--color-text-2);
   font-size: 12px;
+  font-weight: 700;
 }
 
 .steam-video-source-list {
@@ -3243,8 +3152,10 @@ const handleSubmit = async () => {
 .steam-video-debug {
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid var(--color-border-2);
-  background: var(--color-fill-1);
+  border: 1px solid var(--app-card-border);
+  background: color-mix(in srgb, var(--app-card-surface) 84%, transparent);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-2);
   font-size: 12px;
 }
@@ -3266,8 +3177,10 @@ const handleSubmit = async () => {
   margin-top: 14px;
   padding: 14px;
   border-radius: 12px;
-  background: var(--color-fill-1);
-  border: 1px solid var(--color-border-2);
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .video-library-card__header {
@@ -3293,8 +3206,8 @@ const handleSubmit = async () => {
   gap: 12px;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid var(--color-border-2);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--app-card-border);
+  background: color-mix(in srgb, var(--app-card-surface) 84%, transparent);
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
@@ -3306,15 +3219,17 @@ const handleSubmit = async () => {
 .video-library-item__preview {
   flex: 1;
   min-width: 0;
+  padding: 0;
+  text-align: left;
+  justify-content: flex-start;
+}
+
+.video-library-item__preview:deep(.arco-btn-content) {
+  width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
 .video-library-item__thumb {
@@ -3323,7 +3238,7 @@ const handleSubmit = async () => {
   flex-shrink: 0;
   border-radius: 8px;
   overflow: hidden;
-  background: #0f172a;
+  background: color-mix(in srgb, var(--app-card-surface) 82%, black 18%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3378,7 +3293,10 @@ const handleSubmit = async () => {
   margin-top: 14px;
   padding: 20px 0;
   border-radius: 12px;
-  background: var(--color-fill-1);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-images-grid {
@@ -3387,6 +3305,12 @@ const handleSubmit = async () => {
   gap: 12px;
   max-height: 300px;
   overflow-y: auto;
+  padding: 10px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--app-card-surface) 90%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-image-item {
@@ -3394,7 +3318,7 @@ const handleSubmit = async () => {
   border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
-  border: 2px solid var(--color-border-2);
+  border: 2px solid var(--app-card-border);
   transition: all 0.2s;
 }
 
@@ -3423,7 +3347,10 @@ const handleSubmit = async () => {
 .steam-screenshot-hint {
   padding: 10px 12px;
   border-radius: 6px;
-  background: rgba(var(--primary-6), 0.08);
+  background: color-mix(in srgb, rgba(var(--primary-6), 0.08) 60%, var(--app-card-surface));
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-2);
   font-size: 12px;
 }
@@ -3433,8 +3360,11 @@ const handleSubmit = async () => {
   align-items: center;
   gap: 8px;
   padding: 8px;
-  background: var(--color-fill-2);
-  border-radius: 6px;
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  border: 1px solid var(--app-card-border);
+  border-radius: 8px;
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-game-info img {
@@ -3446,7 +3376,7 @@ const handleSubmit = async () => {
 
 .steam-game-info span {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 700;
   color: var(--color-text-1);
 }
 
@@ -3454,12 +3384,21 @@ const handleSubmit = async () => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--app-card-surface) 90%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-screenshots-empty {
   padding: 20px 0;
   border-radius: 8px;
-  background: var(--color-fill-1);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-screenshot-item {
@@ -3468,7 +3407,7 @@ const handleSubmit = async () => {
   overflow: hidden;
   cursor: pointer;
   position: relative;
-  border: 2px solid var(--color-border-2);
+  border: 2px solid var(--app-card-border);
   transition: all 0.2s;
 }
 

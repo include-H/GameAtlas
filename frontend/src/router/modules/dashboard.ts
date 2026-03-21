@@ -11,6 +11,7 @@ export default {
   meta: {
     locale: 'menu.dashboard',
     requiresAuth: true,
+    keepAlive: true,
     icon: IconHome,
     roles: ['*'],
   },

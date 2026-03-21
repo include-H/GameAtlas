@@ -18,6 +18,9 @@ func NewDirectoryHandler(service *services.DirectoryService) *DirectoryHandler {
 }
 
 func (h *DirectoryHandler) Default(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	path, err := h.service.Default()
 	if err != nil {
 		writeServiceError(c, err, "directory roots are not configured")
@@ -33,6 +36,9 @@ func (h *DirectoryHandler) Default(c *gin.Context) {
 }
 
 func (h *DirectoryHandler) List(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	path := strings.TrimSpace(c.Query("path"))
 	result, err := h.service.List(path)
 	if err != nil {

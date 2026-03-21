@@ -8,9 +8,9 @@ export interface WebSocketEvent {
   message?: string
 }
 
-export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
+type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
-export class WebSocketService {
+class WebSocketService {
   private status: WebSocketStatus = 'disconnected'
   private statusRef: Ref<WebSocketStatus> | null = null
   private eventCallbacks: Set<(event: WebSocketEvent) => void> = new Set()
@@ -59,8 +59,4 @@ export function getWebSocketService(): WebSocketService {
     instance = new WebSocketService()
   }
   return instance
-}
-
-export function createWebSocketService(): WebSocketService {
-  return new WebSocketService()
 }

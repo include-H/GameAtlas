@@ -170,9 +170,11 @@ watch(visible, async (newVal) => {
 
 .file-browser-header {
   padding: 12px;
-  border-bottom: 1px solid var(--color-border-2);
-  background: var(--color-fill-2);
-  border-radius: 4px;
+  border: 1px solid var(--app-card-border);
+  background: var(--app-card-surface);
+  border-radius: 8px;
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   margin-bottom: 12px;
 }
 
@@ -190,17 +192,20 @@ watch(visible, async (newVal) => {
 
 .file-item {
   cursor: pointer;
-  transition: background-color 0.2s;
-  border-radius: 4px;
+  transition: background-color 0.2s, border-color 0.2s;
+  border-radius: 8px;
+  border: 1px solid transparent;
   margin-bottom: 4px;
 }
 
 .file-item:hover {
-  background-color: var(--color-fill-2);
+  background-color: color-mix(in srgb, var(--app-card-surface) 82%, transparent);
+  border-color: var(--app-card-border);
 }
 
 .file-item.directory {
-  background-color: var(--color-fill-1);
+  background-color: color-mix(in srgb, var(--app-card-surface) 74%, transparent);
+  border-color: var(--app-card-border);
 }
 
 .file-name {

@@ -2,6 +2,7 @@ package config
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -26,8 +27,15 @@ type Config struct {
 	SMBShareRoot      string
 	SMBUsername       string
 	SMBPassword       string
-	SMBDriveLetter    string
 	VHDDiffRoot       string
+	WikiHistoryLimit  int
+	AdminPassword     string
+	SessionSecret     string
+	AuthMaxFails      int
+	AuthCooldown      time.Duration
+	AuthFailWindow    time.Duration
+	AuthStateTTL      time.Duration
+	AuthTrackBy       string
 	LogLevel          string
 	ReadHeaderTimeout time.Duration
 	ShutdownTimeout   time.Duration
@@ -54,12 +62,29 @@ func Load() Config {
 		SMBShareRoot:      getEnv("SMB_SHARE_ROOT", ""),
 		SMBUsername:       getEnv("SMB_USERNAME", ""),
 		SMBPassword:       getEnv("SMB_PASSWORD", ""),
-		SMBDriveLetter:    strings.TrimSpace(getEnv("SMB_DRIVE_LETTER", "Z:")),
-		VHDDiffRoot:       getEnv("VHD_DIFF_ROOT", `C:\Game\VHDCache`),
+		VHDDiffRoot:       getEnv("VHD_DIFF_ROOT", `C:`),
+		WikiHistoryLimit:  getEnvAsInt("WIKI_HISTORY_LIMIT", 100),
+		AdminPassword:     getEnv("ADMIN_PASSWORD", ""),
+		SessionSecret:     getEnv("SESSION_SECRET", "change-me"),
+		AuthMaxFails:      getEnvAsInt("AUTH_MAX_FAILS", 5),
+		AuthCooldown:      getEnvAsDuration("AUTH_COOLDOWN", 10*time.Minute),
+		AuthFailWindow:    getEnvAsDuration("AUTH_FAIL_WINDOW", 30*time.Minute),
+		AuthStateTTL:      getEnvAsDuration("AUTH_STATE_TTL", 24*time.Hour),
+		AuthTrackBy:       getEnv("AUTH_TRACK_BY", "ip"),
 		LogLevel:          getEnv("LOG_LEVEL", "info"),
 		ReadHeaderTimeout: getEnvAsDuration("READ_HEADER_TIMEOUT", 5*time.Second),
 		ShutdownTimeout:   getEnvAsDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
 	}
+}
+
+func (c Config) Validate() error {
+	if strings.TrimSpace(c.AdminPassword) == "" {
+		return fmt.Errorf("ADMIN_PASSWORD must be configured")
+	}
+	if strings.TrimSpace(c.SessionSecret) == "" || strings.TrimSpace(c.SessionSecret) == "change-me" {
+		return fmt.Errorf("SESSION_SECRET must be configured with a non-default value")
+	}
+	return nil
 }
 
 func loadDotEnv(path string) {

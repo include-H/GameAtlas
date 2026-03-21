@@ -28,7 +28,7 @@ interface FlexibleOptions {
  * @param options 配置选项
  * @returns 取消监听的函数
  */
-export function setRootPixel(options: FlexibleOptions = {}): () => void {
+function setRootPixel(options: FlexibleOptions = {}): () => void {
   const {
     baseFontSize = 50,
     sketchWidth = 375,
@@ -73,32 +73,6 @@ export function setRootPixel(options: FlexibleOptions = {}): () => void {
     window.removeEventListener('orientationchange', setRem)
     docEl.style.fontSize = ''
   }
-}
-
-/**
- * 将 px 转换为 rem
- * @param px 设计稿中的像素值
- * @param baseFontSize 基准字体大小
- * @returns rem 值
- */
-export function px2rem(px: number, baseFontSize: number = 50): string {
-  return `${px / baseFontSize}rem`
-}
-
-/**
- * 检查是否为移动端设备
- * @returns boolean
- */
-export function isMobile(): boolean {
-  return window.matchMedia('(max-width: 768px)').matches
-}
-
-/**
- * 检查是否为触摸设备
- * @returns boolean
- */
-export function isTouchDevice(): boolean {
-  return 'ontouchstart' in window || navigator.maxTouchPoints > 0
 }
 
 export default setRootPixel

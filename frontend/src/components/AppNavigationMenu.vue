@@ -1,7 +1,7 @@
 <template>
   <a-menu
     class="app-navigation-menu"
-    :selected-keys="[activeKey]"
+    :selected-keys="activeKey ? [activeKey] : []"
     :open-keys="openKeys"
     :auto-open-selected="autoOpenSelected"
     :collapsed="collapsed"
@@ -22,11 +22,12 @@ import AppNavigationMenuNode from './AppNavigationMenuNode.vue'
 
 withDefaults(defineProps<{
   items: MenuItem[]
-  activeKey: string
+  activeKey?: string
   openKeys?: string[]
   collapsed?: boolean
   autoOpenSelected?: boolean
 }>(), {
+  activeKey: '',
   openKeys: () => [],
   collapsed: false,
   autoOpenSelected: true,

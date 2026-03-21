@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS games (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     title_alt TEXT,
+    visibility TEXT NOT NULL DEFAULT 'public',
     summary TEXT,
     release_date TEXT,
     engine TEXT,
@@ -120,4 +121,5 @@ CREATE INDEX IF NOT EXISTS idx_game_files_game_id ON game_files (game_id);
 CREATE INDEX IF NOT EXISTS idx_game_assets_game_id ON game_assets (game_id);
 CREATE INDEX IF NOT EXISTS idx_wiki_history_game_id ON wiki_history (game_id);
 CREATE INDEX IF NOT EXISTS idx_games_title ON games (title);
+CREATE INDEX IF NOT EXISTS idx_games_visibility ON games (visibility);
 CREATE INDEX IF NOT EXISTS idx_games_updated_at ON games (updated_at);

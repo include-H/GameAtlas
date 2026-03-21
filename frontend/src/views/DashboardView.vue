@@ -1,13 +1,15 @@
 <template>
   <div class="dashboard" :class="{ 'is-ready': isDashboardReady }">
     <!-- Welcome Section (Slimmer Header) -->
-    <div v-show="isDashboardReady" class="dashboard-section-title">
-      <h1 class="text-gradient">
-        发现
-      </h1>
-      <p class="subtitle">
-        探索您的游戏库动态
-      </p>
+    <div v-show="isDashboardReady" class="dashboard-section-title page-hero">
+      <div class="page-hero__content">
+        <h1 class="page-hero__title text-gradient">
+          发现
+        </h1>
+        <p class="page-hero__subtitle">
+          探索您的游戏库动态
+        </p>
+      </div>
     </div>
 
     <!-- Top Hero Section -->
@@ -33,7 +35,7 @@
 
           <stat-card
             title="收藏"
-            :value="favorites.length"
+            :value="favoriteCount"
             icon="mdi-heart"
             color="#f53f3f"
             :height="104"
@@ -112,7 +114,7 @@
       <a-button
         type="primary"
         size="large"
-        class="app-primary-cta app-primary-cta--large dashboard-empty-button"
+        class="dashboard-empty-button"
         @click="router.push('/games')"
       >
         浏览游戏
@@ -140,10 +142,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
-import gamesService from '@/services/games.service'
+import { createDetailRouteQuery } from '@/utils/navigation'
 import {
   IconTrophy
 } from '@arco-design/web-vue/es/icon'
@@ -157,14 +159,26 @@ defineOptions({
   name: 'DashboardView',
 })
 
+const DASHBOARD_SPLASH_STORAGE_KEY = 'dashboard-splash-played'
+
+const hasPlayedDashboardSplash = () => {
+  if (typeof window === 'undefined') return false
+  return window.sessionStorage.getItem(DASHBOARD_SPLASH_STORAGE_KEY) === '1'
+}
+
+const markDashboardSplashPlayed = () => {
+  if (typeof window === 'undefined') return
+  window.sessionStorage.setItem(DASHBOARD_SPLASH_STORAGE_KEY, '1')
+}
+
+const route = useRoute()
 const router = useRouter()
 const gamesStore = useGamesStore()
 const uiStore = useUiStore()
 
 const isLoading = ref(false)
-const detailedGames = ref<Record<number, Game>>({})
 const isDashboardReady = ref(false)
-const showSplash = ref(true)
+const showSplash = ref(!hasPlayedDashboardSplash())
 const isSplashLeaving = ref(false)
 const splashStartedAt = ref(0)
 
@@ -175,7 +189,7 @@ const SPLASH_FADE_DURATION = 400
 const totalGames = computed(() => gamesStore.stats?.total_games || 0)
 const recentAdditions = computed(() => gamesStore.stats?.recent_games || [])
 const mostPlayed = computed(() => gamesStore.stats?.popular_games || [])
-const favorites = computed(() => gamesStore.stats?.favorite_games || [])
+const favoriteCount = computed(() => gamesStore.stats?.favorite_count || 0)
 
 const isEmpty = computed(() => {
   return recentAdditions.value.length === 0
@@ -183,13 +197,16 @@ const isEmpty = computed(() => {
 
 // Get games for carousel (combine recent and most played, shuffle them)
 const carouselGames = computed(() => {
-  const orderedIds = [...recentAdditions.value, ...mostPlayed.value]
-    .map((game) => game.id)
-    .filter((id, index, self) => self.indexOf(id) === index)
+  const seen = new Set<number>()
 
-  return orderedIds
-    .map((id) => detailedGames.value[id])
-    .filter((game): game is Game => !!game)
+  return [...recentAdditions.value, ...mostPlayed.value]
+    .filter((game): game is Game => {
+      if (!game || seen.has(game.id)) {
+        return false
+      }
+      seen.add(game.id)
+      return true
+    })
     .sort(() => Math.random() - 0.5)
 })
 
@@ -199,14 +216,18 @@ const lastLoadedAt = ref(0)
 const pendingReviews = computed(() => pendingReviewGameCount.value)
 
 const viewGame = (id: string | number) => {
-  router.push({ name: 'game-detail', params: { id: String(id) } })
+  router.push({
+    name: 'game-detail',
+    params: { id: String(id) },
+    query: createDetailRouteQuery(route),
+  })
 }
 
 const toggleFavorite = async (id: string) => {
   try {
     await gamesStore.toggleFavorite(id)
     uiStore.addAlert('收藏已更新', 'success')
-  } catch (error) {
+  } catch {
     uiStore.addAlert('更新收藏失败', 'error')
   }
 }
@@ -216,29 +237,10 @@ const loadDashboardData = async () => {
   isDashboardReady.value = false
   try {
     const stats = await gamesStore.fetchStats()
-    const candidateIds = [...stats.recent_games, ...stats.popular_games]
-      .map((game) => String(game.id))
-      .filter((id, index, items) => items.indexOf(id) === index)
-
-    const details = await Promise.all(
-      candidateIds.map(async (id) => {
-        try {
-          return await gamesService.getGame(id)
-        } catch {
-          return null
-        }
-      }),
-    )
-    detailedGames.value = details
-      .filter((game): game is Game => !!game)
-      .reduce<Record<number, Game>>((acc, game) => {
-        acc[game.id] = game
-        return acc
-      }, {})
     pendingReviewGameCount.value = stats.pending_reviews || 0
     isDashboardReady.value = true
     lastLoadedAt.value = Date.now()
-  } catch (error) {
+  } catch {
     uiStore.addAlert('加载数据失败', 'error')
     isDashboardReady.value = true
   } finally {
@@ -260,6 +262,14 @@ const finishSplash = async () => {
 }
 
 onMounted(async () => {
+  if (hasPlayedDashboardSplash()) {
+    showSplash.value = false
+    isSplashLeaving.value = false
+    await loadDashboardData()
+    return
+  }
+
+  markDashboardSplashPlayed()
   splashStartedAt.value = Date.now()
   await Promise.all([
     loadDashboardData(),
@@ -325,7 +335,7 @@ onActivated(async () => {
   align-items: center;
   gap: 18px;
   width: min(520px, calc(100vw - 48px));
-  animation: splashReveal 1.6s ease both;
+  animation: splashReveal 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .dashboard-loading__eyebrow {
@@ -368,19 +378,19 @@ onActivated(async () => {
 @keyframes splashReveal {
   0% {
     opacity: 0;
-    transform: translateY(24px) scale(0.985);
+    transform: translateY(0);
   }
-  18% {
+  22% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
-  72% {
+  74% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
   100% {
     opacity: 0;
-    transform: translateY(-16px) scale(1.015);
+    transform: translateY(0);
   }
 }
 
@@ -411,27 +421,6 @@ onActivated(async () => {
 
 .dashboard-section-title {
   margin-bottom: 24px;
-  display: flex;
-  align-items: flex-end;
-  gap: 16px;
-}
-
-.dashboard-section-title .text-gradient {
-  font-size: 32px;
-  font-weight: 800;
-  margin: 0;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, var(--color-primary-light-3), var(--color-primary-6));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.dashboard-section-title .subtitle {
-  margin: 0;
-  padding-bottom: 6px;
-  color: var(--color-text-3);
-  font-size: 16px;
-  font-weight: 500;
 }
 
 .dashboard-hero-section {
@@ -503,10 +492,6 @@ onActivated(async () => {
 .dashboard-empty-text {
   color: var(--color-text-3);
   margin: 0 0 24px;
-}
-
-.dashboard-empty-button {
-  margin-top: 8px;
 }
 
 /* Responsive - Arco Design Breakpoints */

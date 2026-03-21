@@ -276,7 +276,10 @@ const handleTab = () => {
   flex-direction: column;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid var(--color-border-2);
+  border: 1px solid var(--app-card-border);
+  background: var(--app-card-surface);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   height: 100%;
   min-height: 0;
 }
@@ -366,5 +369,37 @@ const handleTab = () => {
 .toolbar-h3 {
   font-weight: 700;
   font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .wiki-editor__toolbar {
+    padding: 8px 10px;
+  }
+
+  .wiki-editor__textarea,
+  .wiki-editor__preview {
+    padding: 14px;
+  }
+
+  .wiki-editor__footer {
+    padding: 8px 12px;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 576px) {
+  .wiki-editor__toolbar {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .wiki-editor__textarea {
+    padding: 12px;
+    font-size: 13px;
+  }
+
+  .wiki-editor__preview {
+    padding: 12px;
+  }
 }
 </style>

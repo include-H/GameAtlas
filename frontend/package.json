@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vue-tsc --noEmit && vite build",
-    "preview": "vite preview --host"
+    "preview": "vite preview --host",
+    "lint": "eslint \"src/**/*.{ts,vue}\"",
+    "lint:unused": "eslint \"src/**/*.{ts,vue}\" --max-warnings=0",
+    "knip": "knip"
   },
   "dependencies": {
     "@arco-design/web-vue": "^2.57.0",
@@ -17,11 +20,18 @@
     "vue-router": "^4.5.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^22.10.2",
     "@vitejs/plugin-vue": "^5.2.1",
+    "eslint": "^10.0.3",
+    "eslint-plugin-vue": "^10.8.0",
+    "globals": "^17.4.0",
+    "knip": "^5.88.1",
     "typescript": "^5.7.3",
+    "typescript-eslint": "^8.57.1",
     "vite": "^6.0.11",
+    "vue-eslint-parser": "^10.4.0",
     "vue-tsc": "^2.2.0"
   }
 }

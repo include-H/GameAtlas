@@ -19,6 +19,10 @@ type App struct {
 }
 
 func New(cfg config.Config) (*App, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
 	sqliteDB, err := db.OpenSQLite(cfg.DBPath)
 	if err != nil {
 		return nil, err

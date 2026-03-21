@@ -1,13 +1,12 @@
 import type { RouteRecordRaw } from 'vue-router'
+const LoginView = () => import('@/views/LoginView.vue')
 
-/**
- * Base routes - redirect login to dashboard
- */
 export default {
   path: '/login',
   name: 'login',
-  redirect: '/',
+  component: LoginView,
   meta: {
     hideInMenu: true,
+    keepAlive: false,
   },
 } as RouteRecordRaw
