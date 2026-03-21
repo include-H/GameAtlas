@@ -149,11 +149,10 @@
       <div class="game-detail__download-section">
         <div v-if="versions.length > 0" class="download-version-panel">
           <div class="download-version-list">
-            <a-card
+            <div
               v-for="version in versions"
               :key="version.id"
               class="download-version-item"
-              :bordered="false"
             >
               <div class="version-info">
                 <div class="version-name">
@@ -191,7 +190,7 @@
                   开始游玩
                 </a-button>
               </div>
-            </a-card>
+            </div>
           </div>
         </div>
 
@@ -857,6 +856,7 @@ onUnmounted(() => {
   max-height: 156px;
   overflow-y: auto;
   padding-right: 2px;
+  background: transparent;
 }
 
 .download-version-item {
@@ -867,30 +867,14 @@ onUnmounted(() => {
   gap: 8px;
   min-height: 24px;
   background: transparent;
-  border: 1px solid var(--app-card-border);
+  border: none;
+  box-shadow: none;
   border-radius: 10px;
-  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
 }
 
-.download-version-item:deep(.arco-card-body),
-.download-version-item:deep(.arco-card-header) {
-  background: transparent;
-}
-
-.download-version-item :deep(.arco-card-body) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-  padding: 6px 8px;
-}
-
-.download-version-item:hover {
-  transform: translateY(-2px);
-  border-color: var(--color-border-2);
-  box-shadow: var(--shadow-soft);
+.download-version-item + .download-version-item {
+  border-top: 1px solid var(--color-border-1);
+  padding-top: 8px;
 }
 
 .version-info {
@@ -1077,13 +1061,14 @@ onUnmounted(() => {
 
   .download-version-item {
     min-height: auto;
-  }
-
-  .download-version-item :deep(.arco-card-body) {
     align-items: flex-start;
     flex-direction: column;
     gap: 6px;
     padding: 8px;
+  }
+
+  .download-version-item + .download-version-item {
+    padding-top: 10px;
   }
 
   .version-actions {
