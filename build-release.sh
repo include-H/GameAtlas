@@ -29,7 +29,6 @@ copy_optional_runtime_data() {
   local target_dir="$2"
   local filenames=(
     "bg.jpg"
-    "LXGWWenKaiGBScreen.ttf"
   )
 
   for filename in "${filenames[@]}"; do
@@ -144,7 +143,6 @@ echo "  .env"
 echo "  data/db.db        # 首次运行后自动创建"
 echo "  data/gamelist"
 echo "  data/bg.jpg       # 如存在则作为共享背景"
-echo "  data/LXGWWenKaiGBScreen.ttf  # 如存在则作为全局字体"
 echo "  ROM"
 echo
 echo "启动方式:"

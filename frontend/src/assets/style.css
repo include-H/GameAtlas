@@ -21,7 +21,7 @@
 
 @font-face {
   font-family: 'CustomDataFont';
-  src: url('./fonts/LXGWWenKaiGBScreen.ttf') format('truetype');
+  src: url('./fonts/LXGWWenKaiGBScreen.woff2') format('woff2');
   font-style: normal;
   font-weight: 400;
   font-display: swap;

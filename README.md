@@ -247,10 +247,12 @@ backend/data/gamelist/1/video-1.mp4
 
 - `backend/data/bg.jpg`
   作为共享背景图；若不存在，则回退到系统挑选的游戏素材背景
-- `backend/data/LXGWWenKaiGBScreen.ttf`
-  作为全局默认字体
 
-如果要替换它们，直接覆盖同名文件即可。
+全局默认字体已经随前端构建一起打包，当前仓库默认使用：
+
+- `frontend/src/assets/fonts/LXGWWenKaiGBScreen.woff2`
+
+如果要替换全局字体，更新前端资源并重新构建发布包即可。
 
 ## Wiki 说明
 
@@ -302,8 +304,7 @@ release/game-release-<version>/
 ├── .env.example
 ├── data/
 │   ├── gamelist/
-│   ├── bg.jpg
-│   └── LXGWWenKaiGBScreen.ttf
+│   └── bg.jpg
 └── ROM/
 ```
 
