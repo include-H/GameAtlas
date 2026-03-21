@@ -313,6 +313,8 @@ watch(
   inset: 0;
   z-index: 0;
   pointer-events: none;
+  overflow: hidden;
+  contain: paint;
 }
 
 .shared-ambient-bg__layer {

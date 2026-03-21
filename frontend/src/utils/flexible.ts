@@ -21,6 +21,16 @@ interface FlexibleOptions {
   minWidth?: number
   /** 最大宽度限制，默认 540 (适合移动端) */
   maxWidth?: number
+  /** 是否仅在触屏/移动端启用，默认 true */
+  touchOnly?: boolean
+}
+
+function isTouchLikeDevice(): boolean {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  return window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0
 }
 
 /**
@@ -35,12 +45,19 @@ function setRootPixel(options: FlexibleOptions = {}): () => void {
     maxFontSize = 64,
     minWidth = 320,
     maxWidth = 540,
+    touchOnly = true,
   } = options
 
   const docEl = document.documentElement
 
   function setRem(): void {
     const clientWidth = docEl.clientWidth
+    const shouldUseFlexible = !touchOnly || isTouchLikeDevice()
+
+    if (!shouldUseFlexible) {
+      docEl.style.fontSize = ''
+      return
+    }
 
     // 只在移动端生效
     if (clientWidth > maxWidth) {
@@ -48,8 +65,8 @@ function setRootPixel(options: FlexibleOptions = {}): () => void {
       return
     }
 
-    // 限制最小宽度
-    const width = Math.max(clientWidth, minWidth)
+    // 触屏端允许继续缩小，避免桌面浏览器或窄窗口像被“锁住”在最小宽度
+    const width = minWidth > 0 ? Math.max(clientWidth, minWidth) : clientWidth
 
     // 计算 rem 比例
     const rem = (width / sketchWidth) * baseFontSize

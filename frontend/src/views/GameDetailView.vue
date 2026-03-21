@@ -149,10 +149,11 @@
       <div class="game-detail__download-section">
         <div v-if="versions.length > 0" class="download-version-panel">
           <div class="download-version-list">
-            <div
+            <a-card
               v-for="version in versions"
               :key="version.id"
               class="download-version-item"
+              :bordered="false"
             >
               <div class="version-info">
                 <div class="version-name">
@@ -190,7 +191,7 @@
                   开始游玩
                 </a-button>
               </div>
-            </div>
+            </a-card>
           </div>
         </div>
 
@@ -859,23 +860,36 @@ onUnmounted(() => {
 }
 
 .download-version-item {
+  margin-bottom: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 3px 8px;
   min-height: 24px;
-  background: var(--color-fill-1);
-  border: 1px solid var(--color-border-1);
+  background: transparent;
+  border: 1px solid var(--app-card-border);
   border-radius: 10px;
-  cursor: pointer;
   transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+
+.download-version-item:deep(.arco-card-body),
+.download-version-item:deep(.arco-card-header) {
+  background: transparent;
+}
+
+.download-version-item :deep(.arco-card-body) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
 }
 
 .download-version-item:hover {
   transform: translateY(-2px);
   border-color: var(--color-border-2);
-  background: var(--color-fill-2);
   box-shadow: var(--shadow-soft);
 }
 
@@ -885,6 +899,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
+  padding-left: 6px;
 }
 
 .version-name {
@@ -1061,6 +1076,10 @@ onUnmounted(() => {
   }
 
   .download-version-item {
+    min-height: auto;
+  }
+
+  .download-version-item :deep(.arco-card-body) {
     align-items: flex-start;
     flex-direction: column;
     gap: 6px;

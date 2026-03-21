@@ -40,6 +40,39 @@ function classifyEpigraphLine(line: string): 'cn' | 'en' {
   return 'cn'
 }
 
+function splitCnEpigraphSegments(line: string): string[] {
+  const normalized = line.replace(/\s+/g, '')
+  const segments = normalized
+    .split(/(?<=[，。！？；：、,.!?;:])/u)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0)
+
+  return segments.length > 0 ? segments : [normalized]
+}
+
+function getCnEpigraphTypography(line: string): { fontSize: string; letterSpacing: string } {
+  const contentLength = line.replace(/\s+/g, '').length
+
+  if (contentLength >= 42) {
+    return {
+      fontSize: 'clamp(0.92rem, 0.72vw + 0.68rem, 1.08rem)',
+      letterSpacing: '0.08em',
+    }
+  }
+
+  if (contentLength >= 24) {
+    return {
+      fontSize: 'clamp(0.98rem, 0.9vw + 0.66rem, 1.2rem)',
+      letterSpacing: '0.12em',
+    }
+  }
+
+  return {
+    fontSize: 'clamp(1.04rem, 1.15vw + 0.68rem, 1.32rem)',
+    letterSpacing: '0.16em',
+  }
+}
+
 function buildEpigraphHtml(blockContent: string): string {
   const lines = blockContent
     .split('\n')
@@ -66,6 +99,17 @@ function buildEpigraphHtml(blockContent: string): string {
   const body = lines
     .map((line) => {
       const lineType = classifyEpigraphLine(line)
+
+      if (lineType === 'cn') {
+        const segments = splitCnEpigraphSegments(line)
+        const typography = getCnEpigraphTypography(line)
+        const segmentHtml = segments
+          .map((segment) => `<span class="epigraph__segment">${md.renderInline(segment)}</span>`)
+          .join('')
+
+        return `<p class="epigraph__line epigraph__line--${lineType}" style="font-size: ${typography.fontSize}; letter-spacing: ${typography.letterSpacing};">${segmentHtml}</p>`
+      }
+
       return `<p class="epigraph__line epigraph__line--${lineType}">${md.renderInline(line)}</p>`
     })
     .join('')
@@ -249,10 +293,16 @@ const renderedHtml = computed(() => {
 }
 
 .markdown-renderer :deep(.epigraph__line--cn) {
-  font-size: clamp(1rem, 1.2vw + 0.7rem, 1.35rem);
-  letter-spacing: 0.32em;
-  text-indent: 0.32em;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.3em 0.7em;
   line-height: 1.7;
+}
+
+.markdown-renderer :deep(.epigraph__segment) {
+  white-space: nowrap;
 }
 
 .markdown-renderer :deep(.epigraph__line--en) {
@@ -359,8 +409,7 @@ body.arco-layout-sidemenu-dark .markdown-renderer :deep(hr) {
   }
 
   .markdown-renderer :deep(.epigraph__line--cn) {
-    letter-spacing: 0.14em;
-    text-indent: 0.14em;
+    gap: 0.22em 0.5em;
   }
 }
 </style>
