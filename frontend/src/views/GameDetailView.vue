@@ -716,11 +716,6 @@ onUnmounted(() => {
   box-shadow: var(--shadow-soft);
 }
 
-.sidebar-card--hero {
-  background:
-    linear-gradient(180deg, rgba(24, 30, 42, 0.98) 0%, rgba(18, 23, 33, 0.98) 100%);
-}
-
 .sidebar-card--meta {
   padding-top: 4px;
   flex: 1;
@@ -735,6 +730,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background: transparent;
 }
 
 .sidebar-header-image__img {
@@ -756,6 +752,7 @@ onUnmounted(() => {
   justify-content: center;
   font-size: 3rem;
   color: rgba(255, 255, 255, 0.1);
+  background: transparent;
 }
 
 /* Sidebar Summary */
@@ -764,6 +761,7 @@ onUnmounted(() => {
   font-size: 13px;
   color: var(--color-text-2);
   line-height: 1.5;
+  background: transparent;
 }
 
 /* Sidebar Info */

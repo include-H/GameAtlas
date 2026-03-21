@@ -473,11 +473,13 @@ const handleImageError = (url: string) => {
 /* Filmstrip (Thumbnail Navigation) - Steam Style */
 .screenshot-carousel__filmstrip {
   padding: 10px 0;
-  background:
-    linear-gradient(180deg, rgba(14, 18, 28, 0.92) 0%, rgba(6, 8, 12, 0.96) 100%);
+  background: var(--app-card-surface);
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
 }
 
 .screenshot-carousel__filmstrip-inner {
@@ -514,8 +516,8 @@ const handleImageError = (url: string) => {
   transition: all 0.2s ease;
   border: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
-  background: #0a0d12;
-  opacity: 0.72;
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  opacity: 1;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
