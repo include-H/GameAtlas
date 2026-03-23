@@ -47,7 +47,7 @@ func (h *DownloadsHandler) Download(c *gin.Context) {
 		case errors.Is(err, services.ErrNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "resource not found"})
 		case errors.Is(err, services.ErrForbiddenPath):
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "file path is outside allowed roots"})
+			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "file path is outside PRIMARY_ROM_ROOT"})
 		case errors.Is(err, services.ErrMissingFile), errors.Is(err, services.ErrInvalidFile):
 			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "registered file is unavailable"})
 		case errors.Is(err, services.ErrValidation), errors.Is(err, services.ErrMissingConfig):
@@ -146,7 +146,7 @@ func (h *DownloadsHandler) LaunchScript(c *gin.Context) {
 		case errors.Is(err, services.ErrNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "resource not found"})
 		case errors.Is(err, services.ErrForbiddenPath):
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "file path is outside allowed roots"})
+			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "file path is outside PRIMARY_ROM_ROOT"})
 		case errors.Is(err, services.ErrMissingFile), errors.Is(err, services.ErrInvalidFile):
 			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "registered file is unavailable"})
 		case errors.Is(err, services.ErrInvalidLaunchFile), errors.Is(err, services.ErrMissingSMBConfig):

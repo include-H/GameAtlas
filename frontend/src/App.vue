@@ -152,10 +152,9 @@ const uiStore = useUiStore()
 const authStore = useAuthStore()
 const { menuList, activeKey, openKeys: routeOpenKeys } = useMenu()
 const { sidebarCollapsed } = storeToRefs(uiStore)
-const { isAdmin } = storeToRefs(authStore)
+const { isAdmin, adminDisplayName } = storeToRefs(authStore)
 
 const appName = 'GameAtlas'
-const adminDisplayName = (import.meta.env.VITE_USERNAME || 'Admin').trim() || 'Admin'
 const sideWidth = 240
 const collapsedSideWidth = 48
 const compactNavigationBreakpoint = 992

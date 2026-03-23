@@ -8,13 +8,13 @@ import (
 	"strings"
 )
 
-var ErrPathOutsideRoots = errors.New("path is outside allowed roots")
+var ErrPathOutsideRoot = errors.New("path is outside primary ROM root")
 var ErrFileNotFound = errors.New("file not found")
 var ErrNotAFile = errors.New("path is not a regular file")
-var ErrNoAllowedRoots = errors.New("no allowed library roots configured")
+var ErrNoPrimaryRoot = errors.New("PRIMARY_ROM_ROOT is not configured")
 
 type Guard struct {
-	roots []string
+	root string
 }
 
 type ResolvedFile struct {
@@ -29,22 +29,18 @@ type ResolvedDirectory struct {
 	ResolvedPath  string
 }
 
-func NewGuard(roots []string) *Guard {
-	cleanRoots := make([]string, 0, len(roots))
-	for _, root := range roots {
-		root = strings.TrimSpace(root)
-		if root == "" {
-			continue
-		}
-		cleanRoots = append(cleanRoots, filepath.Clean(root))
+func NewGuard(root string) *Guard {
+	root = strings.TrimSpace(root)
+	if root == "" {
+		return &Guard{}
 	}
 
-	return &Guard{roots: cleanRoots}
+	return &Guard{root: filepath.Clean(root)}
 }
 
 func (g *Guard) ValidateFile(path string) (*ResolvedFile, error) {
-	if len(g.roots) == 0 {
-		return nil, ErrNoAllowedRoots
+	if g.root == "" {
+		return nil, ErrNoPrimaryRoot
 	}
 
 	requestedPath := filepath.Clean(strings.TrimSpace(path))
@@ -52,7 +48,7 @@ func (g *Guard) ValidateFile(path string) (*ResolvedFile, error) {
 		return nil, ErrFileNotFound
 	}
 
-	resolvedPath, err := g.resolveWithinRoots(requestedPath)
+	resolvedPath, err := g.resolveWithinRoot(requestedPath)
 	if err != nil {
 		return nil, err
 	}
@@ -77,16 +73,16 @@ func (g *Guard) ValidateFile(path string) (*ResolvedFile, error) {
 }
 
 func (g *Guard) ValidateDirectory(path string) (*ResolvedDirectory, error) {
-	if len(g.roots) == 0 {
-		return nil, ErrNoAllowedRoots
+	if g.root == "" {
+		return nil, ErrNoPrimaryRoot
 	}
 
 	requestedPath := filepath.Clean(strings.TrimSpace(path))
 	if requestedPath == "" {
-		requestedPath = g.roots[0]
+		requestedPath = g.root
 	}
 
-	resolvedPath, err := g.resolveWithinRoots(requestedPath)
+	resolvedPath, err := g.resolveWithinRoot(requestedPath)
 	if err != nil {
 		return nil, err
 	}
@@ -109,31 +105,32 @@ func (g *Guard) ValidateDirectory(path string) (*ResolvedDirectory, error) {
 }
 
 func (g *Guard) DefaultDirectory() (string, error) {
-	if len(g.roots) == 0 {
-		return "", ErrNoAllowedRoots
+	if g.root == "" {
+		return "", ErrNoPrimaryRoot
 	}
-	return g.roots[0], nil
+	return g.root, nil
 }
 
 func (g *Guard) ParentDirectory(path string) *string {
 	cleaned := filepath.Clean(path)
-	for _, root := range g.roots {
-		root = filepath.Clean(root)
-		if cleaned == root {
-			return nil
+	root := filepath.Clean(g.root)
+	if root == "." || root == "" {
+		return nil
+	}
+	if cleaned == root {
+		return nil
+	}
+	if isWithinRoot(cleaned, root) {
+		parent := filepath.Dir(cleaned)
+		if !isWithinRoot(parent, root) {
+			return &root
 		}
-		if isWithinRoot(cleaned, root) {
-			parent := filepath.Dir(cleaned)
-			if !isWithinRoot(parent, root) {
-				return &root
-			}
-			return &parent
-		}
+		return &parent
 	}
 	return nil
 }
 
-func (g *Guard) resolveWithinRoots(requestedPath string) (string, error) {
+func (g *Guard) resolveWithinRoot(requestedPath string) (string, error) {
 	resolvedPath, err := filepath.EvalSymlinks(requestedPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -142,23 +139,15 @@ func (g *Guard) resolveWithinRoots(requestedPath string) (string, error) {
 		return "", fmt.Errorf("resolve file symlink: %w", err)
 	}
 
-	allowed := false
-	for _, root := range g.roots {
-		resolvedRoot, err := filepath.EvalSymlinks(root)
-		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				continue
-			}
-			return "", fmt.Errorf("resolve root symlink: %w", err)
+	resolvedRoot, err := filepath.EvalSymlinks(g.root)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", ErrNoPrimaryRoot
 		}
-		if isWithinRoot(resolvedPath, resolvedRoot) {
-			allowed = true
-			break
-		}
+		return "", fmt.Errorf("resolve root symlink: %w", err)
 	}
-
-	if !allowed {
-		return "", ErrPathOutsideRoots
+	if !isWithinRoot(resolvedPath, resolvedRoot) {
+		return "", ErrPathOutsideRoot
 	}
 
 	return resolvedPath, nil

@@ -16,13 +16,8 @@ type DirectoryService struct {
 }
 
 func NewDirectoryService(cfg config.Config) *DirectoryService {
-	roots := cfg.AllowedRoots
-	if len(roots) == 0 && strings.TrimSpace(cfg.PrimaryROMRoot) != "" {
-		roots = append(roots, cfg.PrimaryROMRoot)
-	}
-
 	return &DirectoryService{
-		guard: files.NewGuard(roots),
+		guard: files.NewGuard(cfg.PrimaryROMRoot),
 	}
 }
 
@@ -86,9 +81,9 @@ func normalizeDirectoryError(err error) error {
 	switch {
 	case err == nil:
 		return nil
-	case err == files.ErrNoAllowedRoots:
+	case err == files.ErrNoPrimaryRoot:
 		return ErrMissingConfig
-	case err == files.ErrPathOutsideRoots:
+	case err == files.ErrPathOutsideRoot:
 		return ErrForbiddenPath
 	case err == files.ErrFileNotFound:
 		return ErrNotFound

@@ -137,8 +137,8 @@
                 placeholder="请输入访问密码"
                 allow-clear
                 :disabled="showSuccessTransition"
-                @focus="isTyping = true"
-                @blur="isTyping = false"
+                @focus="handlePasswordFocus"
+                @blur="handlePasswordBlur"
               />
               <a-button
                 class="login-field__toggle"
@@ -200,7 +200,7 @@ interface CharacterMotion {
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
-const adminDisplayName = (import.meta.env.VITE_USERNAME || 'Admin').trim() || 'Admin'
+const adminDisplayName = computed(() => authStore.adminDisplayName || 'Admin')
 
 const password = ref('')
 const showPassword = ref(false)
@@ -374,6 +374,24 @@ const resolveRedirect = () => {
 const handleMouseMove = (event: MouseEvent) => {
   mouseX.value = event.clientX
   mouseY.value = event.clientY
+}
+
+const finishSceneEntering = () => {
+  if (!isSceneEntering.value) return
+  isSceneEntering.value = false
+  if (enterAnimationTimer) {
+    window.clearTimeout(enterAnimationTimer)
+    enterAnimationTimer = null
+  }
+}
+
+const handlePasswordFocus = () => {
+  finishSceneEntering()
+  isTyping.value = true
+}
+
+const handlePasswordBlur = () => {
+  isTyping.value = false
 }
 
 const handleClose = () => {
@@ -958,7 +976,9 @@ watchEffect(() => {
   position: absolute;
   display: flex;
   gap: 24px;
-  transition: left 0.25s ease, top 0.25s ease;
+  transition:
+    left 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+    top 0.48s cubic-bezier(0.22, 1, 0.36, 1);
   z-index: 2;
 }
 
@@ -991,7 +1011,7 @@ watchEffect(() => {
   height: 7px;
   border-radius: 2px;
   background: #2d2d2d;
-  transition: transform 0.12s ease-out;
+  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .character__pupil--small {
@@ -1011,7 +1031,9 @@ watchEffect(() => {
   height: 4px;
   border-radius: 999px;
   background: #2d2d2d;
-  transition: left 0.25s ease, top 0.25s ease;
+  transition:
+    left 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    top 0.42s cubic-bezier(0.22, 1, 0.36, 1);
   z-index: 2;
 }
 

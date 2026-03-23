@@ -14,10 +14,10 @@ import (
 	"github.com/hao/game/internal/repositories"
 )
 
-var ErrForbiddenPath = errors.New("file path is outside allowed roots")
+var ErrForbiddenPath = errors.New("file path is outside primary ROM root")
 var ErrMissingFile = errors.New("registered file is unavailable")
 var ErrInvalidFile = errors.New("registered path is not a file")
-var ErrMissingConfig = errors.New("allowed library roots are not configured")
+var ErrMissingConfig = errors.New("PRIMARY_ROM_ROOT is not configured")
 var ErrInvalidLaunchFile = errors.New("launch script only supports VHD or VHDX files")
 var ErrMissingSMBConfig = errors.New("SMB launch script configuration is incomplete")
 
@@ -37,15 +37,10 @@ type DownloadFile struct {
 }
 
 func NewGameFilesService(cfg config.Config, gamesRepo *repositories.GamesRepository, gameFilesRepo *repositories.GameFilesRepository) *GameFilesService {
-	roots := cfg.AllowedRoots
-	if len(roots) == 0 && strings.TrimSpace(cfg.PrimaryROMRoot) != "" {
-		roots = append(roots, cfg.PrimaryROMRoot)
-	}
-
 	return &GameFilesService{
 		gamesRepo:     gamesRepo,
 		gameFilesRepo: gameFilesRepo,
-		fileGuard:     files.NewGuard(roots),
+		fileGuard:     files.NewGuard(cfg.PrimaryROMRoot),
 		cfg:           cfg,
 	}
 }
@@ -241,13 +236,13 @@ func trimGameFileInput(input domain.GameFileWriteInput) domain.GameFileWriteInpu
 
 func normalizeFileError(err error) error {
 	switch {
-	case errors.Is(err, files.ErrPathOutsideRoots):
+	case errors.Is(err, files.ErrPathOutsideRoot):
 		return ErrForbiddenPath
 	case errors.Is(err, files.ErrFileNotFound):
 		return ErrMissingFile
 	case errors.Is(err, files.ErrNotAFile):
 		return ErrInvalidFile
-	case errors.Is(err, files.ErrNoAllowedRoots):
+	case errors.Is(err, files.ErrNoPrimaryRoot):
 		return ErrMissingConfig
 	default:
 		return err

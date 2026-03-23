@@ -32,7 +32,7 @@ func writeServiceError(c *gin.Context, err error, validationMessage string) {
 	case errors.Is(err, services.ErrForbiddenPath):
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"error":   "file path is outside allowed roots",
+			"error":   "file path is outside PRIMARY_ROM_ROOT",
 		})
 	case errors.Is(err, services.ErrMissingFile), errors.Is(err, services.ErrInvalidFile):
 		c.JSON(http.StatusBadRequest, gin.H{

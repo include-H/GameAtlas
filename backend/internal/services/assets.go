@@ -30,15 +30,10 @@ type UploadResult struct {
 }
 
 func NewAssetsService(cfg config.Config, gamesRepo *repositories.GamesRepository, assetsRepo *repositories.AssetsRepository) *AssetsService {
-	proxy := cfg.HTTPProxy
-	if proxy == "" {
-		proxy = cfg.Proxy
-	}
-
 	return &AssetsService{
 		gamesRepo:  gamesRepo,
 		assetsRepo: assetsRepo,
-		store:      files.NewAssetStore(cfg.AssetsDir, proxy, 30*time.Second),
+		store:      files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
 	}
 }
 

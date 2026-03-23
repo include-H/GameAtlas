@@ -27,6 +27,7 @@ import { resolveAssetUrl } from '@/utils/asset-url'
 
 const route = useRoute()
 const gameDetailRouteGuard = useNamedRouteGuard(route, 'game-detail')
+const wikiEditRouteGuard = useNamedRouteGuard(route, 'wiki-edit')
 
 const SUPPORTED_ROUTE_NAMES = new Set([
   'dashboard',
@@ -36,6 +37,7 @@ const SUPPORTED_ROUTE_NAMES = new Set([
   'pending-center',
   'series-library',
   'series-detail',
+  'wiki-edit',
 ])
 
 const DEFAULT_BACKGROUND =
@@ -181,6 +183,30 @@ const pickGameDetailBackground = async (gameId: string) => {
   }
 }
 
+const pickWikiEditBackground = async (gameId: string) => {
+  try {
+    const detail = await gamesService.getGame(gameId)
+    const bannerUrl = resolveAssetUrl(detail.banner_image)
+    if (bannerUrl && (await preloadImage(bannerUrl))) {
+      return bannerUrl
+    }
+
+    const screenshots = shuffleArray(detail.screenshots || [])
+    for (const screenshot of screenshots) {
+      const resolvedUrl = resolveAssetUrl(screenshot)
+      if (!resolvedUrl) continue
+
+      if (await preloadImage(resolvedUrl)) {
+        return resolvedUrl
+      }
+    }
+
+    return ''
+  } catch {
+    return ''
+  }
+}
+
 const pickQualifiedScreenshotBackground = async (
   games: Awaited<ReturnType<typeof gamesService.getGames>>['data'],
 ) => {
@@ -232,6 +258,23 @@ const loadBackground = async () => {
   })
   if (typeof detailBackground === 'string') {
     return detailBackground
+  }
+
+  const wikiBackground = await wikiEditRouteGuard.runWhenActive(async () => {
+    const gameId = getRouteParamString(route, 'gameId')
+    if (!gameId) {
+      return ''
+    }
+
+    const gameBackground = await pickWikiEditBackground(gameId)
+    if (gameBackground) {
+      return gameBackground
+    }
+
+    return loadCustomBackground()
+  })
+  if (typeof wikiBackground === 'string') {
+    return wikiBackground
   }
 
   if (cachedBackgroundUrl) {

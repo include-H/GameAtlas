@@ -13,6 +13,11 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if cfg.Proxy == "" {
+		log.Printf("outbound proxy: disabled")
+	} else {
+		log.Printf("outbound proxy: %s", cfg.ProxyLogValue())
+	}
 
 	application, err := app.New(cfg)
 	if err != nil {

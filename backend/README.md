@@ -116,22 +116,20 @@ go run ./cmd/server
   磁盘前端静态目录，默认 `../frontend/dist`
 - `ASSETS_DIR`
   游戏素材目录，默认 `data/gamelist`
-- `MIGRATIONS_DIR`
-  当前配置项仍保留，但迁移实际来自嵌入式 migration 文件
 
 ### 文件访问边界
 
-- `ALLOWED_LIBRARY_ROOTS`
-  允许浏览和登记游戏文件的根目录，多个路径以逗号分隔
 - `PRIMARY_ROM_ROOT`
-  目录浏览器默认根目录
+  唯一的 ROM 根目录；目录浏览、文件登记和下载都限制在这个目录及其子目录内
 
 ### 管理员认证
 
+- `ADMIN_DISPLAY_NAME`
+  前端显示用的管理员名称；后端运行时读取并通过接口返回给前端
 - `ADMIN_PASSWORD`
   管理员密码
 - `SESSION_SECRET`
-  cookie 会话签名密钥
+  cookie 会话签名密钥；发布脚本会自动生成一个随机值
 - `AUTH_MAX_FAILS`
   最大连续失败次数
 - `AUTH_COOLDOWN`
@@ -158,12 +156,6 @@ go run ./cmd/server
 
 - `PROXY`
   默认出站代理
-- `HTTP_PROXY`
-  HTTP 覆盖代理
-- `HTTPS_PROXY`
-  HTTPS 覆盖代理
-- `STEAM_PROXY`
-  Steam 模块专用代理
 
 ### VHD / VHDX 启动脚本
 

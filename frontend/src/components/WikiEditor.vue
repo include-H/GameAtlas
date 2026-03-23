@@ -95,17 +95,18 @@
     <!-- Editor / Preview -->
     <div class="wiki-editor__content">
       <!-- Editor -->
-      <textarea
-        v-show="!showPreview"
-        ref="editorRef"
-        v-model="content"
-        placeholder="使用 Markdown 编写 Wiki 内容..."
-        class="wiki-editor__textarea"
-        @keydown.tab.prevent="handleTab"
-      />
+      <div v-show="!showPreview" class="wiki-editor__panel">
+        <textarea
+          ref="editorRef"
+          v-model="content"
+          placeholder="使用 Markdown 编写 Wiki 内容..."
+          class="wiki-editor__textarea"
+          @keydown.tab.prevent="handleTab"
+        />
+      </div>
 
       <!-- Preview -->
-      <div v-show="showPreview" class="wiki-editor__preview">
+      <div v-show="showPreview" class="wiki-editor__panel wiki-editor__preview">
         <markdown-renderer v-if="content" :content="content" />
         <div v-else class="wiki-editor__preview-empty">
           <icon-file class="wiki-editor__preview-icon" />
@@ -272,16 +273,25 @@ const handleTab = () => {
 
 <style scoped>
 .wiki-editor {
+  --wiki-surface-bg: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  --wiki-toolbar-bg: color-mix(in srgb, var(--app-card-surface) 76%, var(--color-fill-2) 24%);
+  --wiki-footer-bg: color-mix(in srgb, var(--app-card-surface) 82%, var(--color-fill-2) 18%);
   display: flex;
   flex-direction: column;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--app-card-border);
   background: var(--app-card-surface);
   backdrop-filter: blur(var(--app-card-backdrop-blur));
   -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  box-shadow: var(--shadow-soft);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
   height: 100%;
   min-height: 0;
+}
+
+.wiki-editor:hover {
+  border-color: var(--color-border-2);
 }
 
 .wiki-editor__toolbar {
@@ -293,7 +303,7 @@ const handleTab = () => {
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: var(--color-fill-2);
+  background: var(--wiki-toolbar-bg);
   border-bottom: 1px solid var(--color-border-2);
   gap: 8px;
 }
@@ -302,7 +312,12 @@ const handleTab = () => {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  background: var(--color-fill-1);
+  background: var(--wiki-surface-bg);
+}
+
+.wiki-editor__panel {
+  height: 100%;
+  background: var(--wiki-surface-bg);
 }
 
 .wiki-editor__textarea {
@@ -329,10 +344,8 @@ const handleTab = () => {
 }
 
 .wiki-editor__preview {
-  height: 100%;
   overflow-y: auto;
   padding: 16px;
-  background: var(--color-fill-1);
   box-sizing: border-box;
 }
 
@@ -357,8 +370,39 @@ const handleTab = () => {
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: var(--color-fill-2);
+  background: var(--wiki-footer-bg);
   border-top: 1px solid var(--color-border-2);
+}
+
+.wiki-editor :deep(.arco-btn-group) {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--app-card-surface) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--app-card-border) 85%, transparent);
+}
+
+.wiki-editor :deep(.arco-btn-group .arco-btn) {
+  color: var(--color-text-2);
+  background: transparent;
+}
+
+.wiki-editor :deep(.arco-btn-group .arco-btn:hover) {
+  color: var(--color-text-1);
+  background: color-mix(in srgb, rgba(var(--primary-6), 0.08) 70%, transparent);
+}
+
+.wiki-editor :deep(.arco-btn-group .arco-btn + .arco-btn) {
+  border-left: 1px solid color-mix(in srgb, var(--app-card-border) 85%, transparent);
+}
+
+.wiki-editor :deep(.arco-divider-vertical) {
+  background-color: color-mix(in srgb, var(--color-border-2) 80%, transparent);
+}
+
+.wiki-editor :deep(.arco-tag) {
+  background: color-mix(in srgb, var(--app-card-surface) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--app-card-border) 90%, transparent);
+  color: var(--color-text-2);
 }
 
 .wiki-editor__footer-tag {

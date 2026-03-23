@@ -6,18 +6,21 @@ import type { ApiResponse } from '@/services/types'
 export const useAuthStore = defineStore('auth', () => {
   const isAdmin = ref(false)
   const initialized = ref(false)
+  const adminDisplayName = ref('Admin')
 
   const user = computed(() => ({
-    username: isAdmin.value ? 'Admin' : 'Guest',
+    username: isAdmin.value ? adminDisplayName.value : 'Guest',
     role: isAdmin.value ? 'admin' : 'guest',
   }))
 
   const fetchMe = async () => {
     try {
-      const response = await get<ApiResponse<{ is_admin: boolean; role: string }>>('/auth/me')
+      const response = await get<ApiResponse<{ is_admin: boolean; role: string; admin_display_name?: string }>>('/auth/me')
       isAdmin.value = !!response.data?.is_admin
+      adminDisplayName.value = response.data?.admin_display_name?.trim() || 'Admin'
     } catch {
       isAdmin.value = false
+      adminDisplayName.value = 'Admin'
     } finally {
       initialized.value = true
     }
@@ -26,20 +29,20 @@ export const useAuthStore = defineStore('auth', () => {
 
   const login = async (password: string) => {
     await post<ApiResponse<{ is_admin: boolean }>>('/auth/login', { password })
-    isAdmin.value = true
-    initialized.value = true
-    return { user: user.value, isAdmin: true }
+    return fetchMe()
   }
 
   const logout = async () => {
     await post<ApiResponse<{ logged_out: boolean }>>('/auth/logout')
     isAdmin.value = false
+    adminDisplayName.value = 'Admin'
     initialized.value = true
   }
 
   return {
     user,
     isAdmin,
+    adminDisplayName,
     initialized,
     fetchMe,
     login,

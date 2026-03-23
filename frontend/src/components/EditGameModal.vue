@@ -147,7 +147,22 @@
         </a-col>
       </a-row>
 
-      <a-form-item label="标签">
+      <a-form-item>
+        <template #label>
+          <div class="summary-label">
+            <span>标签</span>
+            <a-button
+              type="text"
+              size="mini"
+              html-type="button"
+              :disabled="!props.game?.wiki_content"
+              :loading="isPreparingWikiTagCandidates"
+              @click="handleParseWikiTags"
+            >
+              从 Wiki 提取字段
+            </a-button>
+          </div>
+        </template>
         <div v-if="tagGroups.length > 0" class="tag-group-grid">
           <div
             v-for="group in tagGroups"
@@ -199,6 +214,7 @@
             <a-button
               type="text"
               size="mini"
+              html-type="button"
               @click="showSummarySelector = true"
             >
               从 Steam 导入
@@ -232,7 +248,7 @@
                 placeholder="版本备注"
                 class="file-label-input"
               />
-              <a-button type="secondary" @click="openFileBrowser(index)">
+              <a-button type="secondary" html-type="button" @click="openFileBrowser(index)">
                 <template #icon>
                   <icon-folder />
                 </template>
@@ -241,6 +257,7 @@
                 <a-button
                   type="text"
                   status="danger"
+                  html-type="button"
                   @click="removeFilePath(index)"
                 >
                 <icon-minus />
@@ -251,6 +268,7 @@
           <a-button
             type="secondary"
             long
+            html-type="button"
             @click="addFilePath"
             :style="{ marginTop: '8px' }"
           >
@@ -286,6 +304,7 @@
                         type="secondary"
                         shape="circle"
                         size="small"
+                        html-type="button"
                         @click.stop="showCoverSelector = true"
                       >
                         <icon-settings />
@@ -296,6 +315,7 @@
                         status="danger"
                         shape="circle"
                         size="small"
+                        html-type="button"
                         @click.stop="removeCover"
                       >
                         <icon-delete />
@@ -340,6 +360,7 @@
                         type="secondary"
                         shape="circle"
                         size="small"
+                        html-type="button"
                         @click.stop="showBannerSelector = true"
                       >
                         <icon-settings />
@@ -350,6 +371,7 @@
                         status="danger"
                         shape="circle"
                         size="small"
+                        html-type="button"
                         @click.stop="removeBanner"
                       >
                         <icon-delete />
@@ -395,6 +417,7 @@
                           type="secondary"
                           shape="circle"
                           size="small"
+                          html-type="button"
                           @click.stop="openVideoSelector"
                         >
 	                        <icon-settings />
@@ -458,14 +481,15 @@
                           hide-footer
                         />
                         <div class="screenshot-overlay">
-                          <a-button
-                            class="media-action-button media-action-button--danger"
-                            type="secondary"
-                            status="danger"
-                            shape="circle"
-                            size="small"
-                            @click.stop="removeScreenshot(screenshot.client_key)"
-                          >
+	                          <a-button
+	                            class="media-action-button media-action-button--danger"
+	                            type="secondary"
+	                            status="danger"
+	                            shape="circle"
+	                            size="small"
+	                            html-type="button"
+	                            @click.stop="removeScreenshot(screenshot.client_key)"
+	                          >
                             <icon-delete />
                           </a-button>
                         </div>
@@ -489,7 +513,7 @@
 
 		      <a-form-item>
 	        <a-space style="justify-content: flex-end; width: 100%">
-          <a-button type="secondary" @click="handleCancel">取消</a-button>
+          <a-button type="secondary" html-type="button" @click="handleCancel">取消</a-button>
           <a-button type="primary" html-type="submit" :loading="isSubmitting">
             保存
           </a-button>
@@ -525,7 +549,7 @@
           <div v-if="selectedSteamSummaryGame" class="steam-summary-section">
             <div class="steam-search-title">
               {{ selectedSteamSummaryGame.name }} 的简介
-              <a-button type="text" size="mini" @click="backToSummarySearch">返回</a-button>
+              <a-button type="text" size="mini" html-type="button" @click="backToSummarySearch">返回</a-button>
             </div>
 
             <div v-if="steamSummaryPreview" class="steam-summary-preview">
@@ -542,6 +566,7 @@
               v-if="steamSummaryPreview"
               type="primary"
               long
+              html-type="button"
               @click="confirmSummaryImport"
             >
               导入这段简介
@@ -575,7 +600,7 @@
           <div v-if="selectedSteamGame && steamCoverImages.length > 0" class="steam-images-section">
             <div class="steam-search-title">
               {{ selectedSteamGame.name }} 的封面
-              <a-button type="text" size="mini" @click="backToCoverGameSearch">返回</a-button>
+              <a-button type="text" size="mini" html-type="button" @click="backToCoverGameSearch">返回</a-button>
             </div>
             <div class="steam-images-grid">
               <div
@@ -593,6 +618,7 @@
               type="primary"
               long
               :loading="isSearchingSteamCover"
+              html-type="button"
               @click="downloadSelectedSteamCover"
             >
               下载选中的封面
@@ -612,7 +638,7 @@
           @success="handleCoverUploadSuccess"
           @error="handleCoverUploadError"
         >
-          <a-button type="secondary" long>
+          <a-button type="secondary" long html-type="button">
             <template #icon>
               <icon-upload />
             </template>
@@ -630,7 +656,7 @@
             placeholder="输入图片 URL..."
             @press-enter="loadCoverFromUrl"
           />
-          <a-button class="url-input-row__action" type="secondary" @click="loadCoverFromUrl">
+          <a-button class="url-input-row__action" type="secondary" html-type="button" @click="loadCoverFromUrl">
             加载
           </a-button>
         </div>
@@ -638,8 +664,8 @@
           <img :src="coverPreviewUrl" @error="handleCoverError" />
         </div>
         <div class="cover-selector-actions">
-          <a-button type="secondary" @click="showCoverSelector = false">取消</a-button>
-          <a-button type="primary" :disabled="!coverPreviewUrl" :loading="isDownloadingCover" @click="confirmCoverSelection">
+          <a-button type="secondary" html-type="button" @click="showCoverSelector = false">取消</a-button>
+          <a-button type="primary" html-type="button" :disabled="!coverPreviewUrl" :loading="isDownloadingCover" @click="confirmCoverSelection">
             确定
           </a-button>
         </div>
@@ -670,7 +696,7 @@
           <div v-if="selectedSteamBannerGame && steamBannerImages.length > 0" class="steam-images-section">
             <div class="steam-search-title">
               {{ selectedSteamBannerGame.name }} 的横幅
-              <a-button type="text" size="mini" @click="backToBannerGameSearch">返回</a-button>
+              <a-button type="text" size="mini" html-type="button" @click="backToBannerGameSearch">返回</a-button>
             </div>
             <div class="steam-images-grid">
               <div
@@ -688,6 +714,7 @@
               type="primary"
               long
               :loading="isSearchingSteamBanner"
+              html-type="button"
               @click="downloadSelectedSteamBanner"
             >
               下载选中的横幅
@@ -707,7 +734,7 @@
           @success="handleBannerUploadSuccess"
           @error="handleBannerUploadError"
         >
-          <a-button type="secondary" long>
+          <a-button type="secondary" long html-type="button">
             <template #icon>
               <icon-upload />
             </template>
@@ -725,7 +752,7 @@
             placeholder="输入图片 URL..."
             @press-enter="loadBannerFromUrl"
           />
-          <a-button class="url-input-row__action" type="secondary" @click="loadBannerFromUrl">
+          <a-button class="url-input-row__action" type="secondary" html-type="button" @click="loadBannerFromUrl">
             加载
           </a-button>
         </div>
@@ -733,8 +760,8 @@
           <img :src="bannerPreviewUrl" @error="handleCoverError" />
         </div>
         <div class="cover-selector-actions">
-          <a-button type="secondary" @click="showBannerSelector = false">取消</a-button>
-          <a-button type="primary" :disabled="!bannerPreviewUrl" :loading="isDownloadingBanner" @click="confirmBannerSelection">
+          <a-button type="secondary" html-type="button" @click="showBannerSelector = false">取消</a-button>
+          <a-button type="primary" html-type="button" :disabled="!bannerPreviewUrl" :loading="isDownloadingBanner" @click="confirmBannerSelection">
             确定
           </a-button>
         </div>
@@ -766,7 +793,7 @@
             <div class="steam-game-info">
               <img :src="steamScreenshotsData.cover" :alt="steamScreenshotsData.name" />
               <span>{{ steamScreenshotsData.name }}</span>
-              <a-button type="text" size="mini" @click="backToScreenshotGameSearch">返回</a-button>
+              <a-button type="text" size="mini" html-type="button" @click="backToScreenshotGameSearch">返回</a-button>
             </div>
 
             <div v-if="steamScreenshotsData.usedFallbackAssets" class="steam-screenshot-hint">
@@ -799,6 +826,7 @@
               type="primary"
               long
               :loading="isDownloadingSteamScreenshots"
+              html-type="button"
               @click="downloadSelectedSteamScreenshots"
             >
               下载选中的 {{ selectedSteamScreenshots.size }} 张截图
@@ -818,7 +846,7 @@
           @success="handleScreenshotUploadSuccess"
           @error="handleScreenshotUploadError"
         >
-          <a-button type="secondary" long>
+          <a-button type="secondary" long html-type="button">
             <template #icon>
               <icon-upload />
             </template>
@@ -837,7 +865,7 @@
               placeholder="输入图片 URL..."
               @press-enter="loadScreenshotPreview"
             />
-            <a-button class="url-input-row__action" type="secondary" @click="loadScreenshotPreview">
+            <a-button class="url-input-row__action" type="secondary" html-type="button" @click="loadScreenshotPreview">
               加载
             </a-button>
           </div>
@@ -850,8 +878,8 @@
 
         <!-- 操作按钮 -->
         <div class="cover-selector-actions">
-          <a-button type="secondary" @click="showScreenshotSelector = false">取消</a-button>
-          <a-button type="primary" :disabled="!screenshotPreviewUrl" :loading="isDownloadingScreenshot" @click="confirmScreenshotSelection">
+          <a-button type="secondary" html-type="button" @click="showScreenshotSelector = false">取消</a-button>
+          <a-button type="primary" html-type="button" :disabled="!screenshotPreviewUrl" :loading="isDownloadingScreenshot" @click="confirmScreenshotSelection">
             确定
           </a-button>
 	        </div>
@@ -865,9 +893,6 @@
 	      :footer="false"
 	    >
 	      <div class="cover-selector-content">
-	        <a-alert class="video-upload-tip" type="warning" show-icon>
-	          Steam 预告片下载已暂时移除，请先使用本地上传。
-	        </a-alert>
 	        <input
 	          ref="videoFileInput"
 	          type="file"
@@ -875,7 +900,7 @@
 	          class="hidden-file-input"
 	          @change="handleVideoFileChange"
 	        />
-	        <a-button type="secondary" long :loading="isUploadingVideo" @click="openVideoFilePicker">
+	        <a-button type="secondary" long html-type="button" :loading="isUploadingVideo" @click="openVideoFilePicker">
 	          <template #icon>
 	            <icon-upload />
 	          </template>
@@ -900,10 +925,13 @@
 	              class="video-library-item"
 	              :class="{ 'is-primary': form.primary_preview_video_uid === video.asset_uid }"
 	            >
-	              <a-button
+	              <div
                   class="video-library-item__preview"
-                  type="text"
+                  role="button"
+                  tabindex="0"
                   @click="setPrimaryPreviewVideo(video.asset_uid)"
+                  @keydown.enter.prevent="setPrimaryPreviewVideo(video.asset_uid)"
+                  @keydown.space.prevent="setPrimaryPreviewVideo(video.asset_uid)"
                 >
 	                <div class="video-library-item__thumb">
 	                  <img
@@ -916,17 +944,18 @@
 	                  </div>
 	                </div>
 	                <div class="video-library-item__info">
-	                  <div class="video-library-item__title-row">
+	                  <div class="video-library-item__meta-row">
 	                    <span class="video-library-item__title">预告片 {{ index + 1 }}</span>
 	                    <a-tag v-if="form.primary_preview_video_uid === video.asset_uid" size="small" color="arcoblue">主预告</a-tag>
+	                    <span class="video-library-item__path">{{ video.asset_uid || video.path }}</span>
 	                  </div>
-	                  <div class="video-library-item__path">{{ video.asset_uid || video.path }}</div>
 	                </div>
-	              </a-button>
+	              </div>
 	              <div class="video-library-item__actions">
 	                <a-button
 	                  size="mini"
 	                  type="text"
+	                  html-type="button"
 	                  :disabled="index === 0"
 	                  @click="reorderEditableVideos(video.asset_uid || video.path, -1)"
 	                >
@@ -935,6 +964,7 @@
 	                <a-button
 	                  size="mini"
 	                  type="text"
+	                  html-type="button"
 	                  :disabled="index === form.preview_videos.length - 1"
 	                  @click="reorderEditableVideos(video.asset_uid || video.path, 1)"
 	                >
@@ -944,11 +974,12 @@
 	                  v-if="form.primary_preview_video_uid !== video.asset_uid"
 	                  size="mini"
 	                  type="text"
+	                  html-type="button"
 	                  @click="setPrimaryPreviewVideo(video.asset_uid)"
 	                >
 	                  设为主预告
 	                </a-button>
-	                <a-button size="mini" type="text" status="danger" @click="removePreviewVideo(video.asset_uid)">
+	                <a-button size="mini" type="text" status="danger" html-type="button" @click="removePreviewVideo(video.asset_uid)">
 	                  删除
 	                </a-button>
 	              </div>
@@ -961,10 +992,60 @@
 	          class="video-library-empty"
 	        />
 	        <div class="cover-selector-actions">
-	          <a-button type="secondary" @click="showVideoSelector = false">完成</a-button>
+	          <a-button type="secondary" html-type="button" @click="showVideoSelector = false">完成</a-button>
 	        </div>
 	      </div>
 	    </a-modal>
+
+      <a-modal
+        v-model:visible="wikiTagPickerVisible"
+        title="从 Wiki 提取字段"
+        :width="760"
+        :footer="false"
+      >
+        <div v-if="wikiTagCandidates.length > 0" class="wiki-tag-picker">
+          <div class="wiki-tag-picker__hint">
+            从当前 Wiki 中提取到了这些词条。你可以给每一项选择归类，也可以忽略。
+          </div>
+
+          <div class="wiki-tag-picker__list">
+            <div
+              v-for="item in wikiTagCandidates"
+              :key="item.key"
+              class="wiki-tag-picker__item"
+            >
+              <div class="wiki-tag-picker__meta">
+                <div class="wiki-tag-picker__value">{{ item.value }}</div>
+                <div class="wiki-tag-picker__source">来源：{{ item.sourceLabel }}</div>
+              </div>
+              <a-select
+                class="wiki-tag-picker__select"
+                :model-value="item.groupKey"
+                @change="handleWikiTagCandidateGroupChange(item.key, $event)"
+              >
+                <a-option value="ignore">忽略</a-option>
+                <a-option value="genre">题材</a-option>
+                <a-option value="subgenre">子类型</a-option>
+                <a-option value="perspective">视角</a-option>
+                <a-option value="theme">内容属性</a-option>
+              </a-select>
+            </div>
+          </div>
+
+          <div class="cover-selector-actions">
+            <a-button type="secondary" html-type="button" @click="wikiTagPickerVisible = false">取消</a-button>
+            <a-button
+              type="primary"
+              html-type="button"
+              :loading="isApplyingWikiTags"
+              @click="applySelectedWikiTags"
+            >
+              应用到标签
+            </a-button>
+          </div>
+        </div>
+        <a-empty v-else description="没有识别到可提取的字段" />
+      </a-modal>
 	  </a-modal>
 </template>
 
@@ -987,7 +1068,7 @@ import {
   IconVideoCamera,
   IconSettings,
 } from '@arco-design/web-vue/es/icon'
-import steamService from '@/services/steam.service'
+import steamService, { proxySteamAssetUrl } from '@/services/steam.service'
 import { seriesService } from '@/services/series.service'
 import platformService from '@/services/platforms.service'
 import tagsService from '@/services/tags.service'
@@ -999,6 +1080,7 @@ import {
   searchCreatableOptions,
   sortCreatableOptionsByName,
 } from '@/utils/creatable-select'
+import { extractWikiTagCandidates, type WikiTagGroupKey } from '@/utils/wiki-tag-parser'
 import type { Developer, Platform, Publisher, ScreenshotItem, Series, SteamGameDetails, Tag, TagGroup, VideoAssetItem } from '@/services/types'
 
 interface Props {
@@ -1025,6 +1107,13 @@ interface EditableVideo {
   asset_uid?: string
   path: string
   sort_order?: number
+}
+
+interface WikiTagCandidateSelection {
+  key: string
+  value: string
+  sourceLabel: string
+  groupKey: WikiTagGroupKey | 'ignore'
 }
 
 interface GameForm {
@@ -1080,6 +1169,10 @@ const seriesOptions = ref<Series[]>([])
 const platformOptions = ref<Platform[]>([])
 const tagGroups = ref<TagGroup[]>([])
 const tagOptions = ref<Tag[]>([])
+const isPreparingWikiTagCandidates = ref(false)
+const isApplyingWikiTags = ref(false)
+const wikiTagPickerVisible = ref(false)
+const wikiTagCandidates = ref<WikiTagCandidateSelection[]>([])
 const developerOptions = ref<Developer[]>([])
 const publisherOptions = ref<Publisher[]>([])
 const isSearchingSeries = ref(false)
@@ -1108,7 +1201,7 @@ const summarySteamPicker = useSteamPicker<SteamGameDetails>({
 
 const coverSteamPicker = useSteamPicker<string[]>({
   onSelect: async (game) => {
-    const coverUrl = `https://steamcdn-a.akamaihd.net/steam/apps/${game.id}/library_600x900_2x.jpg`
+    const coverUrl = proxySteamAssetUrl(`https://steamcdn-a.akamaihd.net/steam/apps/${game.id}/library_600x900_2x.jpg`)
     steamCoverImages.value = [coverUrl]
     selectedCoverImage.value = ''
     return [coverUrl]
@@ -1757,7 +1850,7 @@ const uploadAssetFromUrl = async (
     throw new Error('缺少游戏 ID')
   }
 
-  const response = await fetch(url)
+  const response = await fetch(proxySteamAssetUrl(url))
   if (!response.ok) {
     throw new Error(`下载远程图片失败: ${response.status}`)
   }
@@ -1779,7 +1872,7 @@ const handleCoverError = (e: Event) => {
 
 const loadCoverFromUrl = () => {
   if (coverSearchUrl.value.trim()) {
-    coverPreviewUrl.value = coverSearchUrl.value.trim()
+    coverPreviewUrl.value = proxySteamAssetUrl(coverSearchUrl.value.trim())
   }
 }
 
@@ -1825,7 +1918,7 @@ const handleCoverUploadError = () => {
 // Screenshot handlers
 const loadScreenshotPreview = () => {
   if (screenshotSearchUrl.value.trim()) {
-    screenshotPreviewUrl.value = screenshotSearchUrl.value.trim()
+    screenshotPreviewUrl.value = proxySteamAssetUrl(screenshotSearchUrl.value.trim())
   }
 }
 
@@ -2112,10 +2205,27 @@ const backToBannerGameSearch = () => {
 }
 
 const downloadSelectedSteamBanner = async () => {
-  if (!selectedBannerImage.value) return
+  if (!selectedBannerImage.value || !props.game?.id) return
 
-  bannerSearchUrl.value = selectedBannerImage.value
-  await loadBannerFromUrl()
+  isDownloadingBanner.value = true
+  try {
+    const uploaded = await uploadAssetFromUrl(selectedBannerImage.value, 'banner')
+    if (form.value.banner_image) {
+      queueAssetDeletion('banner', form.value.banner_image)
+    }
+    form.value.banner_image = uploaded.path
+    showBannerSelector.value = false
+    backToBannerGameSearch()
+    steamBannerSearchQuery.value = ''
+    steamBannerSearchResults.value = []
+    bannerSearchUrl.value = ''
+    bannerPreviewUrl.value = ''
+    uiStore.addAlert('横幅下载成功', 'success')
+  } catch (error: any) {
+    uiStore.addAlert('下载失败：' + error.message, 'error')
+  } finally {
+    isDownloadingBanner.value = false
+  }
 }
 
 const loadBannerFromUrl = async () => {
@@ -2398,6 +2508,132 @@ const handleTagSelectionChange = (groupId: number, value: number | number[] | st
   handleFormTagChange(groupId, value)
 }
 
+const handleParseWikiTags = async () => {
+  const content = props.game?.wiki_content || ''
+  if (!content.trim()) {
+    uiStore.addAlert('当前游戏没有可解析的 Wiki 内容', 'warning')
+    return
+  }
+
+  if (tagGroups.value.length === 0) {
+    uiStore.addAlert('当前没有可用标签组', 'warning')
+    return
+  }
+
+  isPreparingWikiTagCandidates.value = true
+
+  try {
+    const extracted = extractWikiTagCandidates(content)
+    if (extracted.length === 0) {
+      uiStore.addAlert('没有识别到可提取的“类型：...”字段', 'warning')
+      return
+    }
+
+    wikiTagCandidates.value = extracted.map((item) => ({
+      key: `${item.sourceLabel}:${item.value.toLowerCase()}`,
+      value: item.value,
+      sourceLabel: item.sourceLabel,
+      groupKey: 'ignore',
+    }))
+    wikiTagPickerVisible.value = true
+  } catch (error) {
+    console.error('Failed to extract wiki tags:', error)
+    uiStore.addAlert('从 Wiki 提取字段失败', 'warning')
+  } finally {
+    isPreparingWikiTagCandidates.value = false
+  }
+}
+
+const handleWikiTagCandidateGroupChange = (
+  key: string,
+  value: WikiTagGroupKey | 'ignore' | number | string | undefined,
+) => {
+  const nextValue: WikiTagGroupKey | 'ignore' =
+    value === 'genre' || value === 'subgenre' || value === 'perspective' || value === 'theme'
+      ? value
+      : 'ignore'
+
+  wikiTagCandidates.value = wikiTagCandidates.value.map((item) =>
+    item.key === key
+      ? {
+          ...item,
+          groupKey: nextValue,
+        }
+      : item,
+  )
+}
+
+const applySelectedWikiTags = async () => {
+  const selected = wikiTagCandidates.value.filter((item) => item.groupKey !== 'ignore')
+  if (selected.length === 0) {
+    uiStore.addAlert('还没有选择要应用的字段', 'warning')
+    return
+  }
+
+  isApplyingWikiTags.value = true
+
+  try {
+    const mergedIds = new Set<number>(
+      form.value.tag_ids
+        .map((item) => normalizeOptionId(item))
+        .filter((item): item is number => item !== null),
+    )
+
+    const grouped = new Map<WikiTagGroupKey, string[]>()
+    for (const item of selected) {
+      const values = grouped.get(item.groupKey) || []
+      if (!values.some((value) => value.toLowerCase() === item.value.toLowerCase())) {
+        values.push(item.value)
+      }
+      grouped.set(item.groupKey, values)
+    }
+
+    const appliedLabels: string[] = []
+
+    for (const [groupKey, names] of grouped.entries()) {
+      const group = tagGroups.value.find((item) => item.key === groupKey)
+      if (!group) continue
+
+      const result = await resolveCreatableSelections({
+        values: names,
+        options: tagOptions.value,
+        findExisting: (name, options) =>
+          options.find((item) => item.group_id === group.id && item.name.trim().toLowerCase() === name.toLowerCase()),
+        createItem: (name) =>
+          tagsService.createTag({
+            group_id: group.id,
+            name,
+          }),
+      })
+
+      tagOptions.value = result.options
+      for (const id of result.ids) {
+        mergedIds.add(id)
+      }
+
+      if (result.ids.length > 0) {
+        appliedLabels.push(`${group.name}：${names.join('、')}`)
+      }
+    }
+
+    form.value.tag_ids = Array.from(mergedIds)
+    pendingTagDraftsByGroup.value = {}
+    wikiTagPickerVisible.value = false
+
+    if (appliedLabels.length === 0) {
+      uiStore.addAlert('已选择字段，但没有成功应用到标签组', 'warning')
+      return
+    }
+
+    uiStore.addAlert(`已应用 Wiki 字段：${appliedLabels.join('；')}`, 'success')
+  } catch (error) {
+    console.error('Failed to apply wiki tags:', error)
+    uiStore.addAlert('应用 Wiki 字段失败', 'warning')
+  } finally {
+    isApplyingWikiTags.value = false
+  }
+}
+
 const handleCancel = () => {
   visible.value = false
   pendingDeleteAssets.value = []
@@ -2405,6 +2641,7 @@ const handleCancel = () => {
 
 const handleSubmit = async () => {
   if (!props.game) return
+  if (isSubmitting.value) return
 
   // Validate form
   try {
@@ -2681,6 +2918,57 @@ const handleSubmit = async () => {
   color: var(--color-text-3);
 }
 
+.wiki-tag-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wiki-tag-picker__hint {
+  font-size: 13px;
+  color: var(--color-text-2);
+}
+
+.wiki-tag-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.wiki-tag-picker__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 10px;
+  background: var(--color-fill-1);
+}
+
+.wiki-tag-picker__meta {
+  min-width: 0;
+}
+
+.wiki-tag-picker__value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-1);
+  word-break: break-word;
+}
+
+.wiki-tag-picker__source {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.wiki-tag-picker__select {
+  width: 100%;
+}
+
 @media (max-width: 1200px) {
   .tag-group-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2689,6 +2977,10 @@ const handleSubmit = async () => {
 
 @media (max-width: 768px) {
   .tag-group-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wiki-tag-picker__item {
     grid-template-columns: 1fr;
   }
 }
@@ -3200,15 +3492,16 @@ const handleSubmit = async () => {
 }
 
 .video-library-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--app-card-border);
   background: color-mix(in srgb, var(--app-card-surface) 84%, transparent);
   transition: border-color 0.2s ease, background 0.2s ease;
+  overflow: hidden;
 }
 
 .video-library-item.is-primary {
@@ -3217,19 +3510,21 @@ const handleSubmit = async () => {
 }
 
 .video-library-item__preview {
-  flex: 1;
-  min-width: 0;
-  padding: 0;
-  text-align: left;
-  justify-content: flex-start;
-}
-
-.video-library-item__preview:deep(.arco-btn-content) {
-  width: 100%;
-  min-width: 0;
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.video-library-item__preview:hover,
+.video-library-item__preview:focus,
+.video-library-item__preview:active {
+  outline: none;
 }
 
 .video-library-item__thumb {
@@ -3256,37 +3551,60 @@ const handleSubmit = async () => {
 }
 
 .video-library-item__info {
+  flex: 1;
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  overflow: hidden;
 }
 
-.video-library-item__title-row {
+.video-library-item__meta-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  min-width: 0;
+  width: 100%;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 
 .video-library-item__title {
+  flex-shrink: 0;
   color: var(--color-text-1);
   font-size: 14px;
   font-weight: 600;
 }
 
 .video-library-item__path {
+  min-width: 0;
   color: var(--color-text-3);
   font-size: 12px;
   line-height: 1.5;
-  word-break: break-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .video-library-item__actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 4px;
   flex-shrink: 0;
+  min-width: fit-content;
+}
+
+@media (max-width: 360px) {
+  .video-library-item {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .video-library-item__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 .video-library-empty {

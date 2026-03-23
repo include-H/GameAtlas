@@ -1,7 +1,7 @@
 <template>
-  <div class="wiki-toc">
-    <div class="wiki-toc__title">目录</div>
-    <nav v-if="headings.length > 0" class="wiki-toc__nav">
+  <aside ref="tocRef" class="wiki-toc" aria-labelledby="wiki-toc-title">
+    <div id="wiki-toc-title" class="wiki-toc__title">目录</div>
+    <nav v-if="headings.length > 0" class="wiki-toc__nav" aria-label="Wiki 目录">
       <a
         v-for="heading in headings"
         :key="heading.id"
@@ -11,17 +11,18 @@
           'wiki-toc__item--active': activeId === heading.id,
           [`wiki-toc__item--level-${heading.level}`]: true
         }"
+        :aria-current="activeId === heading.id ? 'location' : undefined"
         @click.prevent="scrollToHeading(heading.id)"
       >
         {{ heading.text }}
       </a>
     </nav>
     <div v-else class="wiki-toc__empty">暂无目录</div>
-  </div>
+  </aside>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 
 interface Heading {
   id: string
@@ -30,9 +31,16 @@ interface Heading {
 }
 
 const headings = ref<Heading[]>([])
-const activeId = ref<string>('')
+const activeId = ref('')
+const tocRef = ref<HTMLElement | null>(null)
 
-// 生成 ID 的辅助函数
+const HEADING_SELECTOR = 'h1, h2, h3'
+const HEADING_SCROLL_OFFSET = 76
+
+let scrollContainer: HTMLElement | null = null
+let contentObserver: MutationObserver | null = null
+let headingObserver: IntersectionObserver | null = null
+
 const generateId = (text: string, index: number): string => {
   const baseId = text
     .toLowerCase()
@@ -41,162 +49,211 @@ const generateId = (text: string, index: number): string => {
   return index > 0 ? `${baseId}-${index}` : baseId
 }
 
-// 从已渲染的 DOM 中提取标题
-const extractHeadingsFromDOM = () => {
+const getWikiContent = () => {
+  return document.querySelector('.game-detail__wiki-card .markdown-renderer') as HTMLElement | null
+}
+
+const getHeadingElements = () => {
+  return headings.value
+    .map((heading) => document.getElementById(heading.id))
+    .filter((element): element is HTMLElement => Boolean(element))
+}
+
+const updateActiveId = (nextId: string) => {
+  if (!nextId || nextId === activeId.value) return
+
+  activeId.value = nextId
   nextTick(() => {
-    const wikiContent = document.querySelector('.markdown-renderer')
-    if (!wikiContent) {
-      headings.value = []
-      return
-    }
-
-    const hElements = wikiContent.querySelectorAll('h1, h2, h3')
-    const result: Heading[] = []
-    const idMap: Record<string, number> = {}
-
-    hElements.forEach((el) => {
-      const text = el.textContent?.trim() || ''
-      if (!text) return
-
-      const level = parseInt(el.tagName[1])
-      const baseId = generateId(text, 0)
-
-      const count = idMap[baseId] || 0
-      idMap[baseId] = count + 1
-      const id = count > 0 ? `${baseId}-${count}` : baseId
-
-      el.id = id
-      result.push({ id, text, level })
-    })
-
-    headings.value = result
-
-    if (result.length > 0) {
-      activeId.value = result[0].id
-      handleScroll()
-    }
+    scrollToActiveItem()
   })
 }
 
-// 滚动到指定标题
+const computeActiveHeading = () => {
+  const elements = getHeadingElements()
+  if (elements.length === 0) return
+
+  const rootTop = scrollContainer?.getBoundingClientRect().top ?? 0
+  const containerHeight = scrollContainer?.clientHeight ?? window.innerHeight
+  const readingLine = rootTop + Math.min(containerHeight * 0.32, 220) + HEADING_SCROLL_OFFSET
+
+  let candidate: HTMLElement | null = null
+
+  for (const element of elements) {
+    const rect = element.getBoundingClientRect()
+    if (rect.top <= readingLine) {
+      candidate = element
+      continue
+    }
+
+    if (!candidate) {
+      candidate = element
+    }
+    break
+  }
+
+  updateActiveId(candidate?.id || elements[0].id)
+}
+
+const disconnectHeadingObserver = () => {
+  if (headingObserver) {
+    headingObserver.disconnect()
+    headingObserver = null
+  }
+}
+
+const setupHeadingObserver = () => {
+  disconnectHeadingObserver()
+
+  const elements = getHeadingElements()
+  if (elements.length === 0 || typeof IntersectionObserver === 'undefined') return
+
+  headingObserver = new IntersectionObserver(
+    () => {
+      computeActiveHeading()
+    },
+    {
+      root: scrollContainer,
+      rootMargin: `-${HEADING_SCROLL_OFFSET}px 0px -55% 0px`,
+      threshold: [0, 0.2, 0.6, 1],
+    },
+  )
+
+  for (const element of elements) {
+    headingObserver.observe(element)
+  }
+}
+
+const extractHeadingsFromDOM = async () => {
+  await nextTick()
+
+  const wikiContent = getWikiContent()
+  if (!wikiContent) {
+    headings.value = []
+    activeId.value = ''
+    disconnectHeadingObserver()
+    return
+  }
+
+  const hElements = Array.from(wikiContent.querySelectorAll(HEADING_SELECTOR)) as HTMLElement[]
+  const result: Heading[] = []
+  const idMap: Record<string, number> = {}
+
+  for (const element of hElements) {
+    const text = element.textContent?.trim() || ''
+    if (!text) continue
+
+    const level = Number.parseInt(element.tagName[1] || '1', 10)
+    const baseId = generateId(text, 0)
+    const count = idMap[baseId] || 0
+    idMap[baseId] = count + 1
+
+    const id = count > 0 ? `${baseId}-${count}` : baseId
+    element.id = id
+    element.style.scrollMarginTop = `${HEADING_SCROLL_OFFSET}px`
+    result.push({ id, text, level })
+  }
+
+  headings.value = result
+  activeId.value = result[0]?.id || ''
+
+  setupHeadingObserver()
+  computeActiveHeading()
+}
+
 const scrollToHeading = (id: string) => {
   const element = document.getElementById(id)
-  if (element) {
-    activeId.value = id
+  if (!element) return
+
+  updateActiveId(id)
+
+  if (scrollContainer) {
+    const containerRect = scrollContainer.getBoundingClientRect()
+    const targetRect = element.getBoundingClientRect()
+    const top = scrollContainer.scrollTop + targetRect.top - containerRect.top - HEADING_SCROLL_OFFSET
+    scrollContainer.scrollTo({
+      top: Math.max(top, 0),
+      behavior: 'smooth',
+    })
+  } else {
     element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
-    setTimeout(() => {
-      const offset = 80
-      const elementPosition = element.getBoundingClientRect().top + window.pageYOffset
-      window.scrollTo({
-        top: elementPosition - offset,
-        behavior: 'auto'
-      })
-    }, 400)
+  if (typeof history !== 'undefined' && typeof history.replaceState === 'function') {
+    history.replaceState(null, '', `#${id}`)
   }
 }
 
-// 监听滚动，高亮当前标题并滚动目录
-const handleScroll = () => {
-  if (headings.value.length === 0) return
-
-  // 使用视口中心作为判断基准
-  const viewportCenter = window.innerHeight / 2
-  let closestHeading: Heading | null = null
-  let minDistance = Infinity
-
-  // 找到距离视口中心最近的标题
-  for (const heading of headings.value) {
-    const element = document.getElementById(heading.id)
-    if (element) {
-      const rect = element.getBoundingClientRect()
-      const distance = Math.abs(rect.top - viewportCenter)
-
-      if (distance < minDistance) {
-        minDistance = distance
-        closestHeading = heading
-      }
-    }
-  }
-
-  // 更新激活项
-  if (closestHeading) {
-    const changed = closestHeading.id !== activeId.value
-    activeId.value = closestHeading.id
-    // 只在激活项变化时滚动目录
-    if (changed) {
-      nextTick(() => {
-        scrollToActiveItem()
-      })
-    }
-  }
-}
-
-// 滚动目录使激活项保持在可视区域
 const scrollToActiveItem = () => {
-  const tocContainer = document.querySelector('.wiki-toc')
-  const activeItem = document.querySelector('.wiki-toc__item--active')
+  const tocContainer = tocRef.value
+  if (!tocContainer) return
 
-  if (!tocContainer || !activeItem) return
+  const activeItem = tocContainer.querySelector('.wiki-toc__item--active') as HTMLElement | null
+  if (!activeItem) return
 
-  // 使用 offsetTop 获取相对于滚动容器的位置
-  const itemTop = (activeItem as HTMLElement).offsetTop
-  const itemBottom = itemTop + (activeItem as HTMLElement).offsetHeight
+  const itemTop = activeItem.offsetTop
+  const itemBottom = itemTop + activeItem.offsetHeight
   const containerTop = tocContainer.scrollTop
   const containerBottom = containerTop + tocContainer.clientHeight
 
-  // 如果激活项在可视区域上方，滚动到顶部
-  if (itemTop < containerTop) {
+  if (itemTop < containerTop + 8) {
     tocContainer.scrollTo({
-      top: itemTop - 10, // 留一点边距
-      behavior: 'smooth'
+      top: Math.max(itemTop - 8, 0),
+      behavior: 'smooth',
     })
+    return
   }
-  // 如果激活项在可视区域下方，滚动到底部
-  else if (itemBottom > containerBottom) {
+
+  if (itemBottom > containerBottom - 8) {
     tocContainer.scrollTo({
-      top: itemBottom - tocContainer.clientHeight + 10, // 留一点边距
-      behavior: 'smooth'
+      top: itemBottom - tocContainer.clientHeight + 8,
+      behavior: 'smooth',
     })
   }
 }
 
-// 获取滚动容器
-let scrollContainer: HTMLElement | null = null
-let contentObserver: MutationObserver | null = null
+const setupContentObserver = () => {
+  const wikiContent = getWikiContent()
+  if (!wikiContent || typeof MutationObserver === 'undefined') return
+
+  contentObserver?.disconnect()
+  contentObserver = new MutationObserver(() => {
+    void extractHeadingsFromDOM()
+  })
+  contentObserver.observe(wikiContent, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  })
+}
+
+const handleResize = () => {
+  computeActiveHeading()
+}
 
 onMounted(() => {
-  // 找到实际的滚动容器（.content），而不是 window
   scrollContainer = document.querySelector('.content')
+  void extractHeadingsFromDOM().then(() => {
+    setupContentObserver()
+  })
 
-  setTimeout(() => {
-    extractHeadingsFromDOM()
-    const wikiContent = document.querySelector('.markdown-renderer')
-    if (wikiContent && typeof MutationObserver !== 'undefined') {
-      contentObserver = new MutationObserver(() => {
-        extractHeadingsFromDOM()
-      })
-      contentObserver.observe(wikiContent, {
-        childList: true,
-        subtree: true,
-        characterData: true,
-      })
-    }
-  }, 200)
-
-  // 绑定到正确的滚动容器
   if (scrollContainer) {
-    scrollContainer.addEventListener('scroll', handleScroll, { passive: true })
+    scrollContainer.addEventListener('scroll', computeActiveHeading, { passive: true })
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', handleResize, { passive: true })
   }
 })
 
 onUnmounted(() => {
+  disconnectHeadingObserver()
+  contentObserver?.disconnect()
+  contentObserver = null
+
   if (scrollContainer) {
-    scrollContainer.removeEventListener('scroll', handleScroll)
+    scrollContainer.removeEventListener('scroll', computeActiveHeading)
   }
-  if (contentObserver) {
-    contentObserver.disconnect()
-    contentObserver = null
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', handleResize)
   }
 })
 </script>
@@ -214,6 +271,7 @@ onUnmounted(() => {
   max-height: calc(100vh - 100px);
   overflow-y: auto;
   flex: 0 0 25.5%;
+  scroll-behavior: smooth;
 }
 
 .wiki-toc__title {

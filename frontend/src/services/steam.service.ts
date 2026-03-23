@@ -1,4 +1,4 @@
-import { get, post } from './api'
+import { API_BASE_URL, get, post } from './api'
 import type { ApiResponse, SteamFetchImagesResponse, SteamGameDetails, SteamGameSearchResult } from './types'
 
 interface SteamSearchApiItem {
@@ -29,8 +29,38 @@ function mapSearchResult(item: SteamSearchApiItem): SteamGameSearchResult {
     id: String(item.app_id),
     name: item.name,
     releaseDate: item.release_date || undefined,
-    tinyImage: item.tiny_image || undefined,
+    tinyImage: proxySteamAssetUrl(item.tiny_image) || undefined,
   }
+}
+
+const STEAM_PROXY_PATH = '/steam/proxy'
+
+function normalizeApiBaseUrl(baseUrl: string): string {
+  return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
+}
+
+function isSteamProxyUrl(rawUrl: string): boolean {
+  const normalizedBase = normalizeApiBaseUrl(API_BASE_URL)
+  return rawUrl.startsWith(`${normalizedBase}${STEAM_PROXY_PATH}?`)
+}
+
+export function proxySteamAssetUrl(rawUrl?: string | null): string {
+  const value = rawUrl?.trim()
+  if (!value) return ''
+  if (isSteamProxyUrl(value)) return value
+
+  try {
+    const parsed = new URL(value)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return value
+    }
+  } catch {
+    return value
+  }
+
+  const normalizedBase = normalizeApiBaseUrl(API_BASE_URL)
+  const params = new URLSearchParams({ url: value })
+  return `${normalizedBase}${STEAM_PROXY_PATH}?${params.toString()}`
 }
 
 const steamService = {
@@ -64,10 +94,10 @@ const steamService = {
       genres: [],
       tags: [],
       platforms: [],
-      screenshots: data.screenshot_urls || [],
-      headerImage: data.cover_url || '',
-      libraryHero: data.banner_url || undefined,
-      background: data.banner_url || undefined,
+      screenshots: (data.screenshot_urls || []).map((url) => proxySteamAssetUrl(url)),
+      headerImage: proxySteamAssetUrl(data.cover_url),
+      libraryHero: proxySteamAssetUrl(data.banner_url) || undefined,
+      background: proxySteamAssetUrl(data.banner_url) || undefined,
     }
   },
 

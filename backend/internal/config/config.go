@@ -3,6 +3,7 @@ package config
 import (
 	"bufio"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,18 +18,14 @@ type Config struct {
 	DBPath            string
 	StaticDir         string
 	AssetsDir         string
-	MigrationsDir     string
-	AllowedRoots      []string
 	PrimaryROMRoot    string
 	Proxy             string
-	HTTPProxy         string
-	HTTPSProxy        string
-	SteamProxy        string
 	SMBShareRoot      string
 	SMBUsername       string
 	SMBPassword       string
 	VHDDiffRoot       string
 	WikiHistoryLimit  int
+	AdminDisplayName  string
 	AdminPassword     string
 	SessionSecret     string
 	AuthMaxFails      int
@@ -44,6 +41,7 @@ type Config struct {
 func Load() Config {
 	loadDotEnv(".env")
 	proxy := getEnv("PROXY", "")
+	primaryROMRoot := filepath.Clean(getEnv("PRIMARY_ROM_ROOT", "ROM"))
 
 	return Config{
 		AppEnv:            getEnv("APP_ENV", "development"),
@@ -52,18 +50,14 @@ func Load() Config {
 		DBPath:            filepath.Clean(getEnv("DB_PATH", "data/db.db")),
 		StaticDir:         filepath.Clean(getEnv("STATIC_DIR", "../frontend/dist")),
 		AssetsDir:         filepath.Clean(getEnv("ASSETS_DIR", "data/gamelist")),
-		MigrationsDir:     filepath.Clean(getEnv("MIGRATIONS_DIR", "migrations")),
-		AllowedRoots:      getEnvAsList("ALLOWED_LIBRARY_ROOTS", []string{"ROM"}),
-		PrimaryROMRoot:    filepath.Clean(getEnv("PRIMARY_ROM_ROOT", "ROM")),
+		PrimaryROMRoot:    primaryROMRoot,
 		Proxy:             proxy,
-		HTTPProxy:         getEnv("HTTP_PROXY", proxy),
-		HTTPSProxy:        getEnv("HTTPS_PROXY", proxy),
-		SteamProxy:        getEnv("STEAM_PROXY", proxy),
 		SMBShareRoot:      getEnv("SMB_SHARE_ROOT", ""),
 		SMBUsername:       getEnv("SMB_USERNAME", ""),
 		SMBPassword:       getEnv("SMB_PASSWORD", ""),
 		VHDDiffRoot:       getEnv("VHD_DIFF_ROOT", `C:`),
 		WikiHistoryLimit:  getEnvAsInt("WIKI_HISTORY_LIMIT", 100),
+		AdminDisplayName:  getEnv("ADMIN_DISPLAY_NAME", "Admin"),
 		AdminPassword:     getEnv("ADMIN_PASSWORD", ""),
 		SessionSecret:     getEnv("SESSION_SECRET", "change-me"),
 		AuthMaxFails:      getEnvAsInt("AUTH_MAX_FAILS", 5),
@@ -84,7 +78,28 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.SessionSecret) == "" || strings.TrimSpace(c.SessionSecret) == "change-me" {
 		return fmt.Errorf("SESSION_SECRET must be configured with a non-default value")
 	}
+	if _, err := parseProxyURL(c.Proxy); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (c Config) ProxyLogValue() string {
+	parsed, err := parseProxyURL(c.Proxy)
+	if err != nil || parsed == nil {
+		return "direct"
+	}
+
+	if parsed.User != nil {
+		username := parsed.User.Username()
+		if _, hasPassword := parsed.User.Password(); hasPassword {
+			parsed.User = url.UserPassword(username, "******")
+		} else if username != "" {
+			parsed.User = url.User(username)
+		}
+	}
+
+	return parsed.String()
 }
 
 func loadDotEnv(path string) {
@@ -141,6 +156,31 @@ func getEnv(key, fallback string) string {
 	return value
 }
 
+func parseProxyURL(raw string) (*url.URL, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return nil, fmt.Errorf("invalid PROXY %q: %w", raw, err)
+	}
+	if parsed.Scheme == "" {
+		return nil, fmt.Errorf("invalid PROXY %q: missing scheme, expected http://, https://, or socks5://", raw)
+	}
+	switch parsed.Scheme {
+	case "http", "https", "socks5":
+	default:
+		return nil, fmt.Errorf("invalid PROXY %q: unsupported scheme %q, expected http, https, or socks5", raw, parsed.Scheme)
+	}
+	if parsed.Host == "" {
+		return nil, fmt.Errorf("invalid PROXY %q: missing host", raw)
+	}
+
+	return parsed, nil
+}
+
 func getEnvAsInt(key string, fallback int) int {
 	raw := strings.TrimSpace(os.Getenv(key))
 	if raw == "" {
@@ -167,28 +207,4 @@ func getEnvAsDuration(key string, fallback time.Duration) time.Duration {
 	}
 
 	return value
-}
-
-func getEnvAsList(key string, fallback []string) []string {
-	raw := strings.TrimSpace(os.Getenv(key))
-	if raw == "" {
-		return fallback
-	}
-
-	parts := strings.Split(raw, ",")
-	items := make([]string, 0, len(parts))
-
-	for _, part := range parts {
-		item := strings.TrimSpace(part)
-		if item == "" {
-			continue
-		}
-		items = append(items, filepath.Clean(item))
-	}
-
-	if len(items) == 0 {
-		return fallback
-	}
-
-	return items
 }

@@ -30,7 +30,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 
 	healthHandler := handlers.NewHealthHandler(db)
 	authService := services.NewAuthService(cfg, db)
-	authHandler := handlers.NewAuthHandler(authService)
+	authHandler := handlers.NewAuthHandler(authService, cfg)
 	gamesRepo := repositories.NewGamesRepository(db)
 	gameFilesRepo := repositories.NewGameFilesRepository(db)
 	assetsRepo := repositories.NewAssetsRepository(db)

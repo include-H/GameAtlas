@@ -82,10 +82,9 @@
 .
 ├── backend/            # Go 后端、数据库迁移、嵌入式前端资源
 ├── frontend/           # Vue 3 前端
+├── Wiki/               # 仓库内维护的游戏 Wiki 与系列目录
 ├── build-release.sh    # 生产打包脚本
-├── start-dev.sh        # 本地联调脚本
-├── FINAL_FANTASY_XV_WIKI.md
-└── CALL_OF_DUTY_INFINITE_WARFARE_WIKI.md
+└── start-dev.sh        # 本地联调脚本
 ```
 
 ## 开发环境
@@ -144,10 +143,6 @@ npm run dev
 
 - `backend/.env`
 
-可参考：
-
-- [backend/.env.example](/home/Hao/Game/backend/.env.example)
-
 常用配置如下。
 
 ### 服务与路径
@@ -167,17 +162,17 @@ npm run dev
 
 ### 文件访问边界
 
-- `ALLOWED_LIBRARY_ROOTS`
-  允许浏览和登记文件的根目录，多个路径用逗号分隔
 - `PRIMARY_ROM_ROOT`
-  默认 ROM 根目录
+  唯一的 ROM 根目录；目录浏览、文件登记和下载都限制在这个目录及其子目录内
 
 ### 认证与登录限制
 
+- `ADMIN_DISPLAY_NAME`
+  前端显示用的管理员名称；后端运行时读取并通过接口返回给前端
 - `ADMIN_PASSWORD`
   管理员密码
 - `SESSION_SECRET`
-  会话签名密钥
+  会话签名密钥；发布脚本会自动生成一个随机值
 - `AUTH_MAX_FAILS`
   最大连续失败次数
 - `AUTH_COOLDOWN`
@@ -198,12 +193,6 @@ npm run dev
 
 - `PROXY`
   默认出站代理
-- `HTTP_PROXY`
-  HTTP 覆盖代理
-- `HTTPS_PROXY`
-  HTTPS 覆盖代理
-- `STEAM_PROXY`
-  Steam 模块专用代理
 
 ### VHD / VHDX 启动脚本
 
@@ -260,6 +249,26 @@ Wiki 内容使用 Markdown。
 
 后端负责保存内容、生成 HTML 和维护历史记录；前端额外提供目录提取与部分展示增强样式。
 
+仓库内另外维护了一套人工整理的系列 Wiki 文档目录，位于：
+
+- `Wiki/README.md`
+  游戏 Wiki 总目录
+- `Wiki/Assassins Creed/README.md`
+  《刺客信条》系列目录
+- `Wiki/Call Of Duty/README.md`
+  《使命召唤》系列目录
+- `Wiki/Half-Life/README.md`
+  《半条命》系列目录
+- `Wiki/Counter-Strike/README.md`
+  《反恐精英》系列目录
+- `Wiki/Batman/README.md`
+  蝙蝠侠游戏目录
+
+这套目录主要用于沉淀“中文整理型游戏 Wiki”条目，和应用内单游戏 Wiki 能力并不冲突：
+
+- 应用内 Wiki 更偏向每个游戏的数据内容展示与编辑
+- 仓库内 `Wiki/` 更偏向系列索引、写作规范与长期整理沉淀
+
 当前前端还支持题记块语法 `:::epigraph`，适合在条目开头放引言、题记或引用。示例：
 
 ```md
@@ -292,7 +301,8 @@ bash build-release.sh v1.0.0
 - 将前端构建结果复制到后端嵌入目录
 - 编译 `game-server`
 - 生成独立发布目录
-- 写入运行用 `.env` 和 `.env.example`
+- 写入运行用 `.env`
+- 自动生成随机 `SESSION_SECRET`
 
 发布目录类似：
 
@@ -301,7 +311,6 @@ release/game-release-<version>/
 ├── game-server
 ├── start.sh
 ├── .env
-├── .env.example
 ├── data/
 │   ├── gamelist/
 │   └── bg.jpg
@@ -324,7 +333,7 @@ release/game-release-<version>/
 
 也可以将 `game-server` 配成 `systemd` 服务。
 
-即使部署在纯内网环境，当前后端也要求配置 `ADMIN_PASSWORD` 与非默认 `SESSION_SECRET`。如果存在跨网段访问、反向代理暴露或公网入口，仍建议补充 HTTPS、外层访问控制，以及对“局域网免登录下载/启动”边界做网络隔离。
+即使部署在纯内网环境，当前后端也要求配置 `ADMIN_PASSWORD`，并使用安全的 `SESSION_SECRET`。发布脚本会自动写入随机 `SESSION_SECRET`；如果存在跨网段访问、反向代理暴露或公网入口，仍建议补充 HTTPS、外层访问控制，以及对“局域网免登录下载/启动”边界做网络隔离。
 
 ## 后端接口概览
 

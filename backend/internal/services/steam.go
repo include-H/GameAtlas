@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -58,10 +59,7 @@ type steamAppDetailsResponse map[string]struct {
 }
 
 func NewSteamService(cfg config.Config, assetsService *AssetsService) *SteamService {
-	proxy := cfg.SteamProxy
-	if proxy == "" {
-		proxy = cfg.Proxy
-	}
+	proxy := cfg.Proxy
 
 	transport := &http.Transport{Proxy: http.ProxyFromEnvironment}
 	if proxy != "" {
@@ -460,7 +458,7 @@ func (s *SteamService) fetchJSON(endpoint string, target any, proxyOverride stri
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 	req.Header.Set("Referer", "https://store.steampowered.com/")
 
-	resp, err := s.clientForProxy(proxyOverride).Do(req)
+	resp, err := s.doRequest(req, proxyOverride)
 	if err != nil {
 		return err
 	}
@@ -483,7 +481,7 @@ func (s *SteamService) fetchText(endpoint string, proxyOverride string) (string,
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 	req.Header.Set("Referer", "https://store.steampowered.com/")
 
-	resp, err := s.clientForProxy(proxyOverride).Do(req)
+	resp, err := s.doRequest(req, proxyOverride)
 	if err != nil {
 		return "", err
 	}
@@ -498,6 +496,11 @@ func (s *SteamService) fetchText(endpoint string, proxyOverride string) (string,
 		return "", err
 	}
 	return string(body), nil
+}
+
+func (s *SteamService) doRequest(req *http.Request, proxyOverride string) (*http.Response, error) {
+	log.Printf("steam outbound request: method=%s url=%s proxy=%s", req.Method, req.URL.String(), s.proxyLogValue(proxyOverride))
+	return s.clientForProxy(proxyOverride).Do(req)
 }
 
 func (s *SteamService) clientForProxy(proxyOverride string) *http.Client {
@@ -517,6 +520,17 @@ func (s *SteamService) clientForProxy(proxyOverride string) *http.Client {
 	}
 }
 
+func (s *SteamService) proxyLogValue(proxyOverride string) string {
+	proxyOverride = strings.TrimSpace(proxyOverride)
+	if proxyOverride == "" {
+		if strings.TrimSpace(s.proxy) == "" {
+			return "direct"
+		}
+		return s.proxy
+	}
+	return proxyOverride
+}
+
 func (s *SteamService) ProxyAsset(assetURL string, proxyOverride string) (string, []byte, error) {
 	parsed, err := url.Parse(strings.TrimSpace(assetURL))
 	if err != nil {
@@ -526,8 +540,7 @@ func (s *SteamService) ProxyAsset(assetURL string, proxyOverride string) (string
 		return "", nil, ErrValidation
 	}
 
-	host := strings.ToLower(parsed.Hostname())
-	if host == "" || !isAllowedSteamHost(host) {
+	if parsed.Hostname() == "" {
 		return "", nil, ErrValidation
 	}
 
@@ -540,7 +553,7 @@ func (s *SteamService) ProxyAsset(assetURL string, proxyOverride string) (string
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 	req.Header.Set("Referer", "https://store.steampowered.com/")
 
-	resp, err := s.clientForProxy(proxyOverride).Do(req)
+	resp, err := s.doRequest(req, proxyOverride)
 	if err != nil {
 		return "", nil, err
 	}
@@ -555,13 +568,6 @@ func (s *SteamService) ProxyAsset(assetURL string, proxyOverride string) (string
 		return "", nil, err
 	}
 	return strings.TrimSpace(resp.Header.Get("Content-Type")), payload, nil
-}
-
-func isAllowedSteamHost(host string) bool {
-	if host == "store.steampowered.com" {
-		return true
-	}
-	return strings.HasSuffix(host, ".steamstatic.com")
 }
 
 func (s *SteamService) resolveSteamAssetURL(appID int64, proxyOverride string, candidates ...string) *string {

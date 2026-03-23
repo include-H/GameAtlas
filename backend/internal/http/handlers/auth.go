@@ -8,15 +8,20 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/services"
 )
 
 type AuthHandler struct {
-	service *services.AuthService
+	service          *services.AuthService
+	adminDisplayName string
 }
 
-func NewAuthHandler(service *services.AuthService) *AuthHandler {
-	return &AuthHandler{service: service}
+func NewAuthHandler(service *services.AuthService, cfg config.Config) *AuthHandler {
+	return &AuthHandler{
+		service:          service,
+		adminDisplayName: strings.TrimSpace(cfg.AdminDisplayName),
+	}
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
@@ -87,8 +92,9 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"is_admin": isAdminRequest(c),
-			"role":     strings.TrimSpace("admin"),
+			"is_admin":           isAdminRequest(c),
+			"role":               strings.TrimSpace("admin"),
+			"admin_display_name": h.adminDisplayName,
 		},
 	})
 }
