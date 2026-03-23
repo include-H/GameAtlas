@@ -266,12 +266,24 @@ SMB_PASSWORD=game
 VHD_DIFF_ROOT=C:
 ```
 
+如果 `PRIMARY_ROM_ROOT` 下挂了多个 SMB 共享子目录，可以改用：
+
+```env
+PRIMARY_ROM_ROOT=/mnt/Mount/Game
+SMB_PATH_MAPPINGS=/mnt/Mount/Game/Game=\\\\192.168.1.4\\Game1;/mnt/Mount/Game/Gal=\\\\192.168.1.4\\Gal
+SMB_USERNAME=game
+SMB_PASSWORD=game
+VHD_DIFF_ROOT=C:
+```
+
 这些字段的含义：
 
 - `PRIMARY_ROM_ROOT`
   游戏文件真实所在目录。登记文件、目录浏览、文件下载都只能落在这个根目录里。
 - `SMB_SHARE_ROOT`
-  Windows 客户端访问基础 VHD 时使用的 UNC 路径。
+  单根目录场景下，Windows 客户端访问基础 VHD 时使用的 UNC 路径。
+- `SMB_PATH_MAPPINGS`
+  多挂载点场景下使用的映射表。格式是 `<本地路径>=<UNC 路径>`，多个条目用 `;` 分隔；生成 BAT 时会按最长本地前缀匹配对应的共享根。
 - `SMB_USERNAME`
   连接 SMB 共享时写入 BAT 的用户名。
 - `SMB_PASSWORD`
@@ -326,6 +338,7 @@ VHD_DIFF_ROOT=C:
 
 - `SMB_SHARE_ROOT` 配错，客户端根本连不上共享
 - `PRIMARY_ROM_ROOT` 和实际 SMB 暴露目录不是同一套内容
+- `SMB_PATH_MAPPINGS` 没覆盖到实际挂载子目录，或映射到了错误共享
 - 游戏登记的路径不在 `PRIMARY_ROM_ROOT` 内
 - 文件不是 `.vhd` / `.vhdx`
 - Windows 没有管理员权限，`diskpart` 挂载失败

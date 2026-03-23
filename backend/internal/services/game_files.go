@@ -195,8 +195,7 @@ func (s *GameFilesService) RecordDownload(gameID, fileID int64, includeAll bool)
 }
 
 func (s *GameFilesService) BuildLaunchScript(gameID, fileID int64, includeAll bool) (string, string, error) {
-	if strings.TrimSpace(s.cfg.SMBShareRoot) == "" ||
-		strings.TrimSpace(s.cfg.SMBUsername) == "" ||
+	if strings.TrimSpace(s.cfg.SMBUsername) == "" ||
 		strings.TrimSpace(s.cfg.SMBPassword) == "" {
 		return "", "", ErrMissingSMBConfig
 	}
@@ -224,13 +223,13 @@ func (s *GameFilesService) BuildLaunchScript(gameID, fileID int64, includeAll bo
 		return "", "", ErrInvalidLaunchFile
 	}
 
-	baseVHDPath, err := s.buildSMBMountedPath(resolved.ResolvedPath)
+	baseVHDPath, shareRoot, err := s.buildSMBMountedPath(resolved.ResolvedPath)
 	if err != nil {
 		return "", "", err
 	}
 
 	diffFileName := filepath.Base(resolved.ResolvedPath)
-	script := s.renderLaunchScript(game.ID, file.ID, baseVHDPath, diffFileName)
+	script := s.renderLaunchScript(game.ID, file.ID, shareRoot, baseVHDPath, diffFileName)
 	filename := sanitizeBatchFileName(game.Title)
 	if filename == "" {
 		filename = "launch-game"
@@ -268,7 +267,23 @@ func normalizeFileError(err error) error {
 	}
 }
 
-func (s *GameFilesService) buildSMBMountedPath(resolvedPath string) (string, error) {
+func (s *GameFilesService) buildSMBMountedPath(resolvedPath string) (string, string, error) {
+	if mappings, err := s.cfg.ParseSMBPathMappings(); err != nil {
+		return "", "", err
+	} else if len(mappings) > 0 {
+		base, shareRoot, mappingErr := s.buildMappedSMBPath(resolvedPath, mappings)
+		if mappingErr == nil {
+			return base, shareRoot, nil
+		}
+		if !errors.Is(mappingErr, ErrForbiddenPath) {
+			return "", "", mappingErr
+		}
+	}
+
+	if strings.TrimSpace(s.cfg.SMBShareRoot) == "" {
+		return "", "", ErrMissingSMBConfig
+	}
+
 	root := filepath.Clean(strings.TrimSpace(s.cfg.PrimaryROMRoot))
 	if root == "" {
 		root = "ROM"
@@ -276,15 +291,15 @@ func (s *GameFilesService) buildSMBMountedPath(resolvedPath string) (string, err
 
 	resolvedRoot, err := filepath.EvalSymlinks(root)
 	if err != nil {
-		return "", normalizeFileError(err)
+		return "", "", normalizeFileError(err)
 	}
 
 	relative, err := filepath.Rel(resolvedRoot, resolvedPath)
 	if err != nil {
-		return "", ErrForbiddenPath
+		return "", "", ErrForbiddenPath
 	}
 	if relative == "." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || relative == ".." {
-		return "", ErrForbiddenPath
+		return "", "", ErrForbiddenPath
 	}
 
 	relativeWindows := strings.ReplaceAll(filepath.ToSlash(relative), "/", `\`)
@@ -297,11 +312,48 @@ func (s *GameFilesService) buildSMBMountedPath(resolvedPath string) (string, err
 		base += `\` + relativeWindows
 	}
 
-	return base, nil
+	return base, normalizeUNCPath(s.cfg.SMBShareRoot), nil
 }
 
-func (s *GameFilesService) renderLaunchScript(gameID, fileID int64, baseVHDPath string, diffFileName string) string {
-	shareRoot := normalizeUNCPath(s.cfg.SMBShareRoot)
+func (s *GameFilesService) buildMappedSMBPath(resolvedPath string, mappings []config.SMBPathMapping) (string, string, error) {
+	longestPrefixLength := -1
+	selectedBase := ""
+	selectedShareRoot := ""
+
+	for _, mapping := range mappings {
+		resolvedRoot, err := filepath.EvalSymlinks(mapping.LocalRoot)
+		if err != nil {
+			return "", "", normalizeFileError(err)
+		}
+
+		relative, err := filepath.Rel(resolvedRoot, resolvedPath)
+		if err != nil || relative == "." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || relative == ".." {
+			continue
+		}
+
+		relativeWindows := strings.ReplaceAll(filepath.ToSlash(relative), "/", `\`)
+		shareRoot := normalizeUNCPath(mapping.ShareRoot)
+		base := shareRoot
+		if relativeWindows != "" {
+			base += `\` + relativeWindows
+		}
+
+		if len(resolvedRoot) > longestPrefixLength {
+			longestPrefixLength = len(resolvedRoot)
+			selectedBase = base
+			selectedShareRoot = shareRoot
+		}
+	}
+
+	if longestPrefixLength == -1 {
+		return "", "", ErrForbiddenPath
+	}
+
+	return selectedBase, selectedShareRoot, nil
+}
+
+func (s *GameFilesService) renderLaunchScript(gameID, fileID int64, shareRoot string, baseVHDPath string, diffFileName string) string {
+	shareRoot = normalizeUNCPath(shareRoot)
 	shareHost := extractSMBHost(shareRoot)
 
 	var script bytes.Buffer

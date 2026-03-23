@@ -21,6 +21,7 @@ type Config struct {
 	PrimaryROMRoot    string
 	Proxy             string
 	SMBShareRoot      string
+	SMBPathMappings   string
 	SMBUsername       string
 	SMBPassword       string
 	VHDDiffRoot       string
@@ -53,6 +54,7 @@ func Load() Config {
 		PrimaryROMRoot:    primaryROMRoot,
 		Proxy:             proxy,
 		SMBShareRoot:      getEnv("SMB_SHARE_ROOT", ""),
+		SMBPathMappings:   getEnv("SMB_PATH_MAPPINGS", ""),
 		SMBUsername:       getEnv("SMB_USERNAME", ""),
 		SMBPassword:       getEnv("SMB_PASSWORD", ""),
 		VHDDiffRoot:       getEnv("VHD_DIFF_ROOT", `C:`),
@@ -81,7 +83,49 @@ func (c Config) Validate() error {
 	if _, err := parseProxyURL(c.Proxy); err != nil {
 		return err
 	}
+	if _, err := c.ParseSMBPathMappings(); err != nil {
+		return err
+	}
 	return nil
+}
+
+type SMBPathMapping struct {
+	LocalRoot string
+	ShareRoot string
+}
+
+func (c Config) ParseSMBPathMappings() ([]SMBPathMapping, error) {
+	raw := strings.TrimSpace(c.SMBPathMappings)
+	if raw == "" {
+		return nil, nil
+	}
+
+	entries := strings.Split(raw, ";")
+	mappings := make([]SMBPathMapping, 0, len(entries))
+	for _, entry := range entries {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+
+		localRoot, shareRoot, ok := strings.Cut(entry, "=")
+		if !ok {
+			return nil, fmt.Errorf("invalid SMB_PATH_MAPPINGS entry %q: expected <local-path>=<unc-path>", entry)
+		}
+
+		localRoot = strings.TrimSpace(localRoot)
+		shareRoot = strings.TrimSpace(shareRoot)
+		if localRoot == "" || shareRoot == "" {
+			return nil, fmt.Errorf("invalid SMB_PATH_MAPPINGS entry %q: local path and UNC path are required", entry)
+		}
+
+		mappings = append(mappings, SMBPathMapping{
+			LocalRoot: filepath.Clean(localRoot),
+			ShareRoot: shareRoot,
+		})
+	}
+
+	return mappings, nil
 }
 
 func (c Config) ProxyLogValue() string {

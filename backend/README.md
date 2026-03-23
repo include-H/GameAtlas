@@ -161,6 +161,8 @@ go run ./cmd/server
 
 - `SMB_SHARE_ROOT`
   生成 BAT 时使用的 UNC 根路径，例如 `\\192.168.1.4\Game`
+- `SMB_PATH_MAPPINGS`
+  多挂载点场景下使用的“本地路径=UNC 根路径”映射，多个条目用 `;` 分隔，例如 `/mnt/Mount/Game/Game=\\\\192.168.1.4\\Game1;/mnt/Mount/Game/Gal=\\\\192.168.1.4\\Gal`
 - `SMB_USERNAME`
   固定 SMB 用户名
 - `SMB_PASSWORD`
