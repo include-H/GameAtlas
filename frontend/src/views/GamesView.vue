@@ -43,9 +43,6 @@
                 <icon-search />
               </template>
             </a-input>
-            <a-button class="app-input-action-row__action" type="secondary" @click="handleSearch">
-              搜索
-            </a-button>
           </div>
         </a-col>
 
@@ -81,7 +78,7 @@
         </a-col>
 
         <a-col :xs="24" :sm="8" :md="4" :lg="4" :xl="4" :xxl="4" class="games-filters-col games-filters-col--tags">
-          <a-button class="games-filter-drawer-btn" type="secondary" long @click="showTagFilters = !showTagFilters">
+          <a-button class="games-filter-drawer-btn" type="text" long @click="showTagFilters = !showTagFilters">
             <template #icon>
               <icon-filter />
             </template>
@@ -264,7 +261,7 @@
       </template>
       <a-button
         v-if="hasActiveFilters"
-        type="secondary"
+        type="text"
         @click="clearFilters"
       >
         清除筛选

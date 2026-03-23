@@ -63,7 +63,7 @@
         </template>
         <template v-else>
           <span>继续下滑加载更多月份</span>
-          <a-button type="outline" size="small" @click="handleManualLoadMore">
+          <a-button type="text" size="small" @click="handleManualLoadMore">
             加载更多
           </a-button>
         </template>

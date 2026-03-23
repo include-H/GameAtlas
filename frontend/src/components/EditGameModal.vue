@@ -248,7 +248,7 @@
                 placeholder="版本备注"
                 class="file-label-input"
               />
-              <a-button type="secondary" html-type="button" @click="openFileBrowser(index)">
+              <a-button type="text" html-type="button" @click="openFileBrowser(index)">
                 <template #icon>
                   <icon-folder />
                 </template>
@@ -266,7 +266,7 @@
           </div>
           
           <a-button
-            type="secondary"
+            type="text"
             long
             html-type="button"
             @click="addFilePath"
@@ -301,7 +301,7 @@
                     <div class="media-overlay-actions">
                       <a-button
                         class="media-action-button"
-                        type="secondary"
+                        type="text"
                         shape="circle"
                         size="small"
                         html-type="button"
@@ -311,7 +311,7 @@
                       </a-button>
                       <a-button
                         class="media-action-button media-action-button--danger"
-                        type="secondary"
+                        type="text"
                         status="danger"
                         shape="circle"
                         size="small"
@@ -357,7 +357,7 @@
                     <div class="media-overlay-actions">
                       <a-button
                         class="media-action-button"
-                        type="secondary"
+                        type="text"
                         shape="circle"
                         size="small"
                         html-type="button"
@@ -367,7 +367,7 @@
                       </a-button>
                       <a-button
                         class="media-action-button media-action-button--danger"
-                        type="secondary"
+                        type="text"
                         status="danger"
                         shape="circle"
                         size="small"
@@ -414,7 +414,7 @@
 	                    <div class="media-overlay-actions">
 	                      <a-button
                           class="media-action-button"
-                          type="secondary"
+                          type="text"
                           shape="circle"
                           size="small"
                           html-type="button"
@@ -483,7 +483,7 @@
                         <div class="screenshot-overlay">
 	                          <a-button
 	                            class="media-action-button media-action-button--danger"
-	                            type="secondary"
+	                            type="text"
 	                            status="danger"
 	                            shape="circle"
 	                            size="small"
@@ -513,7 +513,7 @@
 
 		      <a-form-item>
 	        <a-space style="justify-content: flex-end; width: 100%">
-          <a-button type="secondary" html-type="button" @click="handleCancel">取消</a-button>
+          <a-button type="text" html-type="button" @click="handleCancel">取消</a-button>
           <a-button type="primary" html-type="submit" :loading="isSubmitting">
             保存
           </a-button>
@@ -638,7 +638,7 @@
           @success="handleCoverUploadSuccess"
           @error="handleCoverUploadError"
         >
-          <a-button type="secondary" long html-type="button">
+          <a-button type="text" long html-type="button">
             <template #icon>
               <icon-upload />
             </template>
@@ -656,7 +656,7 @@
             placeholder="输入图片 URL..."
             @press-enter="loadCoverFromUrl"
           />
-          <a-button class="url-input-row__action" type="secondary" html-type="button" @click="loadCoverFromUrl">
+          <a-button class="url-input-row__action" type="text" html-type="button" @click="loadCoverFromUrl">
             加载
           </a-button>
         </div>
@@ -664,7 +664,7 @@
           <img :src="coverPreviewUrl" @error="handleCoverError" />
         </div>
         <div class="cover-selector-actions">
-          <a-button type="secondary" html-type="button" @click="showCoverSelector = false">取消</a-button>
+          <a-button type="text" html-type="button" @click="showCoverSelector = false">取消</a-button>
           <a-button type="primary" html-type="button" :disabled="!coverPreviewUrl" :loading="isDownloadingCover" @click="confirmCoverSelection">
             确定
           </a-button>
@@ -734,7 +734,7 @@
           @success="handleBannerUploadSuccess"
           @error="handleBannerUploadError"
         >
-          <a-button type="secondary" long html-type="button">
+          <a-button type="text" long html-type="button">
             <template #icon>
               <icon-upload />
             </template>
@@ -752,7 +752,7 @@
             placeholder="输入图片 URL..."
             @press-enter="loadBannerFromUrl"
           />
-          <a-button class="url-input-row__action" type="secondary" html-type="button" @click="loadBannerFromUrl">
+          <a-button class="url-input-row__action" type="text" html-type="button" @click="loadBannerFromUrl">
             加载
           </a-button>
         </div>
@@ -760,7 +760,7 @@
           <img :src="bannerPreviewUrl" @error="handleCoverError" />
         </div>
         <div class="cover-selector-actions">
-          <a-button type="secondary" html-type="button" @click="showBannerSelector = false">取消</a-button>
+          <a-button type="text" html-type="button" @click="showBannerSelector = false">取消</a-button>
           <a-button type="primary" html-type="button" :disabled="!bannerPreviewUrl" :loading="isDownloadingBanner" @click="confirmBannerSelection">
             确定
           </a-button>
@@ -846,7 +846,7 @@
           @success="handleScreenshotUploadSuccess"
           @error="handleScreenshotUploadError"
         >
-          <a-button type="secondary" long html-type="button">
+          <a-button type="text" long html-type="button">
             <template #icon>
               <icon-upload />
             </template>
@@ -865,7 +865,7 @@
               placeholder="输入图片 URL..."
               @press-enter="loadScreenshotPreview"
             />
-            <a-button class="url-input-row__action" type="secondary" html-type="button" @click="loadScreenshotPreview">
+            <a-button class="url-input-row__action" type="text" html-type="button" @click="loadScreenshotPreview">
               加载
             </a-button>
           </div>
@@ -878,7 +878,7 @@
 
         <!-- 操作按钮 -->
         <div class="cover-selector-actions">
-          <a-button type="secondary" html-type="button" @click="showScreenshotSelector = false">取消</a-button>
+          <a-button type="text" html-type="button" @click="showScreenshotSelector = false">取消</a-button>
           <a-button type="primary" html-type="button" :disabled="!screenshotPreviewUrl" :loading="isDownloadingScreenshot" @click="confirmScreenshotSelection">
             确定
           </a-button>
@@ -900,7 +900,7 @@
 	          class="hidden-file-input"
 	          @change="handleVideoFileChange"
 	        />
-	        <a-button type="secondary" long html-type="button" :loading="isUploadingVideo" @click="openVideoFilePicker">
+	        <a-button type="text" long html-type="button" :loading="isUploadingVideo" @click="openVideoFilePicker">
 	          <template #icon>
 	            <icon-upload />
 	          </template>
@@ -992,7 +992,7 @@
 	          class="video-library-empty"
 	        />
 	        <div class="cover-selector-actions">
-	          <a-button type="secondary" html-type="button" @click="showVideoSelector = false">完成</a-button>
+	          <a-button type="text" html-type="button" @click="showVideoSelector = false">完成</a-button>
 	        </div>
 	      </div>
 	    </a-modal>
@@ -1033,7 +1033,7 @@
           </div>
 
           <div class="cover-selector-actions">
-            <a-button type="secondary" html-type="button" @click="wikiTagPickerVisible = false">取消</a-button>
+            <a-button type="text" html-type="button" @click="wikiTagPickerVisible = false">取消</a-button>
             <a-button
               type="primary"
               html-type="button"
@@ -2581,11 +2581,12 @@ const applySelectedWikiTags = async () => {
 
     const grouped = new Map<WikiTagGroupKey, string[]>()
     for (const item of selected) {
-      const values = grouped.get(item.groupKey) || []
+      const groupKey = item.groupKey as WikiTagGroupKey
+      const values = grouped.get(groupKey) || []
       if (!values.some((value) => value.toLowerCase() === item.value.toLowerCase())) {
         values.push(item.value)
       }
-      grouped.set(item.groupKey, values)
+      grouped.set(groupKey, values)
     }
 
     const appliedLabels: string[] = []

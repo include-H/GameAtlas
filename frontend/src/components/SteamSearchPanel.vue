@@ -16,7 +16,7 @@
       </a-input>
       <a-button
         class="app-input-action-row__action"
-        type="secondary"
+        type="text"
         :loading="loading"
         @click="emit('search')"
       >

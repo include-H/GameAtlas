@@ -12,7 +12,7 @@
         <a-space>
           <a-button 
             class="app-secondary-compact"
-            type="secondary"
+            type="text"
             size="small" 
             :disabled="!canGoUp" 
             @click="goToParent"
@@ -55,7 +55,7 @@
               <a-button 
                 v-if="item.type === 'file'" 
                 class="app-secondary-compact"
-                type="secondary" 
+                type="text" 
                 size="small"
                 @click.stop="selectFile(item)"
               >

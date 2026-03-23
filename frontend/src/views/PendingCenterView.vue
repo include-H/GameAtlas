@@ -7,7 +7,7 @@
       </div>
 
       <a-space>
-        <a-button type="secondary" @click="loadPendingGames">
+        <a-button type="text" @click="loadPendingGames">
           <template #icon>
             <icon-refresh />
           </template>
@@ -51,7 +51,7 @@
                 <icon-search />
               </template>
             </a-input>
-            <a-button class="app-input-action-row__action" type="secondary" @click="loadPendingGames">
+            <a-button class="app-input-action-row__action" type="text" @click="loadPendingGames">
               搜索
             </a-button>
           </div>
@@ -297,13 +297,13 @@
                 </template>
                 编辑资料
               </a-button>
-              <a-button type="secondary" @click="openWiki(activeGame)">
+              <a-button type="text" @click="openWiki(activeGame)">
                 <template #icon>
                   <icon-book />
                 </template>
                 编辑 Wiki
               </a-button>
-              <a-button type="secondary" @click="viewGame(activeGame)">
+              <a-button type="text" @click="viewGame(activeGame)">
                 <template #icon>
                   <icon-right />
                 </template>

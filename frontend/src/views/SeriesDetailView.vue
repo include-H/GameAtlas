@@ -1,7 +1,7 @@
 <template>
   <div class="series-detail">
     <div class="series-detail__header page-hero">
-      <a-button class="app-page-back" type="secondary" @click="handleGoBack">
+      <a-button class="header-favorite-btn back-button" type="text" @click="handleGoBack">
         <template #icon>
           <icon-left />
         </template>
@@ -133,6 +133,10 @@ watchRouteParamWhenActive(
 
 .series-detail__subtitle {
   margin: 0;
+}
+
+.back-button {
+  align-self: flex-start;
 }
 
 .series-detail__loading {

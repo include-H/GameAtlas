@@ -186,12 +186,17 @@ const pickGameDetailBackground = async (gameId: string) => {
 const pickWikiEditBackground = async (gameId: string) => {
   try {
     const detail = await gamesService.getGame(gameId)
-    const bannerUrl = resolveAssetUrl(detail.banner_image)
-    if (bannerUrl && (await preloadImage(bannerUrl))) {
-      return bannerUrl
+    const screenshots = shuffleArray(detail.screenshots || [])
+    for (const screenshot of screenshots) {
+      const resolvedUrl = resolveAssetUrl(screenshot)
+      if (!resolvedUrl) continue
+
+      const size = await probeImageSize(resolvedUrl)
+      if (isQualifiedBackground(size)) {
+        return resolvedUrl
+      }
     }
 
-    const screenshots = shuffleArray(detail.screenshots || [])
     for (const screenshot of screenshots) {
       const resolvedUrl = resolveAssetUrl(screenshot)
       if (!resolvedUrl) continue
@@ -199,6 +204,16 @@ const pickWikiEditBackground = async (gameId: string) => {
       if (await preloadImage(resolvedUrl)) {
         return resolvedUrl
       }
+    }
+
+    const bannerUrl = resolveAssetUrl(detail.banner_image)
+    if (bannerUrl && (await preloadImage(bannerUrl))) {
+      return bannerUrl
+    }
+
+    const coverUrl = resolveAssetUrl(detail.cover_image)
+    if (coverUrl && (await preloadImage(coverUrl))) {
+      return coverUrl
     }
 
     return ''

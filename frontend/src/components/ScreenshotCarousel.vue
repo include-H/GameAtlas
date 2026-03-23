@@ -4,7 +4,7 @@
       <a-button
         v-if="mediaItems.length > 1"
         class="screenshot-carousel__arrow screenshot-carousel__arrow--prev"
-        type="secondary"
+        type="text"
         shape="circle"
         @click="prevImage"
         aria-label="上一张"
@@ -47,7 +47,7 @@
       <a-button
         v-if="mediaItems.length > 1"
         class="screenshot-carousel__arrow screenshot-carousel__arrow--next"
-        type="secondary"
+        type="text"
         shape="circle"
         @click="nextImage"
         aria-label="下一张"

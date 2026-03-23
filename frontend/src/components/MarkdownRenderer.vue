@@ -50,26 +50,43 @@ function splitCnEpigraphSegments(line: string): string[] {
   return segments.length > 0 ? segments : [normalized]
 }
 
+function renderCnEpigraphSegment(segment: string): string {
+  const match = segment.match(/^(.*?)([，。！？；：、,.!?;:]+)?$/u)
+
+  if (!match) {
+    return md.renderInline(segment)
+  }
+
+  const content = match[1] ?? ''
+  const punctuation = match[2] ?? ''
+  const contentHtml = content ? `<span class="epigraph__segment-text">${md.renderInline(content)}</span>` : ''
+  const punctuationHtml = punctuation
+    ? `<span class="epigraph__punctuation">${md.renderInline(punctuation)}</span>`
+    : ''
+
+  return `${contentHtml}${punctuationHtml}`
+}
+
 function getCnEpigraphTypography(line: string): { fontSize: string; letterSpacing: string } {
-  const contentLength = line.replace(/\s+/g, '').length
+  const contentLength = line.replace(/[\s，。！？；：、“”‘’「」『』（）()《》〈〉【】〔〕,.!?;:]/gu, '').length
 
   if (contentLength >= 42) {
     return {
       fontSize: 'clamp(0.92rem, 0.72vw + 0.68rem, 1.08rem)',
-      letterSpacing: '0.08em',
+      letterSpacing: '0.03em',
     }
   }
 
   if (contentLength >= 24) {
     return {
       fontSize: 'clamp(0.98rem, 0.9vw + 0.66rem, 1.2rem)',
-      letterSpacing: '0.12em',
+      letterSpacing: '0.05em',
     }
   }
 
   return {
     fontSize: 'clamp(1.04rem, 1.15vw + 0.68rem, 1.32rem)',
-    letterSpacing: '0.16em',
+    letterSpacing: '0.07em',
   }
 }
 
@@ -104,7 +121,7 @@ function buildEpigraphHtml(blockContent: string): string {
         const segments = splitCnEpigraphSegments(line)
         const typography = getCnEpigraphTypography(line)
         const segmentHtml = segments
-          .map((segment) => `<span class="epigraph__segment">${md.renderInline(segment)}</span>`)
+          .map((segment) => `<span class="epigraph__segment">${renderCnEpigraphSegment(segment)}</span>`)
           .join('')
 
         return `<p class="epigraph__line epigraph__line--${lineType}" style="font-size: ${typography.fontSize}; letter-spacing: ${typography.letterSpacing};">${segmentHtml}</p>`
@@ -118,7 +135,7 @@ function buildEpigraphHtml(blockContent: string): string {
     ? `<figcaption class="epigraph__author">—— ${md.renderInline(author)}</figcaption>`
     : ''
 
-  return `<figure class="epigraph"><blockquote class="epigraph__body">${body}</blockquote>${caption}</figure>`
+  return `<figure class="epigraph"><div class="epigraph__content"><blockquote class="epigraph__body">${body}</blockquote>${caption}</div></figure>`
 }
 
 function renderEpigraphBlocks(content: string): string {
@@ -251,16 +268,19 @@ const renderedHtml = computed(() => {
 }
 
 .markdown-renderer :deep(.epigraph) {
-  position: relative;
   margin: 2em auto;
-  padding: 1.8em 3.4em 1.2em;
   max-width: 900px;
   text-align: center;
   color: color-mix(in srgb, var(--color-text-1) 78%, #6f7f93 22%);
 }
 
-.markdown-renderer :deep(.epigraph::before),
-.markdown-renderer :deep(.epigraph::after) {
+.markdown-renderer :deep(.epigraph__content) {
+  position: relative;
+  padding: 1.35em 3.4em;
+}
+
+.markdown-renderer :deep(.epigraph__content::before),
+.markdown-renderer :deep(.epigraph__content::after) {
   position: absolute;
   font-size: clamp(2.75rem, 5vw, 4.2rem);
   line-height: 1;
@@ -269,16 +289,18 @@ const renderedHtml = computed(() => {
   pointer-events: none;
 }
 
-.markdown-renderer :deep(.epigraph::before) {
+.markdown-renderer :deep(.epigraph__content::before) {
   content: '“';
-  top: 0.15em;
-  left: 0.1em;
+  top: 0;
+  left: 0;
+  transform: translate(0.1em, 0.15em);
 }
 
-.markdown-renderer :deep(.epigraph::after) {
+.markdown-renderer :deep(.epigraph__content::after) {
   content: '”';
-  right: 0.1em;
-  bottom: 0.45em;
+  right: 0;
+  bottom: 0;
+  transform: translate(-0.08em, 0.3em);
 }
 
 .markdown-renderer :deep(.epigraph__body) {
@@ -302,7 +324,18 @@ const renderedHtml = computed(() => {
 }
 
 .markdown-renderer :deep(.epigraph__segment) {
+  display: inline-flex;
+  align-items: baseline;
   white-space: nowrap;
+}
+
+.markdown-renderer :deep(.epigraph__segment-text) {
+  letter-spacing: inherit;
+}
+
+.markdown-renderer :deep(.epigraph__punctuation) {
+  letter-spacing: 0;
+  margin-left: -0.08em;
 }
 
 .markdown-renderer :deep(.epigraph__line--en) {

@@ -10,7 +10,7 @@
   <a-layout v-else class="app-layout">
     <a-layout-header class="pro-header glass-header">
       <div class="header-left">
-        <div class="logo hover-glow" @click="handleLogoClick">
+        <div class="logo">
           <icon-trophy :size="28" />
           <span class="logo-text">{{ appName }}</span>
         </div>
@@ -177,10 +177,6 @@ const syncOpenKeysWithRoute = () => {
   mobileOpenKeys.value = [...routeOpenKeys.value]
 }
 
-const handleLogoClick = () => {
-  router.push({ name: 'dashboard' })
-}
-
 const handleAuthAction = async () => {
   if (!isAdmin.value) {
     if (router.currentRoute.value.name === 'login') {
@@ -300,8 +296,9 @@ provide('showMessage', showMessage)
   justify-content: space-between;
   align-items: center;
   padding: 0 24px;
-  background: var(--color-bg-2);
-  border-bottom: 1px solid var(--color-border-2);
+  background: var(--app-header-surface);
+  border-bottom: 1px solid var(--app-header-border);
+  box-shadow: var(--app-header-shadow);
   height: 56px;
   line-height: 56px;
   position: fixed;
@@ -316,6 +313,8 @@ provide('showMessage', showMessage)
 .pro-header .header-right {
   display: flex;
   align-items: center;
+  position: relative;
+  z-index: 1;
 }
 
 .pro-header .logo {
@@ -323,32 +322,52 @@ provide('showMessage', showMessage)
   align-items: center;
   gap: 10px;
   color: var(--color-primary-6);
-  cursor: pointer;
   padding: 4px 12px;
   border-radius: var(--radius-md);
+  background: transparent;
   border: none;
-  outline: none;
-  transition: all var(--transition-fast);
 }
 
-.pro-header .logo:hover {
-  background: transparent;
-  box-shadow: none !important;
+.pro-header .logo :deep(.arco-icon) {
+  color: color-mix(in srgb, var(--color-primary-light-2) 24%, var(--color-primary-6));
+  filter: drop-shadow(0 0 6px rgba(26, 159, 255, 0.16));
 }
 
 .pro-header .logo-text {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg, var(--color-primary-light-3), var(--color-primary-6));
+  background: linear-gradient(135deg, #d8f0ff, var(--color-primary-light-3) 45%, var(--color-primary-6));
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
+  text-shadow:
+    0 0 10px rgba(130, 204, 255, 0.12),
+    0 0 22px rgba(26, 159, 255, 0.06);
 }
 
 .welcome-text {
-  color: var(--color-text-2);
+  color: color-mix(in srgb, var(--color-text-1) 68%, var(--color-primary-light-2) 32%);
   font-size: 14px;
   white-space: nowrap;
+}
+
+.pro-header :deep(.arco-btn-text) {
+  border-radius: 0;
+  color: var(--color-text-2);
+  background-color: transparent;
+  transition:
+    color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.pro-header :deep(.arco-btn-text:hover) {
+  color: var(--color-text-1);
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.pro-header :deep(.arco-btn-text .arco-icon) {
+  color: inherit;
 }
 
 .app-sider__inner {
@@ -499,13 +518,29 @@ body {
   font-weight: 600;
 }
 
-.app-sider .arco-layout-sider-trigger {
-  background: var(--color-fill-1);
-  border-top: 1px solid var(--color-border-1);
-  transition: background-color 0.2s;
+.app-sider :is(.arco-layout-sider-trigger, .arco-layout-sider-trigger-light) {
+  height: 48px;
+  background: color-mix(in srgb, var(--app-card-surface) 82%, rgba(26, 159, 255, 0.08));
+  border-top: 1px solid color-mix(in srgb, var(--app-card-border) 84%, rgba(130, 204, 255, 0.18));
+  color: color-mix(in srgb, var(--color-text-1) 74%, var(--color-primary-light-2) 26%);
+  backdrop-filter: blur(14px) saturate(135%);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
-.app-sider .arco-layout-sider-trigger:hover {
-  background: var(--color-fill-2);
+.app-sider :is(.arco-layout-sider-trigger, .arco-layout-sider-trigger-light):hover {
+  background: color-mix(in srgb, var(--app-card-surface) 72%, rgba(26, 159, 255, 0.14));
+  color: var(--color-text-1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 -10px 24px rgba(26, 159, 255, 0.08);
+}
+
+.app-sider :is(.arco-layout-sider-trigger, .arco-layout-sider-trigger-light) .arco-icon {
+  color: inherit;
 }
 </style>

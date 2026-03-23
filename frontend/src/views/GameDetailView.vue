@@ -4,7 +4,7 @@
       <!-- Game Header Navigation & Title -->
       <div class="game-detail__header">
         <div class="header-content">
-        <a-button class="app-page-back" type="secondary" @click="handleGoBack">
+        <a-button class="header-favorite-btn back-button" type="text" @click="handleGoBack">
           <template #icon>
             <icon-left />
           </template>
@@ -184,7 +184,7 @@
                 <a-button
                   v-if="version.canLaunch"
                   class="version-action-btn version-action-btn--secondary"
-                  type="secondary"
+                  type="text"
                   @click.stop="handleDownloadLaunchScript(version)"
                 >
                   开始游玩
@@ -562,6 +562,10 @@ onUnmounted(() => {
 .header-actions {
   display: flex;
   gap: 8px;
+}
+
+.back-button {
+  align-self: flex-start;
 }
 
 /* Main Content Layout - 固定比例: 左侧70%, 右侧30% */

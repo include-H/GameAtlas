@@ -27,7 +27,7 @@
     </a-form>
 
     <div class="add-game-modal__actions">
-      <a-button type="secondary" @click="handleCancel">
+      <a-button type="text" @click="handleCancel">
         取消
       </a-button>
       <a-button type="primary" :loading="isSubmitting" @click="handleSubmit">

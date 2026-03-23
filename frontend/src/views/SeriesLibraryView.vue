@@ -5,21 +5,23 @@
         <h1 class="series-library__title page-hero__title text-gradient">系列库</h1>
         <p class="series-library__subtitle page-hero__subtitle">按系列浏览，再进入对应作品集合。</p>
       </div>
-      <div class="series-library__search app-input-action-row">
-        <a-input
-          v-model="searchQuery"
-          class="app-input-action-row__field"
-          placeholder="搜索系列"
-          allow-clear
-          @press-enter="loadSeries"
-        >
-          <template #prefix>
-            <icon-search />
-          </template>
-        </a-input>
-        <a-button class="app-input-action-row__action" type="secondary" @click="loadSeries">
-          搜索
-        </a-button>
+      <div class="series-library__search">
+        <div class="series-library__search-body app-input-action-row">
+          <a-input
+            v-model="searchQuery"
+            class="app-input-action-row__field"
+            placeholder="搜索系列"
+            allow-clear
+            @press-enter="loadSeries"
+          >
+            <template #prefix>
+              <icon-search />
+            </template>
+          </a-input>
+          <a-button class="app-input-action-row__action" type="text" @click="loadSeries">
+            搜索
+          </a-button>
+        </div>
       </div>
     </div>
 
@@ -183,6 +185,18 @@ onBeforeUnmount(() => {
 
 .series-library__search {
   width: min(320px, 100%);
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  box-shadow: var(--shadow-soft);
+}
+
+.series-library__search-body {
+  width: 100%;
+  padding: 12px;
+  box-sizing: border-box;
 }
 
 .series-library__meta {
@@ -345,6 +359,10 @@ onBeforeUnmount(() => {
 
   .series-library__search {
     width: 100%;
+  }
+
+  .series-library__search-body {
+    padding: 10px;
   }
 
   .series-library__grid {

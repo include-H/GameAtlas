@@ -20,7 +20,7 @@
           <a-button
             class="app-secondary-compact"
             size="small"
-            type="secondary"
+            type="text"
             @click="scrollLeft"
           >
             <template #icon>
@@ -30,7 +30,7 @@
           <a-button
             class="app-secondary-compact"
             size="small"
-            type="secondary"
+            type="text"
             @click="scrollRight"
           >
             <template #icon>
