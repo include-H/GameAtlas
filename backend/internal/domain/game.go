@@ -46,19 +46,19 @@ type GameFile struct {
 	SortOrder       int     `db:"sort_order"`
 	CreatedAt       string  `db:"created_at"`
 	UpdatedAt       string  `db:"updated_at"`
-	SourceCreatedAt *string `db:"-" json:"source_created_at"`
+	SourceCreatedAt *string `db:"source_created_at" json:"source_created_at"`
 }
 
 type MetadataItem struct {
-	ID              int64   `db:"id" json:"id"`
-	Name            string  `db:"name" json:"name"`
-	Slug            string  `db:"slug" json:"slug"`
-	SortOrder       int     `db:"sort_order" json:"sort_order"`
-	CreatedAt       string  `db:"created_at" json:"created_at"`
-	GameCount       int     `json:"game_count,omitempty"`
-	CoverImage      *string `json:"cover_image,omitempty"`
+	ID              int64    `db:"id" json:"id"`
+	Name            string   `db:"name" json:"name"`
+	Slug            string   `db:"slug" json:"slug"`
+	SortOrder       int      `db:"sort_order" json:"sort_order"`
+	CreatedAt       string   `db:"created_at" json:"created_at"`
+	GameCount       int      `json:"game_count,omitempty"`
+	CoverImage      *string  `json:"cover_image,omitempty"`
 	CoverCandidates []string `json:"cover_candidates,omitempty"`
-	LatestUpdatedAt *string `json:"latest_updated_at,omitempty"`
+	LatestUpdatedAt *string  `json:"latest_updated_at,omitempty"`
 }
 
 type MetadataWriteInput struct {

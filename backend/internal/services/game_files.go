@@ -60,6 +60,14 @@ func (s *GameFilesService) List(gameID int64, includeAll bool) ([]domain.GameFil
 	if files == nil {
 		return []domain.GameFile{}, nil
 	}
+	for index := range files {
+		if !populateSourceCreatedAt(s.fileGuard, &files[index]) {
+			continue
+		}
+		if err := s.gameFilesRepo.UpdateSourceCreatedAt(gameID, files[index].ID, files[index].SourceCreatedAt); err != nil {
+			return nil, err
+		}
+	}
 	return files, nil
 }
 
@@ -85,6 +93,11 @@ func (s *GameFilesService) Create(gameID int64, input domain.GameFileWriteInput)
 	file.SizeBytes = &resolved.SizeBytes
 	if err := s.gameFilesRepo.UpdateSizeBytes(gameID, file.ID, resolved.SizeBytes); err != nil {
 		return nil, err
+	}
+	if populateSourceCreatedAt(s.fileGuard, file) {
+		if err := s.gameFilesRepo.UpdateSourceCreatedAt(gameID, file.ID, file.SourceCreatedAt); err != nil {
+			return nil, err
+		}
 	}
 
 	return file, nil
@@ -112,6 +125,12 @@ func (s *GameFilesService) Update(gameID, fileID int64, input domain.GameFileWri
 	file.SizeBytes = &resolved.SizeBytes
 	if err := s.gameFilesRepo.UpdateSizeBytes(gameID, fileID, resolved.SizeBytes); err != nil {
 		return nil, err
+	}
+	file.SourceCreatedAt = nil
+	if populateSourceCreatedAt(s.fileGuard, file) {
+		if err := s.gameFilesRepo.UpdateSourceCreatedAt(gameID, fileID, file.SourceCreatedAt); err != nil {
+			return nil, err
+		}
 	}
 
 	return file, nil

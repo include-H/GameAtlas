@@ -11,6 +11,7 @@ import (
 
 	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/domain"
+	"github.com/hao/game/internal/files"
 	"github.com/hao/game/internal/repositories"
 )
 
@@ -22,6 +23,7 @@ type GamesService struct {
 	gameFilesRepo *repositories.GameFilesRepository
 	metadataRepo  *repositories.MetadataRepository
 	tagsRepo      *repositories.TagsRepository
+	fileGuard     *files.Guard
 }
 
 type GamesListResult struct {
@@ -66,6 +68,7 @@ func NewGamesService(cfg config.Config, gamesRepo *repositories.GamesRepository,
 		gameFilesRepo: gameFilesRepo,
 		metadataRepo:  metadataRepo,
 		tagsRepo:      tagsRepo,
+		fileGuard:     files.NewGuard(cfg.PrimaryROMRoot),
 	}
 }
 
@@ -195,6 +198,14 @@ func (s *GamesService) GetDetail(id int64, includeAll bool) (*GameDetail, error)
 	files, err := s.gameFilesRepo.ListByGameID(id)
 	if err != nil {
 		return nil, err
+	}
+	for index := range files {
+		if !populateSourceCreatedAt(s.fileGuard, &files[index]) {
+			continue
+		}
+		if err := s.gameFilesRepo.UpdateSourceCreatedAt(id, files[index].ID, files[index].SourceCreatedAt); err != nil {
+			return nil, err
+		}
 	}
 
 	var previewVideo *domain.GameAsset
