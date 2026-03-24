@@ -463,11 +463,6 @@ body .arco-btn-text.arco-btn-status-warning:hover {
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.arco-card:hover {
-  border-color: var(--app-glass-border-hover);
-  box-shadow: var(--app-glass-shadow-hover);
-}
-
 body[arco-theme='light'] .arco-card {
   background: var(--app-card-surface);
   border-color: var(--app-card-border);

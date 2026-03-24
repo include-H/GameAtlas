@@ -1,28 +1,31 @@
 <template>
-  <aside ref="tocRef" class="wiki-toc" aria-labelledby="wiki-toc-title">
-    <div id="wiki-toc-title" class="wiki-toc__title">目录</div>
-    <nav v-if="headings.length > 0" class="wiki-toc__nav" aria-label="Wiki 目录">
-      <a
-        v-for="heading in headings"
-        :key="heading.id"
-        :href="`#${heading.id}`"
-        class="wiki-toc__item"
-        :class="{
-          'wiki-toc__item--active': activeId === heading.id,
-          [`wiki-toc__item--level-${heading.level}`]: true
-        }"
-        :aria-current="activeId === heading.id ? 'location' : undefined"
-        @click.prevent="scrollToHeading(heading.id)"
-      >
-        {{ heading.text }}
-      </a>
-    </nav>
-    <div v-else class="wiki-toc__empty">暂无目录</div>
+  <aside class="wiki-toc" aria-labelledby="wiki-toc-title">
+    <div id="wiki-toc-title" class="wiki-toc__header">目录</div>
+    <div ref="tocBodyRef" class="wiki-toc__body">
+      <nav v-if="headings.length > 0" class="wiki-toc__nav" aria-label="Wiki 目录">
+        <a
+          v-for="heading in headings"
+          :key="heading.id"
+          :href="`#${heading.id}`"
+          class="wiki-toc__item"
+          :class="{
+            'wiki-toc__item--active': activeId === heading.id,
+            [`wiki-toc__item--level-${heading.level}`]: true
+          }"
+          :aria-current="activeId === heading.id ? 'location' : undefined"
+          @click.prevent="scrollToHeading(heading.id)"
+        >
+          {{ heading.text }}
+        </a>
+      </nav>
+      <div v-else class="wiki-toc__empty">暂无目录</div>
+    </div>
   </aside>
 </template>
 
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 interface Heading {
   id: string
@@ -32,7 +35,8 @@ interface Heading {
 
 const headings = ref<Heading[]>([])
 const activeId = ref('')
-const tocRef = ref<HTMLElement | null>(null)
+const tocBodyRef = ref<HTMLElement | null>(null)
+const router = useRouter()
 
 const HEADING_SELECTOR = 'h1, h2, h3'
 const HEADING_SCROLL_OFFSET = 76
@@ -189,34 +193,32 @@ const markPageUnloading = () => {
 }
 
 const replaceUrlHash = (id: string) => {
-  if (typeof window === 'undefined' || typeof history === 'undefined') return
-  if (typeof history.replaceState !== 'function') return
+  if (typeof window === 'undefined') return
   if (isPageUnloading || document.visibilityState === 'hidden') return
 
   const targetHash = `#${id}`
   if (window.location.hash === targetHash) return
 
-  try {
-    history.replaceState(history.state, '', targetHash)
-  } catch {
-    // Ignore replaceState failures to avoid breaking scroll behavior.
-  }
+  void router.replace({ hash: targetHash }).then(
+    () => undefined,
+    () => undefined,
+  )
 }
 
 const scrollToActiveItem = () => {
-  const tocContainer = tocRef.value
-  if (!tocContainer) return
+  const tocBody = tocBodyRef.value
+  if (!tocBody) return
 
-  const activeItem = tocContainer.querySelector('.wiki-toc__item--active') as HTMLElement | null
+  const activeItem = tocBody.querySelector('.wiki-toc__item--active') as HTMLElement | null
   if (!activeItem) return
 
   const itemTop = activeItem.offsetTop
   const itemBottom = itemTop + activeItem.offsetHeight
-  const containerTop = tocContainer.scrollTop
-  const containerBottom = containerTop + tocContainer.clientHeight
+  const containerTop = tocBody.scrollTop
+  const containerBottom = containerTop + tocBody.clientHeight
 
   if (itemTop < containerTop + 8) {
-    tocContainer.scrollTo({
+    tocBody.scrollTo({
       top: Math.max(itemTop - 8, 0),
       behavior: 'smooth',
     })
@@ -224,8 +226,8 @@ const scrollToActiveItem = () => {
   }
 
   if (itemBottom > containerBottom - 8) {
-    tocContainer.scrollTo({
-      top: itemBottom - tocContainer.clientHeight + 8,
+    tocBody.scrollTo({
+      top: itemBottom - tocBody.clientHeight + 8,
       behavior: 'smooth',
     })
   }
@@ -312,22 +314,30 @@ onUnmounted(() => {
   border-radius: var(--radius-lg);
   backdrop-filter: blur(var(--app-card-backdrop-blur));
   -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
-  padding: 12px;
   position: sticky;
   top: 80px;
   max-height: calc(100vh - 100px);
-  overflow-y: auto;
+  overflow: hidden;
   flex: 0 0 25.5%;
-  scroll-behavior: smooth;
+  display: flex;
+  flex-direction: column;
 }
 
-.wiki-toc__title {
-  font-size: 14px;
+.wiki-toc__header {
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text-1);
-  margin-bottom: 12px;
-  padding-bottom: 8px;
+  padding: 12px 20px;
   border-bottom: 1px solid var(--color-border-2);
+  flex: 0 0 auto;
+}
+
+.wiki-toc__body {
+  padding: 20px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .wiki-toc__nav {
@@ -372,20 +382,20 @@ onUnmounted(() => {
   font-size: 12px;
 }
 
-.wiki-toc::-webkit-scrollbar {
+.wiki-toc__body::-webkit-scrollbar {
   width: 4px;
 }
 
-.wiki-toc::-webkit-scrollbar-track {
+.wiki-toc__body::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.wiki-toc::-webkit-scrollbar-thumb {
+.wiki-toc__body::-webkit-scrollbar-thumb {
   background: var(--color-border-2);
   border-radius: 2px;
 }
 
-.wiki-toc::-webkit-scrollbar-thumb:hover {
+.wiki-toc__body::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-3);
 }
 
@@ -403,6 +413,10 @@ onUnmounted(() => {
     max-height: none;
     width: 100%;
     flex: none;
+  }
+
+  .wiki-toc__body {
+    overflow: visible;
   }
 }
 </style>
