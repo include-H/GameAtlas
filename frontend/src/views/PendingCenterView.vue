@@ -7,7 +7,7 @@
       </div>
 
       <a-space>
-        <a-button type="text" @click="loadPendingGames">
+        <a-button class="app-text-action-btn" type="text" @click="loadPendingGames">
           <template #icon>
             <icon-refresh />
           </template>
@@ -51,7 +51,7 @@
                 <icon-search />
               </template>
             </a-input>
-            <a-button class="app-input-action-row__action" type="text" @click="loadPendingGames">
+            <a-button class="app-text-action-btn app-input-action-row__action" type="text" @click="loadPendingGames">
               搜索
             </a-button>
           </div>
@@ -102,7 +102,7 @@
       </span>
       <div class="pending-center__result-actions">
         <a-select v-model="itemsPerPage" :options="pageSizeOptions" size="small" />
-        <a-button type="text" size="small" @click="resetFilters">重置筛选</a-button>
+        <a-button class="app-text-action-btn" type="text" size="small" @click="resetFilters">重置筛选</a-button>
       </div>
     </div>
 

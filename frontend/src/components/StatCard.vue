@@ -1,13 +1,10 @@
 <template>
   <a-card
     :style="{
-      background: 'rgba(22, 26, 37, 0.4)',
-      border: '1px solid var(--color-border-1)',
       borderLeft: `4px solid ${color}`,
-      boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
       height: typeof height === 'number' ? `${height}px` : height 
     }"
-    class="stat-card"
+    class="stat-card app-glass-surface app-glass-surface--interactive"
     :hoverable="true"
     @click="$emit('click', $event)"
   >
@@ -100,17 +97,13 @@ const iconComponent = computed(() => {
 <style scoped>
 .stat-card {
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  border: 1px solid var(--app-card-border);
-  background: var(--app-card-surface);
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
   overflow: hidden;
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .stat-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--app-glass-shadow-hover);
 }
 
 .stat-card-content {

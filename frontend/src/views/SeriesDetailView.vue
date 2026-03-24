@@ -1,7 +1,7 @@
 <template>
   <div class="series-detail">
     <div class="series-detail__header page-hero">
-      <a-button class="header-favorite-btn back-button" type="text" @click="handleGoBack">
+      <a-button class="app-text-action-btn back-button" type="text" @click="handleGoBack">
         <template #icon>
           <icon-left />
         </template>

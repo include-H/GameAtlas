@@ -78,7 +78,7 @@
         </a-col>
 
         <a-col :xs="24" :sm="8" :md="4" :lg="4" :xl="4" :xxl="4" class="games-filters-col games-filters-col--tags">
-          <a-button class="games-filter-drawer-btn" type="text" long @click="showTagFilters = !showTagFilters">
+          <a-button class="app-text-action-btn games-filter-drawer-btn" type="text" long @click="showTagFilters = !showTagFilters">
             <template #icon>
               <icon-filter />
             </template>
@@ -176,6 +176,7 @@
               标签: {{ tagLabelMap[String(tagId)] || tagId }}
             </a-tag>
             <a-button
+              class="app-text-action-btn"
               size="small"
               type="text"
               @click="clearFilters"
@@ -261,6 +262,7 @@
       </template>
       <a-button
         v-if="hasActiveFilters"
+        class="app-text-action-btn"
         type="text"
         @click="clearFilters"
       >

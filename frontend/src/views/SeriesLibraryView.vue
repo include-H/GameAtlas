@@ -5,7 +5,7 @@
         <h1 class="series-library__title page-hero__title text-gradient">系列库</h1>
         <p class="series-library__subtitle page-hero__subtitle">按系列浏览，再进入对应作品集合。</p>
       </div>
-      <div class="series-library__search">
+      <div class="series-library__search app-glass-surface">
         <div class="series-library__search-body app-input-action-row">
           <a-input
             v-model="searchQuery"
@@ -18,7 +18,7 @@
               <icon-search />
             </template>
           </a-input>
-          <a-button class="app-input-action-row__action" type="text" @click="loadSeries">
+          <a-button class="app-text-action-btn app-input-action-row__action" type="text" @click="loadSeries">
             搜索
           </a-button>
         </div>
@@ -39,7 +39,7 @@
         <div
           v-for="series in seriesCards"
           :key="series.id"
-          class="series-card hover-lift"
+          class="series-card hover-lift app-glass-surface app-glass-surface--interactive"
           role="button"
           tabindex="0"
           @click="openSeries(series.id)"
@@ -185,12 +185,7 @@ onBeforeUnmount(() => {
 
 .series-library__search {
   width: min(320px, 100%);
-  background: var(--app-card-surface);
-  border: 1px solid var(--app-card-border);
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
-  box-shadow: var(--shadow-soft);
 }
 
 .series-library__search-body {
@@ -222,25 +217,20 @@ onBeforeUnmount(() => {
 .series-card {
   position: relative;
   padding: 0;
-  border: 1px solid var(--app-card-border);
   border-radius: var(--radius-lg);
-  background: var(--app-card-surface);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   overflow: hidden;
   cursor: pointer;
   text-align: left;
   display: flex;
   flex-direction: column;
   height: 100%;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  transition: all var(--transition-fast);
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
   text-align: left;
 }
 
 .series-card:hover {
-  border-color: rgba(26, 159, 255, 0.3);
-  box-shadow: var(--shadow-hover);
+  border-color: var(--app-glass-border-hover);
+  box-shadow: var(--app-glass-shadow-hover);
 }
 
 .series-card__cover {

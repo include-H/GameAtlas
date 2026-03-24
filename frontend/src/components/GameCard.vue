@@ -1,6 +1,6 @@
 <template>
   <div
-    :class="['game-card hover-lift', { 'game-card--list': isList, 'game-card--cover-only': coverOnly }]"
+    :class="['game-card hover-lift app-glass-surface app-glass-surface--interactive', { 'game-card--list': isList, 'game-card--cover-only': coverOnly }]"
     :title="game.title"
     @click="$emit('view', String(game.id))"
   >
@@ -134,23 +134,18 @@ const displayImage = computed(() => {
 .game-card {
   position: relative;
   cursor: pointer;
-  background: var(--app-card-surface);
   border-radius: var(--radius-lg);
   overflow: hidden;
   margin-bottom: 5px;
-  border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  transition: all var(--transition-fast);
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
 .game-card:hover {
-  border-color: rgba(26, 159, 255, 0.3);
-  box-shadow: var(--shadow-hover);
+  border-color: var(--app-glass-border-hover);
+  box-shadow: var(--app-glass-shadow-hover);
 }
 
 .game-card--list {
@@ -183,7 +178,6 @@ const displayImage = computed(() => {
 .game-card--cover-only {
   margin-bottom: 0;
   border-radius: 10px;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
 }
 
 .game-card--cover-only .game-card__image-wrapper {

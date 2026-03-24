@@ -21,7 +21,7 @@
         <div v-if="selectedSteamSummaryGame" class="steam-summary-section">
           <div class="steam-search-title">
             {{ selectedSteamSummaryGame.name }} 的简介
-            <a-button type="text" size="mini" html-type="button" @click="emit('back-summary')">返回</a-button>
+            <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('back-summary')">返回</a-button>
           </div>
 
           <div v-if="steamSummaryPreview" class="steam-summary-preview">
@@ -71,7 +71,7 @@
         <div v-if="selectedSteamGame && steamCoverImages.length > 0" class="steam-images-section">
           <div class="steam-search-title">
             {{ selectedSteamGame.name }} 的封面
-            <a-button type="text" size="mini" html-type="button" @click="emit('back-cover-game-search')">返回</a-button>
+            <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('back-cover-game-search')">返回</a-button>
           </div>
           <div class="steam-images-grid">
             <div
@@ -107,7 +107,7 @@
         @success="emit('cover-upload-success', $event)"
         @error="emit('cover-upload-error')"
       >
-        <a-button type="text" long html-type="button">
+        <a-button class="app-text-action-btn" type="text" long html-type="button">
           <template #icon>
             <icon-upload />
           </template>
@@ -124,7 +124,7 @@
           @update:model-value="emit('update:cover-search-url', String($event ?? ''))"
           @press-enter="emit('load-cover-from-url')"
         />
-        <a-button class="url-input-row__action" type="text" html-type="button" @click="emit('load-cover-from-url')">
+        <a-button class="app-text-action-btn url-input-row__action" type="text" html-type="button" @click="emit('load-cover-from-url')">
           加载
         </a-button>
       </div>
@@ -132,7 +132,7 @@
         <img :src="coverPreviewUrl" @error="emit('cover-image-error', $event)" />
       </div>
       <div class="cover-selector-actions">
-        <a-button type="text" html-type="button" @click="emit('update:show-cover-selector', false)">取消</a-button>
+        <a-button class="app-text-action-btn" type="text" html-type="button" @click="emit('update:show-cover-selector', false)">取消</a-button>
         <a-button
           type="primary"
           html-type="button"
@@ -169,7 +169,7 @@
         <div v-if="selectedSteamBannerGame && steamBannerImages.length > 0" class="steam-images-section">
           <div class="steam-search-title">
             {{ selectedSteamBannerGame.name }} 的横幅
-            <a-button type="text" size="mini" html-type="button" @click="emit('back-banner-game-search')">返回</a-button>
+            <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('back-banner-game-search')">返回</a-button>
           </div>
           <div class="steam-images-grid">
             <div
@@ -205,7 +205,7 @@
         @success="emit('banner-upload-success', $event)"
         @error="emit('banner-upload-error')"
       >
-        <a-button type="text" long html-type="button">
+        <a-button class="app-text-action-btn" type="text" long html-type="button">
           <template #icon>
             <icon-upload />
           </template>
@@ -222,7 +222,7 @@
           @update:model-value="emit('update:banner-search-url', String($event ?? ''))"
           @press-enter="emit('load-banner-from-url')"
         />
-        <a-button class="url-input-row__action" type="text" html-type="button" @click="emit('load-banner-from-url')">
+        <a-button class="app-text-action-btn url-input-row__action" type="text" html-type="button" @click="emit('load-banner-from-url')">
           加载
         </a-button>
       </div>
@@ -230,7 +230,7 @@
         <img :src="bannerPreviewUrl" @error="emit('cover-image-error', $event)" />
       </div>
       <div class="cover-selector-actions">
-        <a-button type="text" html-type="button" @click="emit('update:show-banner-selector', false)">取消</a-button>
+        <a-button class="app-text-action-btn" type="text" html-type="button" @click="emit('update:show-banner-selector', false)">取消</a-button>
         <a-button
           type="primary"
           html-type="button"
@@ -268,7 +268,7 @@
           <div class="steam-game-info">
             <img :src="steamScreenshotsData.cover" :alt="steamScreenshotsData.name" />
             <span>{{ steamScreenshotsData.name }}</span>
-            <a-button type="text" size="mini" html-type="button" @click="emit('back-screenshot-game-search')">返回</a-button>
+            <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('back-screenshot-game-search')">返回</a-button>
           </div>
 
           <div v-if="steamScreenshotsData.usedFallbackAssets" class="steam-screenshot-hint">
@@ -319,7 +319,7 @@
         @success="emit('screenshot-upload-success', $event)"
         @error="emit('screenshot-upload-error')"
       >
-        <a-button type="text" long html-type="button">
+        <a-button class="app-text-action-btn" type="text" long html-type="button">
           <template #icon>
             <icon-upload />
           </template>
@@ -337,7 +337,7 @@
             @update:model-value="emit('update:screenshot-search-url', String($event ?? ''))"
             @press-enter="emit('load-screenshot-preview')"
           />
-          <a-button class="url-input-row__action" type="text" html-type="button" @click="emit('load-screenshot-preview')">
+          <a-button class="app-text-action-btn url-input-row__action" type="text" html-type="button" @click="emit('load-screenshot-preview')">
             加载
           </a-button>
         </div>
@@ -348,7 +348,7 @@
       </div>
 
       <div class="cover-selector-actions">
-        <a-button type="text" html-type="button" @click="emit('update:show-screenshot-selector', false)">取消</a-button>
+        <a-button class="app-text-action-btn" type="text" html-type="button" @click="emit('update:show-screenshot-selector', false)">取消</a-button>
         <a-button
           type="primary"
           html-type="button"
@@ -567,6 +567,11 @@ const emit = defineEmits<{
 .url-input-row__field {
   flex: 1;
   min-width: 0;
+}
+
+.url-input-row__action {
+  flex-shrink: 0;
+  min-width: 72px;
 }
 
 .cover-preview-large {

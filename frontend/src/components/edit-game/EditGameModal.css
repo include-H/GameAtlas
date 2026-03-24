@@ -301,21 +301,6 @@
   pointer-events: auto;
 }
 
-.media-action-button {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  padding: 0;
-  border-radius: 999px;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
-  transition: transform 0.2s ease;
-}
-
-.media-action-button:hover {
-  transform: scale(1.06);
-}
-
 .media-preview:hover .media-overlay,
 .screenshot-thumb:hover .screenshot-overlay {
   opacity: 1;
@@ -538,11 +523,6 @@
 .url-input-row__field {
   flex: 1;
   min-width: 0;
-}
-
-.url-input-row__action {
-  flex-shrink: 0;
-  min-width: 72px;
 }
 
 .cover-selector-actions {

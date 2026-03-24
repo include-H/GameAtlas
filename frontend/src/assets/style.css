@@ -78,6 +78,9 @@
   --app-card-surface: rgba(255, 255, 255, 0.8);
   --app-card-border: rgba(0, 0, 0, 0.05);
   --app-card-backdrop-blur: 12px;
+  --app-glass-border-hover: color-mix(in srgb, var(--color-primary-6) 28%, var(--app-card-border));
+  --app-glass-shadow-rest: var(--shadow-soft);
+  --app-glass-shadow-hover: var(--shadow-hover);
   --app-header-surface: color-mix(in srgb, var(--app-card-surface) 88%, rgba(26, 159, 255, 0.08));
   --app-header-border: color-mix(in srgb, var(--app-card-border) 78%, rgba(26, 159, 255, 0.18));
   --app-header-shadow: 0 10px 28px rgba(19, 26, 40, 0.08);
@@ -110,6 +113,7 @@ body[arco-theme='dark'] {
   --shadow-float: 0 20px 40px rgba(0, 0, 0, 0.6);
   --app-card-surface: rgba(22, 26, 37, 0.58);
   --app-card-border: rgba(255, 255, 255, 0.05);
+  --app-glass-border-hover: color-mix(in srgb, #82ccff 34%, var(--app-card-border));
   --app-header-surface: color-mix(in srgb, rgba(15, 18, 25, 0.78) 78%, rgba(26, 159, 255, 0.12));
   --app-header-border: color-mix(in srgb, var(--app-card-border) 72%, rgba(130, 204, 255, 0.22));
   --app-header-shadow: 0 16px 36px rgba(0, 0, 0, 0.32);
@@ -217,6 +221,24 @@ body[arco-theme='dark'] #app {
   backdrop-filter: blur(var(--app-card-backdrop-blur));
   -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   border: 1px solid var(--app-card-border);
+  box-shadow: var(--app-glass-shadow-rest);
+}
+
+.app-glass-surface {
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  box-shadow: var(--app-glass-shadow-rest);
+}
+
+.app-glass-surface--interactive {
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.app-glass-surface--interactive:hover {
+  border-color: var(--app-glass-border-hover);
+  box-shadow: var(--app-glass-shadow-hover);
 }
 
 .app-input-action-row {
@@ -294,62 +316,55 @@ body[arco-theme='light'] .glass-header {
   color: transparent;
 }
 
-/* Header favorite/back/edit buttons - 覆盖默认 hover 黑底 */
-.header-favorite-btn.arco-btn-text,
-.header-edit-btn.arco-btn-text {
-  color: var(--color-text-2);
-  background-color: transparent;
-}
-
-.header-favorite-btn.arco-btn-text:hover,
-.header-edit-btn.arco-btn-text:hover {
-  color: var(--color-text-1);
-  background-color: rgba(255, 255, 255, 0.08);
-}
-
-.header-favorite-btn.arco-btn-text.is-favorite {
-  color: var(--color-danger-6);
-}
-
-.header-favorite-btn.arco-btn-text.is-favorite:hover {
-  background-color: rgba(255, 77, 79, 0.1);
-}
-
-/* 全局 text 按钮 hover 样式优化 - 覆盖默认黑底 */
+/* -----------------------------------------------------------------------
+   Utility Classes (Text Action Buttons)
+   ----------------------------------------------------------------------- */
+.app-text-action-btn,
+.app-text-action-btn.arco-btn,
 body .arco-btn-text {
-  color: var(--color-text-2);
+  color: var(--color-text-2) !important;
   background-color: transparent;
 }
 
+.app-text-action-btn:hover,
+.app-text-action-btn.arco-btn:hover,
 body .arco-btn-text:hover {
-  color: var(--color-text-1);
+  color: var(--color-text-1) !important;
   background-color: rgba(255, 255, 255, 0.08) !important;
 }
 
+.app-text-action-btn .arco-icon,
+.app-text-action-btn.arco-btn .arco-icon,
 body .arco-btn-text .arco-icon {
   color: inherit;
 }
 
+.app-text-action-btn.arco-btn-status-danger,
 body .arco-btn-text.arco-btn-status-danger {
-  color: var(--color-danger-6);
+  color: var(--color-danger-6) !important;
 }
 
+.app-text-action-btn.arco-btn-status-danger:hover,
 body .arco-btn-text.arco-btn-status-danger:hover {
   background-color: rgba(255, 77, 79, 0.1) !important;
 }
 
+.app-text-action-btn.arco-btn-status-success,
 body .arco-btn-text.arco-btn-status-success {
-  color: var(--color-success-6);
+  color: var(--color-success-6) !important;
 }
 
+.app-text-action-btn.arco-btn-status-success:hover,
 body .arco-btn-text.arco-btn-status-success:hover {
   background-color: rgba(0, 180, 42, 0.1) !important;
 }
 
+.app-text-action-btn.arco-btn-status-warning,
 body .arco-btn-text.arco-btn-status-warning {
-  color: var(--color-warning-6);
+  color: var(--color-warning-6) !important;
 }
 
+.app-text-action-btn.arco-btn-status-warning:hover,
 body .arco-btn-text.arco-btn-status-warning:hover {
   background-color: rgba(255, 150, 0, 0.1) !important;
 }
@@ -444,12 +459,13 @@ body .arco-btn-text.arco-btn-status-warning:hover {
   background: var(--app-card-surface);
   backdrop-filter: blur(var(--app-card-backdrop-blur));
   -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--app-glass-shadow-rest);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .arco-card:hover {
-  border-color: var(--color-border-2);
+  border-color: var(--app-glass-border-hover);
+  box-shadow: var(--app-glass-shadow-hover);
 }
 
 body[arco-theme='light'] .arco-card {

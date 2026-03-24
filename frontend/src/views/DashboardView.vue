@@ -114,7 +114,6 @@
       <a-button
         type="primary"
         size="large"
-        class="dashboard-empty-button"
         @click="router.push('/games')"
       >
         浏览游戏

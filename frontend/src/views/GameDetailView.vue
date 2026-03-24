@@ -4,7 +4,7 @@
       <!-- Game Header Navigation & Title -->
       <div class="game-detail__header">
         <div class="header-content">
-        <a-button class="header-favorite-btn back-button" type="text" @click="handleGoBack">
+        <a-button class="app-text-action-btn back-button" type="text" @click="handleGoBack">
           <template #icon>
             <icon-left />
           </template>
@@ -14,10 +14,10 @@
         <div class="header-info">
           <h1 class="header-title">{{ game.title }}</h1>
           <div class="header-actions">
-            <a-button 
-              class="header-favorite-btn"
-              type="text" 
-              :class="{ 'is-favorite': game.isFavorite }"
+            <a-button
+              class="app-text-action-btn"
+              type="text"
+              :status="game.isFavorite ? 'danger' : undefined"
               @click="handleToggleFavorite"
             >
               <template #icon>
@@ -27,10 +27,10 @@
               {{ game.isFavorite ? '已收藏' : '收藏' }}
             </a-button>
 
-            <a-button 
+            <a-button
               v-if="canEdit"
-              class="header-edit-btn"
-              type="text" 
+              class="app-text-action-btn"
+              type="text"
               @click="showEditModal = true"
             >
               <template #icon>
@@ -172,7 +172,6 @@
               </div>
               <div class="version-actions">
                 <a-button
-                  class="version-action-btn version-action-btn--primary"
                   type="primary"
                   @click="handleDownloadVersion(version)"
                 >
@@ -183,7 +182,7 @@
                 </a-button>
                 <a-button
                   v-if="version.canLaunch"
-                  class="version-action-btn version-action-btn--secondary"
+                  class="app-text-action-btn"
                   type="text"
                   @click.stop="handleDownloadLaunchScript(version)"
                 >
@@ -212,7 +211,7 @@
                 <span>关于这款游戏</span>
                 <a-button
                   v-if="canEdit"
-                  class="header-edit-btn"
+                  class="app-text-action-btn"
                   type="text"
                   size="small"
                   @click="openWikiEditor"
@@ -234,7 +233,7 @@
             <p class="game-detail__no-wiki-text">暂无 Wiki</p>
             <a-button
               v-if="canEdit"
-              class="header-edit-btn"
+              class="app-text-action-btn"
               type="text"
               size="small"
               @click="openWikiEditor"
@@ -955,20 +954,6 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-}
-
-.version-action-btn--secondary.arco-btn-text {
-  color: var(--color-text-2);
-  background-color: transparent;
-}
-
-.version-action-btn--secondary.arco-btn-text:hover {
-  color: var(--color-text-1);
-  background-color: rgba(255, 255, 255, 0.08);
-}
-
-.version-action-btn--secondary.arco-btn-text .arco-icon {
-  color: inherit;
 }
 
 /* Download Empty State */

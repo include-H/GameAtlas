@@ -16,7 +16,7 @@
               <div class="media-overlay">
                 <div class="media-overlay-actions">
                   <a-button
-                    class="media-action-button"
+                    class="app-text-action-btn media-action-button"
                     type="text"
                     shape="circle"
                     size="small"
@@ -26,7 +26,7 @@
                     <icon-settings />
                   </a-button>
                   <a-button
-                    class="media-action-button media-action-button--danger"
+                    class="app-text-action-btn media-action-button media-action-button--danger"
                     type="text"
                     status="danger"
                     shape="circle"
@@ -71,7 +71,7 @@
               <div class="media-overlay">
                 <div class="media-overlay-actions">
                   <a-button
-                    class="media-action-button"
+                    class="app-text-action-btn media-action-button"
                     type="text"
                     shape="circle"
                     size="small"
@@ -81,7 +81,7 @@
                     <icon-settings />
                   </a-button>
                   <a-button
-                    class="media-action-button media-action-button--danger"
+                    class="app-text-action-btn media-action-button media-action-button--danger"
                     type="text"
                     status="danger"
                     shape="circle"
@@ -128,7 +128,7 @@
               <div class="media-overlay media-overlay--top-right">
                 <div class="media-overlay-actions">
                   <a-button
-                    class="media-action-button"
+                    class="app-text-action-btn media-action-button"
                     type="text"
                     shape="circle"
                     size="small"
@@ -199,7 +199,7 @@
                     />
                     <div class="screenshot-overlay">
                       <a-button
-                        class="media-action-button media-action-button--danger"
+                        class="app-text-action-btn media-action-button media-action-button--danger"
                         type="text"
                         status="danger"
                         shape="circle"

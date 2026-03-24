@@ -15,7 +15,7 @@
         </template>
       </a-input>
       <a-button
-        class="app-input-action-row__action"
+        class="app-text-action-btn app-input-action-row__action"
         type="text"
         :loading="loading"
         @click="emit('search')"
