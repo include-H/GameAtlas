@@ -14,7 +14,6 @@ type Game struct {
 	WikiContentHTML      *string `db:"wiki_content_html"`
 	NeedsReview          bool    `db:"needs_review"`
 	PreviewVideoAssetUID *string `db:"preview_video_asset_uid"`
-	Views                int64   `db:"views"`
 	Downloads            int64   `db:"downloads"`
 	PrimaryScreenshot    *string `db:"primary_screenshot"`
 	ScreenshotCount      int64   `db:"screenshot_count"`
@@ -209,7 +208,6 @@ type ReviewIssueOverride struct {
 type GameStats struct {
 	TotalGames     int
 	TotalDownloads int64
-	TotalViews     int64
 	TotalSize      int64
 	RecentGames    []Game
 	PopularGames   []Game

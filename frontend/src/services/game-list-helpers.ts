@@ -13,7 +13,6 @@ export interface GameListApiItem {
   cover_image: string | null
   banner_image: string | null
   needs_review: boolean
-  views: number
   downloads: number
   primary_screenshot?: string | null
   screenshot_count?: number
@@ -72,7 +71,6 @@ export function mapGameListItem(item: GameListApiItem, favoriteIds?: Set<string>
     developer_count: item.developer_count ?? 0,
     publisher_count: item.publisher_count ?? 0,
     platform_count: item.platform_count ?? 0,
-    views: item.views,
     downloads: item.downloads,
     created_at: item.created_at,
     updated_at: item.updated_at,

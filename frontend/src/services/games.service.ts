@@ -72,7 +72,6 @@ interface GameDetailApiItem extends GameListApiItem {
 interface GameStatsApiResponse {
   total_games: number
   total_downloads: number
-  total_views: number
   total_size: number
   recent_games: GameListApiItem[]
   popular_games: GameListApiItem[]
@@ -197,7 +196,6 @@ function mapTimelineItem(item: TimelineGameApiItem, favoriteIds?: Set<string>): 
     title: item.title,
     release_date: item.release_date,
     cover_image: item.cover_image,
-    views: 0,
     downloads: 0,
     created_at: '',
     updated_at: '',
@@ -418,7 +416,6 @@ const gamesService = {
     return {
       total_games: response.data.total_games,
       total_downloads: response.data.total_downloads,
-      total_views: response.data.total_views,
       total_size: response.data.total_size,
       recent_games: response.data.recent_games.map((item) => mapGameListItem(item)),
       popular_games: response.data.popular_games.map((item) => mapGameListItem(item)),

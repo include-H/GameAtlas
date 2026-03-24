@@ -161,7 +161,6 @@ func (h *GamesHandler) Stats(c *gin.Context) {
 		"data": gin.H{
 			"total_games":     stats.TotalGames,
 			"total_downloads": stats.TotalDownloads,
-			"total_views":     stats.TotalViews,
 			"total_size":      stats.TotalSize,
 			"recent_games":    toGameListItemResponses(stats.RecentGames),
 			"popular_games":   toGameListItemResponses(stats.PopularGames),
@@ -300,7 +299,6 @@ type gameListItemResponse struct {
 	CoverImage        *string `json:"cover_image"`
 	BannerImage       *string `json:"banner_image"`
 	NeedsReview       bool    `json:"needs_review"`
-	Views             int64   `json:"views"`
 	Downloads         int64   `json:"downloads"`
 	PrimaryScreenshot *string `json:"primary_screenshot"`
 	ScreenshotCount   int64   `json:"screenshot_count"`
@@ -361,7 +359,6 @@ type gameDetailResponse struct {
 	WikiContent     *string                `json:"wiki_content"`
 	WikiContentHTML *string                `json:"wiki_content_html"`
 	NeedsReview     bool                   `json:"needs_review"`
-	Views           int64                  `json:"views"`
 	Downloads       int64                  `json:"downloads"`
 	PreviewVideo    *gameAssetResponse     `json:"preview_video"`
 	PreviewVideos   []gameAssetResponse    `json:"preview_videos"`
@@ -412,7 +409,6 @@ func toGameListItemResponse(game domain.Game) gameListItemResponse {
 		CoverImage:        game.CoverImage,
 		BannerImage:       game.BannerImage,
 		NeedsReview:       game.NeedsReview,
-		Views:             game.Views,
 		Downloads:         game.Downloads,
 		PrimaryScreenshot: game.PrimaryScreenshot,
 		ScreenshotCount:   game.ScreenshotCount,
@@ -510,7 +506,6 @@ func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDe
 		WikiContent:     detail.Game.WikiContent,
 		WikiContentHTML: detail.Game.WikiContentHTML,
 		NeedsReview:     detail.Game.NeedsReview,
-		Views:           detail.Game.Views,
 		Downloads:       detail.Game.Downloads,
 		PreviewVideo:    previewVideo,
 		PreviewVideos:   previewVideos,

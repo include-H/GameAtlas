@@ -16,7 +16,6 @@ var allowedGameSortFields = map[string]string{
 	"created_at":   "g.created_at",
 	"updated_at":   "g.updated_at",
 	"release_date": "g.release_date",
-	"views":        "g.views",
 	"downloads":    "g.downloads",
 }
 
@@ -118,7 +117,6 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 			g.wiki_content_html,
 			g.needs_review,
 			g.preview_video_asset_uid,
-			g.views,
 			g.downloads,
 			(
 				SELECT ga.path
@@ -190,7 +188,6 @@ func (r *GamesRepository) GetByID(id int64) (*domain.Game, error) {
 			wiki_content_html,
 			needs_review,
 			preview_video_asset_uid,
-			views,
 			downloads,
 			NULL AS primary_screenshot,
 			0 AS screenshot_count,
@@ -369,7 +366,7 @@ func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, err
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING
 			id, title, title_alt, visibility, summary, release_date, engine, cover_image, banner_image,
-			wiki_content, wiki_content_html, needs_review, preview_video_asset_uid, views, downloads, created_at, updated_at`
+			wiki_content, wiki_content_html, needs_review, preview_video_asset_uid, downloads, created_at, updated_at`
 
 	var game domain.Game
 	if err := r.db.Get(
@@ -476,7 +473,6 @@ func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStat
 			g.wiki_content_html,
 			g.needs_review,
 			g.preview_video_asset_uid,
-			g.views,
 			g.downloads,
 			(
 				SELECT ga.path
@@ -520,7 +516,6 @@ func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStat
 		SELECT
 			COUNT(*) AS total_games,
 			COALESCE(SUM(g.downloads), 0) AS total_downloads,
-			COALESCE(SUM(g.views), 0) AS total_views,
 			COALESCE(SUM(CASE WHEN g.needs_review = 1 THEN 1 ELSE 0 END), 0) AS pending_reviews
 		FROM games g
 		WHERE %s
@@ -529,7 +524,6 @@ func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStat
 	type statsRow struct {
 		TotalGames     int   `db:"total_games"`
 		TotalDownloads int64 `db:"total_downloads"`
-		TotalViews     int64 `db:"total_views"`
 		PendingReviews int   `db:"pending_reviews"`
 	}
 
@@ -574,7 +568,6 @@ func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStat
 	return &domain.GameStats{
 		TotalGames:     summary.TotalGames,
 		TotalDownloads: summary.TotalDownloads,
-		TotalViews:     summary.TotalViews,
 		TotalSize:      0,
 		RecentGames:    recentGames,
 		PopularGames:   popularGames,

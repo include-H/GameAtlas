@@ -335,7 +335,6 @@ const sortOptions = ref([
   { label: '年份新到旧', value: 'release_desc' },
   { label: '年份旧到新', value: 'release_asc' },
   { label: '下载最多', value: 'downloads_desc' },
-  { label: '浏览次数', value: 'views_desc' },
   { label: '随机', value: 'random_desc' },
 ])
 
@@ -372,7 +371,6 @@ const sortBy = computed({
     if (route.query.sort === 'release_desc') return 'release_desc'
     if (route.query.sort === 'random' || route.query.sort === 'random_desc') return 'random_desc'
     if (route.query.sort === 'downloads' || route.query.sort === 'downloads_desc') return 'downloads_desc'
-    if (route.query.sort === 'views' || route.query.sort === 'views_desc') return 'views_desc'
     return (route.query.sort as string) || 'created_desc'
   },
   set: (sort: string) => {
@@ -598,7 +596,6 @@ const loadGames = async () => {
     title: 'title',
     release: 'release_date',
     downloads: 'downloads',
-    views: 'views',
     random: 'random',
   }
   const filter = {

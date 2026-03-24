@@ -117,7 +117,6 @@ func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([
 			g.wiki_content_html,
 			g.needs_review,
 			g.preview_video_asset_uid,
-			g.views,
 			g.downloads,
 			(
 				SELECT ga.path

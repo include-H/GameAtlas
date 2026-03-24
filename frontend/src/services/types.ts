@@ -154,7 +154,6 @@ export interface Game {
   developer_count?: number
   publisher_count?: number
   platform_count?: number
-  views: number
   downloads: number
   created_at: string
   updated_at: string
@@ -200,7 +199,6 @@ export interface GameVersion {
 export interface GameStats {
   total_games: number
   total_downloads: number
-  total_views: number
   total_size: number
   recent_games: Game[]
   popular_games: Game[]
@@ -218,7 +216,7 @@ export interface GameFilter {
 }
 
 export interface GameSort {
-  field: 'title' | 'created_at' | 'updated_at' | 'release_date' | 'views' | 'downloads' | 'random'
+  field: 'title' | 'created_at' | 'updated_at' | 'release_date' | 'downloads' | 'random'
   order: 'asc' | 'desc'
   seed?: number
 }
