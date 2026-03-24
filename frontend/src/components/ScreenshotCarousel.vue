@@ -15,33 +15,37 @@
       </a-button>
 
       <div class="screenshot-carousel__main">
-        <div class="screenshot-carousel__media-shell">
-          <img
-            v-if="currentMedia?.type === 'image'"
-            :key="currentMedia.url"
-            :src="currentMedia.url"
-            :alt="alt"
-            :class="['screenshot-carousel__image', { 'is-loaded': imageLoaded }]"
-            @load="onImageLoad"
-            @error="handleImageError(currentMedia.url)"
-          />
-          <video
-            v-else-if="currentMedia?.type === 'video'"
-            :key="currentMedia.url"
-            ref="videoRef"
-            :src="currentMedia.url"
-            class="screenshot-carousel__video"
-            :poster="videoPoster || undefined"
-            autoplay
-            controls
-            muted
-            playsinline
-            preload="metadata"
-            @canplay="tryPlayVideo"
-            @loadedmetadata="onVideoLoaded"
-            @ended="handleVideoEnded"
-          />
-        </div>
+        <transition name="screenshot-carousel-fade">
+          <div
+            v-if="currentMedia"
+            :key="currentMedia.key"
+            class="screenshot-carousel__media-shell"
+          >
+            <img
+              v-if="currentMedia.type === 'image'"
+              :src="currentMedia.url"
+              :alt="alt"
+              class="screenshot-carousel__image"
+              @load="onImageLoad"
+              @error="handleImageError(currentMedia.url)"
+            />
+            <video
+              v-else
+              ref="videoRef"
+              :src="currentMedia.url"
+              class="screenshot-carousel__video"
+              :poster="videoPoster || undefined"
+              autoplay
+              controls
+              muted
+              playsinline
+              preload="metadata"
+              @canplay="tryPlayVideo"
+              @loadedmetadata="onVideoLoaded"
+              @ended="handleVideoEnded"
+            />
+          </div>
+        </transition>
       </div>
 
       <a-button
@@ -398,6 +402,7 @@ const handleImageError = (url: string) => {
   inset: 0;
   width: 100%;
   height: 100%;
+  will-change: opacity;
 }
 
 .screenshot-carousel__image {
@@ -405,8 +410,6 @@ const handleImageError = (url: string) => {
   height: 100%;
   object-fit: cover;
   display: block;
-  opacity: 0;
-  transition: opacity 0.16s ease;
   object-position: center center;
 }
 
@@ -419,8 +422,20 @@ const handleImageError = (url: string) => {
   object-position: center center;
 }
 
-.screenshot-carousel__image.is-loaded {
-  opacity: 1;
+.screenshot-carousel-fade-enter-active,
+.screenshot-carousel-fade-leave-active {
+  transition: opacity 0.32s ease;
+}
+
+.screenshot-carousel-fade-enter-active,
+.screenshot-carousel-fade-leave-active {
+  position: absolute;
+  inset: 0;
+}
+
+.screenshot-carousel-fade-enter-from,
+.screenshot-carousel-fade-leave-to {
+  opacity: 0;
 }
 
 /* Navigation Arrows */
