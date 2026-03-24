@@ -42,6 +42,7 @@ let contentObserver: MutationObserver | null = null
 let headingObserver: IntersectionObserver | null = null
 let wikiCardObserver: MutationObserver | null = null
 let observedWikiContent: HTMLElement | null = null
+let isPageUnloading = false
 
 const generateId = (text: string, index: number): string => {
   const baseId = text
@@ -180,8 +181,25 @@ const scrollToHeading = (id: string) => {
     element.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  if (typeof history !== 'undefined' && typeof history.replaceState === 'function') {
-    history.replaceState(null, '', `#${id}`)
+  replaceUrlHash(id)
+}
+
+const markPageUnloading = () => {
+  isPageUnloading = true
+}
+
+const replaceUrlHash = (id: string) => {
+  if (typeof window === 'undefined' || typeof history === 'undefined') return
+  if (typeof history.replaceState !== 'function') return
+  if (isPageUnloading || document.visibilityState === 'hidden') return
+
+  const targetHash = `#${id}`
+  if (window.location.hash === targetHash) return
+
+  try {
+    history.replaceState(history.state, '', targetHash)
+  } catch {
+    // Ignore replaceState failures to avoid breaking scroll behavior.
   }
 }
 
@@ -252,6 +270,7 @@ const handleResize = () => {
 }
 
 onMounted(() => {
+  isPageUnloading = false
   scrollContainer = document.querySelector('.content')
   setupWikiCardObserver()
   setupContentObserver()
@@ -262,6 +281,8 @@ onMounted(() => {
   }
   if (typeof window !== 'undefined') {
     window.addEventListener('resize', handleResize, { passive: true })
+    window.addEventListener('beforeunload', markPageUnloading)
+    window.addEventListener('pagehide', markPageUnloading)
   }
 })
 
@@ -278,6 +299,8 @@ onUnmounted(() => {
   }
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', handleResize)
+    window.removeEventListener('beforeunload', markPageUnloading)
+    window.removeEventListener('pagehide', markPageUnloading)
   }
 })
 </script>
