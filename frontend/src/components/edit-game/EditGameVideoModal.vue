@@ -41,11 +41,7 @@
           >
             <div
               class="video-library-item__preview"
-              role="button"
-              tabindex="0"
               @click="emit('set-primary-video', video.asset_uid)"
-              @keydown.enter.prevent="emit('set-primary-video', video.asset_uid)"
-              @keydown.space.prevent="emit('set-primary-video', video.asset_uid)"
             >
               <div class="video-library-item__thumb">
                 <img
@@ -217,10 +213,12 @@ const openVideoFilePicker = () => {
   border: 1px solid var(--color-border-2);
   border-radius: 10px;
   background: var(--color-fill-1);
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 10px;
+  overflow: hidden;
 }
 
 .video-library-item.is-primary {
@@ -232,16 +230,9 @@ const openVideoFilePicker = () => {
   display: flex;
   gap: 10px;
   align-items: center;
-  cursor: pointer;
+  min-width: 0;
   border-radius: 8px;
   padding: 4px;
-  outline: none;
-}
-
-.video-library-item__preview:hover,
-.video-library-item__preview:focus,
-.video-library-item__preview:active {
-  background: rgba(var(--primary-6), 0.08);
 }
 
 .video-library-item__thumb {
@@ -277,11 +268,13 @@ const openVideoFilePicker = () => {
 }
 
 .video-library-item__meta-row {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 8px;
+  min-width: 0;
   width: 100%;
+  overflow: hidden;
 }
 
 .video-library-item__title {
@@ -302,8 +295,11 @@ const openVideoFilePicker = () => {
 
 .video-library-item__actions {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
   gap: 4px;
+  flex-shrink: 0;
+  min-width: fit-content;
 }
 
 .video-library-empty {
@@ -317,6 +313,19 @@ const openVideoFilePicker = () => {
 
   .video-library-item__actions {
     justify-content: flex-end;
+  }
+}
+
+@media (max-width: 560px) {
+  .video-library-item {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .video-library-item__actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 </style>
