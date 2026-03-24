@@ -85,11 +85,9 @@ func applyMigration(db *sqlx.DB, name string, content string) error {
 		return fmt.Errorf("begin migration %s: %w", name, err)
 	}
 
-	for _, stmt := range splitMigrationStatements(content) {
-		if _, err := tx.Exec(stmt); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("execute migration %s: %w", name, err)
-		}
+	if _, err := tx.Exec(content); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("execute migration %s: %w", name, err)
 	}
 
 	if _, err := tx.Exec("INSERT INTO schema_migrations (name) VALUES (?)", name); err != nil {
@@ -102,19 +100,6 @@ func applyMigration(db *sqlx.DB, name string, content string) error {
 	}
 
 	return nil
-}
-
-func splitMigrationStatements(content string) []string {
-	parts := strings.Split(content, ";")
-	statements := make([]string, 0, len(parts))
-	for _, part := range parts {
-		stmt := strings.TrimSpace(part)
-		if stmt == "" {
-			continue
-		}
-		statements = append(statements, stmt)
-	}
-	return statements
 }
 
 func ensureMigrationTable(db *sqlx.DB) error {

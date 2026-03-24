@@ -77,6 +77,40 @@ func TestRunMigrationsIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestApplyMigrationHandlesSemicolonInStringLiteral(t *testing.T) {
+	db := openTestSQLite(t)
+	defer func() {
+		_ = db.Close()
+	}()
+
+	if err := ensureMigrationTable(db); err != nil {
+		t.Fatalf("ensureMigrationTable returned error: %v", err)
+	}
+
+	const name = "999999_semicolon_in_string.sql"
+	const migration = `
+CREATE TABLE sample_notes (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	note TEXT NOT NULL
+);
+INSERT INTO sample_notes (note) VALUES ('hello;world');
+`
+
+	if err := applyMigration(db, name, migration); err != nil {
+		t.Fatalf("applyMigration returned error: %v", err)
+	}
+
+	var note string
+	if err := db.Get(&note, "SELECT note FROM sample_notes LIMIT 1"); err != nil {
+		t.Fatalf("select inserted note returned error: %v", err)
+	}
+	if note != "hello;world" {
+		t.Fatalf("inserted note = %q, want %q", note, "hello;world")
+	}
+
+	assertMigrationRecordedState(t, db, name, true)
+}
+
 func openTestSQLite(t *testing.T) *sqlx.DB {
 	t.Helper()
 
