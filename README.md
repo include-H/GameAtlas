@@ -316,6 +316,48 @@ VHD_DIFF_ROOT=C:
    - 调用 `diskpart` 挂载
 7. 挂载成功后，在“此电脑”中打开新盘符进入游戏
 
+### 从零到可玩的完整示例（含手动导入 `Game_Wiki`）
+
+下面这套流程覆盖你提到的完整链路：创建 VHD 基础盘 -> 灌入游戏文件 -> 入库 -> 导入现成 Wiki -> 启动游戏。
+
+1. 在 Windows 上创建基础 VHD（示例 120GB）
+
+```powershell
+# 1) 创建一个 120GB 的动态扩容 VHDX 基础盘文件
+New-VHD -Path "D:\GameBase\PS2_GT4.vhdx" -SizeBytes 120GB -Dynamic
+
+# 2) 挂载这个 VHDX，让系统识别为一块新磁盘
+Mount-VHD -Path "D:\GameBase\PS2_GT4.vhdx"
+
+# 3) 找到“未初始化”的磁盘（PartitionStyle=RAW），并初始化为 GPT 分区表
+# 注意：这里的 RAW 仅表示“还没建分区表”，不是最终文件系统格式
+Initialize-Disk -Number (Get-Disk | Where-Object PartitionStyle -Eq 'RAW' | Select-Object -First 1).Number -PartitionStyle GPT
+
+# 4) 在该磁盘上创建一个占满全盘的分区，并自动分配盘符
+$part = New-Partition -DiskNumber (Get-Disk | Sort-Object Number -Descending | Select-Object -First 1).Number -UseMaximumSize -AssignDriveLetter
+
+# 5) 将新分区格式化为 NTFS，并设置卷标
+Format-Volume -Partition $part -FileSystem NTFS -NewFileSystemLabel "GT4_BASE"
+```
+
+2. 把游戏文件灌入刚挂载出来的盘符（例如 `E:`）
+3. 卸载基础盘，把它放到服务端 `PRIMARY_ROM_ROOT` 对应目录，并确保 SMB 共享可访问
+4. 在 GameAtlas 后台新增游戏，并在“文件版本”里添加这份 `.vhd/.vhdx` 的路径
+5. 手动从 GitHub 仓库获取已完成 Wiki（`https://github.com/include-H/Game_Wiki`）
+
+可选方式 A（有 Git）：
+
+```bash
+git clone https://github.com/include-H/Game_Wiki.git
+```
+
+可选方式 B（无 Git）：
+- 在浏览器打开仓库，下载 ZIP 解压
+
+6. 找到对应游戏的 Markdown 文档，复制内容到 GameAtlas 的 Wiki 编辑页并保存
+7. 回到游戏详情页点击“开始游玩”，下载并在 Windows 客户端以管理员权限运行 BAT
+8. BAT 完成后会在客户端挂载差分盘，进入新出现的盘符启动游戏
+
 ### 差分盘放在哪里
 
 差分盘文件名默认与基础盘同名，保存在：

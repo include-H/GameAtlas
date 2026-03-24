@@ -124,6 +124,7 @@ echo "写入运行配置..."
 write_runtime_env "$PACKAGE_DIR/.env" "$SESSION_SECRET_VALUE"
 
 echo "复制参考文档..."
+cp "$ROOT_DIR/README.md" "$PACKAGE_DIR/README.md"
 cp "$BACKEND_DIR/README.md" "$PACKAGE_DIR/README-backend.md"
 
 cat > "$PACKAGE_DIR/start.sh" <<'EOF'
