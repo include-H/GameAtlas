@@ -1,4 +1,5 @@
-import api from './api'
+import { get } from './api'
+import type { ApiResponse } from './types'
 
 export interface DirectoryItem {
   name: string
@@ -14,16 +15,33 @@ interface DirectoryListResponse {
   items: DirectoryItem[]
 }
 
+interface DirectoryDefaultData {
+  path: string
+}
+
+interface DirectoryListApiItem {
+  name: string
+  path: string
+  is_directory: boolean
+  size_bytes?: number | null
+}
+
+interface DirectoryListData {
+  current_path: string
+  parent_path: string | null
+  items: DirectoryListApiItem[]
+}
+
 export const directoryService = {
   getDefaultDirectory(): Promise<string> {
-    return api.get('/directory/default').then((res) => res.data.data.path)
+    return get<ApiResponse<DirectoryDefaultData>>('/directory/default').then((res) => res.data.path)
   },
 
   listDirectory(path?: string): Promise<DirectoryListResponse> {
-    return api.get('/directory/list', { params: path ? { path } : undefined }).then((res) => ({
-      currentPath: res.data.data.current_path,
-      parentPath: res.data.data.parent_path,
-      items: (res.data.data.items || []).map((item: any) => ({
+    return get<ApiResponse<DirectoryListData>>('/directory/list', { params: path ? { path } : undefined }).then((res) => ({
+      currentPath: res.data.current_path,
+      parentPath: res.data.parent_path,
+      items: (res.data.items || []).map((item) => ({
         name: item.name,
         path: item.path,
         type: item.is_directory ? 'directory' : 'file',

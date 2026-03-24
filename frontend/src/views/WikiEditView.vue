@@ -132,18 +132,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
 import wikiService, { type WikiContent, type WikiHistoryEntry } from '@/services/wiki.service'
 import { useNamedRouteGuard, watchRouteParamWhenActive } from '@/composables/useNamedRouteGuard'
 import { resolveReturnRoute } from '@/utils/navigation'
+import { getHttpErrorMessage } from '@/utils/http-error'
 import {
   IconSave
 } from '@arco-design/web-vue/es/icon'
 import WikiEditor from '@/components/WikiEditor.vue'
-import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -158,6 +158,7 @@ const selectedHistory = ref<WikiHistoryEntry | null>(null)
 const isHistoryLoading = ref(false)
 const previewHistoryContent = ref(true)
 const historyPreviewVisible = ref(false)
+const MarkdownRenderer = defineAsyncComponent(() => import('@/components/MarkdownRenderer.vue'))
 
 const isSaving = ref(false)
 
@@ -200,8 +201,8 @@ const handleSave = async () => {
     await loadHistory(String(game.value.id))
 
     router.push(resolveReturnRoute(route, getGameDetailRoute()))
-  } catch (error: any) {
-    const errorMessage = error?.response?.data?.error || error?.message || '保存 Wiki 失败'
+  } catch (error) {
+    const errorMessage = getHttpErrorMessage(error, '保存 Wiki 失败')
     uiStore.addAlert(errorMessage, 'error')
     console.error('Failed to save wiki:', error)
   } finally {

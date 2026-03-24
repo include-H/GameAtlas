@@ -47,10 +47,9 @@
         <div class="game-detail__content">
           <div class="game-detail__main">
             <screenshot-carousel
-              :preview-video="game.preview_video?.path || null"
               :preview-videos="game.preview_videos?.map((item) => item.path) || []"
               :video-poster="game.banner_image || game.cover_image || null"
-              :screenshots="game.screenshots || []"
+              :screenshots="(game.screenshot_items || []).map((item) => item.path)"
               :alt="game.title"
               :height="carouselHeight"
             />
@@ -262,7 +261,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, defineAsyncComponent } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
@@ -271,8 +270,8 @@ import { useUiStore } from '@/stores/ui'
 import wikiService, { type WikiContent } from '@/services/wiki.service'
 import downloadService from '@/services/download.service'
 import type { GameVersion } from '@/services/types'
+import { getHttpStatus } from '@/utils/http-error'
 import ScreenshotCarousel from '@/components/ScreenshotCarousel.vue'
-import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import EditGameModal from '@/components/EditGameModal.vue'
 import WikiToc from '@/components/WikiToc.vue'
 import { useNamedRouteGuard, watchRouteParamWhenActive } from '@/composables/useNamedRouteGuard'
@@ -301,6 +300,7 @@ const topSectionRef = ref<HTMLElement | null>(null)
 const topSectionHeight = ref<number | undefined>(undefined)
 const isDesktopTopLayout = ref(false)
 let topSectionObserver: ResizeObserver | null = null
+const MarkdownRenderer = defineAsyncComponent(() => import('@/components/MarkdownRenderer.vue'))
 
 const developerNames = computed(() => (game.value?.developers || []).map((item) => item.name).join(' / '))
 const publisherNames = computed(() => (game.value?.publishers || []).map((item) => item.name).join(' / '))
@@ -330,7 +330,7 @@ const formatSize = (bytes: number) => {
   return `${size.toFixed(1)} ${units[unitIndex]}`
 }
 
-const shouldSpanMetadataRow = (items?: ArrayLike<unknown> | null) => {
+const shouldSpanMetadataRow = (items?: { length: number } | null) => {
   return (items?.length || 0) > 2
 }
 
@@ -417,7 +417,7 @@ const loadGameDetail = async (gameId: string) => {
         // Wiki doesn't exist
       }
     } catch (error) {
-      const status = (error as any)?.response?.status
+      const status = getHttpStatus(error)
       if (status === 404) {
         router.replace({ name: 'not-found' })
         return

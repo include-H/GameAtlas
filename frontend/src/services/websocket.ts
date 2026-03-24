@@ -1,11 +1,32 @@
 import type { Ref } from 'vue'
 
-export interface WebSocketEvent {
-  type: 'connected' | 'game:created' | 'game:updated' | 'game:deleted' | 'game:wiki_updated' | 'pong'
-  gameId?: number
+interface BaseWebSocketEvent {
   timestamp: string
-  data?: any
   message?: string
+}
+
+interface ConnectedWebSocketEvent extends BaseWebSocketEvent {
+  type: 'connected'
+}
+
+interface PongWebSocketEvent extends BaseWebSocketEvent {
+  type: 'pong'
+}
+
+interface GameWebSocketEvent extends BaseWebSocketEvent {
+  type: 'game:created' | 'game:updated' | 'game:deleted' | 'game:wiki_updated'
+  gameId: number
+}
+
+export type WebSocketEvent =
+  | ConnectedWebSocketEvent
+  | PongWebSocketEvent
+  | GameWebSocketEvent
+
+export interface WebSocketSendPayload {
+  type: string
+  gameId?: number
+  [key: string]: string | number | boolean | null | undefined
 }
 
 type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
@@ -23,7 +44,7 @@ class WebSocketService {
     this.setStatus('disconnected')
   }
 
-  send(_data: any): void {}
+  send(_data: WebSocketSendPayload): void {}
 
   isConnected(): boolean {
     return false

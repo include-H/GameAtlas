@@ -104,7 +104,6 @@ import { resolveAssetUrl } from '@/utils/asset-url'
 
 interface Props {
   screenshots?: string[]
-  previewVideo?: string | null
   previewVideos?: string[]
   videoPoster?: string | null
   alt?: string
@@ -113,7 +112,6 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   screenshots: () => [],
-  previewVideo: null,
   previewVideos: () => [],
   videoPoster: null,
   alt: 'Game screenshot',
@@ -146,24 +144,11 @@ const visibleScreenshots = computed(() => {
 
 const mediaItems = computed<MediaItem[]>(() => {
   const items: MediaItem[] = []
-  const rawVideoList = props.previewVideos.length > 0
-    ? props.previewVideos
-    : (props.previewVideo ? [props.previewVideo] : [])
-  const resolvedVideoList = rawVideoList
+  const resolvedVideoList = props.previewVideos
     .filter(Boolean)
     .map((video) => resolveAssetUrl(video))
-  const resolvedPrimaryVideo = props.previewVideo ? resolveAssetUrl(props.previewVideo) : ''
-  const orderedVideoList: string[] = []
-
-  if (resolvedPrimaryVideo) {
-    orderedVideoList.push(resolvedPrimaryVideo)
-  }
-  for (const videoUrl of resolvedVideoList) {
-    if (!videoUrl || orderedVideoList.includes(videoUrl)) continue
-    orderedVideoList.push(videoUrl)
-  }
-
-  orderedVideoList.forEach((videoUrl, index) => {
+  resolvedVideoList.forEach((videoUrl, index) => {
+    if (!videoUrl) return
     items.push({
       key: `video:${index}:${videoUrl}`,
       type: 'video',
@@ -221,7 +206,7 @@ watch(() => props.height, (newHeight) => {
   applyHeight(newHeight)
 }, { immediate: true })
 
-watch(() => [props.screenshots, props.previewVideo, props.previewVideos], () => {
+watch(() => [props.screenshots, props.previewVideos], () => {
   brokenImages.value = []
   currentIndex.value = 0
   aspectResolved.value = false

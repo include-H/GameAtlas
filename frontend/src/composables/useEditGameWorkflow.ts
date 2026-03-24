@@ -4,6 +4,7 @@ import gamesService from '@/services/games.service'
 import { seriesService } from '@/services/series.service'
 import platformService from '@/services/platforms.service'
 import { resolveCreatableSelections } from '@/utils/creatable-select'
+import { getHttpErrorMessage } from '@/utils/http-error'
 import type {
   Developer,
   Game,
@@ -78,12 +79,8 @@ interface UseEditGameWorkflowOptions {
   closeModal: () => void
 }
 
-type GameFilePathEntry = NonNullable<Game['file_paths']>[number]
-
-const isGameFilePathObject = (
-  item: GameFilePathEntry,
-): item is Exclude<GameFilePathEntry, string> => {
-  return typeof item === 'object' && item !== null
+const hasResolvedFilePath = (item: NonNullable<Game['files']>[number]) => {
+  return typeof item.file_path === 'string' && item.file_path.trim().length > 0
 }
 
 const slugifyMetadataName = (name: string) => {
@@ -94,19 +91,14 @@ const slugifyMetadataName = (name: string) => {
     .replace(/^-+|-+$/g, '')
 }
 
-const readErrorMessage = (error: unknown, fallback = '未知错误') => {
-  if (error instanceof Error && error.message) return error.message
-  return fallback
-}
-
 const persistGameFilePaths = async (
   gameId: number,
   game: Game,
   filePaths: WorkflowFilePathItem[],
 ) => {
   const originalFileIds = new Set(
-    (game.file_paths || [])
-      .filter(isGameFilePathObject)
+    (game.files || [])
+      .filter(hasResolvedFilePath)
       .map((item) => item.id)
       .filter((id): id is number => typeof id === 'number'),
   )
@@ -414,7 +406,7 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       options.emitSuccess()
       options.closeModal()
     } catch (error) {
-      options.addAlert(readErrorMessage(error, '保存失败'), 'error')
+      options.addAlert(getHttpErrorMessage(error, '保存失败'), 'error')
     } finally {
       options.isSubmitting.value = false
     }

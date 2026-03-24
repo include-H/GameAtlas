@@ -1,4 +1,5 @@
 import { computed } from 'vue'
+import type { Component } from 'vue'
 import { useRoute, type RouteRecordRaw } from 'vue-router'
 import { appRoutes } from '@/router'
 import usePermission from './permission'
@@ -7,7 +8,7 @@ export interface MenuItem {
   name: string
   path: string
   locale: string
-  icon?: any
+  icon?: Component
   children?: MenuItem[]
   parentNames?: string[]
   hideInMenu?: boolean
@@ -44,11 +45,17 @@ function generateMenuItems(
       continue
     }
 
+    const routeIcon = route.meta?.icon
+    const iconComponent =
+      typeof routeIcon === 'function' || (typeof routeIcon === 'object' && routeIcon !== null)
+        ? (routeIcon as Component)
+        : undefined
+
     const menuItem: MenuItem = {
       name: route.name as string,
       path: route.path,
       locale: route.meta.locale as string,
-      icon: route.meta?.icon,
+      icon: iconComponent,
       parentNames,
       hideInMenu: route.meta?.hideInMenu as boolean | undefined,
       roles: route.meta?.roles as string[],

@@ -2,8 +2,11 @@ import { computed } from 'vue'
 import zhCN from '@/locale/zh-CN'
 
 type Locale = 'zh-CN' | 'en-US'
+interface LocaleMessages {
+  [key: string]: string | LocaleMessages
+}
 
-const locales: Record<Locale, any> = {
+const locales: Record<Locale, LocaleMessages> = {
   'zh-CN': zhCN,
   'en-US': {
     menu: {
@@ -60,7 +63,7 @@ export default function useLocale() {
    */
   const t = (key: string): string => {
     const keys = key.split('.')
-    let value: any = locales[currentLocale.value]
+    let value: string | LocaleMessages = locales[currentLocale.value]
 
     for (let index = 0; index < keys.length; index += 1) {
       const segment = keys[index]
@@ -69,7 +72,7 @@ export default function useLocale() {
       }
 
       if (segment in value) {
-        const next = value[segment]
+        const next: string | LocaleMessages = value[segment]
         const remaining = keys.slice(index).join('.')
         // Support flat keys like "games.timeline" under menu while keeping "menu.games" usable.
         if (
@@ -78,7 +81,7 @@ export default function useLocale() {
           remaining in value
         ) {
           value = value[remaining]
-          return value || key
+          return typeof value === 'string' ? value : key
         }
         value = next
         continue
@@ -87,13 +90,13 @@ export default function useLocale() {
       const remaining = keys.slice(index).join('.')
       if (remaining in value) {
         value = value[remaining]
-        return value || key
+        return typeof value === 'string' ? value : key
       }
 
       return key
     }
 
-    return value || key
+    return typeof value === 'string' ? value : key
   }
 
   /**

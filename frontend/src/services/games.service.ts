@@ -57,7 +57,6 @@ interface ScreenshotApiItem {
 interface GameDetailApiItem extends GameListApiItem {
   wiki_content: string | null
   wiki_content_html: string | null
-  preview_video: ScreenshotApiItem | null
   preview_videos: ScreenshotApiItem[]
   screenshots: ScreenshotApiItem[]
   series: MetadataApiItem[]
@@ -114,14 +113,9 @@ function mapFile(file: GameFileApiItem): GameFileEntry {
   return { ...file }
 }
 
-function hasResolvedFilePath(file: GameFileApiItem): file is GameFileApiItem & { file_path: string } {
-  return typeof file.file_path === 'string' && file.file_path.trim().length > 0
-}
-
 function mapGameDetail(item: GameDetailApiItem): Game {
   const screenshots = [...item.screenshots].sort((a, b) => a.sort_order - b.sort_order)
   const files = [...item.files].sort((a, b) => a.sort_order - b.sort_order)
-  const editableFiles = files.filter(hasResolvedFilePath)
   const favoriteIds = new Set(readFavorites())
 
   return applyFavorite({
@@ -135,22 +129,9 @@ function mapGameDetail(item: GameDetailApiItem): Game {
     platform: item.platforms[0]?.name,
     wiki_content: item.wiki_content,
     wiki_content_html: item.wiki_content_html,
-    preview_video: item.preview_video,
     preview_videos: [...(item.preview_videos || [])].sort((a, b) => a.sort_order - b.sort_order),
     screenshot_items: screenshots,
-    screenshots: screenshots.map((shot) => shot.path),
     files: files.map(mapFile),
-    file_path: editableFiles[0]?.file_path,
-    file_paths: editableFiles.length > 0
-      ? editableFiles.map((file) => ({
-      id: file.id,
-      path: file.file_path,
-      label: file.label || '',
-      notes: file.notes || '',
-      size: file.size_bytes,
-      sort_order: file.sort_order,
-    }))
-      : undefined,
   }, favoriteIds)
 }
 
@@ -199,8 +180,9 @@ function mapTimelineItem(item: TimelineGameApiItem, favoriteIds?: Set<string>): 
     downloads: 0,
     created_at: '',
     updated_at: '',
-    screenshots: [],
-    file_paths: [],
+    preview_videos: [],
+    screenshot_items: [],
+    files: [],
   }, favoriteIds)
 }
 
@@ -424,7 +406,7 @@ const gamesService = {
     }
   },
 
-  async addGameFromFile(filePath: string): Promise<{ success: any[]; failed: any[] }> {
+  async addGameFromFile(filePath: string): Promise<{ success: Game[]; failed: never[] }> {
     const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || 'Unknown Game'
     const title = fileName.replace(/\.[^/.]+$/, '')
     const game = await this.createGame({ title, file_path: filePath })

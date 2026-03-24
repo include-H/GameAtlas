@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import steamService from '@/services/steam.service'
 import type { SteamGameSearchResult } from '@/services/types'
+import { getHttpErrorMessage } from '@/utils/http-error'
 
 interface UseSteamPickerOptions<TSelection> {
   onSelect: (game: SteamGameSearchResult) => Promise<TSelection> | TSelection
@@ -33,8 +34,8 @@ export const useSteamPicker = <TSelection>(options: UseSteamPickerOptions<TSelec
     isSearching.value = true
     try {
       results.value = await steamService.searchGames(query.value.trim())
-    } catch (error: any) {
-      options.onError?.(error?.message || '未知错误')
+    } catch (error) {
+      options.onError?.(getHttpErrorMessage(error))
     } finally {
       isSearching.value = false
     }
@@ -46,8 +47,8 @@ export const useSteamPicker = <TSelection>(options: UseSteamPickerOptions<TSelec
     isSearching.value = true
     try {
       selectedData.value = await options.onSelect(game)
-    } catch (error: any) {
-      options.onError?.(error?.message || '未知错误')
+    } catch (error) {
+      options.onError?.(getHttpErrorMessage(error))
       resetSelection()
     } finally {
       isSearching.value = false

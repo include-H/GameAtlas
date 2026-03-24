@@ -690,8 +690,8 @@ const {
 } = useGameFilePaths({
   filePaths: computed(() => form.value.file_paths),
   getDefaultDirectory: () => directoryService.getDefaultDirectory(),
-  onResolveInitialPathError: (error) => {
-    console.error('Failed to get default directory:', error)
+  onResolveInitialPathError: (message) => {
+    console.error(message)
   },
 })
 

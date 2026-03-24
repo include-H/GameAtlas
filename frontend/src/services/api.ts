@@ -34,25 +34,25 @@ apiClient.interceptors.response.use(
 )
 
 // Generic request wrapper
-const request = async <T = any>(config: AxiosRequestConfig): Promise<T> => {
+const request = async <T = unknown>(config: AxiosRequestConfig): Promise<T> => {
   const response = await apiClient.request<T>(config)
   return response.data
 }
 
 // HTTP method helpers
-export const get = <T = any>(url: string, config?: AxiosRequestConfig): Promise<T> => {
+export const get = <T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T> => {
   return request<T>({ ...config, method: 'GET', url })
 }
 
-export const post = <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> => {
+export const post = <T = unknown, D = unknown>(url: string, data?: D, config?: AxiosRequestConfig<D>): Promise<T> => {
   return request<T>({ ...config, method: 'POST', url, data })
 }
 
-export const put = <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> => {
+export const put = <T = unknown, D = unknown>(url: string, data?: D, config?: AxiosRequestConfig<D>): Promise<T> => {
   return request<T>({ ...config, method: 'PUT', url, data })
 }
 
-export const del = <T = any>(url: string, config?: AxiosRequestConfig): Promise<T> => {
+export const del = <T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T> => {
   return request<T>({ ...config, method: 'DELETE', url })
 }
 

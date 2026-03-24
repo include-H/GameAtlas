@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import gamesService from '@/services/games.service'
 import { getWebSocketService, type WebSocketEvent } from '@/services/websocket'
 import type { Game, GameVersion, GameFilter, GameSort, GameStats } from '@/services/types'
+import { getHttpErrorMessage } from '@/utils/http-error'
 
 export const useGamesStore = defineStore('games', () => {
   // State
@@ -121,8 +122,8 @@ export const useGamesStore = defineStore('games', () => {
       }
 
       return response
-    } catch (err: any) {
-      error.value = err.response?.data?.message || 'Failed to fetch games'
+    } catch (err) {
+      error.value = getHttpErrorMessage(err, 'Failed to fetch games')
       throw err
     } finally {
       isLoading.value = false
@@ -137,8 +138,8 @@ export const useGamesStore = defineStore('games', () => {
       const game = await gamesService.getGame(id)
       currentGame.value = game
       return game
-    } catch (err: any) {
-      error.value = err.response?.data?.message || 'Failed to fetch game'
+    } catch (err) {
+      error.value = getHttpErrorMessage(err, 'Failed to fetch game')
       throw err
     } finally {
       isLoading.value = false
@@ -150,8 +151,8 @@ export const useGamesStore = defineStore('games', () => {
       const versions = await gamesService.getGameVersions(gameId)
       currentVersions.value = versions
       return versions
-    } catch (err: any) {
-      error.value = err.response?.data?.message || 'Failed to fetch versions'
+    } catch (err) {
+      error.value = getHttpErrorMessage(err, 'Failed to fetch versions')
       throw err
     }
   }
@@ -160,8 +161,8 @@ export const useGamesStore = defineStore('games', () => {
     try {
       stats.value = await gamesService.getStats()
       return stats.value
-    } catch (err: any) {
-      error.value = err.response?.data?.message || 'Failed to fetch stats'
+    } catch (err) {
+      error.value = getHttpErrorMessage(err, 'Failed to fetch stats')
       throw err
     }
   }
@@ -172,8 +173,8 @@ export const useGamesStore = defineStore('games', () => {
       applyFavoriteState(gameId, result.isFavorite)
 
       return result.isFavorite
-    } catch (err: any) {
-      error.value = err.response?.data?.message || 'Failed to toggle favorite'
+    } catch (err) {
+      error.value = getHttpErrorMessage(err, 'Failed to toggle favorite')
       throw err
     }
   }

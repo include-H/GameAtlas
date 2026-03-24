@@ -1,4 +1,5 @@
 import { ref, type Ref } from 'vue'
+import { getHttpErrorMessage } from '@/utils/http-error'
 
 export interface FilePathItem {
   id?: number
@@ -9,7 +10,7 @@ export interface FilePathItem {
 interface UseGameFilePathsOptions {
   filePaths: Ref<FilePathItem[]>
   getDefaultDirectory: () => Promise<string>
-  onResolveInitialPathError?: (error: unknown) => void
+  onResolveInitialPathError?: (message: string) => void
 }
 
 export const useGameFilePaths = (options: UseGameFilePathsOptions) => {
@@ -39,7 +40,7 @@ export const useGameFilePaths = (options: UseGameFilePathsOptions) => {
       }
       showFileBrowser.value = true
     } catch (error) {
-      options.onResolveInitialPathError?.(error)
+      options.onResolveInitialPathError?.(getHttpErrorMessage(error, '获取默认目录失败'))
     }
   }
 

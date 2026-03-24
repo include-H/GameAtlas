@@ -5,6 +5,7 @@ import tagsService from '@/services/tags.service'
 import type {
   Developer,
   Game,
+  GameFileEntry,
   Platform,
   Publisher,
   ScreenshotItem,
@@ -69,12 +70,8 @@ interface UseEditGameFormBootstrapOptions {
   createEditableVideo: (asset: VideoAssetItem | string) => BootstrapEditableVideo
 }
 
-type GameFilePathEntry = NonNullable<Game['file_paths']>[number]
-
-const isGameFilePathObject = (
-  item: GameFilePathEntry,
-): item is Exclude<GameFilePathEntry, string> => {
-  return typeof item === 'object' && item !== null
+const hasResolvedFilePath = (item: GameFileEntry) => {
+  return typeof item.file_path === 'string' && item.file_path.trim().length > 0
 }
 
 const createEmptyForm = (): BootstrapGameForm => ({
@@ -117,20 +114,11 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
     }
 
     let filePaths: BootstrapFilePathItem[] = [{ path: '', label: '' }]
-    if (game.file_paths && game.file_paths.length > 0) {
-      filePaths = game.file_paths.map((item) => {
-        if (typeof item === 'string') {
-          return { path: item, label: '' }
-        }
-
-        if (isGameFilePathObject(item)) {
-          return { id: item.id, path: item.path || '', label: item.label || '' }
-        }
-
-        return { path: '', label: '' }
-      })
-    } else if (game.file_path) {
-      filePaths = [{ path: game.file_path, label: '' }]
+    if (game.files && game.files.length > 0) {
+      filePaths = game.files
+        .filter(hasResolvedFilePath)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((item) => ({ id: item.id, path: item.file_path || '', label: item.label || '' }))
     }
 
     const seriesId: string | number | null = game.series && game.series.length > 0
@@ -157,11 +145,11 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
       summary: game.summary || '',
       cover_image: game.cover_image || '',
       banner_image: game.banner_image || '',
-      preview_videos: (game.preview_videos || (game.preview_video ? [game.preview_video] : [])).map((asset) =>
+      preview_videos: (game.preview_videos || []).map((asset) =>
         options.createEditableVideo(asset),
       ),
-      primary_preview_video_uid: game.preview_video?.asset_uid || game.preview_videos?.[0]?.asset_uid || '',
-      screenshots: (game.screenshot_items || game.screenshots || []).map((asset, index) =>
+      primary_preview_video_uid: game.preview_videos?.[0]?.asset_uid || '',
+      screenshots: (game.screenshot_items || []).map((asset, index) =>
         options.createEditableScreenshot(asset, index),
       ),
       file_paths: filePaths,

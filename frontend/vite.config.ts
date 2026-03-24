@@ -1,9 +1,22 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import Components from 'unplugin-vue-components/vite'
+import { ArcoResolver } from 'unplugin-vue-components/resolvers'
 import path from 'node:path'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    Components({
+      dts: 'src/components.d.ts',
+      resolvers: [
+        ArcoResolver({
+          importStyle: false,
+          sideEffect: false,
+        }),
+      ],
+    }),
+  ],
   envDir: path.resolve(__dirname, '../backend'),
   build: {
     assetsDir: 'ui',

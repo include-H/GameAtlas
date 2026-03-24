@@ -3,7 +3,9 @@ interface CreatableNamedOption {
   name: string
 }
 
-export const normalizeOptionId = (value: unknown): number | null => {
+type CreatableSelectionValue = string | number | boolean | null | undefined
+
+export const normalizeOptionId = (value: CreatableSelectionValue): number | null => {
   if (typeof value === 'number' && !Number.isNaN(value)) return value
   return null
 }

@@ -121,7 +121,7 @@ function evaluatePendingIssues(game: Game, ignoredDetails: PendingIssueDetailKey
   const hasCover = !!game.cover_image
   const hasBanner = !!game.banner_image
   const hasScreenshots =
-    (!!game.screenshots && game.screenshots.length > 0) ||
+    (!!game.screenshot_items && game.screenshot_items.length > 0) ||
     (typeof game.screenshot_count === 'number' && game.screenshot_count > 0) ||
     !!game.primary_screenshot
   if (!hasCover) {
@@ -140,8 +140,6 @@ function evaluatePendingIssues(game: Game, ignoredDetails: PendingIssueDetailKey
 
   const hasFiles =
     (!!game.files && game.files.length > 0) ||
-    (!!game.file_paths && game.file_paths.length > 0) ||
-    !!game.file_path ||
     (typeof game.file_count === 'number' && game.file_count > 0)
   if (!hasFiles) {
     details.push('missing-files-list')

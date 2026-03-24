@@ -165,7 +165,7 @@ const pickFallbackBackground = async (games: Awaited<ReturnType<typeof gamesServ
 const pickGameDetailBackground = async (gameId: string) => {
   try {
     const detail = await gamesService.getGame(gameId)
-    const screenshots = shuffleArray(detail.screenshots || [])
+    const screenshots = shuffleArray((detail.screenshot_items || []).map((item) => item.path))
 
     for (const screenshot of screenshots) {
       const resolvedUrl = resolveAssetUrl(screenshot)
@@ -186,7 +186,7 @@ const pickGameDetailBackground = async (gameId: string) => {
 const pickWikiEditBackground = async (gameId: string) => {
   try {
     const detail = await gamesService.getGame(gameId)
-    const screenshots = shuffleArray(detail.screenshots || [])
+    const screenshots = shuffleArray((detail.screenshot_items || []).map((item) => item.path))
     for (const screenshot of screenshots) {
       const resolvedUrl = resolveAssetUrl(screenshot)
       if (!resolvedUrl) continue
@@ -235,7 +235,7 @@ const pickQualifiedScreenshotBackground = async (
       continue
     }
 
-    const screenshots = shuffleArray(detail.screenshots || [])
+    const screenshots = shuffleArray((detail.screenshot_items || []).map((item) => item.path))
     for (const screenshot of screenshots) {
       const resolvedUrl = resolveAssetUrl(screenshot)
       if (!resolvedUrl) continue

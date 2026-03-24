@@ -281,7 +281,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onActivated } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -290,7 +290,8 @@ import platformService from '@/services/platforms.service'
 import tagsService from '@/services/tags.service'
 import { getPendingIssueLabel, matchesPendingIssue } from '@/utils/pendingIssues'
 import { createDetailRouteQuery } from '@/utils/navigation'
-import type { Tag, TagGroup } from '@/services/types'
+import { getHttpErrorMessage } from '@/utils/http-error'
+import type { Game, GameFilter, GameSort, Tag, TagGroup } from '@/services/types'
 import GameCard from '@/components/GameCard.vue'
 import AddGameModal from '@/components/AddGameModal.vue'
 import { Modal, Message } from '@arco-design/web-vue'
@@ -340,7 +341,7 @@ const sortOptions = ref([
   { label: '随机', value: 'random_desc' },
 ])
 
-const visibleGames = ref<any[]>([])
+const visibleGames = ref<Game[]>([])
 const visiblePagination = ref({
   total: 0,
   page: 1,
@@ -437,8 +438,8 @@ const titleSorter = new Intl.Collator('zh-Hans-CN-u-co-pinyin', {
   sensitivity: 'base',
 })
 
-const updateRoute = (newParams: Record<string, any>) => {
-  const query = { ...route.query, ...newParams }
+const updateRoute = (newParams: LocationQueryRaw) => {
+  const query: LocationQueryRaw = { ...route.query, ...newParams }
   // Remove undefined or null values
   Object.keys(query).forEach(key => {
     if (query[key] === undefined || query[key] === null || query[key] === '') {
@@ -483,8 +484,8 @@ const handleAddGameSubmit = async (data: { title: string; visibility: 'public' |
 
     // Refresh game list
     await loadGames()
-  } catch (error: any) {
-    uiStore.addAlert(`添加游戏失败：${error.message || '未知错误'}`, 'error')
+  } catch (error) {
+    uiStore.addAlert(`添加游戏失败：${getHttpErrorMessage(error)}`, 'error')
   }
 }
 
@@ -510,8 +511,8 @@ const handleDelete = (id: number, title: string) => {
         await gamesService.deleteGame(id.toString())
         Message.success(`游戏 "${title}" 已删除`)
         await loadGames()
-      } catch (error: any) {
-        Message.error(`删除游戏失败：${error.message || '未知错误'}`)
+      } catch (error) {
+        Message.error(`删除游戏失败：${getHttpErrorMessage(error)}`)
       }
     }
   })
@@ -593,24 +594,29 @@ const loadGames = async () => {
 
   // Parse sort value and map to backend fields
   const [field, order] = sortBy.value.split('_')
-  const sortFieldMap: Record<string, string> = {
+  const sortFieldMap: Record<'created' | 'title' | 'release' | 'downloads' | 'random', GameSort['field']> = {
     created: 'created_at',
     title: 'title',
     release: 'release_date',
     downloads: 'downloads',
     random: 'random',
   }
-  const filter = {
+  const resolvedSortKey =
+    field === 'created' || field === 'title' || field === 'release' || field === 'downloads' || field === 'random'
+      ? field
+      : 'created'
+  const filter: GameFilter = {
     search: (route.query.search as string) || undefined,
     platform: (route.query.platform as string) || undefined,
     tag_ids: selectedTagIds.value,
     favorite: filterFavorites.value || undefined,
     status: (route.query.status as string) || undefined,
   }
-  const sort = {
-    field: (sortFieldMap[field] || 'created_at') as any,
-    order: (order || 'desc') as any,
-    seed: field === 'random' ? Number(route.query.seed) || Date.now() : undefined,
+  const resolvedSortOrder: GameSort['order'] = order === 'asc' ? 'asc' : 'desc'
+  const sort: GameSort = {
+    field: sortFieldMap[resolvedSortKey],
+    order: resolvedSortOrder,
+    seed: resolvedSortKey === 'random' ? Number(route.query.seed) || Date.now() : undefined,
   }
 
   try {

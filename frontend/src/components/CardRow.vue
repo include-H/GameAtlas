@@ -80,8 +80,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import type { Component } from 'vue'
 import { useRouter } from 'vue-router'
 import type { RouteLocationRaw } from 'vue-router'
+import type { Game } from '@/services/types'
 import {
   IconRight,
   IconLeft,
@@ -99,7 +101,7 @@ import {
 interface Props {
   title: string
   icon: string
-  items: any[]
+  items: Game[]
   cardWidth?: string
   showViewAll?: boolean
   viewAllRoute?: RouteLocationRaw
@@ -122,7 +124,7 @@ const canScrollLeft = ref(false)
 const canScrollRight = ref(false)
 
 // Map icon names to components
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, Component> = {
   'mdi-new-box': IconPlus,
   'mdi-download': IconDownload,
   'mdi-heart': IconHeart,

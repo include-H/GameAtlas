@@ -106,7 +106,7 @@ const loadDirectory = async (path?: string) => {
     currentPath.value = data.currentPath
     parentPath.value = data.parentPath
     directoryItems.value = data.items
-  } catch (error: any) {
+  } catch (error) {
     console.error('Failed to load directory:', error)
   }
 }

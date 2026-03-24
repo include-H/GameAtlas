@@ -186,6 +186,7 @@ import {
   IconTrophy,
 } from '@arco-design/web-vue/es/icon'
 import { useAuthStore } from '@/stores/auth'
+import { getHttpErrorData, getHttpErrorMessage, getHttpStatus } from '@/utils/http-error'
 
 type CharacterName = 'purple' | 'black' | 'orange' | 'yellow'
 
@@ -195,6 +196,11 @@ interface CharacterMotion {
   faceY: number
   pupilX: number
   pupilY: number
+}
+
+interface LoginErrorData {
+  remaining_attempts?: number
+  retry_after_seconds?: number
 }
 
 const router = useRouter()
@@ -535,10 +541,10 @@ const handleLogin = async () => {
     successTransitionTimer = window.setTimeout(() => {
       router.push(redirect)
     }, 980)
-  } catch (error: any) {
+  } catch (error) {
     triggerErrorAnimation()
-    const status = Number(error?.response?.status || 0)
-    const data = error?.response?.data?.data || {}
+    const status = getHttpStatus(error)
+    const data = getHttpErrorData<LoginErrorData>(error) || {}
 
     if (status === 401) {
       const attempts = Number(data?.remaining_attempts)
@@ -554,7 +560,7 @@ const handleLogin = async () => {
       }
     }
 
-    Message.error(error?.response?.data?.error || '登录失败')
+    Message.error(getHttpErrorMessage(error, '登录失败'))
   } finally {
     isSubmitting.value = false
   }

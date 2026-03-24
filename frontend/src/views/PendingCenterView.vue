@@ -271,11 +271,11 @@
             <div class="detail-overview">
               <div class="detail-overview__item">
                 <span>文件</span>
-                <strong>{{ activeGame.files?.length || activeGame.file_paths?.length || activeGame.file_count || 0 }}</strong>
+                <strong>{{ activeGame.files?.length || activeGame.file_count || 0 }}</strong>
               </div>
               <div class="detail-overview__item">
                 <span>截图</span>
-                <strong>{{ activeGame.screenshots?.length || activeGame.screenshot_count || 0 }}</strong>
+                <strong>{{ activeGame.screenshot_items?.length || activeGame.screenshot_count || 0 }}</strong>
               </div>
               <div class="detail-overview__item">
                 <span>开发商</span>
@@ -559,11 +559,11 @@ const activeGameDetails = computed(() => {
 })
 
 const getDisplayImage = (game: Game) => {
-  return game.cover_image || game.banner_image || game.primary_screenshot || game.screenshots?.[0] || placeholderImage
+  return game.cover_image || game.banner_image || game.primary_screenshot || game.screenshot_items?.[0]?.path || placeholderImage
 }
 
 const getDetailHeroImage = (game: Game) => {
-  return game.banner_image || game.cover_image || game.primary_screenshot || game.screenshots?.[0] || placeholderImage
+  return game.banner_image || game.cover_image || game.primary_screenshot || game.screenshot_items?.[0]?.path || placeholderImage
 }
 
 const updateDetailHeroFit = (event: Event) => {

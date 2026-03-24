@@ -75,11 +75,11 @@ const updateItem = (index: number, field: 'path' | 'label', value: string | numb
   })
 }
 
-const handlePathUpdate = (index: number, value: unknown) => {
+const handlePathUpdate = (index: number, value: string | number | undefined) => {
   updateItem(index, 'path', typeof value === 'string' || typeof value === 'number' ? value : '')
 }
 
-const handleLabelUpdate = (index: number, value: unknown) => {
+const handleLabelUpdate = (index: number, value: string | number | undefined) => {
   updateItem(index, 'label', typeof value === 'string' || typeof value === 'number' ? value : '')
 }
 </script>

@@ -138,14 +138,10 @@ export interface Game {
   tag_groups?: GameTagGroup[]
   cover_image?: string | null
   banner_image?: string | null
-  preview_video?: VideoAssetItem | null
   preview_videos?: VideoAssetItem[]
-  screenshots?: string[]
   screenshot_items?: ScreenshotItem[]
   wiki_content?: string | null
   wiki_content_html?: string | null
-  file_path?: string
-  file_paths?: Array<string | { id?: number; path: string; label?: string; notes?: string; size?: number | null; sort_order?: number }>
   files?: GameFileEntry[]
   needs_review?: boolean
   primary_screenshot?: string | null
@@ -177,8 +173,6 @@ export interface GameInput {
   platforms?: Array<number | string>
   preview_video_asset_uid?: string | null
   tag_ids?: number[]
-  screenshots?: string[]
-  file_paths?: string[]
 }
 
 export interface GameVersion {

@@ -33,6 +33,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { Component } from 'vue'
 import {
   IconTrophy,
   IconPlayCircle,
@@ -65,7 +66,7 @@ defineEmits<{
 }>()
 
 // Map icon names to components
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, Component> = {
   'mdi-gamepad-variant': IconTrophy,
   'mdi-play-circle': IconPlayCircle,
   'mdi-download': IconDownload,

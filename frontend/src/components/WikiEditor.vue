@@ -133,8 +133,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import MarkdownRenderer from './MarkdownRenderer.vue'
+import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import {
   IconBold,
   IconCode,
@@ -168,6 +167,7 @@ const emit = defineEmits<{
 const content = ref(props.modelValue)
 const showPreview = ref(false)
 const editorRef = ref<HTMLTextAreaElement | null>(null)
+const MarkdownRenderer = defineAsyncComponent(() => import('./MarkdownRenderer.vue'))
 
 watch(content, (value) => {
   emit('update:modelValue', value)

@@ -367,6 +367,7 @@
 import { IconCheck, IconUpload } from '@arco-design/web-vue/es/icon'
 import SteamSearchPanel from '@/components/SteamSearchPanel.vue'
 import type { SteamGameSearchResult } from '@/services/types'
+import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
 
 interface SteamScreenshotsData {
   name: string
@@ -443,7 +444,7 @@ const emit = defineEmits<{
   'back-cover-game-search': []
   'update:selected-cover-image': [value: string]
   'download-selected-steam-cover': []
-  'cover-upload-success': [fileItem: unknown]
+  'cover-upload-success': [fileItem: FileItem]
   'cover-upload-error': []
   'update:cover-search-url': [value: string]
   'load-cover-from-url': []
@@ -458,7 +459,7 @@ const emit = defineEmits<{
   'back-banner-game-search': []
   'update:selected-banner-image': [value: string]
   'download-selected-steam-banner': []
-  'banner-upload-success': [fileItem: unknown]
+  'banner-upload-success': [fileItem: FileItem]
   'banner-upload-error': []
   'update:banner-search-url': [value: string]
   'load-banner-from-url': []
@@ -472,7 +473,7 @@ const emit = defineEmits<{
   'back-screenshot-game-search': []
   'toggle-steam-screenshot': [index: number]
   'download-selected-steam-screenshots': []
-  'screenshot-upload-success': [fileItem: unknown]
+  'screenshot-upload-success': [fileItem: FileItem]
   'screenshot-upload-error': []
   'update:screenshot-search-url': [value: string]
   'load-screenshot-preview': []

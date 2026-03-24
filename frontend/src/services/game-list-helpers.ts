@@ -74,7 +74,8 @@ export function mapGameListItem(item: GameListApiItem, favoriteIds?: Set<string>
     downloads: item.downloads,
     created_at: item.created_at,
     updated_at: item.updated_at,
-    screenshots: [],
-    file_paths: [],
+    preview_videos: [],
+    screenshot_items: [],
+    files: [],
   }, favoriteIds)
 }

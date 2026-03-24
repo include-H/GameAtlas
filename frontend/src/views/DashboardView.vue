@@ -222,9 +222,9 @@ const viewGame = (id: string | number) => {
   })
 }
 
-const toggleFavorite = async (id: string) => {
+const toggleFavorite = async (id: string | number) => {
   try {
-    await gamesStore.toggleFavorite(id)
+    await gamesStore.toggleFavorite(String(id))
     uiStore.addAlert('收藏已更新', 'success')
   } catch {
     uiStore.addAlert('更新收藏失败', 'error')

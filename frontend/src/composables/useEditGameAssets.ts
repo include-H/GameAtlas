@@ -1,5 +1,7 @@
 import { type Ref } from 'vue'
 import { uploadAsset, type UploadedAssetResult } from '@/services/assets'
+import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
+import { getHttpErrorMessage } from '@/utils/http-error'
 
 type AlertType = 'success' | 'warning' | 'error'
 type AssetType = 'cover' | 'banner' | 'screenshot' | 'video'
@@ -31,10 +33,6 @@ interface UploadResponseLike {
   error?: string
 }
 
-interface UploadSuccessFileItem {
-  response?: UploadResponseLike
-}
-
 interface UseEditGameAssetsOptions {
   form: Ref<AssetFormBridge>
   gameId: Ref<number | undefined>
@@ -55,18 +53,6 @@ const readUploadError = (response?: UploadResponseLike) => {
   return response?.error || '未知错误'
 }
 
-const readErrorMessage = (error: unknown, fallback = '未知错误') => {
-  if (error instanceof Error && error.message) return error.message
-  return fallback
-}
-
-const parseUploadSuccessFileItem = (value: unknown): UploadSuccessFileItem => {
-  if (typeof value !== 'object' || value === null) {
-    return {}
-  }
-  return value as UploadSuccessFileItem
-}
-
 export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
   const appendPreviewVideo = (video: AssetEditableVideo) => {
     options.form.value.preview_videos.push(video)
@@ -75,9 +61,8 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     }
   }
 
-  const handleCoverUploadSuccess = (fileItem: unknown) => {
-    const parsedFileItem = parseUploadSuccessFileItem(fileItem)
-    const response = parsedFileItem.response
+  const handleCoverUploadSuccess = (fileItem: FileItem) => {
+    const response = fileItem.response as UploadResponseLike | undefined
     if (response?.success && response.data?.path) {
       if (options.form.value.cover_image) {
         options.queueAssetDeletion('cover', options.form.value.cover_image)
@@ -95,9 +80,8 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     options.addAlert('封面上传失败', 'error')
   }
 
-  const handleBannerUploadSuccess = (fileItem: unknown) => {
-    const parsedFileItem = parseUploadSuccessFileItem(fileItem)
-    const response = parsedFileItem.response
+  const handleBannerUploadSuccess = (fileItem: FileItem) => {
+    const response = fileItem.response as UploadResponseLike | undefined
     if (response?.success && response.data?.path) {
       if (options.form.value.banner_image) {
         options.queueAssetDeletion('banner', options.form.value.banner_image)
@@ -115,9 +99,8 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     options.addAlert('横幅上传失败', 'error')
   }
 
-  const handleScreenshotUploadSuccess = (fileItem: unknown) => {
-    const parsedFileItem = parseUploadSuccessFileItem(fileItem)
-    const response = parsedFileItem.response
+  const handleScreenshotUploadSuccess = (fileItem: FileItem) => {
+    const response = fileItem.response as UploadResponseLike | undefined
     if (response?.success && response.data?.path) {
       options.form.value.screenshots.push(
         options.createEditableScreenshot(response.data, options.form.value.screenshots.length),
@@ -157,7 +140,7 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
       options.addAlert('预告片上传成功', 'success')
     } catch (error) {
       options.videoUploadProgress.value = 0
-      options.addAlert('预告片上传失败：' + readErrorMessage(error), 'error')
+      options.addAlert('预告片上传失败：' + getHttpErrorMessage(error), 'error')
     } finally {
       options.isUploadingVideo.value = false
       input.value = ''

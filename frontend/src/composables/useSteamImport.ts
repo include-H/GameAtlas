@@ -1,6 +1,8 @@
 import { ref, watch, type Ref } from 'vue'
 import steamService, { proxySteamAssetUrl } from '@/services/steam.service'
 import { useSteamPicker } from '@/composables/useSteamPicker'
+import type { SteamGameDetails, SteamGameSearchResult } from '@/services/types'
+import { getHttpErrorMessage } from '@/utils/http-error'
 
 type AlertType = 'success' | 'warning' | 'error'
 type AssetType = 'cover' | 'banner' | 'screenshot' | 'video'
@@ -31,17 +33,6 @@ interface SteamImportFormBridge {
   cover_image: string
   banner_image: string
   screenshots: EditableScreenshotLike[]
-}
-
-interface SteamGameDetailsLike {
-  description?: string
-  releaseDate?: string
-  developers?: string[]
-  publishers?: string[]
-  libraryHero?: string
-  background?: string
-  headerImage?: string
-  screenshots?: string[]
 }
 
 interface SteamScreenshotsData {
@@ -98,7 +89,7 @@ const stripHtmlToText = (html: string) => {
 export const useSteamImport = (options: UseSteamImportOptions) => {
   const showSummarySelector = ref(false)
   const steamSummaryPreview = ref('')
-  const steamSummaryDetails = ref<SteamGameDetailsLike | null>(null)
+  const steamSummaryDetails = ref<SteamGameDetails | null>(null)
 
   const showCoverSelector = ref(false)
   const coverSearchUrl = ref('')
@@ -128,7 +119,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     return options.form.value.title?.trim() || ''
   }
 
-  const applySteamMetadataToForm = (details: SteamGameDetailsLike) => {
+  const applySteamMetadataToForm = (details: SteamGameDetails) => {
     if (details.releaseDate) {
       options.form.value.release_date = details.releaseDate
       options.releaseDate.value = new Date(`${details.releaseDate}T00:00:00`)
@@ -149,7 +140,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     }
   }
 
-  const summarySteamPicker = useSteamPicker<SteamGameDetailsLike>({
+  const summarySteamPicker = useSteamPicker<SteamGameDetails>({
     onSelect: async (game) => {
       const details = await steamService.getGameDetails(game.id)
       steamSummaryDetails.value = details
@@ -252,7 +243,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     await summarySteamPicker.search()
   }
 
-  const selectSteamSummaryGame = async (game: any) => {
+  const selectSteamSummaryGame = async (game: SteamGameSearchResult) => {
     steamSummaryPreview.value = ''
     steamSummaryDetails.value = null
     await summarySteamPicker.select(game)
@@ -297,7 +288,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     await coverSteamPicker.search()
   }
 
-  const selectSteamCoverGame = async (game: any) => {
+  const selectSteamCoverGame = async (game: SteamGameSearchResult) => {
     await coverSteamPicker.select(game)
   }
 
@@ -326,8 +317,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       coverSearchUrl.value = ''
       coverPreviewUrl.value = ''
       options.addAlert('封面下载成功', 'success')
-    } catch (error: any) {
-      options.addAlert('封面下载失败：' + error.message, 'error')
+    } catch (error) {
+      options.addAlert('封面下载失败：' + getHttpErrorMessage(error), 'error')
     } finally {
       isDownloadingCover.value = false
     }
@@ -348,8 +339,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       steamCoverSearchQuery.value = ''
       steamCoverSearchResults.value = []
       options.addAlert('封面下载成功', 'success')
-    } catch (error: any) {
-      options.addAlert('下载失败：' + error.message, 'error')
+    } catch (error) {
+      options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
     } finally {
       isSearchingSteamCover.value = false
     }
@@ -367,7 +358,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     await bannerSteamPicker.search()
   }
 
-  const selectSteamBannerGame = async (game: any) => {
+  const selectSteamBannerGame = async (game: SteamGameSearchResult) => {
     await bannerSteamPicker.select(game)
   }
 
@@ -390,8 +381,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       bannerSearchUrl.value = ''
       bannerPreviewUrl.value = ''
       options.addAlert('横幅下载成功', 'success')
-    } catch (error: any) {
-      options.addAlert('下载失败：' + error.message, 'error')
+    } catch (error) {
+      options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
     } finally {
       isDownloadingBanner.value = false
     }
@@ -420,8 +411,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       bannerSearchUrl.value = ''
       bannerPreviewUrl.value = ''
       options.addAlert('横幅下载成功', 'success')
-    } catch (error: any) {
-      options.addAlert('下载失败：' + error.message, 'error')
+    } catch (error) {
+      options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
     } finally {
       isDownloadingBanner.value = false
     }
@@ -439,7 +430,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     await screenshotSteamPicker.search()
   }
 
-  const selectSteamScreenshotGame = async (game: any) => {
+  const selectSteamScreenshotGame = async (game: SteamGameSearchResult) => {
     await screenshotSteamPicker.select(game)
   }
 
@@ -479,8 +470,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       screenshotSearchUrl.value = ''
       screenshotPreviewUrl.value = ''
       options.addAlert('截图下载成功', 'success')
-    } catch (error: any) {
-      options.addAlert('截图下载失败：' + error.message, 'error')
+    } catch (error) {
+      options.addAlert('截图下载失败：' + getHttpErrorMessage(error), 'error')
     } finally {
       isDownloadingScreenshot.value = false
     }
@@ -507,8 +498,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       steamScreenshotSearchQuery.value = ''
       steamScreenshotSearchResults.value = []
       options.addAlert(`成功添加 ${indices.length} 张截图`, 'success')
-    } catch (error: any) {
-      options.addAlert('下载失败：' + error.message, 'error')
+    } catch (error) {
+      options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
     } finally {
       isDownloadingSteamScreenshots.value = false
     }

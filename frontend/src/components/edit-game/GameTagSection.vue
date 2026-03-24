@@ -62,6 +62,7 @@
 
 <script setup lang="ts">
 import type { Tag, TagGroup } from '@/services/types'
+import type { SelectOptionValue } from '@arco-design/web-vue/es/select/interface'
 
 export type GameTagSelectionValue =
   | string
@@ -91,7 +92,9 @@ const emit = defineEmits<{
   'tag-selection-change': [payload: { groupId: number; value: GameTagSelectionValue }]
 }>()
 
-const normalizeTagSelectionValue = (value: unknown): GameTagSelectionValue => {
+type RawTagSelectionValue = SelectOptionValue | SelectOptionValue[] | null | undefined
+
+const normalizeTagSelectionValue = (value: RawTagSelectionValue): GameTagSelectionValue => {
   if (
     value === null ||
     value === undefined ||
@@ -110,7 +113,7 @@ const normalizeTagSelectionValue = (value: unknown): GameTagSelectionValue => {
   return undefined
 }
 
-const handleRawTagSelectionChange = (groupId: number, value: unknown) => {
+const handleRawTagSelectionChange = (groupId: number, value: RawTagSelectionValue) => {
   handleTagSelectionChange(groupId, normalizeTagSelectionValue(value))
 }
 

@@ -482,7 +482,6 @@ body[arco-theme='light'] .arco-card {
   box-shadow: var(--shadow-float);
 }
 
-.arco-trigger-popup,
 .arco-select-dropdown,
 .arco-tree-select-popup,
 .arco-cascader-panel,

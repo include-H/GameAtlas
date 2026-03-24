@@ -40,6 +40,8 @@ const HEADING_SCROLL_OFFSET = 76
 let scrollContainer: HTMLElement | null = null
 let contentObserver: MutationObserver | null = null
 let headingObserver: IntersectionObserver | null = null
+let wikiCardObserver: MutationObserver | null = null
+let observedWikiContent: HTMLElement | null = null
 
 const generateId = (text: string, index: number): string => {
   const baseId = text
@@ -214,8 +216,10 @@ const scrollToActiveItem = () => {
 const setupContentObserver = () => {
   const wikiContent = getWikiContent()
   if (!wikiContent || typeof MutationObserver === 'undefined') return
+  if (observedWikiContent === wikiContent && contentObserver) return
 
   contentObserver?.disconnect()
+  observedWikiContent = wikiContent
   contentObserver = new MutationObserver(() => {
     void extractHeadingsFromDOM()
   })
@@ -226,15 +230,32 @@ const setupContentObserver = () => {
   })
 }
 
+const setupWikiCardObserver = () => {
+  if (typeof MutationObserver === 'undefined') return
+
+  const wikiCard = document.querySelector('.game-detail__wiki-card') as HTMLElement | null
+  if (!wikiCard) return
+
+  wikiCardObserver?.disconnect()
+  wikiCardObserver = new MutationObserver(() => {
+    setupContentObserver()
+    void extractHeadingsFromDOM()
+  })
+  wikiCardObserver.observe(wikiCard, {
+    childList: true,
+    subtree: true,
+  })
+}
+
 const handleResize = () => {
   computeActiveHeading()
 }
 
 onMounted(() => {
   scrollContainer = document.querySelector('.content')
-  void extractHeadingsFromDOM().then(() => {
-    setupContentObserver()
-  })
+  setupWikiCardObserver()
+  setupContentObserver()
+  void extractHeadingsFromDOM()
 
   if (scrollContainer) {
     scrollContainer.addEventListener('scroll', computeActiveHeading, { passive: true })
@@ -248,6 +269,9 @@ onUnmounted(() => {
   disconnectHeadingObserver()
   contentObserver?.disconnect()
   contentObserver = null
+  observedWikiContent = null
+  wikiCardObserver?.disconnect()
+  wikiCardObserver = null
 
   if (scrollContainer) {
     scrollContainer.removeEventListener('scroll', computeActiveHeading)
