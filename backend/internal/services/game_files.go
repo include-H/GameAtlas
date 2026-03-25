@@ -60,14 +60,6 @@ func (s *GameFilesService) List(gameID int64, includeAll bool) ([]domain.GameFil
 	if files == nil {
 		return []domain.GameFile{}, nil
 	}
-	for index := range files {
-		if !populateSourceCreatedAt(s.fileGuard, &files[index]) {
-			continue
-		}
-		if err := s.gameFilesRepo.UpdateSourceCreatedAt(gameID, files[index].ID, files[index].SourceCreatedAt); err != nil {
-			return nil, err
-		}
-	}
 	return files, nil
 }
 
