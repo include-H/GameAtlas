@@ -145,6 +145,81 @@ func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([
 	return games, nil
 }
 
+func (r *MetadataRepository) ListSeriesGamesBySeriesIDs(seriesIDs []int64, includeAll bool) (map[int64][]domain.Game, error) {
+	normalized := uniquePositiveIDs(seriesIDs)
+	if len(normalized) == 0 {
+		return map[int64][]domain.Game{}, nil
+	}
+
+	where := "WHERE g.series_id IN (?)"
+	args := []any{normalized}
+	if !includeAll {
+		where += " AND g.visibility = ?"
+		args = append(args, domain.GameVisibilityPublic)
+	}
+
+	query, boundArgs, err := sqlx.In(fmt.Sprintf(`
+		SELECT
+			g.series_id,
+			g.id,
+			g.public_id,
+			g.title,
+			g.title_alt,
+			g.visibility,
+			g.summary,
+			g.release_date,
+			g.engine,
+			g.cover_image,
+			g.banner_image,
+			g.wiki_content,
+			g.wiki_content_html,
+			g.needs_review,
+			g.preview_video_asset_uid,
+			g.downloads,
+			(
+				SELECT ga.path
+				FROM game_assets ga
+				WHERE ga.game_id = g.id AND ga.asset_type = 'screenshot'
+				ORDER BY ga.sort_order ASC, ga.id ASC
+				LIMIT 1
+			) AS primary_screenshot,
+			0 AS screenshot_count,
+			0 AS file_count,
+			0 AS developer_count,
+			0 AS publisher_count,
+			0 AS platform_count,
+			g.created_at,
+			g.updated_at
+		FROM games g
+		%s
+		ORDER BY g.series_id ASC, g.updated_at DESC, g.id DESC
+	`, where), args...)
+	if err != nil {
+		return nil, fmt.Errorf("build series games by ids query: %w", err)
+	}
+	query = r.db.Rebind(query)
+
+	type seriesGameRow struct {
+		SeriesID int64 `db:"series_id"`
+		domain.Game
+	}
+
+	var rows []seriesGameRow
+	if err := r.db.Select(&rows, query, boundArgs...); err != nil {
+		return nil, fmt.Errorf("list series games by ids: %w", err)
+	}
+
+	gamesBySeriesID := make(map[int64][]domain.Game, len(normalized))
+	for _, seriesID := range normalized {
+		gamesBySeriesID[seriesID] = []domain.Game{}
+	}
+	for _, row := range rows {
+		gamesBySeriesID[row.SeriesID] = append(gamesBySeriesID[row.SeriesID], row.Game)
+	}
+
+	return gamesBySeriesID, nil
+}
+
 func (r *MetadataRepository) DeleteUnusedSeries() error {
 	const query = `
 		DELETE FROM series

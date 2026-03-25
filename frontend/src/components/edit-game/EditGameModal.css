@@ -40,6 +40,13 @@
   font-weight: 700;
 }
 
+.field-label-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
 .tag-group-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

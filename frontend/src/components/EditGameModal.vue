@@ -19,7 +19,22 @@
     <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" @submit="handleSubmit">
       <a-row :gutter="16">
         <a-col :span="12">
-          <a-form-item field="title" label="游戏名称">
+          <a-form-item field="title">
+            <template #label>
+              <div class="field-label-action">
+                <span>游戏名称</span>
+                <a-button
+                  type="text"
+                  size="mini"
+                  html-type="button"
+                  :disabled="!props.game?.wiki_content"
+                  :loading="isPreparingWikiMetadataCandidates"
+                  @click="importMetadataFromWiki"
+                >
+                  从 Wiki 提取
+                </a-button>
+              </div>
+            </template>
             <a-input v-model="form.title" placeholder="请输入游戏名称" />
           </a-form-item>
         </a-col>
@@ -355,7 +370,16 @@
       @group-change="handleWikiTagCandidateGroupChange($event.key, $event.value)"
       @apply="applySelectedWikiTags"
     />
-	  </a-modal>
+
+    <edit-game-wiki-metadata-picker-modal
+      :visible="wikiMetadataPickerVisible"
+      :candidates="wikiMetadataCandidates"
+      :is-applying-wiki-metadata="isApplyingWikiMetadata"
+      @update:visible="wikiMetadataPickerVisible = $event"
+      @selection-change="handleWikiMetadataCandidateSelectionChange($event.key, $event.selected)"
+      @apply="applySelectedWikiMetadata"
+    />
+  </a-modal>
 </template>
 
 <script setup lang="ts">
@@ -371,6 +395,7 @@ import GameMediaSection from '@/components/edit-game/GameMediaSection.vue'
 import EditGameAssetImportModals from '@/components/edit-game/EditGameAssetImportModals.vue'
 import EditGameVideoModal from '@/components/edit-game/EditGameVideoModal.vue'
 import EditGameWikiTagPickerModal from '@/components/edit-game/EditGameWikiTagPickerModal.vue'
+import EditGameWikiMetadataPickerModal from '@/components/edit-game/EditGameWikiMetadataPickerModal.vue'
 import { proxySteamAssetUrl } from '@/services/steam.service'
 import { seriesService } from '@/services/series.service'
 import { resolveAssetCandidates } from '@/utils/asset-url'
@@ -858,6 +883,10 @@ const uploadAssetFromUrl = async (
 const {
   showSummarySelector,
   steamSummaryPreview,
+  isPreparingWikiMetadataCandidates,
+  isApplyingWikiMetadata,
+  wikiMetadataPickerVisible,
+  wikiMetadataCandidates,
   showCoverSelector,
   coverSearchUrl,
   coverPreviewUrl,
@@ -898,6 +927,9 @@ const {
   selectSteamSummaryGame,
   backToSummarySearch,
   confirmSummaryImport,
+  importMetadataFromWiki,
+  handleWikiMetadataCandidateSelectionChange,
+  applySelectedWikiMetadata,
   handleCoverSearchClear,
   searchSteamForCover,
   selectSteamCoverGame,
@@ -930,6 +962,7 @@ const {
   }),
   releaseDate,
   gameId: computed(() => props.game?.id),
+  getWikiContent: () => props.game?.wiki_content || '',
   uploadAssetFromUrl,
   queueAssetDeletion,
   createEditableScreenshot,

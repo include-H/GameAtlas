@@ -3,6 +3,7 @@ import steamService, { proxySteamAssetUrl } from '@/services/steam.service'
 import { useSteamPicker } from '@/composables/useSteamPicker'
 import type { SteamGameDetails, SteamGameSearchResult } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
+import { extractWikiMetadata } from '@/utils/wiki-metadata-parser'
 
 type AlertType = 'success' | 'warning' | 'error'
 type AssetType = 'cover' | 'banner' | 'screenshot' | 'video'
@@ -28,8 +29,10 @@ interface SteamImportFormBridge {
   title: string
   title_alt: string
   release_date: string | undefined
+  engine: string
   developer_ids: Array<string | number>
   publisher_ids: Array<string | number>
+  platform_ids: Array<string | number>
   cover_image: string
   banner_image: string
   screenshots: EditableScreenshotLike[]
@@ -43,10 +46,26 @@ interface SteamScreenshotsData {
   usedFallbackAssets: boolean
 }
 
+export interface WikiMetadataCandidateSelection {
+  key: string
+  label: string
+  value: string
+  selected: boolean
+  group?: 'title_alt'
+}
+
+const splitTitleAltValues = (value: string) => {
+  return value
+    .split(/\s*\/\s*/g)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
 interface UseSteamImportOptions {
   form: Ref<SteamImportFormBridge>
   releaseDate: Ref<Date | null>
   gameId: Ref<number | undefined>
+  getWikiContent: () => string
   uploadAssetFromUrl: (
     url: string,
     assetType: 'cover' | 'banner' | 'screenshot',
@@ -90,6 +109,10 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const showSummarySelector = ref(false)
   const steamSummaryPreview = ref('')
   const steamSummaryDetails = ref<SteamGameDetails | null>(null)
+  const isPreparingWikiMetadataCandidates = ref(false)
+  const isApplyingWikiMetadata = ref(false)
+  const wikiMetadataPickerVisible = ref(false)
+  const wikiMetadataCandidates = ref<WikiMetadataCandidateSelection[]>([])
 
   const showCoverSelector = ref(false)
   const coverSearchUrl = ref('')
@@ -137,6 +160,220 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
         if (name.trim()) merged.add(name.trim())
       }
       options.form.value.publisher_ids = Array.from(merged)
+    }
+  }
+
+  const prepareWikiMetadataCandidates = () => {
+    const metadata = extractWikiMetadata(options.getWikiContent())
+    const candidates: WikiMetadataCandidateSelection[] = []
+
+    if (metadata.summary) {
+      candidates.push({
+        key: 'summary',
+        label: '简介',
+        value: metadata.summary,
+        selected: true,
+      })
+    }
+    const englishTitleAlts = splitTitleAltValues(metadata.englishTitleAlt)
+    const chineseTitleAlts = splitTitleAltValues(metadata.chineseTitleAlt)
+
+    englishTitleAlts.forEach((value, index) => {
+      candidates.push({
+        key: `title_alt_en:${index}`,
+        label: '英文名',
+        value,
+        selected: index === 0,
+        group: 'title_alt',
+      })
+    })
+
+    chineseTitleAlts.forEach((value, index) => {
+      candidates.push({
+        key: `title_alt_cn:${index}`,
+        label: '别名',
+        value,
+        selected: englishTitleAlts.length === 0 && index === 0,
+        group: 'title_alt',
+      })
+    })
+    if (metadata.releaseDate) {
+      candidates.push({
+        key: 'release_date',
+        label: '发行日期',
+        value: metadata.releaseDate,
+        selected: true,
+      })
+    }
+    if (metadata.engine) {
+      candidates.push({
+        key: 'engine',
+        label: '游戏引擎',
+        value: metadata.engine,
+        selected: true,
+      })
+    }
+    if (metadata.developers.length > 0) {
+      candidates.push({
+        key: 'developers',
+        label: '开发商',
+        value: metadata.developers.join(' / '),
+        selected: true,
+      })
+    }
+    if (metadata.publishers.length > 0) {
+      candidates.push({
+        key: 'publishers',
+        label: '发行商',
+        value: metadata.publishers.join(' / '),
+        selected: true,
+      })
+    }
+    if (metadata.platforms.length > 0) {
+      candidates.push({
+        key: 'platforms',
+        label: '平台',
+        value: metadata.platforms.join(' / '),
+        selected: true,
+      })
+    }
+
+    if (candidates.length === 0) {
+      options.addAlert('当前 Wiki 没有可提取的信息', 'warning')
+      return
+    }
+
+    wikiMetadataCandidates.value = candidates
+    wikiMetadataPickerVisible.value = true
+  }
+
+  const importMetadataFromWiki = () => {
+    const content = options.getWikiContent().trim()
+    if (!content) {
+      options.addAlert('当前游戏没有可解析的 Wiki 内容', 'warning')
+      return
+    }
+
+    isPreparingWikiMetadataCandidates.value = true
+    try {
+      prepareWikiMetadataCandidates()
+    } catch (error) {
+      console.error('Failed to extract wiki metadata:', error)
+      options.addAlert('从 Wiki 提取元数据失败', 'warning')
+    } finally {
+      isPreparingWikiMetadataCandidates.value = false
+    }
+  }
+
+  const handleWikiMetadataCandidateSelectionChange = (key: string, selected: boolean) => {
+    wikiMetadataCandidates.value = wikiMetadataCandidates.value.map((item) =>
+      item.key === key
+        ? {
+            ...item,
+            selected,
+          }
+        : selected && item.group && item.group === wikiMetadataCandidates.value.find((candidate) => candidate.key === key)?.group
+          ? {
+              ...item,
+              selected: false,
+            }
+          : item,
+    )
+  }
+
+  const applySelectedWikiMetadata = () => {
+    const selected = wikiMetadataCandidates.value.filter((item) => item.selected)
+    if (selected.length === 0) {
+      options.addAlert('还没有选择要应用的字段', 'warning')
+      return
+    }
+
+    isApplyingWikiMetadata.value = true
+
+    try {
+      const metadata = extractWikiMetadata(options.getWikiContent())
+      const appliedLabels: string[] = []
+
+      for (const item of selected) {
+        if (item.key.startsWith('title_alt_en:')) {
+          if (item.value) {
+            options.form.value.title_alt = item.value
+            appliedLabels.push('英文名')
+          }
+          continue
+        }
+
+        if (item.key.startsWith('title_alt_cn:')) {
+          if (item.value) {
+            options.form.value.title_alt = item.value
+            appliedLabels.push('别名')
+          }
+          continue
+        }
+
+        switch (item.key) {
+          case 'summary':
+            if (metadata.summary) {
+              options.form.value.summary = metadata.summary
+              appliedLabels.push('简介')
+            }
+            break
+          case 'engine':
+            if (metadata.engine) {
+              options.form.value.engine = metadata.engine
+              appliedLabels.push('游戏引擎')
+            }
+            break
+          case 'release_date':
+            if (metadata.releaseDate) {
+              options.form.value.release_date = metadata.releaseDate
+              options.releaseDate.value = new Date(`${metadata.releaseDate}T00:00:00`)
+              appliedLabels.push('发行日期')
+            }
+            break
+          case 'developers':
+            if (metadata.developers.length > 0) {
+              const merged = new Set<string | number>(options.form.value.developer_ids)
+              for (const name of metadata.developers) {
+                merged.add(name)
+              }
+              options.form.value.developer_ids = Array.from(merged)
+              appliedLabels.push('开发商')
+            }
+            break
+          case 'publishers':
+            if (metadata.publishers.length > 0) {
+              const merged = new Set<string | number>(options.form.value.publisher_ids)
+              for (const name of metadata.publishers) {
+                merged.add(name)
+              }
+              options.form.value.publisher_ids = Array.from(merged)
+              appliedLabels.push('发行商')
+            }
+            break
+          case 'platforms':
+            if (metadata.platforms.length > 0) {
+              const merged = new Set<string | number>(options.form.value.platform_ids)
+              for (const name of metadata.platforms) {
+                merged.add(name)
+              }
+              options.form.value.platform_ids = Array.from(merged)
+              appliedLabels.push('平台')
+            }
+            break
+        }
+      }
+
+      wikiMetadataPickerVisible.value = false
+
+      if (appliedLabels.length === 0) {
+        options.addAlert('已选择字段，但没有成功应用到表单', 'warning')
+        return
+      }
+
+      options.addAlert(`已应用 Wiki 字段：${appliedLabels.join('；')}`, 'success')
+    } finally {
+      isApplyingWikiMetadata.value = false
     }
   }
 
@@ -235,6 +472,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     summarySteamPicker.clear()
     steamSummaryPreview.value = ''
     steamSummaryDetails.value = null
+    wikiMetadataPickerVisible.value = false
+    wikiMetadataCandidates.value = []
   }
 
   const searchSteamForSummary = async () => {
@@ -577,6 +816,10 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   return {
     showSummarySelector,
     steamSummaryPreview,
+    isPreparingWikiMetadataCandidates,
+    isApplyingWikiMetadata,
+    wikiMetadataPickerVisible,
+    wikiMetadataCandidates,
     showCoverSelector,
     coverSearchUrl,
     coverPreviewUrl,
@@ -617,6 +860,9 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     selectSteamSummaryGame,
     backToSummarySearch,
     confirmSummaryImport,
+    importMetadataFromWiki,
+    handleWikiMetadataCandidateSelectionChange,
+    applySelectedWikiMetadata,
     handleCoverSearchClear,
     searchSteamForCover,
     selectSteamCoverGame,

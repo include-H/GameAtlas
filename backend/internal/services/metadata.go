@@ -44,9 +44,9 @@ func (s *MetadataService) List(resource MetadataResource, includeAll bool, optio
 		return nil, err
 	}
 	if resource.Table == "series" {
+		s.enrichSeriesItems(items, includeAll)
 		filtered := make([]domain.MetadataItem, 0, len(items))
 		for index := range items {
-			s.enrichSeriesItem(&items[index], includeAll)
 			if includeAll || items[index].GameCount > 0 {
 				filtered = append(filtered, items[index])
 			}
@@ -193,7 +193,34 @@ func (s *MetadataService) enrichSeriesItem(item *domain.MetadataItem, includeAll
 		return
 	}
 
+	applySeriesItemGames(item, games)
+}
+
+func (s *MetadataService) enrichSeriesItems(items []domain.MetadataItem, includeAll bool) {
+	if len(items) == 0 {
+		return
+	}
+
+	seriesIDs := make([]int64, 0, len(items))
+	for _, item := range items {
+		seriesIDs = append(seriesIDs, item.ID)
+	}
+
+	gamesBySeriesID, err := s.repo.ListSeriesGamesBySeriesIDs(seriesIDs, includeAll)
+	if err != nil {
+		return
+	}
+
+	for index := range items {
+		applySeriesItemGames(&items[index], gamesBySeriesID[items[index].ID])
+	}
+}
+
+func applySeriesItemGames(item *domain.MetadataItem, games []domain.Game) {
 	item.GameCount = len(games)
+	item.LatestUpdatedAt = nil
+	item.CoverCandidates = nil
+	item.CoverImage = nil
 	if len(games) == 0 {
 		return
 	}
