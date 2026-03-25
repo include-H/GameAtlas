@@ -1,19 +1,18 @@
 import { DirectiveBinding } from 'vue'
 
 /**
- * Check permission for element
- * (Authentication removed - all permissions granted)
+ * Permission check placeholder for element-level controls.
+ * This directive currently does not hide or disable elements.
  */
 function checkPermission(_el: HTMLElement, _binding: DirectiveBinding) {
-  // No auth required - all users have all permissions
+  // Element-level permission enforcement has not been implemented yet.
   return
 }
 
 /**
  * v-permission directive for Arco Design Vue Pro
  * Usage: <a-button v-permission="['admin']">Delete</a-button>
- *
- * (Authentication removed - element is always shown)
+ * The directive is currently a no-op and always leaves the element visible.
  */
 export default {
   mounted(el: HTMLElement, binding: DirectiveBinding) {
