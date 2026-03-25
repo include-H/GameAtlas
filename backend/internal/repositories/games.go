@@ -13,7 +13,7 @@ import (
 )
 
 var allowedGameSortFields = map[string]string{
-	"title":        "g.title",
+	"title":        "g.title_sort_key",
 	"created_at":   "g.created_at",
 	"updated_at":   "g.updated_at",
 	"release_date": "g.release_date",
@@ -83,6 +83,10 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 	order := strings.ToUpper(params.Order)
 	if order != "ASC" && order != "DESC" {
 		order = "DESC"
+	}
+	idOrder := "DESC"
+	if order == "ASC" {
+		idOrder = "ASC"
 	}
 
 	baseWhere := strings.Join(where, " AND ")
@@ -155,9 +159,9 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 			g.updated_at
 		FROM games g
 		WHERE %s
-		ORDER BY %s %s, g.id DESC
+		ORDER BY %s %s, g.id %s
 		LIMIT :limit OFFSET :offset
-	`, baseWhere, sortField, order)
+	`, baseWhere, sortField, order, idOrder)
 
 	listStmt, listArgs, err := sqlx.Named(listQuery, args)
 	if err != nil {
@@ -363,8 +367,8 @@ func (r *GamesRepository) HasOlderTimelineGame(params domain.GamesTimelineParams
 func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, error) {
 	const query = `
 		INSERT INTO games (
-			title, title_alt, visibility, summary, release_date, engine, cover_image, banner_image, needs_review, preview_video_asset_uid
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			title, title_alt, title_sort_key, visibility, summary, release_date, engine, cover_image, banner_image, needs_review, preview_video_asset_uid
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING
 			id, title, title_alt, visibility, summary, release_date, engine, cover_image, banner_image,
 			wiki_content, wiki_content_html, needs_review, preview_video_asset_uid, downloads, created_at, updated_at`
@@ -375,6 +379,7 @@ func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, err
 		query,
 		input.Title,
 		input.TitleAlt,
+		buildTitleSortKey(input.Title, input.TitleAlt),
 		input.Visibility,
 		input.Summary,
 		input.ReleaseDate,
@@ -400,6 +405,7 @@ func (r *GamesRepository) Update(id int64, input domain.GameWriteInput) (*domain
 		SET
 			title = ?,
 			title_alt = ?,
+			title_sort_key = ?,
 			visibility = ?,
 			summary = ?,
 			release_date = ?,
@@ -415,6 +421,7 @@ func (r *GamesRepository) Update(id int64, input domain.GameWriteInput) (*domain
 		query,
 		input.Title,
 		input.TitleAlt,
+		buildTitleSortKey(input.Title, input.TitleAlt),
 		input.Visibility,
 		input.Summary,
 		input.ReleaseDate,
@@ -479,12 +486,53 @@ func (r *GamesRepository) UpdateAggregate(id int64, input domain.GameAggregateUp
 	return uniqueNonEmptyStrings(deletedAssetPaths), nil
 }
 
+func (r *GamesRepository) RebuildTitleSortKeys() error {
+	type gameTitleRow struct {
+		ID           int64   `db:"id"`
+		Title        string  `db:"title"`
+		TitleAlt     *string `db:"title_alt"`
+		TitleSortKey string  `db:"title_sort_key"`
+	}
+
+	var rows []gameTitleRow
+	if err := r.db.Select(&rows, "SELECT id, title, title_alt, title_sort_key FROM games"); err != nil {
+		return fmt.Errorf("list games for title sort key rebuild: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return fmt.Errorf("begin title sort key rebuild tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	const updateQuery = "UPDATE games SET title_sort_key = ? WHERE id = ?"
+	for _, row := range rows {
+		nextKey := buildTitleSortKey(row.Title, row.TitleAlt)
+		if row.TitleSortKey == nextKey {
+			continue
+		}
+		if _, err := tx.Exec(updateQuery, nextKey, row.ID); err != nil {
+			return fmt.Errorf("update title sort key for game %d: %w", row.ID, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit title sort key rebuild tx: %w", err)
+	}
+
+	return nil
+}
+
 func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.GameWriteInput) error {
 	result, err := tx.Exec(`
 		UPDATE games
 		SET
 			title = ?,
 			title_alt = ?,
+			title_sort_key = ?,
 			visibility = ?,
 			summary = ?,
 			release_date = ?,
@@ -498,6 +546,7 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 	`,
 		input.Title,
 		input.TitleAlt,
+		buildTitleSortKey(input.Title, input.TitleAlt),
 		input.Visibility,
 		input.Summary,
 		input.ReleaseDate,

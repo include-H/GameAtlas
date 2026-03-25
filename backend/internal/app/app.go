@@ -10,6 +10,7 @@ import (
 	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/db"
 	"github.com/hao/game/internal/http/routes"
+	"github.com/hao/game/internal/repositories"
 )
 
 type App struct {
@@ -31,6 +32,12 @@ func New(cfg config.Config) (*App, error) {
 	if err := db.RunMigrations(sqliteDB); err != nil {
 		_ = sqliteDB.Close()
 		return nil, err
+	}
+
+	gamesRepo := repositories.NewGamesRepository(sqliteDB)
+	if err := gamesRepo.RebuildTitleSortKeys(); err != nil {
+		_ = sqliteDB.Close()
+		return nil, fmt.Errorf("rebuild title sort keys: %w", err)
 	}
 
 	router := routes.New(cfg, sqliteDB)
