@@ -223,7 +223,6 @@ export interface GameVersion {
 export interface GameStats {
   total_games: number
   total_downloads: number
-  total_size: number
   recent_games: GameListItem[]
   popular_games: GameListItem[]
   favorite_count: number

@@ -166,7 +166,6 @@ func (h *GamesHandler) Stats(c *gin.Context) {
 		"data": gin.H{
 			"total_games":     stats.TotalGames,
 			"total_downloads": stats.TotalDownloads,
-			"total_size":      stats.TotalSize,
 			"recent_games":    toGameListItemResponses(stats.RecentGames),
 			"popular_games":   toGameListItemResponses(stats.PopularGames),
 			"pending_reviews": stats.PendingReviews,

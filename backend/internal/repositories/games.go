@@ -1090,7 +1090,6 @@ func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStat
 	return &domain.GameStats{
 		TotalGames:     summary.TotalGames,
 		TotalDownloads: summary.TotalDownloads,
-		TotalSize:      0,
 		RecentGames:    recentGames,
 		PopularGames:   popularGames,
 		PendingReviews: summary.PendingReviews,

@@ -37,7 +37,6 @@ interface MetadataApiItem {
 interface GameStatsApiResponse {
   total_games: number
   total_downloads: number
-  total_size: number
   recent_games: GameListItemDto[]
   popular_games: GameListItemDto[]
   pending_reviews: number
@@ -408,7 +407,6 @@ const gamesService = {
     return {
       total_games: response.data.total_games,
       total_downloads: response.data.total_downloads,
-      total_size: response.data.total_size,
       recent_games: response.data.recent_games.map((item) => annotateFavorite(item, favoriteIds)),
       popular_games: response.data.popular_games.map((item) => annotateFavorite(item, favoriteIds)),
       favorite_count: getFavoriteCount(),

@@ -234,7 +234,6 @@ type ReviewIssueOverride struct {
 type GameStats struct {
 	TotalGames     int
 	TotalDownloads int64
-	TotalSize      int64
 	RecentGames    []Game
 	PopularGames   []Game
 	PendingReviews int
