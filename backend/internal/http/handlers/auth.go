@@ -89,14 +89,22 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 }
 
 func (h *AuthHandler) Me(c *gin.Context) {
+	isAdmin := isAdminRequest(c)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"is_admin":           isAdminRequest(c),
-			"role":               strings.TrimSpace("admin"),
+			"is_admin":           isAdmin,
+			"role":               currentAuthRole(isAdmin),
 			"admin_display_name": h.adminDisplayName,
 		},
 	})
+}
+
+func currentAuthRole(isAdmin bool) string {
+	if isAdmin {
+		return "admin"
+	}
+	return "guest"
 }
 
 func isAdminRequest(c *gin.Context) bool {
