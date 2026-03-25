@@ -55,7 +55,7 @@ interface TimelineGamesApiResponse {
   pagination: TimelinePaginationApi
 }
 
-export interface AggregateFileInput {
+interface AggregateFileInput {
   id?: number
   file_path: string
   label?: string | null
@@ -63,14 +63,14 @@ export interface AggregateFileInput {
   sort_order: number
 }
 
-export interface AggregateDeleteAssetInput {
+interface AggregateDeleteAssetInput {
   asset_type: 'cover' | 'banner' | 'screenshot' | 'video'
   path: string
   asset_id?: number
   asset_uid?: string
 }
 
-export interface AggregateUpdateInput {
+interface AggregateUpdateInput {
   game: Partial<GameWriteRequest>
   files: AggregateFileInput[]
   delete_assets: AggregateDeleteAssetInput[]

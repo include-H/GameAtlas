@@ -81,6 +81,24 @@ go run ./cmd/server
 - 如果磁盘 `frontend/dist` 存在，后端会优先托管它
 - 如果磁盘静态资源不存在，后端会回退到嵌入式 `web/dist`
 
+## 本地校验
+
+推荐在 `backend/` 下执行：
+
+```bash
+bash check.sh
+```
+
+这个脚本会运行：
+
+- `go test ./...`
+- `go vet ./...`
+
+补充说明：
+
+- 当前部分 Linux 发行版自带的 Go 1.22.x 存在 `goindex` 误判标准库子包的问题，可能把 `net/http/httptest` 之类的标准库包错误报成 “not in std”。
+- `check.sh` 会自动追加 `GODEBUG=goindex=0`，用来绕过这类环境问题，不影响仓库代码行为。
+
 ## 入口与启动流程
 
 服务入口：

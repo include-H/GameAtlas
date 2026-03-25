@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-export interface HttpErrorEnvelope<TData = unknown> {
+interface HttpErrorEnvelope<TData = unknown> {
   success?: boolean
   error?: string
   message?: string

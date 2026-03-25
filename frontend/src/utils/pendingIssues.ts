@@ -226,28 +226,3 @@ export function isSeverePendingEvaluation(evaluation: PendingIssueEvaluation) {
     (evaluation.groups.includes('missing-assets') && evaluation.groups.includes('missing-wiki'))
   )
 }
-
-export function getPendingIssues(game: PendingGame, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueKey[] {
-  return evaluatePendingIssues(game, ignoredDetails).groups
-}
-
-export function getPendingIssueDetails(game: PendingGame, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueDetailKey[] {
-  return evaluatePendingIssues(game, ignoredDetails).details
-}
-
-export function getIgnoredPendingIssueDetails(game: PendingGame, ignoredDetails: PendingIssueDetailKey[] = []) {
-  return evaluatePendingIssues(game, ignoredDetails).ignoredDetails
-}
-
-export function isSeverePendingGame(game: PendingGame, ignoredDetails: PendingIssueDetailKey[] = []) {
-  return isSeverePendingEvaluation(evaluatePendingIssues(game, ignoredDetails))
-}
-
-export function matchesPendingIssueEvaluation(evaluation: PendingIssueEvaluation, key?: string | null) {
-  if (!key) return true
-  return evaluation.groups.includes(key as PendingIssueKey)
-}
-
-export function matchesPendingIssue(game: PendingGame, key?: string | null) {
-  return matchesPendingIssueEvaluation(evaluatePendingIssues(game), key)
-}

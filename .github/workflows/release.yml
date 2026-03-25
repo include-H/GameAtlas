@@ -33,9 +33,21 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm run test:run
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
       - name: Download Go dependencies
         working-directory: backend
         run: go mod download
+
+      - name: Run backend tests
+        working-directory: backend
+        run: go test ./...
 
       - name: Build release package
         env:

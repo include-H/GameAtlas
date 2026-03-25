@@ -334,7 +334,8 @@ func (r *GamesRepository) ListTimeline(params domain.GamesTimelineParams) ([]dom
 			g.public_id,
 			g.title,
 			g.release_date,
-			g.cover_image
+			g.cover_image,
+			g.banner_image
 		FROM games g
 		WHERE %s
 		ORDER BY g.release_date DESC, g.id DESC

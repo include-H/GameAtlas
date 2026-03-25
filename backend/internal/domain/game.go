@@ -158,6 +158,7 @@ type TimelineGame struct {
 	Title       string  `db:"title"`
 	ReleaseDate *string `db:"release_date"`
 	CoverImage  *string `db:"cover_image"`
+	BannerImage *string `db:"banner_image"`
 }
 
 type GameWriteInput struct {

@@ -406,6 +406,7 @@ type timelineGameItemResponse struct {
 	Title       string  `json:"title"`
 	ReleaseDate *string `json:"release_date"`
 	CoverImage  *string `json:"cover_image"`
+	BannerImage *string `json:"banner_image"`
 }
 
 type gameAssetResponse struct {
@@ -523,6 +524,7 @@ func toTimelineGameItemResponse(game domain.TimelineGame) timelineGameItemRespon
 		Title:       game.Title,
 		ReleaseDate: game.ReleaseDate,
 		CoverImage:  game.CoverImage,
+		BannerImage: game.BannerImage,
 	}
 }
 

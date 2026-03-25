@@ -15,7 +15,7 @@ import {
 
 export { PENDING_WORKBENCH_PAGE_SIZE }
 
-export type PendingWorkbenchSortBy =
+type PendingWorkbenchSortBy =
   | 'issue-count'
   | 'created-desc'
   | 'updated-asc'

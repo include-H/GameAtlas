@@ -4,7 +4,7 @@ import type { GameListItem, ReviewIssueOverride } from './types'
 
 export const PENDING_WORKBENCH_PAGE_SIZE = 10
 
-export interface PendingWorkbenchSnapshot {
+interface PendingWorkbenchSnapshot {
   queueGames: GameListItem[]
   overrides: ReviewIssueOverride[]
   total: number

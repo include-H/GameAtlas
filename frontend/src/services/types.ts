@@ -163,6 +163,7 @@ export interface TimelineGameResponse {
   title: string
   release_date: string | null
   cover_image: string | null
+  banner_image: string | null
 }
 
 export interface GameWriteRequest {
