@@ -205,6 +205,7 @@ const gamesService = {
     if (params?.filter?.series) queryParams.append('series', params.filter.series)
     if (params?.filter?.platform) queryParams.append('platform', params.filter.platform)
     if (params?.filter?.status === 'pending-review') queryParams.append('needs_review', 'true')
+    if (params?.filter?.pending_queue) queryParams.append('pending', 'true')
     if (params?.filter?.tag_ids?.length) {
       params.filter.tag_ids.forEach((tagId) => {
         queryParams.append('tag', String(tagId))

@@ -207,6 +207,7 @@ export interface GameFilter {
   tag_ids?: number[]
   favorite?: boolean
   status?: string
+  pending_queue?: boolean
 }
 
 export interface GameSort {

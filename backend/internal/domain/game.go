@@ -133,6 +133,7 @@ type GamesListParams struct {
 	PlatformID  int64
 	TagIDs      []int64
 	NeedsReview *bool
+	PendingOnly bool
 	Visibility  string
 	IncludeAll  bool
 	Sort        string

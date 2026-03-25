@@ -2,30 +2,41 @@ import gamesService from './games.service'
 import reviewIssuesService from './review-issues.service'
 import type { Game, ReviewIssueOverride } from './types'
 
-export const PENDING_WORKBENCH_WINDOW_SIZE = 50
+export const PENDING_WORKBENCH_PAGE_SIZE = 10
 
 export interface PendingWorkbenchSnapshot {
-  windowGames: Game[]
+  queueGames: Game[]
   overrides: ReviewIssueOverride[]
+  total: number
+  totalPages: number
+  page: number
+  pageSize: number
 }
 
 const pendingWorkbenchService = {
-  async getSnapshot(windowSize = PENDING_WORKBENCH_WINDOW_SIZE): Promise<PendingWorkbenchSnapshot> {
+  async getSnapshot(page = 1, pageSize = PENDING_WORKBENCH_PAGE_SIZE): Promise<PendingWorkbenchSnapshot> {
     const response = await gamesService.getGames({
-      page: 1,
-      pageSize: windowSize,
+      page,
+      pageSize,
+      filter: {
+        pending_queue: true,
+      },
       sort: {
         field: 'updated_at',
-        order: 'desc',
+        order: 'asc',
       },
     })
 
-    const windowGames = response.data
-    const overrides = await reviewIssuesService.list(windowGames.map((game) => game.id))
+    const queueGames = response.data
+    const overrides = await reviewIssuesService.list(queueGames.map((game) => game.id))
 
     return {
-      windowGames,
+      queueGames,
       overrides,
+      total: response.pagination.total,
+      totalPages: response.pagination.totalPages,
+      page: response.pagination.page,
+      pageSize: response.pagination.limit,
     }
   },
 }

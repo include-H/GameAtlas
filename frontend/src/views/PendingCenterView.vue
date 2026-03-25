@@ -4,7 +4,7 @@
       <div class="page-hero__content">
         <h1 class="pending-center__title page-hero__title text-gradient">待处理工作台</h1>
         <p class="pending-center__subtitle page-hero__subtitle">
-          流式窗口视图：仅展示最近 {{ PENDING_WORKBENCH_WINDOW_SIZE }} 条更新记录中的待处理项。
+          队列视图：后端按待处理规则分页，每页 {{ PENDING_WORKBENCH_PAGE_SIZE }} 条，直到清空待处理游戏。
         </p>
       </div>
 
@@ -13,16 +13,16 @@
           <template #icon>
             <icon-refresh />
           </template>
-          刷新窗口
+          刷新队列
         </a-button>
       </a-space>
     </div>
 
     <div class="pending-center__stats">
       <a-card class="stat-card stat-card--total" :bordered="false">
-        <div class="stat-card__label">窗口待处理数</div>
+        <div class="stat-card__label">待处理总数</div>
         <div class="stat-card__value">{{ totalPendingCount }}</div>
-        <div class="stat-card__hint">窗口容量 {{ PENDING_WORKBENCH_WINDOW_SIZE }}，当前采样 {{ totalWindowCount }} 条</div>
+        <div class="stat-card__hint">当前第 {{ currentPage }} 页，本页 {{ currentBatchCount }} 条</div>
       </a-card>
       <a-card
         v-for="definition in pendingIssueDefinitions"
@@ -43,7 +43,7 @@
         <a-col :xs="24" :sm="12" :md="8" :lg="8">
           <a-input
             v-model="searchQuery"
-            placeholder="筛选窗口内游戏"
+            placeholder="筛选当前页游戏"
             allow-clear
           >
             <template #prefix>
@@ -93,7 +93,7 @@
 
     <div class="pending-center__result-meta">
       <span>
-        当前筛选显示 {{ filteredGames.length }} 条，窗口命中 {{ totalPendingCount }} / {{ totalWindowCount }} 条，已忽略 {{ ignoredOverridesCount }} 个问题
+        当前页筛选显示 {{ filteredGames.length }} 条，待处理总量 {{ totalPendingCount }} 条，已忽略 {{ ignoredOverridesCount }} 个问题
       </span>
       <div class="pending-center__result-actions">
         <a-button class="app-text-action-btn" type="text" size="small" @click="resetFilters">重置筛选</a-button>
@@ -102,7 +102,7 @@
 
     <div v-if="isLoading" class="pending-center__loading">
       <a-spin :size="24" />
-      <p>正在整理工作台窗口...</p>
+      <p>正在整理待处理队列...</p>
     </div>
 
     <a-empty v-else-if="filteredGames.length === 0" class="pending-center__empty">
@@ -171,6 +171,16 @@
               </a-tag>
             </a-space>
           </div>
+        </div>
+        <div v-if="totalPages > 1" class="pending-center__pagination">
+          <a-pagination
+            :current="currentPage"
+            :total="totalPendingCount"
+            :page-size="PENDING_WORKBENCH_PAGE_SIZE"
+            show-total
+            show-jumper
+            @change="changePage"
+          />
         </div>
       </div>
 
@@ -325,7 +335,7 @@ import {
   type PendingIssueKey,
 } from '@/utils/pendingIssues'
 import { createDetailRouteQuery } from '@/utils/navigation'
-import { PENDING_WORKBENCH_WINDOW_SIZE, usePendingWorkbench } from '@/composables/usePendingWorkbench'
+import { PENDING_WORKBENCH_PAGE_SIZE, usePendingWorkbench } from '@/composables/usePendingWorkbench'
 import { IconBook, IconEdit, IconRefresh, IconRight, IconSearch } from '@arco-design/web-vue/es/icon'
 
 defineOptions({
@@ -342,6 +352,9 @@ const detailHeroFit = ref<'cover' | 'contain'>('cover')
 
 const {
   activeGame,
+  changePage,
+  currentBatchCount,
+  currentPage,
   filteredGames,
   getIgnoredDetails,
   getIgnoredIssueDetails,
@@ -361,8 +374,8 @@ const {
   selectedIssue,
   showIgnored,
   sortBy,
+  totalPages,
   totalPendingCount,
-  totalWindowCount,
 } = usePendingWorkbench({
   addAlert: (message, type) => uiStore.addAlert(message, type),
 })
@@ -585,6 +598,12 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.pending-center__pagination {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
 }
 
 .pending-game {

@@ -40,6 +40,11 @@ func (h *GamesHandler) List(c *gin.Context) {
 			params.NeedsReview = &value
 		}
 	}
+	if raw := c.Query("pending"); raw != "" {
+		if value, err := strconv.ParseBool(raw); err == nil {
+			params.PendingOnly = value
+		}
+	}
 
 	result, err := h.service.List(params)
 	if err != nil {

@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import pendingWorkbenchService, {
-  PENDING_WORKBENCH_WINDOW_SIZE,
+  PENDING_WORKBENCH_PAGE_SIZE,
 } from '@/services/pending-workbench.service'
 import reviewIssuesService from '@/services/review-issues.service'
 import type { Game, ReviewIssueOverride } from '@/services/types'
@@ -14,7 +14,7 @@ import {
   type PendingIssueKey,
 } from '@/utils/pendingIssues'
 
-export { PENDING_WORKBENCH_WINDOW_SIZE }
+export { PENDING_WORKBENCH_PAGE_SIZE }
 
 export type PendingWorkbenchSortBy =
   | 'issue-count'
@@ -28,9 +28,13 @@ interface UsePendingWorkbenchOptions {
 
 export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   const isLoading = ref(false)
-  const windowGames = ref<Game[]>([])
+  const queueGames = ref<Game[]>([])
   const activeGame = ref<Game | null>(null)
   const reviewIssueOverrides = ref<ReviewIssueOverride[]>([])
+
+  const currentPage = ref(1)
+  const totalPages = ref(0)
+  const totalPendingCount = ref(0)
 
   const searchQuery = ref('')
   const selectedIssue = ref<PendingIssueKey | undefined>()
@@ -51,6 +55,7 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   })
 
   const ignoredOverridesCount = computed(() => reviewIssueOverrides.value.length)
+  const currentBatchCount = computed(() => queueGames.value.length)
 
   const getIgnoredDetails = (gameId: number | string): PendingIssueDetailKey[] => {
     return (reviewOverrideMap.value[String(gameId)] || [])
@@ -66,21 +71,18 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   const issueCounts = computed(() => {
     const counts = {} as Record<PendingIssueKey, number>
     pendingIssueDefinitions.forEach((definition) => {
-      counts[definition.key] = windowGames.value.filter((game) =>
+      counts[definition.key] = queueGames.value.filter((game) =>
         getVisibleIssueGroups(game).includes(definition.key),
       ).length
     })
     return counts
   })
 
-  const totalWindowCount = computed(() => windowGames.value.length)
-  const totalPendingCount = computed(() => windowGames.value.filter((game) => hasVisibleIssues(game)).length)
-
   const filteredGames = computed(() => {
     const keyword = searchQuery.value.trim().toLowerCase()
     const recentThreshold = Date.now() - 7 * 24 * 60 * 60 * 1000
 
-    const games = windowGames.value.filter((game) => {
+    const games = queueGames.value.filter((game) => {
       if (!showIgnored.value && !hasVisibleIssues(game)) {
         return false
       }
@@ -156,6 +158,30 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     showIgnored.value = false
   }
 
+  const loadWorkbenchGames = async (page = currentPage.value) => {
+    isLoading.value = true
+    try {
+      const snapshot = await pendingWorkbenchService.getSnapshot(page, PENDING_WORKBENCH_PAGE_SIZE)
+      queueGames.value = snapshot.queueGames
+      reviewIssueOverrides.value = snapshot.overrides
+      currentPage.value = snapshot.page
+      totalPages.value = snapshot.totalPages
+      totalPendingCount.value = snapshot.total
+
+      if (snapshot.page > snapshot.totalPages && snapshot.totalPages > 0) {
+        await loadWorkbenchGames(snapshot.totalPages)
+      }
+    } catch {
+      options.addAlert('加载待处理工作台失败', 'error')
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const refreshCurrentPage = async () => {
+    await loadWorkbenchGames(currentPage.value)
+  }
+
   const ignoreIssue = async (game: Game, issueKey: PendingIssueDetailKey) => {
     try {
       const override = await reviewIssuesService.ignore(String(game.id), issueKey)
@@ -166,6 +192,7 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
         override,
       ]
       options.addAlert('已忽略待处理项', 'success')
+      await refreshCurrentPage()
     } catch {
       options.addAlert('忽略问题失败', 'error')
     }
@@ -178,27 +205,25 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
         (item) => !(item.game_id === game.id && item.issue_key === issueKey),
       )
       options.addAlert('已恢复待处理项', 'success')
+      await refreshCurrentPage()
     } catch {
       options.addAlert('恢复问题失败', 'error')
     }
   }
 
-  const loadWorkbenchGames = async () => {
-    isLoading.value = true
-    try {
-      const snapshot = await pendingWorkbenchService.getSnapshot(PENDING_WORKBENCH_WINDOW_SIZE)
-      windowGames.value = snapshot.windowGames
-      reviewIssueOverrides.value = snapshot.overrides
-    } catch {
-      options.addAlert('加载待处理工作台失败', 'error')
-    } finally {
-      isLoading.value = false
+  const changePage = async (page: number) => {
+    const safePage = Math.max(1, page)
+    if (safePage === currentPage.value && queueGames.value.length > 0) {
+      return
     }
+    await loadWorkbenchGames(safePage)
   }
 
   return {
     isLoading,
     activeGame,
+    currentBatchCount,
+    currentPage,
     filteredGames,
     ignoredOverridesCount,
     issueCounts,
@@ -208,14 +233,15 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     selectedIssue,
     showIgnored,
     sortBy,
+    totalPages,
     totalPendingCount,
-    totalWindowCount,
     reviewOverrideMap,
     getIgnoredDetails,
     getIgnoredIssueDetails,
     getVisibleIssueDetails,
     getVisibleIssueGroups,
     hasVisibleIssues,
+    changePage,
     ignoreIssue,
     loadWorkbenchGames,
     resetFilters,

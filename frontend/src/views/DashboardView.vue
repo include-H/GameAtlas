@@ -144,6 +144,7 @@ import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
+import gamesService from '@/services/games.service'
 import { createDetailRouteQuery } from '@/utils/navigation'
 import {
   IconTrophy
@@ -236,7 +237,18 @@ const loadDashboardData = async () => {
   isDashboardReady.value = false
   try {
     const stats = await gamesStore.fetchStats()
-    pendingReviewGameCount.value = stats.pending_reviews || 0
+    try {
+      const pendingQueueResponse = await gamesService.getGames({
+        page: 1,
+        pageSize: 1,
+        filter: {
+          pending_queue: true,
+        },
+      })
+      pendingReviewGameCount.value = pendingQueueResponse.pagination.total || 0
+    } catch {
+      pendingReviewGameCount.value = stats.pending_reviews || 0
+    }
     isDashboardReady.value = true
     lastLoadedAt.value = Date.now()
   } catch {
