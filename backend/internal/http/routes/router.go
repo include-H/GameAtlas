@@ -79,6 +79,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.GET("/games/:id", gamesHandler.Get)
 	api.POST("/games", gamesHandler.Create)
 	api.PUT("/games/:id", gamesHandler.Update)
+	api.PUT("/games/:id/aggregate", gamesHandler.UpdateAggregate)
 	api.DELETE("/games/:id", gamesHandler.Delete)
 	api.GET("/games/:id/files", gameFilesHandler.List)
 	api.POST("/games/:id/files", gameFilesHandler.Create)

@@ -183,6 +183,29 @@ type GameFileWriteInput struct {
 	SortOrder int     `json:"sort_order"`
 }
 
+type GameFileUpsertInput struct {
+	ID        *int64  `json:"id"`
+	FilePath  string  `json:"file_path"`
+	Label     *string `json:"label"`
+	Notes     *string `json:"notes"`
+	SortOrder int     `json:"sort_order"`
+}
+
+type GameAssetDeleteInput struct {
+	AssetType string `json:"asset_type"`
+	Path      string `json:"path"`
+	AssetID   *int64 `json:"asset_id"`
+	AssetUID  string `json:"asset_uid"`
+}
+
+type GameAggregateUpdateInput struct {
+	Game                     GameWriteInput         `json:"game"`
+	Files                    []GameFileUpsertInput  `json:"files"`
+	DeleteAssets             []GameAssetDeleteInput `json:"delete_assets"`
+	ScreenshotOrderAssetUIDs []string               `json:"screenshot_order_asset_uids"`
+	VideoOrderAssetUIDs      []string               `json:"video_order_asset_uids"`
+}
+
 type WikiWriteInput struct {
 	Content       string  `json:"content"`
 	ChangeSummary *string `json:"change_summary"`

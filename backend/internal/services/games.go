@@ -4,13 +4,16 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/domain"
+	"github.com/hao/game/internal/files"
 	"github.com/hao/game/internal/repositories"
 )
 
@@ -22,6 +25,8 @@ type GamesService struct {
 	gameFilesRepo *repositories.GameFilesRepository
 	metadataRepo  *repositories.MetadataRepository
 	tagsRepo      *repositories.TagsRepository
+	fileGuard     *files.Guard
+	assetStore    *files.AssetStore
 }
 
 type GamesListResult struct {
@@ -60,12 +65,14 @@ type GameDetail struct {
 	Files         []domain.GameFile
 }
 
-func NewGamesService(_ config.Config, gamesRepo *repositories.GamesRepository, gameFilesRepo *repositories.GameFilesRepository, metadataRepo *repositories.MetadataRepository, tagsRepo *repositories.TagsRepository) *GamesService {
+func NewGamesService(cfg config.Config, gamesRepo *repositories.GamesRepository, gameFilesRepo *repositories.GameFilesRepository, metadataRepo *repositories.MetadataRepository, tagsRepo *repositories.TagsRepository) *GamesService {
 	return &GamesService{
 		gamesRepo:     gamesRepo,
 		gameFilesRepo: gameFilesRepo,
 		metadataRepo:  metadataRepo,
 		tagsRepo:      tagsRepo,
+		fileGuard:     files.NewGuard(cfg.PrimaryROMRoot),
+		assetStore:    files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
 	}
 }
 
@@ -269,6 +276,96 @@ func (s *GamesService) Update(id int64, input domain.GameWriteInput) (*domain.Ga
 		return nil, err
 	}
 	return game, nil
+}
+
+func (s *GamesService) UpdateAggregate(id int64, input domain.GameAggregateUpdateInput) (*domain.Game, []string, error) {
+	trimmedInput, err := s.validateAndTrimGameInput(input.Game)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if trimmedInput.PreviewVideoAssetUID != nil && strings.TrimSpace(*trimmedInput.PreviewVideoAssetUID) != "" {
+		videos, err := s.gamesRepo.ListVideos(id)
+		if err != nil {
+			return nil, nil, normalizeRepoError(err)
+		}
+		targetUID := strings.TrimSpace(*trimmedInput.PreviewVideoAssetUID)
+		found := false
+		for _, video := range videos {
+			if video.AssetUID == targetUID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, nil, ErrValidation
+		}
+	}
+
+	normalizedFiles := make([]domain.GameFileUpsertInput, 0, len(input.Files))
+	for index, item := range input.Files {
+		fileInput := domain.GameFileWriteInput{
+			FilePath:  item.FilePath,
+			Label:     item.Label,
+			Notes:     item.Notes,
+			SortOrder: item.SortOrder,
+		}
+		if err := validateGameFileInput(fileInput); err != nil {
+			return nil, nil, err
+		}
+
+		trimmedFileInput := trimGameFileInput(fileInput)
+		resolved, err := s.fileGuard.ValidateFile(trimmedFileInput.FilePath)
+		if err != nil {
+			return nil, nil, normalizeFileError(err)
+		}
+		normalizedFiles = append(normalizedFiles, domain.GameFileUpsertInput{
+			ID:        item.ID,
+			FilePath:  resolved.ResolvedPath,
+			Label:     trimmedFileInput.Label,
+			Notes:     trimmedFileInput.Notes,
+			SortOrder: index,
+		})
+	}
+
+	for _, item := range input.DeleteAssets {
+		assetType := strings.TrimSpace(item.AssetType)
+		switch assetType {
+		case "cover", "banner", "screenshot", "video":
+		default:
+			return nil, nil, ErrValidation
+		}
+	}
+
+	deletedAssetPaths, err := s.gamesRepo.UpdateAggregate(id, domain.GameAggregateUpdateInput{
+		Game:                     trimmedInput,
+		Files:                    normalizedFiles,
+		DeleteAssets:             input.DeleteAssets,
+		ScreenshotOrderAssetUIDs: input.ScreenshotOrderAssetUIDs,
+		VideoOrderAssetUIDs:      input.VideoOrderAssetUIDs,
+	})
+	if err != nil {
+		return nil, nil, normalizeRepoError(err)
+	}
+
+	if err := s.cleanupUnusedMetadata(); err != nil {
+		return nil, nil, err
+	}
+
+	assetDeleteWarnings := make([]string, 0)
+	for _, path := range deletedAssetPaths {
+		if err := s.assetStore.DeleteAsset(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Printf("aggregate update: failed to delete asset file %s: %v", path, err)
+			assetDeleteWarnings = append(assetDeleteWarnings, path)
+		}
+	}
+
+	game, err := s.gamesRepo.GetByID(id)
+	if err != nil {
+		return nil, nil, normalizeRepoError(err)
+	}
+
+	return game, assetDeleteWarnings, nil
 }
 
 func (s *GamesService) Delete(id int64) error {

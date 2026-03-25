@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -441,6 +442,360 @@ func (r *GamesRepository) Update(id int64, input domain.GameWriteInput) (*domain
 	}
 
 	return r.GetByID(id)
+}
+
+func (r *GamesRepository) UpdateAggregate(id int64, input domain.GameAggregateUpdateInput) ([]string, error) {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return nil, fmt.Errorf("begin aggregate update tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := r.updateGameRowTx(tx, id, input.Game); err != nil {
+		return nil, err
+	}
+	if err := r.replaceRelationsTx(tx, id, input.Game); err != nil {
+		return nil, err
+	}
+	if err := r.syncGameFilesTx(tx, id, input.Files); err != nil {
+		return nil, err
+	}
+
+	deletedAssetPaths, err := r.deleteAssetsTx(tx, id, input.DeleteAssets)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.reorderAssetsTx(tx, id, "screenshot", input.ScreenshotOrderAssetUIDs); err != nil {
+		return nil, err
+	}
+	if err := r.reorderAssetsTx(tx, id, "video", input.VideoOrderAssetUIDs); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit aggregate update tx: %w", err)
+	}
+
+	return uniqueNonEmptyStrings(deletedAssetPaths), nil
+}
+
+func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.GameWriteInput) error {
+	result, err := tx.Exec(`
+		UPDATE games
+		SET
+			title = ?,
+			title_alt = ?,
+			visibility = ?,
+			summary = ?,
+			release_date = ?,
+			engine = ?,
+			cover_image = ?,
+			banner_image = ?,
+			needs_review = ?,
+			preview_video_asset_uid = ?,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`,
+		input.Title,
+		input.TitleAlt,
+		input.Visibility,
+		input.Summary,
+		input.ReleaseDate,
+		input.Engine,
+		input.CoverImage,
+		input.BannerImage,
+		boolToInt(input.NeedsReview),
+		input.PreviewVideoAssetUID,
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("update game: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("read updated rows: %w", err)
+	}
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+func (r *GamesRepository) replaceRelationsTx(tx *sqlx.Tx, gameID int64, input domain.GameWriteInput) error {
+	if err := replaceRelationRows(tx, "game_series", "series_id", gameID, input.SeriesIDs); err != nil {
+		return err
+	}
+	if err := replaceRelationRows(tx, "game_platforms", "platform_id", gameID, input.PlatformIDs); err != nil {
+		return err
+	}
+	if err := replaceRelationRows(tx, "game_developers", "developer_id", gameID, input.DeveloperIDs); err != nil {
+		return err
+	}
+	if err := replaceRelationRows(tx, "game_publishers", "publisher_id", gameID, input.PublisherIDs); err != nil {
+		return err
+	}
+	if err := replaceRelationRows(tx, "game_tags", "tag_id", gameID, input.TagIDs); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *GamesRepository) syncGameFilesTx(tx *sqlx.Tx, gameID int64, files []domain.GameFileUpsertInput) error {
+	type existingGameFile struct {
+		ID int64 `db:"id"`
+	}
+
+	var existingFiles []existingGameFile
+	if err := tx.Select(&existingFiles, "SELECT id FROM game_files WHERE game_id = ?", gameID); err != nil {
+		return fmt.Errorf("list game files before sync: %w", err)
+	}
+
+	keepFileIDs := make(map[int64]struct{}, len(files))
+	for index, item := range files {
+		sortOrder := item.SortOrder
+		if sortOrder < 0 {
+			sortOrder = index
+		}
+
+		if item.ID != nil && *item.ID > 0 {
+			result, err := tx.Exec(`
+				UPDATE game_files
+				SET file_path = ?, label = ?, notes = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP
+				WHERE game_id = ? AND id = ?
+			`, item.FilePath, item.Label, item.Notes, sortOrder, gameID, *item.ID)
+			if err != nil {
+				return fmt.Errorf("update game file: %w", err)
+			}
+			rows, err := result.RowsAffected()
+			if err != nil {
+				return fmt.Errorf("read updated game file rows: %w", err)
+			}
+			if rows == 0 {
+				return sql.ErrNoRows
+			}
+			keepFileIDs[*item.ID] = struct{}{}
+			continue
+		}
+
+		if _, err := tx.Exec(`
+			INSERT INTO game_files (game_id, file_path, label, notes, sort_order)
+			VALUES (?, ?, ?, ?, ?)
+		`, gameID, item.FilePath, item.Label, item.Notes, sortOrder); err != nil {
+			return fmt.Errorf("create game file: %w", err)
+		}
+	}
+
+	for _, file := range existingFiles {
+		if _, keep := keepFileIDs[file.ID]; keep {
+			continue
+		}
+		if _, err := tx.Exec("DELETE FROM game_files WHERE game_id = ? AND id = ?", gameID, file.ID); err != nil {
+			return fmt.Errorf("delete game file: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (r *GamesRepository) deleteAssetsTx(tx *sqlx.Tx, gameID int64, deleteAssets []domain.GameAssetDeleteInput) ([]string, error) {
+	assetPaths := make([]string, 0, len(deleteAssets))
+
+	var currentPrimaryVideoUID sql.NullString
+	if err := tx.Get(&currentPrimaryVideoUID, "SELECT preview_video_asset_uid FROM games WHERE id = ?", gameID); err != nil {
+		return nil, fmt.Errorf("load game preview video uid: %w", err)
+	}
+	needsPrimaryVideoFallback := false
+
+	for _, item := range deleteAssets {
+		switch strings.TrimSpace(item.AssetType) {
+		case "cover":
+			if _, err := tx.Exec("UPDATE games SET cover_image = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?", gameID); err != nil {
+				return nil, fmt.Errorf("delete cover image: %w", err)
+			}
+			assetPaths = append(assetPaths, strings.TrimSpace(item.Path))
+		case "banner":
+			if _, err := tx.Exec("UPDATE games SET banner_image = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?", gameID); err != nil {
+				return nil, fmt.Errorf("delete banner image: %w", err)
+			}
+			assetPaths = append(assetPaths, strings.TrimSpace(item.Path))
+		case "screenshot":
+			deletedPath, _, deleted, err := r.deleteSingleAssetTx(tx, gameID, "screenshot", item)
+			if err != nil {
+				return nil, err
+			}
+			if deleted {
+				assetPaths = append(assetPaths, deletedPath)
+			}
+		case "video":
+			deletedPath, deletedUID, deleted, err := r.deleteSingleAssetTx(tx, gameID, "video", item)
+			if err != nil {
+				return nil, err
+			}
+			if deleted {
+				assetPaths = append(assetPaths, deletedPath)
+				if currentPrimaryVideoUID.Valid && strings.TrimSpace(currentPrimaryVideoUID.String) == strings.TrimSpace(deletedUID) {
+					needsPrimaryVideoFallback = true
+					currentPrimaryVideoUID = sql.NullString{}
+				}
+			}
+		default:
+			return nil, fmt.Errorf("invalid asset type: %s", strings.TrimSpace(item.AssetType))
+		}
+	}
+
+	if needsPrimaryVideoFallback {
+		var fallbackUID sql.NullString
+		if err := tx.Get(&fallbackUID, `
+			SELECT asset_uid
+			FROM game_assets
+			WHERE game_id = ? AND asset_type = 'video'
+			ORDER BY sort_order ASC, id ASC
+			LIMIT 1
+		`, gameID); err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				return nil, fmt.Errorf("load fallback primary video: %w", err)
+			}
+			fallbackUID = sql.NullString{}
+		}
+
+		if fallbackUID.Valid {
+			if _, err := tx.Exec(
+				"UPDATE games SET preview_video_asset_uid = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+				fallbackUID.String,
+				gameID,
+			); err != nil {
+				return nil, fmt.Errorf("set fallback primary video: %w", err)
+			}
+		} else {
+			if _, err := tx.Exec(
+				"UPDATE games SET preview_video_asset_uid = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+				gameID,
+			); err != nil {
+				return nil, fmt.Errorf("clear primary video: %w", err)
+			}
+		}
+	}
+
+	return assetPaths, nil
+}
+
+func (r *GamesRepository) deleteSingleAssetTx(
+	tx *sqlx.Tx,
+	gameID int64,
+	assetType string,
+	item domain.GameAssetDeleteInput,
+) (string, string, bool, error) {
+	trimmedUID := strings.TrimSpace(item.AssetUID)
+	if trimmedUID != "" {
+		var deleted struct {
+			Path     string         `db:"path"`
+			AssetUID sql.NullString `db:"asset_uid"`
+		}
+		if err := tx.Get(&deleted, `
+			DELETE FROM game_assets
+			WHERE game_id = ? AND asset_type = ? AND asset_uid = ?
+			RETURNING path, asset_uid
+		`, gameID, assetType, trimmedUID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return "", "", false, nil
+			}
+			return "", "", false, fmt.Errorf("delete %s by uid: %w", assetType, err)
+		}
+		return deleted.Path, deleted.AssetUID.String, true, nil
+	}
+
+	if item.AssetID != nil && *item.AssetID > 0 {
+		var deleted struct {
+			Path     string         `db:"path"`
+			AssetUID sql.NullString `db:"asset_uid"`
+		}
+		if err := tx.Get(&deleted, `
+			DELETE FROM game_assets
+			WHERE game_id = ? AND asset_type = ? AND id = ?
+			RETURNING path, asset_uid
+		`, gameID, assetType, *item.AssetID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return "", "", false, nil
+			}
+			return "", "", false, fmt.Errorf("delete %s by id: %w", assetType, err)
+		}
+		return deleted.Path, deleted.AssetUID.String, true, nil
+	}
+
+	trimmedPath := strings.TrimSpace(item.Path)
+	if trimmedPath == "" {
+		return "", "", false, nil
+	}
+	var deleted struct {
+		Path     string         `db:"path"`
+		AssetUID sql.NullString `db:"asset_uid"`
+	}
+	if err := tx.Get(&deleted, `
+		DELETE FROM game_assets
+		WHERE game_id = ? AND asset_type = ? AND path = ?
+		RETURNING path, asset_uid
+	`, gameID, assetType, trimmedPath); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", "", false, nil
+		}
+		return "", "", false, fmt.Errorf("delete %s by path: %w", assetType, err)
+	}
+	return deleted.Path, deleted.AssetUID.String, true, nil
+}
+
+func (r *GamesRepository) reorderAssetsTx(tx *sqlx.Tx, gameID int64, assetType string, assetUIDs []string) error {
+	if len(assetUIDs) == 0 {
+		return nil
+	}
+
+	for index, assetUID := range assetUIDs {
+		trimmedUID := strings.TrimSpace(assetUID)
+		if trimmedUID == "" {
+			return fmt.Errorf("empty %s asset uid", assetType)
+		}
+
+		result, err := tx.Exec(`
+			UPDATE game_assets
+			SET sort_order = ?
+			WHERE game_id = ? AND asset_type = ? AND asset_uid = ?
+		`, index, gameID, assetType, trimmedUID)
+		if err != nil {
+			return fmt.Errorf("update %s sort order: %w", assetType, err)
+		}
+		rows, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("read %s reorder rows: %w", assetType, err)
+		}
+		if rows == 0 {
+			return sql.ErrNoRows
+		}
+	}
+
+	return nil
+}
+
+func uniqueNonEmptyStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, exists := seen[trimmed]; exists {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		result = append(result, trimmed)
+	}
+
+	return result
 }
 
 func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStats, error) {

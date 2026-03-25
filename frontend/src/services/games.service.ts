@@ -97,6 +97,36 @@ interface TimelineGamesApiResponse {
   pagination: TimelinePaginationApi
 }
 
+export interface AggregateFileInput {
+  id?: number
+  file_path: string
+  label?: string | null
+  notes?: string | null
+  sort_order: number
+}
+
+export interface AggregateDeleteAssetInput {
+  asset_type: 'cover' | 'banner' | 'screenshot' | 'video'
+  path: string
+  asset_id?: number
+  asset_uid?: string
+}
+
+export interface AggregateUpdateInput {
+  game: Partial<GameInput>
+  files: AggregateFileInput[]
+  delete_assets: AggregateDeleteAssetInput[]
+  screenshot_order_asset_uids: string[]
+  video_order_asset_uids: string[]
+}
+
+interface AggregateUpdateApiResponse {
+  game: GameListApiItem
+  warnings?: {
+    asset_delete_paths?: string[]
+  }
+}
+
 type TimelineGamesResult = {
   data: Game[]
   hasMore: boolean
@@ -333,6 +363,48 @@ const gamesService = {
     }
     const response = await put<ApiResponse<GameListApiItem>>(`/games/${id}`, payload)
     return mapGameListItem(response.data)
+  },
+
+  async updateGameAggregate(id: string, data: AggregateUpdateInput): Promise<{ game: Game; warnings: string[] }> {
+    const payload = {
+      title: data.game.title || '',
+      title_alt: data.game.title_alt ?? null,
+      visibility: data.game.visibility ?? 'public',
+      summary: data.game.summary ?? null,
+      release_date: data.game.release_date ?? null,
+      engine: data.game.engine ?? null,
+      cover_image: data.game.cover_image ?? null,
+      banner_image: data.game.banner_image ?? null,
+      needs_review: data.game.needs_review ?? false,
+      preview_video_asset_uid: data.game.preview_video_asset_uid ?? null,
+      series_ids: data.game.series || [],
+      platform_ids: mapPlatformValues(data.game.platforms),
+      developer_ids: data.game.developers || [],
+      publisher_ids: data.game.publishers || [],
+      tag_ids: data.game.tag_ids || [],
+      files: data.files.map((item) => ({
+        id: item.id,
+        file_path: item.file_path,
+        label: item.label ?? null,
+        notes: item.notes ?? null,
+        sort_order: item.sort_order,
+      })),
+      delete_assets: data.delete_assets.map((item) => ({
+        asset_type: item.asset_type,
+        path: item.path,
+        asset_id: item.asset_id,
+        asset_uid: item.asset_uid,
+      })),
+      screenshot_order_asset_uids: data.screenshot_order_asset_uids,
+      video_order_asset_uids: data.video_order_asset_uids,
+    }
+
+    const response = await put<ApiResponse<AggregateUpdateApiResponse>>(`/games/${id}/aggregate`, payload)
+    const warnings = response.data.warnings?.asset_delete_paths || []
+    return {
+      game: mapGameListItem(response.data.game),
+      warnings,
+    }
   },
 
   async createGameFile(gameId: string, data: {

@@ -1,5 +1,4 @@
 import { ref, type Ref } from 'vue'
-import { deleteAsset, reorderScreenshots, reorderVideos } from '@/services/assets'
 import gamesService from '@/services/games.service'
 import { seriesService } from '@/services/series.service'
 import platformService from '@/services/platforms.service'
@@ -79,95 +78,12 @@ interface UseEditGameWorkflowOptions {
   closeModal: () => void
 }
 
-const hasResolvedFilePath = (item: NonNullable<Game['files']>[number]) => {
-  return typeof item.file_path === 'string' && item.file_path.trim().length > 0
-}
-
 const slugifyMetadataName = (name: string) => {
   return name
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-}
-
-const persistGameFilePaths = async (
-  gameId: number,
-  game: Game,
-  filePaths: WorkflowFilePathItem[],
-) => {
-  const originalFileIds = new Set(
-    (game.files || [])
-      .filter(hasResolvedFilePath)
-      .map((item) => item.id)
-      .filter((id): id is number => typeof id === 'number'),
-  )
-
-  const keptFileIds = new Set<number>()
-  const validFilePaths = filePaths.filter((item) => item.path.trim())
-
-  for (let index = 0; index < validFilePaths.length; index += 1) {
-    const item = validFilePaths[index]
-    const payload = {
-      file_path: item.path.trim(),
-      label: item.label.trim() || null,
-      notes: null,
-      sort_order: index,
-    }
-
-    if (item.id) {
-      keptFileIds.add(item.id)
-      await gamesService.updateGameFile(String(gameId), String(item.id), payload)
-    } else {
-      const created = await gamesService.createGameFile(String(gameId), payload)
-      if (created.id) keptFileIds.add(created.id)
-    }
-  }
-
-  for (const fileId of originalFileIds) {
-    if (!keptFileIds.has(fileId)) {
-      await gamesService.deleteGameFile(String(gameId), String(fileId))
-    }
-  }
-}
-
-const submitAssetDeletionQueue = async (
-  gameId: number,
-  pendingDeleteAssets: PendingDeleteAsset[],
-) => {
-  for (const item of pendingDeleteAssets) {
-    try {
-      await deleteAsset(gameId, item.type, item.path, item.assetId, item.assetUid)
-    } catch (error) {
-      console.error('Failed to delete asset after save:', item.path, error)
-    }
-  }
-}
-
-const submitAssetOrder = async (
-  gameId: number,
-  screenshots: WorkflowEditableScreenshot[],
-  previewVideos: WorkflowEditableVideo[],
-) => {
-  const orderedScreenshotUids = screenshots
-    .map((item, index) => {
-      item.sort_order = index
-      return item.asset_uid
-    })
-    .filter((assetUid): assetUid is string => Boolean(assetUid))
-  if (orderedScreenshotUids.length > 0) {
-    await reorderScreenshots(gameId, orderedScreenshotUids)
-  }
-
-  const orderedVideoUids = previewVideos
-    .map((item, index) => {
-      item.sort_order = index
-      return item.asset_uid
-    })
-    .filter((assetUid): assetUid is string => Boolean(assetUid))
-  if (orderedVideoUids.length > 0) {
-    await reorderVideos(gameId, orderedVideoUids)
-  }
 }
 
 const resolveSeriesSelection = async (
@@ -384,9 +300,20 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
         options.addAlert('标签处理失败', 'warning')
       }
 
-      await gamesService.updateGame(
-        String(game.id),
-        createUpdatePayload({
+      const orderedScreenshotUids = options.form.value.screenshots
+        .map((item, index) => {
+          item.sort_order = index
+          return item.asset_uid
+        })
+        .filter((assetUid): assetUid is string => Boolean(assetUid))
+      const orderedVideoUids = options.form.value.preview_videos
+        .map((item, index) => {
+          item.sort_order = index
+          return item.asset_uid
+        })
+        .filter((assetUid): assetUid is string => Boolean(assetUid))
+      const aggregateResult = await gamesService.updateGameAggregate(String(game.id), {
+        game: createUpdatePayload({
           form: options.form.value,
           platformIds,
           seriesIds,
@@ -394,12 +321,28 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
           publisherIds,
           tagIds,
         }),
-      )
-
-      await persistGameFilePaths(game.id, game, options.form.value.file_paths)
-      await submitAssetDeletionQueue(game.id, pendingDeleteAssets.value)
+        files: options.form.value.file_paths
+          .filter((item) => item.path.trim())
+          .map((item, index) => ({
+            id: item.id,
+            file_path: item.path.trim(),
+            label: item.label.trim() || null,
+            notes: null,
+            sort_order: index,
+          })),
+        delete_assets: pendingDeleteAssets.value.map((item) => ({
+          asset_type: item.type,
+          path: item.path,
+          asset_id: item.assetId,
+          asset_uid: item.assetUid,
+        })),
+        screenshot_order_asset_uids: orderedScreenshotUids,
+        video_order_asset_uids: orderedVideoUids,
+      })
       pendingDeleteAssets.value = []
-      await submitAssetOrder(game.id, options.form.value.screenshots, options.form.value.preview_videos)
+      if (aggregateResult.warnings.length > 0) {
+        options.addAlert('部分素材文件未能物理删除，系统稍后可重试', 'warning')
+      }
       await refreshSeriesOptions()
 
       options.addAlert('保存成功', 'success')

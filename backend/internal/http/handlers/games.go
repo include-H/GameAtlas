@@ -247,6 +247,89 @@ func (h *GamesHandler) Update(c *gin.Context) {
 	})
 }
 
+type gameAggregateUpdateRequest struct {
+	Title                    string                        `json:"title"`
+	TitleAlt                 *string                       `json:"title_alt"`
+	Visibility               string                        `json:"visibility"`
+	Summary                  *string                       `json:"summary"`
+	ReleaseDate              *string                       `json:"release_date"`
+	Engine                   *string                       `json:"engine"`
+	CoverImage               *string                       `json:"cover_image"`
+	BannerImage              *string                       `json:"banner_image"`
+	NeedsReview              bool                          `json:"needs_review"`
+	SeriesIDs                []int64                       `json:"series_ids"`
+	PlatformIDs              []int64                       `json:"platform_ids"`
+	DeveloperIDs             []int64                       `json:"developer_ids"`
+	PublisherIDs             []int64                       `json:"publisher_ids"`
+	TagIDs                   []int64                       `json:"tag_ids"`
+	PreviewVideoAssetUID     *string                       `json:"preview_video_asset_uid"`
+	Files                    []domain.GameFileUpsertInput  `json:"files"`
+	DeleteAssets             []domain.GameAssetDeleteInput `json:"delete_assets"`
+	ScreenshotOrderAssetUIDs []string                      `json:"screenshot_order_asset_uids"`
+	VideoOrderAssetUIDs      []string                      `json:"video_order_asset_uids"`
+}
+
+func (h *GamesHandler) UpdateAggregate(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
+	id, ok := parseIDParam(c, "id")
+	if !ok {
+		return
+	}
+
+	var request gameAggregateUpdateRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "invalid game payload",
+		})
+		return
+	}
+
+	game, deleteWarnings, err := h.service.UpdateAggregate(id, domain.GameAggregateUpdateInput{
+		Game: domain.GameWriteInput{
+			Title:                request.Title,
+			TitleAlt:             request.TitleAlt,
+			Visibility:           request.Visibility,
+			Summary:              request.Summary,
+			ReleaseDate:          request.ReleaseDate,
+			Engine:               request.Engine,
+			CoverImage:           request.CoverImage,
+			BannerImage:          request.BannerImage,
+			NeedsReview:          request.NeedsReview,
+			SeriesIDs:            request.SeriesIDs,
+			PlatformIDs:          request.PlatformIDs,
+			DeveloperIDs:         request.DeveloperIDs,
+			PublisherIDs:         request.PublisherIDs,
+			TagIDs:               request.TagIDs,
+			PreviewVideoAssetUID: request.PreviewVideoAssetUID,
+		},
+		Files:                    request.Files,
+		DeleteAssets:             request.DeleteAssets,
+		ScreenshotOrderAssetUIDs: request.ScreenshotOrderAssetUIDs,
+		VideoOrderAssetUIDs:      request.VideoOrderAssetUIDs,
+	})
+	if err != nil {
+		writeServiceError(c, err, "title is required")
+		return
+	}
+
+	data := gin.H{
+		"game": toGameListItemResponse(*game),
+	}
+	if len(deleteWarnings) > 0 {
+		data["warnings"] = gin.H{
+			"asset_delete_paths": deleteWarnings,
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    data,
+	})
+}
+
 func (h *GamesHandler) Delete(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
