@@ -634,9 +634,6 @@ onMounted(async () => {
 
   await loadFilterOptions()
 
-  // Initialize WebSocket for real-time updates
-  gamesStore.initializeWebSocket()
-
   searchQuery.value = (route.query.search as string) || ''
   // Only load if games list is empty or if we have specific queries
   if (games.value.length === 0 || Object.keys(route.query).length > 0) {

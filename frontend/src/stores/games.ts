@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import gamesService from '@/services/games.service'
-import { getWebSocketService, type WebSocketEvent } from '@/services/websocket'
 import type { GameDetail, GameListItem, GameListQuery, GameSort, GameStats, GameVersion } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
 
@@ -21,7 +20,6 @@ export const useGamesStore = defineStore('games', () => {
 
   const isLoading = ref(false)
   const error = ref<string | null>(null)
-  let lastListQuery: { query: GameListQuery; sort?: GameSort } | null = null
 
   // Computed
   const hasMorePages = computed(() => pagination.value.page < pagination.value.totalPages)
@@ -90,15 +88,6 @@ export const useGamesStore = defineStore('games', () => {
     const page = params.query?.page ?? 1
     const limit = params.query?.limit ?? pagination.value.limit
     const append = params.append ?? false
-
-    lastListQuery = {
-      query: {
-        ...params.query,
-        page,
-        limit,
-      },
-      sort: params.sort,
-    }
 
     try {
       const response = await gamesService.getGames({
@@ -181,47 +170,6 @@ export const useGamesStore = defineStore('games', () => {
     }
   }
 
-  // 初始化 WebSocket 监听
-  let unsubscribeWebSocket: (() => void) | null = null
-  
-  const initializeWebSocket = () => {
-    if (unsubscribeWebSocket) return // 避免重复初始化
-
-    const wsService = getWebSocketService()
-
-    unsubscribeWebSocket = wsService.subscribe((event: WebSocketEvent) => {
-      switch (event.type) {
-        case 'game:created':
-        case 'game:updated':
-        case 'game:deleted':
-          // 自动刷新游戏列表
-          if (lastListQuery) {
-            fetchGames(lastListQuery)
-          }
-          break
-        case 'game:wiki_updated':
-          // 如果当前正在查看该游戏，刷新详情
-          if (currentGame.value && event.gameId === currentGame.value.id) {
-            if (currentGame.value.public_id) {
-              fetchGame(currentGame.value.public_id)
-            }
-          }
-          break
-      }
-    })
-    
-    // 连接 WebSocket
-    wsService.connect()
-  }
-
-  // 取消订阅 WebSocket
-  const unsubscribeWebSocketEvents = () => {
-    if (unsubscribeWebSocket) {
-      unsubscribeWebSocket()
-      unsubscribeWebSocket = null
-    }
-  }
-
   return {
     // State
     games,
@@ -240,7 +188,5 @@ export const useGamesStore = defineStore('games', () => {
     fetchGameVersions,
     fetchStats,
     toggleFavorite,
-    initializeWebSocket,
-    unsubscribeWebSocketEvents,
   }
 })
