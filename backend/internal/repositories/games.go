@@ -114,6 +114,57 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 	args["offset"] = offset
 
 	listQuery := fmt.Sprintf(`
+		WITH page_games AS (
+			SELECT g.id
+			FROM games g
+			WHERE %s
+			ORDER BY %s %s, g.id %s
+			LIMIT :limit OFFSET :offset
+		),
+		ranked_screenshots AS (
+			SELECT
+				ga.game_id,
+				ga.path,
+				ROW_NUMBER() OVER (
+					PARTITION BY ga.game_id
+					ORDER BY ga.sort_order ASC, ga.id ASC
+				) AS row_num
+			FROM game_assets ga
+			INNER JOIN page_games pg ON pg.id = ga.game_id
+			WHERE ga.asset_type = 'screenshot'
+		),
+		screenshot_stats AS (
+			SELECT
+				rs.game_id,
+				COUNT(*) AS screenshot_count,
+				MAX(CASE WHEN rs.row_num = 1 THEN rs.path END) AS primary_screenshot
+			FROM ranked_screenshots rs
+			GROUP BY rs.game_id
+		),
+		file_stats AS (
+			SELECT gf.game_id, COUNT(*) AS file_count
+			FROM game_files gf
+			INNER JOIN page_games pg ON pg.id = gf.game_id
+			GROUP BY gf.game_id
+		),
+		developer_stats AS (
+			SELECT gd.game_id, COUNT(*) AS developer_count
+			FROM game_developers gd
+			INNER JOIN page_games pg ON pg.id = gd.game_id
+			GROUP BY gd.game_id
+		),
+		publisher_stats AS (
+			SELECT gp.game_id, COUNT(*) AS publisher_count
+			FROM game_publishers gp
+			INNER JOIN page_games pg ON pg.id = gp.game_id
+			GROUP BY gp.game_id
+		),
+		platform_stats AS (
+			SELECT gp.game_id, COUNT(*) AS platform_count
+			FROM game_platforms gp
+			INNER JOIN page_games pg ON pg.id = gp.game_id
+			GROUP BY gp.game_id
+		)
 		SELECT
 			g.id,
 			g.public_id,
@@ -130,45 +181,23 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 			g.needs_review,
 			g.preview_video_asset_uid,
 			g.downloads,
-			(
-				SELECT ga.path
-				FROM game_assets ga
-				WHERE ga.game_id = g.id AND ga.asset_type = 'screenshot'
-				ORDER BY ga.sort_order ASC, ga.id ASC
-				LIMIT 1
-			) AS primary_screenshot,
-			(
-				SELECT COUNT(*)
-				FROM game_assets ga
-				WHERE ga.game_id = g.id AND ga.asset_type = 'screenshot'
-			) AS screenshot_count,
-			(
-				SELECT COUNT(*)
-				FROM game_files gf
-				WHERE gf.game_id = g.id
-			) AS file_count,
-			(
-				SELECT COUNT(*)
-				FROM game_developers gd
-				WHERE gd.game_id = g.id
-			) AS developer_count,
-			(
-				SELECT COUNT(*)
-				FROM game_publishers gp
-				WHERE gp.game_id = g.id
-			) AS publisher_count,
-			(
-				SELECT COUNT(*)
-				FROM game_platforms gp
-				WHERE gp.game_id = g.id
-			) AS platform_count,
+			ss.primary_screenshot,
+			COALESCE(ss.screenshot_count, 0) AS screenshot_count,
+			COALESCE(fs.file_count, 0) AS file_count,
+			COALESCE(ds.developer_count, 0) AS developer_count,
+			COALESCE(ps.publisher_count, 0) AS publisher_count,
+			COALESCE(pls.platform_count, 0) AS platform_count,
 			g.created_at,
 			g.updated_at
-		FROM games g
-		WHERE %s
+		FROM page_games pg
+		INNER JOIN games g ON g.id = pg.id
+		LEFT JOIN screenshot_stats ss ON ss.game_id = g.id
+		LEFT JOIN file_stats fs ON fs.game_id = g.id
+		LEFT JOIN developer_stats ds ON ds.game_id = g.id
+		LEFT JOIN publisher_stats ps ON ps.game_id = g.id
+		LEFT JOIN platform_stats pls ON pls.game_id = g.id
 		ORDER BY %s %s, g.id %s
-		LIMIT :limit OFFSET :offset
-	`, baseWhere, sortField, order, idOrder)
+	`, baseWhere, sortField, order, idOrder, sortField, order, idOrder)
 
 	listStmt, listArgs, err := sqlx.Named(listQuery, args)
 	if err != nil {
@@ -922,61 +951,6 @@ func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStat
 
 	baseWhere := strings.Join(where, " AND ")
 
-	const baseSelect = `
-		SELECT
-			g.id,
-			g.public_id,
-			g.title,
-			g.title_alt,
-			g.visibility,
-			g.summary,
-			g.release_date,
-			g.engine,
-			g.cover_image,
-			g.banner_image,
-			g.wiki_content,
-			g.wiki_content_html,
-			g.needs_review,
-			g.preview_video_asset_uid,
-			g.downloads,
-			(
-				SELECT ga.path
-				FROM game_assets ga
-				WHERE ga.game_id = g.id AND ga.asset_type = 'screenshot'
-				ORDER BY ga.sort_order ASC, ga.id ASC
-				LIMIT 1
-			) AS primary_screenshot,
-			(
-				SELECT COUNT(*)
-				FROM game_assets ga
-				WHERE ga.game_id = g.id AND ga.asset_type = 'screenshot'
-			) AS screenshot_count,
-			(
-				SELECT COUNT(*)
-				FROM game_files gf
-				WHERE gf.game_id = g.id
-			) AS file_count,
-			(
-				SELECT COUNT(*)
-				FROM game_developers gd
-				WHERE gd.game_id = g.id
-			) AS developer_count,
-			(
-				SELECT COUNT(*)
-				FROM game_publishers gp
-				WHERE gp.game_id = g.id
-			) AS publisher_count,
-			(
-				SELECT COUNT(*)
-				FROM game_platforms gp
-				WHERE gp.game_id = g.id
-			) AS platform_count,
-			g.created_at,
-			g.updated_at
-		FROM games g
-		WHERE %s
-	`
-
 	summaryQuery := fmt.Sprintf(`
 		SELECT
 			COUNT(*) AS total_games,
@@ -1004,10 +978,91 @@ func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStat
 	}
 
 	loadGames := func(orderBy string) ([]domain.Game, error) {
-		query := fmt.Sprintf(baseSelect+`
+		query := fmt.Sprintf(`
+			WITH stat_games AS (
+				SELECT g.id
+				FROM games g
+				WHERE %s
+				ORDER BY %s
+				LIMIT 12
+			),
+			ranked_screenshots AS (
+				SELECT
+					ga.game_id,
+					ga.path,
+					ROW_NUMBER() OVER (
+						PARTITION BY ga.game_id
+						ORDER BY ga.sort_order ASC, ga.id ASC
+					) AS row_num
+				FROM game_assets ga
+				INNER JOIN stat_games sg ON sg.id = ga.game_id
+				WHERE ga.asset_type = 'screenshot'
+			),
+			screenshot_stats AS (
+				SELECT
+					rs.game_id,
+					COUNT(*) AS screenshot_count,
+					MAX(CASE WHEN rs.row_num = 1 THEN rs.path END) AS primary_screenshot
+				FROM ranked_screenshots rs
+				GROUP BY rs.game_id
+			),
+			file_stats AS (
+				SELECT gf.game_id, COUNT(*) AS file_count
+				FROM game_files gf
+				INNER JOIN stat_games sg ON sg.id = gf.game_id
+				GROUP BY gf.game_id
+			),
+			developer_stats AS (
+				SELECT gd.game_id, COUNT(*) AS developer_count
+				FROM game_developers gd
+				INNER JOIN stat_games sg ON sg.id = gd.game_id
+				GROUP BY gd.game_id
+			),
+			publisher_stats AS (
+				SELECT gp.game_id, COUNT(*) AS publisher_count
+				FROM game_publishers gp
+				INNER JOIN stat_games sg ON sg.id = gp.game_id
+				GROUP BY gp.game_id
+			),
+			platform_stats AS (
+				SELECT gp.game_id, COUNT(*) AS platform_count
+				FROM game_platforms gp
+				INNER JOIN stat_games sg ON sg.id = gp.game_id
+				GROUP BY gp.game_id
+			)
+			SELECT
+				g.id,
+				g.public_id,
+				g.title,
+				g.title_alt,
+				g.visibility,
+				g.summary,
+				g.release_date,
+				g.engine,
+				g.cover_image,
+				g.banner_image,
+				g.wiki_content,
+				g.wiki_content_html,
+				g.needs_review,
+				g.preview_video_asset_uid,
+				g.downloads,
+				ss.primary_screenshot,
+				COALESCE(ss.screenshot_count, 0) AS screenshot_count,
+				COALESCE(fs.file_count, 0) AS file_count,
+				COALESCE(ds.developer_count, 0) AS developer_count,
+				COALESCE(ps.publisher_count, 0) AS publisher_count,
+				COALESCE(pls.platform_count, 0) AS platform_count,
+				g.created_at,
+				g.updated_at
+			FROM stat_games sg
+			INNER JOIN games g ON g.id = sg.id
+			LEFT JOIN screenshot_stats ss ON ss.game_id = g.id
+			LEFT JOIN file_stats fs ON fs.game_id = g.id
+			LEFT JOIN developer_stats ds ON ds.game_id = g.id
+			LEFT JOIN publisher_stats ps ON ps.game_id = g.id
+			LEFT JOIN platform_stats pls ON pls.game_id = g.id
 			ORDER BY %s
-			LIMIT 12
-		`, baseWhere, orderBy)
+		`, baseWhere, orderBy, orderBy)
 		stmt, queryArgs, err := sqlx.Named(query, args)
 		if err != nil {
 			return nil, fmt.Errorf("build stats games query: %w", err)
