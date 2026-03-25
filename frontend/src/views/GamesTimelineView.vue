@@ -80,7 +80,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import GameCard from '@/components/GameCard.vue'
 import gamesService from '@/services/games.service'
-import type { Game } from '@/services/types'
+import type { TimelineGame } from '@/services/types'
 import { createDetailRouteQuery } from '@/utils/navigation'
 
 defineOptions({
@@ -94,7 +94,7 @@ interface TimelineMonthGroup {
   monthLabel: string
   fullLabel: string
   sortValue: number
-  games: Game[]
+  games: TimelineGame[]
 }
 
 interface TimelineRow {
@@ -112,7 +112,7 @@ const router = useRouter()
 
 const isLoading = ref(false)
 const isLoadingMore = ref(false)
-const allGames = ref<Game[]>([])
+const allGames = ref<TimelineGame[]>([])
 const hasMore = ref(false)
 const nextCursor = ref<string | null>(null)
 const currentWindowFrom = ref<string | null>(null)
@@ -197,7 +197,7 @@ const timelineRows = computed<TimelineRow[]>(() => {
   return rows
 })
 
-const appendTimelineChunk = (games: Game[]) => {
+const appendTimelineChunk = (games: TimelineGame[]) => {
   if (games.length === 0) return
   const existingIDs = new Set(allGames.value.map((game) => game.public_id).filter(Boolean) as string[])
   const incoming = games.filter((game) => Boolean(game.public_id) && !existingIDs.has(String(game.public_id)))

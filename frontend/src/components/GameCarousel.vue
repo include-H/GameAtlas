@@ -55,12 +55,12 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { Game } from '@/services/types'
+import type { GameListItem } from '@/services/types'
 import { resolveAssetUrl } from '@/utils/asset-url'
 import { createDetailRouteQuery } from '@/utils/navigation'
 
 interface Props {
-  games: Game[]
+  games: GameListItem[]
   autoPlay?: boolean
   interval?: number
 }
@@ -77,7 +77,7 @@ let autoPlayTimer: number | null = null
 
 const games = computed(() => props.games.slice(0, 5))
 
-const getBackgroundImage = (game: Game) => {
+const getBackgroundImage = (game: GameListItem) => {
   return resolveAssetUrl(
     game.primary_screenshot
       || game.banner_image
@@ -86,7 +86,7 @@ const getBackgroundImage = (game: Game) => {
   )
 }
 
-const getDescription = (game: Game) => {
+const getDescription = (game: GameListItem) => {
   const desc = game.summary || ''
   if (desc) {
     return desc.length > 200
@@ -96,11 +96,8 @@ const getDescription = (game: Game) => {
   return ''
 }
 
-const getMetaInfo = (game: Game) => {
+const getMetaInfo = (game: GameListItem) => {
   const parts: string[] = []
-  if (game.developers && game.developers.length > 0) {
-    parts.push(game.developers[0].name)
-  }
   if (game.release_date) {
     parts.push(new Date(game.release_date).getFullYear() + '年')
   }

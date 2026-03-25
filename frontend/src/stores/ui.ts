@@ -3,6 +3,10 @@ import { ref, computed } from 'vue'
 
 type ViewMode = 'grid' | 'list'
 type CardSize = 'small' | 'medium' | 'large'
+type AmbientBackgroundOverride = {
+  key: string
+  url: string
+} | null
 
 export const useUiStore = defineStore('ui', () => {
   // Theme
@@ -17,6 +21,7 @@ export const useUiStore = defineStore('ui', () => {
   const sidebarCollapsed = ref(false)
   const showFilters = ref(false)
   const showSortOptions = ref(false)
+  const ambientBackgroundOverride = ref<AmbientBackgroundOverride>(null)
 
   // Pagination
   const itemsPerPage = ref(20)
@@ -99,6 +104,14 @@ export const useUiStore = defineStore('ui', () => {
     showSortOptions.value = !showSortOptions.value
   }
 
+  const setAmbientBackgroundOverride = (value: AmbientBackgroundOverride) => {
+    ambientBackgroundOverride.value = value
+  }
+
+  const clearAmbientBackgroundOverride = () => {
+    ambientBackgroundOverride.value = null
+  }
+
   // Alert methods
   const addAlert = (
     message: string,
@@ -162,6 +175,7 @@ export const useUiStore = defineStore('ui', () => {
     sidebarCollapsed,
     showFilters,
     showSortOptions,
+    ambientBackgroundOverride,
     itemsPerPage,
     alerts,
     // Actions
@@ -175,6 +189,8 @@ export const useUiStore = defineStore('ui', () => {
     toggleSidebar,
     toggleFilters,
     toggleSortOptions,
+    setAmbientBackgroundOverride,
+    clearAmbientBackgroundOverride,
     addAlert,
     removeAlert,
     clearAlerts,

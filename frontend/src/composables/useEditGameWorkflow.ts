@@ -6,8 +6,8 @@ import { resolveCreatableSelections } from '@/utils/creatable-select'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import type {
   Developer,
-  Game,
-  GameInput,
+  GameDetail,
+  GameWriteRequest,
   Platform,
   Publisher,
   Series,
@@ -47,12 +47,12 @@ interface EditGameFormBridge {
   title: string
   title_alt: string
   visibility: 'public' | 'private'
-  developers: Array<string | number>
-  publishers: Array<string | number>
+  developer_ids: Array<string | number>
+  publisher_ids: Array<string | number>
   release_date: string | undefined
   engine: string
-  platform: Array<string | number>
-  series: string | number | null
+  platform_ids: Array<string | number>
+  series_id: string | number | null
   tag_ids: Array<string | number>
   summary: string
   cover_image: string
@@ -64,7 +64,7 @@ interface EditGameFormBridge {
 }
 
 interface UseEditGameWorkflowOptions {
-  game: Ref<Game | null>
+  game: Ref<GameDetail | null>
   form: Ref<EditGameFormBridge>
   isSubmitting: Ref<boolean>
   seriesOptions: Ref<Series[]>
@@ -97,16 +97,22 @@ const resolveSeriesSelection = async (
   } else if (typeof seriesValue === 'number') {
     seriesIds = [seriesValue]
   } else if (typeof seriesValue === 'string' && seriesValue.trim()) {
-    try {
-      const seriesName = seriesValue.trim()
-      const newSeries = await seriesService.createSeries({
-        name: seriesName,
-        slug: seriesName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      })
-      seriesIds = [newSeries.id]
-    } catch (error) {
-      console.error('Failed to process series:', seriesValue, error)
-      addAlert(`系列 "${seriesValue}" 处理失败`, 'warning')
+    const normalizedValue = seriesValue.trim()
+    const maybeId = Number(normalizedValue)
+    if (!Number.isNaN(maybeId) && normalizedValue === String(maybeId)) {
+      seriesIds = [maybeId]
+    } else {
+      try {
+        const seriesName = normalizedValue
+        const newSeries = await seriesService.createSeries({
+          name: seriesName,
+          slug: seriesName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        })
+        seriesIds = [newSeries.id]
+      } catch (error) {
+        console.error('Failed to process series:', seriesValue, error)
+        addAlert(`系列 "${seriesValue}" 处理失败`, 'warning')
+      }
     }
   }
 
@@ -196,21 +202,21 @@ const resolvePlatforms = async (
 const createUpdatePayload = (params: {
   form: EditGameFormBridge
   platformIds: number[]
-  seriesIds: number[] | undefined
+  seriesId: number | null | undefined
   developerIds: number[] | undefined
   publisherIds: number[] | undefined
   tagIds: number[]
-}): Partial<GameInput> => {
+}): Partial<GameWriteRequest> => {
   return {
     title: params.form.title,
     title_alt: params.form.title_alt,
     visibility: params.form.visibility,
     release_date: params.form.release_date || undefined,
     engine: params.form.engine,
-    platforms: params.platformIds,
-    series: params.seriesIds,
-    developers: params.developerIds,
-    publishers: params.publisherIds,
+    platform_ids: params.platformIds,
+    series_id: params.seriesId ?? null,
+    developer_ids: params.developerIds,
+    publisher_ids: params.publisherIds,
     tag_ids: params.tagIds,
     summary: params.form.summary,
     cover_image: params.form.cover_image,
@@ -256,39 +262,40 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
     options.isSubmitting.value = true
 
     try {
-      const seriesIds = await resolveSeriesSelection(options.form.value.series, options.addAlert)
+      const seriesIds = await resolveSeriesSelection(options.form.value.series_id, options.addAlert)
+      const seriesId = seriesIds?.[0] ?? null
 
       const developerResult = await resolveDevelopers(
-        options.form.value.developers,
+        options.form.value.developer_ids,
         options.developerOptions.value,
         options.addAlert,
       )
       options.developerOptions.value = developerResult.options
       const developerIds = developerResult.ids
       if (developerIds) {
-        options.form.value.developers = [...developerIds]
+        options.form.value.developer_ids = [...developerIds]
       }
 
       const publisherResult = await resolvePublishers(
-        options.form.value.publishers,
+        options.form.value.publisher_ids,
         options.publisherOptions.value,
         options.addAlert,
       )
       options.publisherOptions.value = publisherResult.options
       const publisherIds = publisherResult.ids
       if (publisherIds) {
-        options.form.value.publishers = [...publisherIds]
+        options.form.value.publisher_ids = [...publisherIds]
       }
 
       const platformResult = await resolvePlatforms(
-        options.form.value.platform,
+        options.form.value.platform_ids,
         options.platformOptions.value,
         options.addAlert,
       )
       options.platformOptions.value = platformResult.options
       const platformIds = platformResult.ids || []
       if (platformResult.ids) {
-        options.form.value.platform = [...platformIds]
+        options.form.value.platform_ids = [...platformIds]
       }
 
       let tagIds: number[] = []
@@ -319,7 +326,7 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
         game: createUpdatePayload({
           form: options.form.value,
           platformIds,
-          seriesIds,
+          seriesId,
           developerIds,
           publisherIds,
           tagIds,

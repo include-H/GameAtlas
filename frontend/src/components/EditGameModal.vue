@@ -34,7 +34,7 @@
         <a-col :span="12">
           <a-form-item label="开发商">
             <a-select
-              v-model="form.developers"
+              v-model="form.developer_ids"
               placeholder="选择开发商（可多选）"
               multiple
               allow-clear
@@ -58,7 +58,7 @@
         <a-col :span="12">
           <a-form-item label="发行商">
             <a-select
-              v-model="form.publishers"
+              v-model="form.publisher_ids"
               placeholder="选择发行商（可多选）"
               multiple
               allow-clear
@@ -113,7 +113,7 @@
         <a-col :span="12">
           <a-form-item label="平台">
             <a-select
-              v-model="form.platform"
+              v-model="form.platform_ids"
               placeholder="选择或输入平台（可多选）"
               multiple
               allow-clear
@@ -134,7 +134,7 @@
         <a-col :span="12">
           <a-form-item label="系列">
             <a-select
-              v-model="form.series"
+              v-model="form.series_id"
               placeholder="选择系列"
               allow-clear
               allow-search
@@ -363,7 +363,7 @@ import { ref, watch, computed } from 'vue'
 import { useUiStore } from '@/stores/ui'
 import { uploadAsset, type UploadedAssetResult } from '@/services/assets'
 import { directoryService } from '@/services/directory.service'
-import type { Game } from '@/services/types'
+import type { GameDetail } from '@/services/types'
 import FileBrowserModal from '@/components/FileBrowserModal.vue'
 import GameTagSection, { type GameTagSelectionValue } from '@/components/edit-game/GameTagSection.vue'
 import GameFilePathsSection from '@/components/edit-game/GameFilePathsSection.vue'
@@ -398,7 +398,7 @@ import type {
 
 interface Props {
   visible: boolean
-  game: Game | null
+  game: GameDetail | null
 }
 
 interface EditableScreenshot {
@@ -420,12 +420,12 @@ interface GameForm {
   title: string
   title_alt: string
   visibility: 'public' | 'private'
-  developers: Array<string | number>
-  publishers: Array<string | number>
+  developer_ids: Array<string | number>
+  publisher_ids: Array<string | number>
   release_date: string | undefined
   engine: string
-  platform: (string | number)[]
-  series: string | number | null
+  platform_ids: (string | number)[]
+  series_id: string | number | null
   tag_ids: Array<string | number>
   summary: string
   cover_image: string
@@ -479,9 +479,10 @@ const handleSeriesSearch = async (query: string) => {
   try {
     const results = await seriesService.searchSeries(query)
     // Add results but keep current selection if it exists
-    const current = seriesOptions.value.find(s => s.id === form.value.series)
+    const currentSeriesId = form.value.series_id
+    const current = seriesOptions.value.find((s) => s.id === currentSeriesId)
     seriesOptions.value = results
-    if (current && !results.find(s => s.id === current.id)) {
+    if (current && !results.find((s) => s.id === current.id)) {
       seriesOptions.value.push(current)
     }
   } finally {
@@ -500,7 +501,7 @@ const handleDeveloperSearch = async (query: string) => {
     const { developersService } = await import('@/services/developers.service')
     developerOptions.value = await searchCreatableOptions({
       query,
-      selectedValues: form.value.developers,
+      selectedValues: form.value.developer_ids,
       currentOptions: developerOptions.value,
       search: (keyword) => developersService.searchDevelopers(keyword),
     })
@@ -520,7 +521,7 @@ const handlePublisherSearch = async (query: string) => {
     const { publishersService } = await import('@/services/publishers.service')
     publisherOptions.value = await searchCreatableOptions({
       query,
-      selectedValues: form.value.publishers,
+      selectedValues: form.value.publisher_ids,
       currentOptions: publisherOptions.value,
       search: (keyword) => publishersService.searchPublishers(keyword),
     })
@@ -533,12 +534,12 @@ const form = ref<GameForm>({
   title: '',
   title_alt: '',
   visibility: 'public',
-  developers: [],
-  publishers: [],
+  developer_ids: [],
+  publisher_ids: [],
   release_date: undefined,
   engine: '',
-  platform: [],
-  series: null,
+  platform_ids: [],
+  series_id: null,
   tag_ids: [],
   summary: '',
   cover_image: '',

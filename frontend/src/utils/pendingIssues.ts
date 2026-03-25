@@ -1,4 +1,4 @@
-import type { Game } from '@/services/types'
+import type { GameDetail, GameListItem } from '@/services/types'
 
 export type PendingIssueKey =
   | 'missing-assets'
@@ -122,16 +122,45 @@ export function getPendingIssueDetailLabel(key?: string | null) {
   return pendingIssueDetailDefinitions.find((item) => item.key === key)?.label || '待补充'
 }
 
-export function evaluatePendingIssues(game: Game, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueEvaluation {
+type PendingGame = GameListItem | GameDetail
+
+const hasDetailPayload = (game: PendingGame): game is GameDetail => {
+  return 'screenshots' in game
+}
+
+const hasListCounts = (game: PendingGame): game is GameListItem => {
+  return 'screenshot_count' in game
+}
+
+function hasMeaningfulWikiContent(content?: string | null, html?: string | null) {
+  if (content?.trim()) {
+    return true
+  }
+
+  if (!html?.trim()) {
+    return false
+  }
+
+  const plainText = html
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .trim()
+
+  return plainText.length > 0
+}
+
+export function evaluatePendingIssues(game: PendingGame, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueEvaluation {
   const details: PendingIssueDetailKey[] = []
   const ignoredSet = new Set(ignoredDetails)
 
   const hasCover = !!game.cover_image
   const hasBanner = !!game.banner_image
   const hasScreenshots =
-    (!!game.screenshot_items && game.screenshot_items.length > 0) ||
-    (typeof game.screenshot_count === 'number' && game.screenshot_count > 0) ||
-    !!game.primary_screenshot
+    (hasListCounts(game) && game.screenshot_count > 0) ||
+    (hasDetailPayload(game) && game.screenshots.length > 0) ||
+    (hasListCounts(game) && !!game.primary_screenshot)
   if (!hasCover) {
     details.push('missing-cover')
   }
@@ -141,28 +170,27 @@ export function evaluatePendingIssues(game: Game, ignoredDetails: PendingIssueDe
   if (!hasScreenshots) {
     details.push('missing-screenshots')
   }
-  const hasWiki = !!game.wiki_content?.trim() || !!game.wiki_content_html?.trim()
+  const hasWiki = hasMeaningfulWikiContent(game.wiki_content, game.wiki_content_html)
   if (!hasWiki) {
     details.push('missing-wiki-content')
   }
 
   const hasFiles =
-    (!!game.files && game.files.length > 0) ||
-    (typeof game.file_count === 'number' && game.file_count > 0)
+    (hasDetailPayload(game) && game.files.length > 0) ||
+    (hasListCounts(game) && game.file_count > 0)
   if (!hasFiles) {
     details.push('missing-files-list')
   }
 
   const hasDeveloper =
-    (!!game.developers && game.developers.length > 0) ||
-    (typeof game.developer_count === 'number' && game.developer_count > 0)
+    (hasDetailPayload(game) && game.developers.length > 0) ||
+    (hasListCounts(game) && game.developer_count > 0)
   const hasPublisher =
-    (!!game.publishers && game.publishers.length > 0) ||
-    (typeof game.publisher_count === 'number' && game.publisher_count > 0)
+    (hasDetailPayload(game) && game.publishers.length > 0) ||
+    (hasListCounts(game) && game.publisher_count > 0)
   const hasPlatform =
-    (!!game.platforms && game.platforms.length > 0) ||
-    !!game.platform ||
-    (typeof game.platform_count === 'number' && game.platform_count > 0)
+    (hasDetailPayload(game) && game.platforms.length > 0) ||
+    (hasListCounts(game) && game.platform_count > 0)
   const hasSummary = !!game.summary?.trim()
   if (!hasDeveloper) {
     details.push('missing-developer')
@@ -199,19 +227,19 @@ export function isSeverePendingEvaluation(evaluation: PendingIssueEvaluation) {
   )
 }
 
-export function getPendingIssues(game: Game, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueKey[] {
+export function getPendingIssues(game: PendingGame, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueKey[] {
   return evaluatePendingIssues(game, ignoredDetails).groups
 }
 
-export function getPendingIssueDetails(game: Game, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueDetailKey[] {
+export function getPendingIssueDetails(game: PendingGame, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueDetailKey[] {
   return evaluatePendingIssues(game, ignoredDetails).details
 }
 
-export function getIgnoredPendingIssueDetails(game: Game, ignoredDetails: PendingIssueDetailKey[] = []) {
+export function getIgnoredPendingIssueDetails(game: PendingGame, ignoredDetails: PendingIssueDetailKey[] = []) {
   return evaluatePendingIssues(game, ignoredDetails).ignoredDetails
 }
 
-export function isSeverePendingGame(game: Game, ignoredDetails: PendingIssueDetailKey[] = []) {
+export function isSeverePendingGame(game: PendingGame, ignoredDetails: PendingIssueDetailKey[] = []) {
   return isSeverePendingEvaluation(evaluatePendingIssues(game, ignoredDetails))
 }
 
@@ -220,6 +248,6 @@ export function matchesPendingIssueEvaluation(evaluation: PendingIssueEvaluation
   return evaluation.groups.includes(key as PendingIssueKey)
 }
 
-export function matchesPendingIssue(game: Game, key?: string | null) {
+export function matchesPendingIssue(game: PendingGame, key?: string | null) {
   return matchesPendingIssueEvaluation(evaluatePendingIssues(game), key)
 }

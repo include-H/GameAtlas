@@ -136,7 +136,7 @@ import { ref, computed, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
-import wikiService, { type WikiContent, type WikiHistoryEntry } from '@/services/wiki.service'
+import wikiService, { type WikiDocumentResponse, type WikiHistoryEntry } from '@/services/wiki.service'
 import { useNamedRouteGuard, watchRouteParamWhenActive } from '@/composables/useNamedRouteGuard'
 import { resolveReturnRoute } from '@/utils/navigation'
 import { getHttpErrorMessage } from '@/utils/http-error'
@@ -152,7 +152,7 @@ const uiStore = useUiStore()
 const { runWhenActive } = useNamedRouteGuard(route, 'wiki-edit')
 
 const game = computed(() => gamesStore.currentGame)
-const wiki = ref<WikiContent | null>(null)
+const wiki = ref<WikiDocumentResponse | null>(null)
 const historyEntries = ref<WikiHistoryEntry[]>([])
 const selectedHistory = ref<WikiHistoryEntry | null>(null)
 const isHistoryLoading = ref(false)

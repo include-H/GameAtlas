@@ -20,12 +20,16 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 import { getRouteParamString, useNamedRouteGuard } from '@/composables/useNamedRouteGuard'
 import gamesService from '@/services/games.service'
+import { useUiStore } from '@/stores/ui'
 import { resolveAssetUrl } from '@/utils/asset-url'
 
 const route = useRoute()
+const uiStore = useUiStore()
+const { ambientBackgroundOverride } = storeToRefs(uiStore)
 const gameDetailRouteGuard = useNamedRouteGuard(route, 'game-detail')
 const wikiEditRouteGuard = useNamedRouteGuard(route, 'wiki-edit')
 
@@ -43,21 +47,22 @@ const SUPPORTED_ROUTE_NAMES = new Set([
 const DEFAULT_BACKGROUND =
   'radial-gradient(circle at top right, rgba(26, 159, 255, 0.12), transparent 40%), linear-gradient(180deg, rgba(15, 18, 25, 0.96), rgba(15, 18, 25, 0.88))'
 
-let cachedBackgroundUrl = ''
-let inflightBackgroundRequest: Promise<string> | null = null
-
 const layerUrls = ref<string[]>(['', ''])
 const activeLayerIndex = ref(0)
 const hasAppliedBackground = ref(false)
 const applyRequestId = ref(0)
 
 const LIST_CANDIDATE_LIMIT = 24
-const DETAIL_CANDIDATE_LIMIT = 8
-const MIN_BACKGROUND_WIDTH = 1920
-const MIN_BACKGROUND_HEIGHT = 1080
 const CUSTOM_BACKGROUND_PATH = '/data/bg.jpg'
 
 const isEnabled = computed(() => SUPPORTED_ROUTE_NAMES.has(String(route.name || '')))
+const pendingCenterOverrideUrl = computed(() => {
+  if (route.name !== 'pending-center') {
+    return ''
+  }
+
+  return resolveAssetUrl(ambientBackgroundOverride.value?.url || '')
+})
 
 const buildLayerStyle = (url: string) => {
   if (url) {
@@ -85,15 +90,6 @@ const shuffleArray = <T,>(items: T[]) => {
   return copy
 }
 
-const probeImageSize = (url: string) => {
-  return new Promise<{ width: number; height: number } | null>((resolve) => {
-    const image = new Image()
-    image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight })
-    image.onerror = () => resolve(null)
-    image.src = url
-  })
-}
-
 const preloadImage = (url: string) => {
   return new Promise<boolean>((resolve) => {
     if (!url) {
@@ -106,10 +102,6 @@ const preloadImage = (url: string) => {
     image.onerror = () => resolve(false)
     image.src = url
   })
-}
-
-const isQualifiedBackground = (size: { width: number; height: number } | null) => {
-  return Boolean(size && size.width >= MIN_BACKGROUND_WIDTH && size.height >= MIN_BACKGROUND_HEIGHT)
 }
 
 const resolveCustomBackgroundUrl = () => {
@@ -139,140 +131,74 @@ const resolveCustomBackgroundUrl = () => {
 
 const loadCustomBackground = async () => {
   const customBackgroundUrl = resolveCustomBackgroundUrl()
-  const size = await probeImageSize(customBackgroundUrl)
-  if (!size) {
+  if (!(await preloadImage(customBackgroundUrl))) {
     return ''
   }
 
   return customBackgroundUrl
 }
 
-const pickFallbackBackground = async (games: Awaited<ReturnType<typeof gamesService.getGames>>['data']) => {
-  const candidates = shuffleArray(games)
-    .flatMap((game) => [game.banner_image, game.cover_image])
-    .map((asset) => resolveAssetUrl(asset))
-    .filter(Boolean)
+const pickRandomFromUrls = async (urls: Array<string | null | undefined>) => {
+  for (const url of shuffleArray(urls)) {
+    const resolvedUrl = resolveAssetUrl(url)
+    if (!resolvedUrl) continue
 
-  for (const candidate of candidates) {
-    if (await preloadImage(candidate)) {
-      return candidate
+    if (await preloadImage(resolvedUrl)) {
+      return resolvedUrl
     }
   }
 
   return ''
 }
 
-const pickGameDetailBackground = async (gameId: string) => {
+const pickGameScopedBackground = async (gameId: string) => {
   try {
     const detail = await gamesService.getGame(gameId)
-    const screenshots = shuffleArray((detail.screenshot_items || []).map((item) => item.path))
-
-    for (const screenshot of screenshots) {
-      const resolvedUrl = resolveAssetUrl(screenshot)
-      if (!resolvedUrl) continue
-
-      const size = await probeImageSize(resolvedUrl)
-      if (isQualifiedBackground(size)) {
-        return resolvedUrl
-      }
+    const screenshotUrl = await pickRandomFromUrls(detail.screenshots.map((item) => item.path))
+    if (screenshotUrl) {
+      return screenshotUrl
     }
 
-    return resolveAssetUrl(detail.banner_image || detail.cover_image) || ''
+    return pickRandomFromUrls([detail.banner_image, detail.cover_image])
   } catch {
     return ''
   }
-}
-
-const pickWikiEditBackground = async (gameId: string) => {
-  try {
-    const detail = await gamesService.getGame(gameId)
-    const screenshots = shuffleArray((detail.screenshot_items || []).map((item) => item.path))
-    for (const screenshot of screenshots) {
-      const resolvedUrl = resolveAssetUrl(screenshot)
-      if (!resolvedUrl) continue
-
-      const size = await probeImageSize(resolvedUrl)
-      if (isQualifiedBackground(size)) {
-        return resolvedUrl
-      }
-    }
-
-    for (const screenshot of screenshots) {
-      const resolvedUrl = resolveAssetUrl(screenshot)
-      if (!resolvedUrl) continue
-
-      if (await preloadImage(resolvedUrl)) {
-        return resolvedUrl
-      }
-    }
-
-    const bannerUrl = resolveAssetUrl(detail.banner_image)
-    if (bannerUrl && (await preloadImage(bannerUrl))) {
-      return bannerUrl
-    }
-
-    const coverUrl = resolveAssetUrl(detail.cover_image)
-    if (coverUrl && (await preloadImage(coverUrl))) {
-      return coverUrl
-    }
-
-    return ''
-  } catch {
-    return ''
-  }
-}
-
-const pickQualifiedScreenshotBackground = async (
-  games: Awaited<ReturnType<typeof gamesService.getGames>>['data'],
-) => {
-  const candidateGames = shuffleArray(games).slice(0, DETAIL_CANDIDATE_LIMIT)
-
-  for (const game of candidateGames) {
-    if (!game.public_id) {
-      continue
-    }
-    let detail
-    try {
-      detail = await gamesService.getGame(game.public_id)
-    } catch {
-      continue
-    }
-
-    const screenshots = shuffleArray((detail.screenshot_items || []).map((item) => item.path))
-    for (const screenshot of screenshots) {
-      const resolvedUrl = resolveAssetUrl(screenshot)
-      if (!resolvedUrl) continue
-
-      const size = await probeImageSize(resolvedUrl)
-      if (isQualifiedBackground(size)) {
-        return resolvedUrl
-      }
-    }
-  }
-
-  return ''
 }
 
 const pickBackgroundFromGames = async () => {
   const response = await gamesService.getGames({
-    page: 1,
-    pageSize: LIST_CANDIDATE_LIMIT,
+    query: {
+      page: 1,
+      limit: LIST_CANDIDATE_LIMIT,
+    },
     sort: {
       field: 'updated_at',
       order: 'desc',
     },
   })
 
-  const fallbackPromise = pickFallbackBackground(response.data)
-  const qualifiedScreenshotUrl = await pickQualifiedScreenshotBackground(response.data)
-  const fallbackUrl = await fallbackPromise
-  return qualifiedScreenshotUrl || fallbackUrl
+  for (const game of shuffleArray(response.data)) {
+    if (!game.public_id) {
+      continue
+    }
+
+    const backgroundUrl = await pickGameScopedBackground(game.public_id)
+    if (backgroundUrl) {
+      return backgroundUrl
+    }
+  }
+
+  return ''
 }
 
 const loadBackground = async () => {
+  if (pendingCenterOverrideUrl.value) {
+    return pendingCenterOverrideUrl.value
+  }
+
   const detailBackground = await gameDetailRouteGuard.runWhenActive(async () => {
     const gameId = getRouteParamString(route, 'publicId')
-    return gameId ? pickGameDetailBackground(gameId) : ''
+    return gameId ? pickGameScopedBackground(gameId) : ''
   })
   if (typeof detailBackground === 'string') {
     return detailBackground
@@ -280,39 +206,18 @@ const loadBackground = async () => {
 
   const wikiBackground = await wikiEditRouteGuard.runWhenActive(async () => {
     const gameId = getRouteParamString(route, 'publicId')
-    if (!gameId) {
-      return ''
-    }
-
-    const gameBackground = await pickWikiEditBackground(gameId)
-    if (gameBackground) {
-      return gameBackground
-    }
-
-    return loadCustomBackground()
+    return gameId ? pickGameScopedBackground(gameId) : ''
   })
   if (typeof wikiBackground === 'string') {
     return wikiBackground
   }
 
-  if (cachedBackgroundUrl) {
-    return cachedBackgroundUrl
+  const customBackgroundUrl = await loadCustomBackground()
+  if (customBackgroundUrl) {
+    return customBackgroundUrl
   }
 
-  if (!inflightBackgroundRequest) {
-    inflightBackgroundRequest = loadCustomBackground()
-      .then((customBackgroundUrl) => customBackgroundUrl || pickBackgroundFromGames())
-      .then((url) => {
-        cachedBackgroundUrl = url
-        return url
-      })
-      .catch(() => '')
-      .finally(() => {
-        inflightBackgroundRequest = null
-      })
-  }
-
-  return inflightBackgroundRequest
+  return pickBackgroundFromGames()
 }
 
 const applyBackground = async () => {
@@ -360,7 +265,7 @@ const applyBackground = async () => {
 }
 
 watch(
-  [() => route.fullPath, isEnabled],
+  [() => route.fullPath, isEnabled, () => pendingCenterOverrideUrl.value, () => ambientBackgroundOverride.value?.key || ''],
   async () => {
     await applyBackground()
   },

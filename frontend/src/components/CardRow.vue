@@ -83,7 +83,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import type { Component } from 'vue'
 import { useRouter } from 'vue-router'
 import type { RouteLocationRaw } from 'vue-router'
-import type { Game } from '@/services/types'
+import type { GameListItem } from '@/services/types'
 import {
   IconRight,
   IconLeft,
@@ -101,7 +101,7 @@ import {
 interface Props {
   title: string
   icon: string
-  items: Game[]
+  items: GameListItem[]
   cardWidth?: string
   showViewAll?: boolean
   viewAllRoute?: RouteLocationRaw

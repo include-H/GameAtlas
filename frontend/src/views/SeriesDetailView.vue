@@ -46,7 +46,7 @@ import gamesService from '@/services/games.service'
 import { seriesService } from '@/services/series.service'
 import GameCard from '@/components/GameCard.vue'
 import { useNamedRouteGuard, watchRouteParamWhenActive } from '@/composables/useNamedRouteGuard'
-import type { Game } from '@/services/types'
+import type { GameListItem } from '@/services/types'
 import { createDetailRouteQuery, resolveReturnRoute } from '@/utils/navigation'
 
 defineOptions({
@@ -59,7 +59,7 @@ const uiStore = useUiStore()
 const { runWhenActive } = useNamedRouteGuard(route, 'series-detail')
 
 const isLoading = ref(false)
-const games = ref<Game[]>([])
+const games = ref<GameListItem[]>([])
 const seriesName = ref('系列')
 
 const handleGoBack = () => {

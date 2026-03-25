@@ -257,7 +257,7 @@ type gameAggregateUpdateRequest struct {
 	CoverImage               *string                       `json:"cover_image"`
 	BannerImage              *string                       `json:"banner_image"`
 	NeedsReview              bool                          `json:"needs_review"`
-	SeriesIDs                []int64                       `json:"series_ids"`
+	SeriesID                 *int64                        `json:"series_id"`
 	PlatformIDs              []int64                       `json:"platform_ids"`
 	DeveloperIDs             []int64                       `json:"developer_ids"`
 	PublisherIDs             []int64                       `json:"publisher_ids"`
@@ -298,7 +298,7 @@ func (h *GamesHandler) UpdateAggregate(c *gin.Context) {
 			CoverImage:           request.CoverImage,
 			BannerImage:          request.BannerImage,
 			NeedsReview:          request.NeedsReview,
-			SeriesIDs:            request.SeriesIDs,
+			SeriesID:             request.SeriesID,
 			PlatformIDs:          request.PlatformIDs,
 			DeveloperIDs:         request.DeveloperIDs,
 			PublisherIDs:         request.PublisherIDs,
@@ -387,6 +387,8 @@ type gameListItemResponse struct {
 	Engine            *string `json:"engine"`
 	CoverImage        *string `json:"cover_image"`
 	BannerImage       *string `json:"banner_image"`
+	WikiContent       *string `json:"wiki_content"`
+	WikiContentHTML   *string `json:"wiki_content_html"`
 	NeedsReview       bool    `json:"needs_review"`
 	Downloads         int64   `json:"downloads"`
 	PrimaryScreenshot *string `json:"primary_screenshot"`
@@ -454,7 +456,7 @@ type gameDetailResponse struct {
 	PreviewVideo    *gameAssetResponse     `json:"preview_video"`
 	PreviewVideos   []gameAssetResponse    `json:"preview_videos"`
 	Screenshots     []gameAssetResponse    `json:"screenshots"`
-	Series          []metadataItemResponse `json:"series"`
+	Series          *metadataItemResponse  `json:"series"`
 	Platforms       []metadataItemResponse `json:"platforms"`
 	Developers      []metadataItemResponse `json:"developers"`
 	Publishers      []metadataItemResponse `json:"publishers"`
@@ -500,6 +502,8 @@ func toGameListItemResponse(game domain.Game) gameListItemResponse {
 		Engine:            game.Engine,
 		CoverImage:        game.CoverImage,
 		BannerImage:       game.BannerImage,
+		WikiContent:       game.WikiContent,
+		WikiContentHTML:   game.WikiContentHTML,
 		NeedsReview:       game.NeedsReview,
 		Downloads:         game.Downloads,
 		PrimaryScreenshot: game.PrimaryScreenshot,
@@ -586,6 +590,17 @@ func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDe
 		})
 	}
 
+	var series *metadataItemResponse
+	if detail.Series != nil {
+		series = &metadataItemResponse{
+			ID:        detail.Series.ID,
+			Name:      detail.Series.Name,
+			Slug:      detail.Series.Slug,
+			SortOrder: detail.Series.SortOrder,
+			CreatedAt: detail.Series.CreatedAt,
+		}
+	}
+
 	return gameDetailResponse{
 		ID:              detail.Game.ID,
 		PublicID:        detail.Game.PublicID,
@@ -604,7 +619,7 @@ func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDe
 		PreviewVideo:    previewVideo,
 		PreviewVideos:   previewVideos,
 		Screenshots:     screenshots,
-		Series:          toMetadataResponses(detail.Series),
+		Series:          series,
 		Platforms:       toMetadataResponses(detail.Platforms),
 		Developers:      toMetadataResponses(detail.Developers),
 		Publishers:      toMetadataResponses(detail.Publishers),

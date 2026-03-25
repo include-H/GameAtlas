@@ -3,7 +3,7 @@ import pendingWorkbenchService, {
   PENDING_WORKBENCH_PAGE_SIZE,
 } from '@/services/pending-workbench.service'
 import reviewIssuesService from '@/services/review-issues.service'
-import type { Game, ReviewIssueOverride } from '@/services/types'
+import type { GameListItem, ReviewIssueOverride } from '@/services/types'
 import {
   evaluatePendingIssues,
   isSeverePendingEvaluation,
@@ -33,8 +33,8 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   }
 
   const isLoading = ref(false)
-  const queueGames = ref<Game[]>([])
-  const activeGame = ref<Game | null>(null)
+  const queueGames = ref<GameListItem[]>([])
+  const activeGame = ref<GameListItem | null>(null)
   const reviewIssueOverrides = ref<ReviewIssueOverride[]>([])
   const gamePublicIDByInternalID = computed<Record<number, string>>(() => {
     return queueGames.value.reduce<Record<number, string>>((acc, game) => {
@@ -82,7 +82,7 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     }, {})
   })
 
-  const getIgnoredDetails = (game: Game): PendingIssueDetailKey[] => {
+  const getIgnoredDetails = (game: GameListItem): PendingIssueDetailKey[] => {
     if (!game.public_id) {
       return []
     }
@@ -99,21 +99,21 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     }, {})
   })
 
-  const getIssueEvaluation = (game: Game): PendingIssueEvaluation => {
+  const getIssueEvaluation = (game: GameListItem): PendingIssueEvaluation => {
     if (!game.public_id) {
       return emptyEvaluation
     }
     return gameIssueEvaluationMap.value[game.public_id] || emptyEvaluation
   }
 
-  const isSevereGame = (game: Game) => {
+  const isSevereGame = (game: GameListItem) => {
     return isSeverePendingEvaluation(getIssueEvaluation(game))
   }
 
-  const getVisibleIssueGroups = (game: Game) => getIssueEvaluation(game).groups
-  const getVisibleIssueDetails = (game: Game) => getIssueEvaluation(game).details
-  const getIgnoredIssueDetails = (game: Game) => getIssueEvaluation(game).ignoredDetails
-  const hasVisibleIssues = (game: Game) => getIssueEvaluation(game).details.length > 0
+  const getVisibleIssueGroups = (game: GameListItem) => getIssueEvaluation(game).groups
+  const getVisibleIssueDetails = (game: GameListItem) => getIssueEvaluation(game).details
+  const getIgnoredIssueDetails = (game: GameListItem) => getIssueEvaluation(game).ignoredDetails
+  const hasVisibleIssues = (game: GameListItem) => getIssueEvaluation(game).details.length > 0
 
   const issueCounts = computed(() => {
     const counts = {} as Record<PendingIssueKey, number>
@@ -156,9 +156,6 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
       const metadata = [
         game.title,
         game.summary || '',
-        ...(game.developers || []).map((item) => item.name),
-        ...(game.publishers || []).map((item) => item.name),
-        ...(game.platforms || []),
       ]
 
       return metadata.join(' ').toLowerCase().includes(keyword)
@@ -229,7 +226,7 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     await loadWorkbenchGames(currentPage.value)
   }
 
-  const ignoreIssue = async (game: Game, issueKey: PendingIssueDetailKey) => {
+  const ignoreIssue = async (game: GameListItem, issueKey: PendingIssueDetailKey) => {
     if (!game.public_id) return
     try {
       const override = await reviewIssuesService.ignore(game.public_id, issueKey)
@@ -246,7 +243,7 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     }
   }
 
-  const restoreIssue = async (game: Game, issueKey: PendingIssueDetailKey) => {
+  const restoreIssue = async (game: GameListItem, issueKey: PendingIssueDetailKey) => {
     if (!game.public_id) return
     try {
       await reviewIssuesService.restore(game.public_id, issueKey)

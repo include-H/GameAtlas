@@ -184,12 +184,15 @@
 
         <div v-if="activeGame" class="detail-panel">
           <div class="detail-panel__hero">
+            <div
+              class="detail-panel__hero-backdrop"
+              :style="{ backgroundImage: detailHeroSrc ? `url(${detailHeroSrc})` : 'none' }"
+            />
             <img
-              :src="getDetailHeroImage(activeGame)"
+              :src="detailHeroSrc"
               :alt="activeGame.title"
               class="detail-panel__hero-image"
               :class="{ 'detail-panel__hero-image--contain': detailHeroFit === 'contain' }"
-              @load="updateDetailHeroFit"
             />
           </div>
 
@@ -310,7 +313,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import gamesService from '@/services/games.service'
@@ -339,6 +342,8 @@ const uiStore = useUiStore()
 const editingGame = ref<GameDetail | null>(null)
 const showEditModal = ref(false)
 const detailHeroFit = ref<'cover' | 'contain'>('cover')
+const detailHeroSrc = ref('')
+const detailHeroRequestId = ref(0)
 
 const {
   activeGame,
@@ -381,10 +386,74 @@ const pendingIssueDetailDefinitionMap = pendingIssueDetailDefinitions.reduce<
   return acc
 }, {} as Record<PendingIssueDetailKey, PendingIssueDetailDefinition>)
 
+const getPendingCenterVisualImage = (game: GameListItem) => {
+  return game.banner_image || game.primary_screenshot || game.cover_image || placeholderImage
+}
+
+const syncAmbientBackground = () => {
+  if (!activeGame.value?.public_id) {
+    uiStore.clearAmbientBackgroundOverride()
+    return
+  }
+
+  const imageUrl = getPendingCenterVisualImage(activeGame.value)
+  if (!imageUrl || imageUrl === placeholderImage) {
+    uiStore.clearAmbientBackgroundOverride()
+    return
+  }
+
+  uiStore.setAmbientBackgroundOverride({
+    key: activeGame.value.public_id,
+    url: imageUrl,
+  })
+}
+
+const preloadDetailHero = (src: string) => {
+  return new Promise<{ width: number; height: number } | null>((resolve) => {
+    if (!src || src === placeholderImage) {
+      resolve(null)
+      return
+    }
+
+    const image = new Image()
+    image.onload = () => {
+      resolve({
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      })
+    }
+    image.onerror = () => resolve(null)
+    image.src = src
+  })
+}
+
+const updateDetailHero = async () => {
+  const requestId = detailHeroRequestId.value + 1
+  detailHeroRequestId.value = requestId
+
+  const nextSrc = activeGame.value ? getPendingCenterVisualImage(activeGame.value) : placeholderImage
+
+  if (!nextSrc || nextSrc === placeholderImage) {
+    detailHeroFit.value = 'contain'
+    detailHeroSrc.value = placeholderImage
+    return
+  }
+
+  const meta = await preloadDetailHero(nextSrc)
+  if (requestId !== detailHeroRequestId.value) {
+    return
+  }
+
+  const aspectRatio = meta?.width && meta?.height ? meta.width / meta.height : 1
+  detailHeroFit.value = aspectRatio >= 1.5 ? 'cover' : 'contain'
+  detailHeroSrc.value = nextSrc
+}
+
 watch(
   activeGame,
   () => {
-    detailHeroFit.value = activeGame.value?.banner_image ? 'cover' : 'contain'
+    syncAmbientBackground()
+    void updateDetailHero()
   },
   { immediate: true },
 )
@@ -409,21 +478,6 @@ const activeGameDetails = computed(() => {
 
 const getDisplayImage = (game: GameListItem) => {
   return game.cover_image || game.banner_image || game.primary_screenshot || placeholderImage
-}
-
-const getDetailHeroImage = (game: GameListItem) => {
-  return game.banner_image || game.cover_image || game.primary_screenshot || placeholderImage
-}
-
-const updateDetailHeroFit = (event: Event) => {
-  const target = event.target as HTMLImageElement | null
-  if (!target?.naturalWidth || !target.naturalHeight) {
-    detailHeroFit.value = 'cover'
-    return
-  }
-
-  const aspectRatio = target.naturalWidth / target.naturalHeight
-  detailHeroFit.value = aspectRatio >= 1.5 ? 'cover' : 'contain'
 }
 
 const formatDate = (value?: string | null) => {
@@ -480,6 +534,18 @@ const handleEditSuccess = async () => {
 
 onMounted(async () => {
   await loadWorkbenchGames()
+})
+
+onActivated(() => {
+  syncAmbientBackground()
+})
+
+onDeactivated(() => {
+  uiStore.clearAmbientBackgroundOverride()
+})
+
+onBeforeUnmount(() => {
+  uiStore.clearAmbientBackgroundOverride()
 })
 </script>
 
@@ -708,6 +774,7 @@ onMounted(async () => {
   width: 100%;
   aspect-ratio: 16 / 9;
   max-height: 300px;
+  position: relative;
   border-radius: 16px;
   overflow: hidden;
   background: var(--color-fill-2);
@@ -716,11 +783,33 @@ onMounted(async () => {
   justify-content: center;
 }
 
+.detail-panel__hero-backdrop {
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  filter: blur(26px) saturate(1.02) brightness(0.72);
+  transform: scale(1.08);
+  transform-origin: center;
+}
+
+.detail-panel__hero-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(10, 14, 24, 0.2), rgba(10, 14, 24, 0.46)),
+    linear-gradient(90deg, rgba(10, 14, 24, 0.32), transparent 24%, transparent 76%, rgba(10, 14, 24, 0.32));
+}
+
 .detail-panel__hero-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  position: relative;
+  z-index: 1;
 }
 
 .detail-panel__hero-image--contain {

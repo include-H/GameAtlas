@@ -49,7 +49,7 @@
             <screenshot-carousel
               :preview-videos="game.preview_videos?.map((item) => item.path) || []"
               :video-poster="game.banner_image || game.cover_image || null"
-              :screenshots="(game.screenshot_items || []).map((item) => item.path)"
+              :screenshots="game.screenshots.map((item) => item.path)"
               :alt="game.title"
               :height="carouselHeight"
             />
@@ -83,9 +83,9 @@
 
           <div class="sidebar-card sidebar-card--meta">
             <div class="sidebar-info">
-              <div v-if="game.series && game.series.length > 0" class="sidebar-info__item">
+              <div v-if="game.series" class="sidebar-info__item">
                 <span class="sidebar-info__label">系列</span>
-                <span class="sidebar-info__value">{{ game.series[0].name }}</span>
+                <span class="sidebar-info__value">{{ game.series.name }}</span>
               </div>
               <div v-if="game.developers && game.developers.length > 0" class="sidebar-info__item">
                 <span class="sidebar-info__label">开发商</span>
@@ -113,15 +113,11 @@
                 <span class="sidebar-info__label">平台</span>
                 <div class="sidebar-info__value">
                   <a-space wrap>
-                    <a-tag v-for="platform in game.platforms" :key="platform">
-                      {{ platform }}
+                    <a-tag v-for="platform in game.platforms" :key="platform.id">
+                      {{ platform.name }}
                     </a-tag>
                   </a-space>
                 </div>
-              </div>
-              <div v-else-if="game.platform" class="sidebar-info__item">
-                <span class="sidebar-info__label">平台</span>
-                <span class="sidebar-info__value">{{ game.platform }}</span>
               </div>
               <div
                 v-for="group in game.tag_groups || []"
@@ -267,7 +263,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
-import wikiService, { type WikiContent } from '@/services/wiki.service'
+import wikiService, { type WikiDocumentResponse } from '@/services/wiki.service'
 import downloadService from '@/services/download.service'
 import type { GameVersion } from '@/services/types'
 import { getHttpStatus } from '@/utils/http-error'
@@ -294,7 +290,7 @@ const { isAdmin } = storeToRefs(authStore)
 
 const game = computed(() => gamesStore.currentGame)
 const versions = computed(() => gamesStore.currentVersions)
-const wiki = ref<WikiContent | null>(null)
+const wiki = ref<WikiDocumentResponse | null>(null)
 const showEditModal = ref(false)
 const topSectionRef = ref<HTMLElement | null>(null)
 const topSectionHeight = ref<number | undefined>(undefined)

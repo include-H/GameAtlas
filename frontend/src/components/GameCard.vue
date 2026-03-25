@@ -43,8 +43,8 @@
 
       <!-- Row 2: Developer and Actions -->
       <div class="game-card__row game-card__row--metadata">
-        <span class="game-card__developer" :title="game.developers && game.developers.length > 0 ? game.developers[0].name : ''">
-          {{ game.developers && game.developers.length > 0 ? game.developers[0].name : '' }}
+        <span class="game-card__developer" :title="metadataText">
+          {{ metadataText }}
         </span>
         
         <!-- Card Actions moved inside metadata row -->
@@ -89,7 +89,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import type { Game } from '@/services/types'
+import type { GameListItem, TimelineGame } from '@/services/types'
 import { useAuthStore } from '@/stores/auth'
 import {
   IconHeartFill,
@@ -99,7 +99,7 @@ import {
 } from '@arco-design/web-vue/es/icon'
 
 interface Props {
-  game: Game
+  game: GameListItem | TimelineGame
   isList?: boolean
   coverOnly?: boolean
 }
@@ -135,13 +135,21 @@ const handleDelete = () => {
 
 const placeholderImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23424242" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/%3E%3C/svg%3E'
 
+const metadataText = computed(() => {
+  return ''
+})
+
+const bannerImage = computed(() => {
+  return 'banner_image' in props.game ? props.game.banner_image : null
+})
+
 const displayImage = computed(() => {
   if (props.isList) {
     // List mode prefers horizontal banner
-    return props.game.banner_image || props.game.cover_image || placeholderImage
+    return bannerImage.value || props.game.cover_image || placeholderImage
   }
   // Grid mode prefers vertical cover
-  return props.game.cover_image || props.game.banner_image || placeholderImage
+  return props.game.cover_image || bannerImage.value || placeholderImage
 })
 </script>
 

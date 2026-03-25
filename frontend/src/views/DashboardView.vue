@@ -153,7 +153,7 @@ import StatCard from '@/components/StatCard.vue'
 import CardRow from '@/components/CardRow.vue'
 import GameCard from '@/components/GameCard.vue'
 import GameCarousel from '@/components/GameCarousel.vue'
-import type { Game } from '@/services/types'
+import type { GameListItem } from '@/services/types'
 
 defineOptions({
   name: 'DashboardView',
@@ -200,7 +200,7 @@ const carouselGames = computed(() => {
   const seen = new Set<number>()
 
   return [...recentAdditions.value, ...mostPlayed.value]
-    .filter((game): game is Game => {
+    .filter((game): game is GameListItem => {
       if (!game || seen.has(game.id)) {
         return false
       }
@@ -241,10 +241,10 @@ const loadDashboardData = async () => {
     const stats = await gamesStore.fetchStats()
     try {
       const pendingQueueResponse = await gamesService.getGames({
-        page: 1,
-        pageSize: 1,
-        filter: {
-          pending_queue: true,
+        query: {
+          page: 1,
+          limit: 1,
+          pending: true,
         },
       })
       pendingReviewGameCount.value = pendingQueueResponse.pagination.total || 0

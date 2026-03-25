@@ -28,8 +28,8 @@ interface SteamImportFormBridge {
   title: string
   title_alt: string
   release_date: string | undefined
-  developers: Array<string | number>
-  publishers: Array<string | number>
+  developer_ids: Array<string | number>
+  publisher_ids: Array<string | number>
   cover_image: string
   banner_image: string
   screenshots: EditableScreenshotLike[]
@@ -125,18 +125,18 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       options.releaseDate.value = new Date(`${details.releaseDate}T00:00:00`)
     }
     if (details.developers && details.developers.length > 0) {
-      const merged = new Set<string | number>(options.form.value.developers)
+      const merged = new Set<string | number>(options.form.value.developer_ids)
       for (const name of details.developers) {
         if (name.trim()) merged.add(name.trim())
       }
-      options.form.value.developers = Array.from(merged)
+      options.form.value.developer_ids = Array.from(merged)
     }
     if (details.publishers && details.publishers.length > 0) {
-      const merged = new Set<string | number>(options.form.value.publishers)
+      const merged = new Set<string | number>(options.form.value.publisher_ids)
       for (const name of details.publishers) {
         if (name.trim()) merged.add(name.trim())
       }
-      options.form.value.publishers = Array.from(merged)
+      options.form.value.publisher_ids = Array.from(merged)
     }
   }
 

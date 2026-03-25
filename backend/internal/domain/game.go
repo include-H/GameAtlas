@@ -170,7 +170,7 @@ type GameWriteInput struct {
 	CoverImage           *string `json:"cover_image"`
 	BannerImage          *string `json:"banner_image"`
 	NeedsReview          bool    `json:"needs_review"`
-	SeriesIDs            []int64 `json:"series_ids"`
+	SeriesID             *int64  `json:"series_id"`
 	PlatformIDs          []int64 `json:"platform_ids"`
 	DeveloperIDs         []int64 `json:"developer_ids"`
 	PublisherIDs         []int64 `json:"publisher_ids"`
