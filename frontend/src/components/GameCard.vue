@@ -2,7 +2,7 @@
   <div
     :class="['game-card hover-lift app-glass-surface app-glass-surface--interactive', { 'game-card--list': isList, 'game-card--cover-only': coverOnly }]"
     :title="game.title"
-    @click="$emit('view', String(game.id))"
+    @click="handleView"
   >
     <!-- Cover Image -->
     <div class="game-card__image-wrapper">
@@ -53,7 +53,7 @@
             type="text"
             size="small"
             :class="{ 'is-favorite': game.isFavorite }"
-            @click.stop="$emit('toggle-favorite', String(game.id))"
+            @click.stop="handleToggleFavorite"
           >
             <template #icon>
               <icon-heart v-if="!game.isFavorite" />
@@ -71,7 +71,7 @@
               </template>
             </a-button>
             <template #content>
-              <a-doption @click="$emit('delete', String(game.id))" style="color: rgb(var(--danger-6));">
+              <a-doption @click="handleDelete" style="color: rgb(var(--danger-6));">
                 <template #icon>
                   <icon-delete />
                 </template>
@@ -112,11 +112,26 @@ const props = withDefaults(defineProps<Props>(), {
 const authStore = useAuthStore()
 const { isAdmin } = storeToRefs(authStore)
 
-defineEmits<{
+const emit = defineEmits<{
   view: [id: string]
   'toggle-favorite': [id: string]
   delete: [id: string]
 }>()
+
+const handleView = () => {
+  if (!props.game.public_id) return
+  emit('view', props.game.public_id)
+}
+
+const handleToggleFavorite = () => {
+  if (!props.game.public_id) return
+  emit('toggle-favorite', props.game.public_id)
+}
+
+const handleDelete = () => {
+  if (!props.game.public_id) return
+  emit('delete', props.game.public_id)
+}
 
 const placeholderImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23424242" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/%3E%3C/svg%3E'
 

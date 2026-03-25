@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -20,6 +21,35 @@ func parseIDParam(c *gin.Context, name string) (int64, bool) {
 		return 0, false
 	}
 	return value, true
+}
+
+func parseGamePublicIDParam(c *gin.Context, name string, resolver func(publicID string) (int64, error)) (int64, bool) {
+	publicID := strings.TrimSpace(c.Param(name))
+	if publicID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "invalid public_id parameter",
+		})
+		return 0, false
+	}
+
+	id, err := resolver(publicID)
+	if err == nil {
+		return id, true
+	}
+	if errors.Is(err, services.ErrNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   "resource not found",
+		})
+		return 0, false
+	}
+
+	c.JSON(http.StatusBadRequest, gin.H{
+		"success": false,
+		"error":   "invalid public_id parameter",
+	})
+	return 0, false
 }
 
 func writeServiceError(c *gin.Context, err error, validationMessage string) {

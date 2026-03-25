@@ -80,7 +80,7 @@
         <game-card
           :game="item"
           @view="viewGame"
-          @toggle-favorite="toggleFavorite(item.id)"
+          @toggle-favorite="toggleFavorite"
         />
       </template>
     </card-row>
@@ -99,7 +99,7 @@
         <game-card
           :game="item"
           @view="viewGame"
-          @toggle-favorite="toggleFavorite(item.id)"
+          @toggle-favorite="toggleFavorite"
         />
       </template>
     </card-row>
@@ -215,17 +215,19 @@ const lastLoadedAt = ref(0)
 
 const pendingReviews = computed(() => pendingReviewGameCount.value)
 
-const viewGame = (id: string | number) => {
+const viewGame = (publicId: string) => {
+  if (!publicId) return
   router.push({
     name: 'game-detail',
-    params: { id: String(id) },
+    params: { publicId },
     query: createDetailRouteQuery(route),
   })
 }
 
-const toggleFavorite = async (id: string | number) => {
+const toggleFavorite = async (gameRef: string) => {
+  if (!gameRef) return
   try {
-    await gamesStore.toggleFavorite(String(id))
+    await gamesStore.toggleFavorite(gameRef)
     uiStore.addAlert('收藏已更新', 'success')
   } catch {
     uiStore.addAlert('更新收藏失败', 'error')

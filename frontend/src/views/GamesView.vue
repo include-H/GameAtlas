@@ -206,8 +206,8 @@
           <game-card
             :game="game"
             @view="viewGame"
-            @toggle-favorite="toggleFavorite(game.id)"
-            @delete="handleDelete(game.id, game.title)"
+            @toggle-favorite="toggleFavorite"
+            @delete="handleDelete($event, game.title)"
           />
         </div>
       </div>
@@ -223,8 +223,8 @@
             :game="game"
             is-list
             @view="viewGame"
-            @toggle-favorite="toggleFavorite(game.id)"
-            @delete="handleDelete(game.id, game.title)"
+            @toggle-favorite="toggleFavorite"
+            @delete="handleDelete($event, game.title)"
           />
         </a-col>
       </a-row>
@@ -445,10 +445,11 @@ watch(() => route.query, () => {
   loadGames()
 })
 
-const viewGame = (id: string | number) => {
+const viewGame = (publicId: string) => {
+  if (!publicId) return
   router.push({
     name: 'game-detail',
-    params: { id: String(id) },
+    params: { publicId },
     query: createDetailRouteQuery(route),
   })
 }
@@ -474,16 +475,18 @@ const handleAddGameSubmit = async (data: { title: string; visibility: 'public' |
   }
 }
 
-const toggleFavorite = async (id: number) => {
+const toggleFavorite = async (gameRef: string) => {
+  if (!gameRef) return
   try {
-    await gamesStore.toggleFavorite(id.toString())
+    await gamesStore.toggleFavorite(gameRef)
     uiStore.addAlert('收藏已更新', 'success')
   } catch {
     uiStore.addAlert('更新收藏失败', 'error')
   }
 }
 
-const handleDelete = (id: number, title: string) => {
+const handleDelete = (gameRef: string, title: string) => {
+  if (!gameRef) return
   if (!isAdmin.value) return
   Modal.confirm({
     title: '确认删除',
@@ -493,7 +496,7 @@ const handleDelete = (id: number, title: string) => {
     okButtonProps: { status: 'danger' },
     onOk: async () => {
       try {
-        await gamesService.deleteGame(id.toString())
+        await gamesService.deleteGame(gameRef)
         Message.success(`游戏 "${title}" 已删除`)
         await loadGames()
       } catch (error) {

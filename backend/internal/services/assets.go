@@ -38,7 +38,8 @@ func NewAssetsService(cfg config.Config, gamesRepo *repositories.GamesRepository
 }
 
 func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart.FileHeader, sortOrder int) (*UploadResult, error) {
-	if _, err := s.gamesRepo.GetByID(gameID); err != nil {
+	game, err := s.gamesRepo.GetByID(gameID)
+	if err != nil {
 		return nil, normalizeRepoError(err)
 	}
 
@@ -49,8 +50,8 @@ func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart
 	defer src.Close()
 
 	contentType := header.Header.Get("Content-Type")
-	assetUID, assetName := allocateAssetIdentity(gameID, assetType)
-	path, err := s.store.SaveUploadedAsset(gameID, assetType, assetName, src, contentType)
+	assetUID, assetName := allocateAssetIdentity(assetType)
+	path, err := s.store.SaveUploadedAsset(game.PublicID, assetType, assetName, src, contentType)
 	if err != nil {
 		return nil, normalizeAssetError(err)
 	}
@@ -172,11 +173,12 @@ func (s *AssetsService) SetPrimaryVideo(input domain.PrimaryVideoUpdateInput) er
 }
 
 func (s *AssetsService) ApplyRemoteAsset(gameID int64, assetType string, remoteURL string, sortOrder int) (string, error) {
-	if _, err := s.gamesRepo.GetByID(gameID); err != nil {
+	game, err := s.gamesRepo.GetByID(gameID)
+	if err != nil {
 		return "", normalizeRepoError(err)
 	}
-	assetUID, assetName := allocateAssetIdentity(gameID, assetType)
-	path, err := s.store.DownloadRemoteAsset(gameID, assetType, assetName, remoteURL)
+	assetUID, assetName := allocateAssetIdentity(assetType)
+	path, err := s.store.DownloadRemoteAsset(game.PublicID, assetType, assetName, remoteURL)
 	if err != nil {
 		return "", normalizeAssetError(err)
 	}
@@ -193,11 +195,12 @@ func (s *AssetsService) ApplyRemoteAsset(gameID int64, assetType string, remoteU
 }
 
 func (s *AssetsService) ApplyRawAsset(gameID int64, assetType string, content []byte, contentType string, sortOrder int) (string, error) {
-	if _, err := s.gamesRepo.GetByID(gameID); err != nil {
+	game, err := s.gamesRepo.GetByID(gameID)
+	if err != nil {
 		return "", normalizeRepoError(err)
 	}
-	assetUID, assetName := allocateAssetIdentity(gameID, assetType)
-	path, err := s.store.SaveUploadedAsset(gameID, assetType, assetName, bytes.NewReader(content), contentType)
+	assetUID, assetName := allocateAssetIdentity(assetType)
+	path, err := s.store.SaveUploadedAsset(game.PublicID, assetType, assetName, bytes.NewReader(content), contentType)
 	if err != nil {
 		return "", normalizeAssetError(err)
 	}
@@ -252,35 +255,55 @@ func (s *AssetsService) assignFallbackPrimaryVideo(gameID int64) error {
 	return normalizeRepoError(s.assetsRepo.UpdateGamePreviewVideoAssetUID(gameID, &videos[0].AssetUID))
 }
 
-func newAssetUID(gameID int64) string {
-	buf := make([]byte, 3)
+func newAssetUID() string {
+	buf := make([]byte, 16)
 	if _, err := rand.Read(buf); err != nil {
-		return fmt.Sprintf("%d-%06x", gameID, time.Now().UnixNano()&0xffffff)
+		now := time.Now().UnixNano()
+		return fmt.Sprintf(
+			"a%07x-%04x-4%03x-a%03x-%012x",
+			now&0x0fffffff,
+			now&0xffff,
+			now&0x0fff,
+			now&0x0fff,
+			now&0x0fffffffffff,
+		)
 	}
-	return fmt.Sprintf("%d-%s", gameID, hex.EncodeToString(buf))
+
+	// UUIDv4 bits.
+	buf[6] = (buf[6] & 0x0f) | 0x40
+	buf[8] = (buf[8] & 0x3f) | 0x80
+	hexText := hex.EncodeToString(buf)
+	return fmt.Sprintf(
+		"%s-%s-%s-%s-%s",
+		hexText[0:8],
+		hexText[8:12],
+		hexText[12:16],
+		hexText[16:20],
+		hexText[20:32],
+	)
 }
 
-func newAssetToken(gameID int64, assetType string) string {
+func newAssetToken(assetType string) string {
 	switch assetType {
 	case "cover", "banner":
-		return fmt.Sprintf("%s-%s", assetType, newAssetUID(gameID))
+		return newAssetUID()
 	default:
-		return newAssetUID(gameID)
+		return newAssetUID()
 	}
 }
 
-func allocateAssetIdentity(gameID int64, assetType string) (string, string) {
+func allocateAssetIdentity(assetType string) (string, string) {
 	switch assetType {
 	case "screenshot":
-		uid := newAssetUID(gameID)
+		uid := newAssetUID()
 		return uid, uid
 	case "video":
-		uid := newAssetUID(gameID)
+		uid := newAssetUID()
 		return uid, uid
 	case "cover", "banner":
-		return "", newAssetToken(gameID, assetType)
+		return "", newAssetToken(assetType)
 	default:
-		return "", newAssetToken(gameID, assetType)
+		return "", newAssetToken(assetType)
 	}
 }
 
@@ -307,6 +330,8 @@ func (s *AssetsService) ReorderVideos(input domain.VideoOrderUpdateInput) error 
 func normalizeAssetError(err error) error {
 	switch {
 	case errors.Is(err, files.ErrInvalidImageType):
+		return ErrValidation
+	case errors.Is(err, files.ErrInvalidAssetName):
 		return ErrValidation
 	case errors.Is(err, files.ErrInvalidRemoteURL), errors.Is(err, files.ErrBlockedRemoteURL):
 		return ErrValidation

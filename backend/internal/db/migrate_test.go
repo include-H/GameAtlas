@@ -30,6 +30,7 @@ func TestRunMigrationsOnFreshDatabaseAppliesAllEmbeddedFiles(t *testing.T) {
 	assertTableExists(t, db, "game_assets")
 	assertTableExists(t, db, "tag_groups")
 	assertIndexExists(t, db, "idx_games_release_date_id")
+	assertIndexExists(t, db, "idx_games_public_id")
 
 	var groupCount int
 	if err := db.Get(&groupCount, "SELECT COUNT(*) FROM tag_groups"); err != nil {

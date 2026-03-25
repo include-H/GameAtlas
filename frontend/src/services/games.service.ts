@@ -79,6 +79,7 @@ interface GameStatsApiResponse {
 
 interface TimelineGameApiItem {
   id: number
+  public_id: string
   title: string
   release_date: string | null
   cover_image: string | null
@@ -204,6 +205,7 @@ function getLatestGameFileTimestamp(files: GameFileReleaseSource[]): number {
 function mapTimelineItem(item: TimelineGameApiItem, favoriteIds?: Set<string>): Game {
   return applyFavorite({
     id: item.id,
+    public_id: item.public_id,
     title: item.title,
     release_date: item.release_date,
     cover_image: item.cover_image,
@@ -254,7 +256,7 @@ const gamesService = {
 
     if (params?.filter?.favorite) {
       const favoriteIds = new Set(readFavorites())
-      games = games.filter((game) => favoriteIds.has(String(game.id)))
+      games = games.filter((game) => Boolean(game.public_id) && favoriteIds.has(String(game.public_id)))
     }
 
     return {

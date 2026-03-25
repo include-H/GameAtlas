@@ -33,6 +33,14 @@ func NewWikiService(gamesRepo *repositories.GamesRepository, wikiRepo *repositor
 	}
 }
 
+func (s *WikiService) ResolveGameID(publicID string) (int64, error) {
+	id, err := s.gamesRepo.ResolveIDByPublicID(publicID)
+	if err != nil {
+		return 0, normalizeRepoError(err)
+	}
+	return id, nil
+}
+
 func (s *WikiService) Get(gameID int64, includeAll bool) (*WikiDocument, error) {
 	game, err := s.gamesRepo.GetByID(gameID)
 	if err != nil {

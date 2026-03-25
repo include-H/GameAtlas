@@ -335,10 +335,10 @@ const shouldSpanMetadataRow = (items?: { length: number } | null) => {
 }
 
 const handleDownloadVersion = async (version: GameVersion) => {
-  if (!game.value) return
+  if (!game.value?.public_id) return
 
   try {
-    await downloadService.startDownload(String(game.value.id), version.id)
+    await downloadService.startDownload(game.value.public_id, version.id)
     uiStore.addAlert(`已开始下载 ${version.version}`, 'success')
   } catch {
     uiStore.addAlert('下载启动失败', 'error')
@@ -346,10 +346,10 @@ const handleDownloadVersion = async (version: GameVersion) => {
 }
 
 const handleDownloadLaunchScript = (version: GameVersion) => {
-  if (!game.value) return
+  if (!game.value?.public_id) return
 
   try {
-    downloadService.downloadLaunchScript(String(game.value.id), version.id)
+    downloadService.downloadLaunchScript(game.value.public_id, version.id)
     uiStore.addAlert(`已为 ${version.version} 生成启动脚本`, 'success')
   } catch {
     uiStore.addAlert('开始游玩失败', 'error')
@@ -358,10 +358,10 @@ const handleDownloadLaunchScript = (version: GameVersion) => {
 
 const handleEditSuccess = async () => {
   // Reload game data after edit
-  if (game.value) {
+  if (game.value?.public_id) {
     await Promise.all([
-      gamesStore.fetchGame(String(game.value.id)),
-      gamesStore.fetchGameVersions(String(game.value.id)),
+      gamesStore.fetchGame(game.value.public_id),
+      gamesStore.fetchGameVersions(game.value.public_id),
     ])
   }
 }
@@ -371,18 +371,18 @@ const handleGoBack = () => {
 }
 
 const openWikiEditor = () => {
-  if (!game.value) return
+  if (!game.value?.public_id) return
   router.push({
     name: 'wiki-edit',
-    params: { gameId: String(game.value.id) },
+    params: { publicId: game.value.public_id },
     query: createDetailRouteQuery(route),
   })
 }
 
 const handleToggleFavorite = async () => {
-  if (!game.value) return
+  if (!game.value?.public_id) return
   try {
-    await gamesStore.toggleFavorite(String(game.value.id))
+    await gamesStore.toggleFavorite(game.value.public_id)
     uiStore.addAlert('收藏已更新', 'success')
   } catch {
     uiStore.addAlert('更新收藏失败', 'error')
@@ -430,7 +430,7 @@ const loadGameDetail = async (gameId: string) => {
 watchRouteParamWhenActive(
   route,
   'game-detail',
-  'id',
+  'publicId',
   async (gameId) => {
     showEditModal.value = false
     await loadGameDetail(gameId)

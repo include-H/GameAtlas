@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -22,7 +21,7 @@ func (h *ReviewIssueOverrideHandler) List(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
 	}
-	gameIDs, err := parseGameIDsQuery(c.Query("game_ids"))
+	gameIDs, err := parseGamePublicIDsQuery(c.Query("game_ids"), h.service.ResolveGameID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -47,7 +46,7 @@ func (h *ReviewIssueOverrideHandler) Ignore(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
 	}
-	gameID, ok := parseIDParam(c, "id")
+	gameID, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}
@@ -82,7 +81,7 @@ func (h *ReviewIssueOverrideHandler) Delete(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
 	}
-	gameID, ok := parseIDParam(c, "id")
+	gameID, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}
@@ -100,7 +99,7 @@ func (h *ReviewIssueOverrideHandler) Delete(c *gin.Context) {
 	})
 }
 
-func parseGameIDsQuery(raw string) ([]int64, error) {
+func parseGamePublicIDsQuery(raw string, resolver func(publicID string) (int64, error)) ([]int64, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return nil, nil
@@ -109,11 +108,11 @@ func parseGameIDsQuery(raw string) ([]int64, error) {
 	parts := strings.Split(raw, ",")
 	items := make([]int64, 0, len(parts))
 	for _, part := range parts {
-		value := strings.TrimSpace(part)
-		if value == "" {
+		publicID := strings.TrimSpace(part)
+		if publicID == "" {
 			continue
 		}
-		id, err := strconv.ParseInt(value, 10, 64)
+		id, err := resolver(publicID)
 		if err != nil || id <= 0 {
 			return nil, err
 		}

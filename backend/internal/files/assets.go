@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -28,8 +29,11 @@ var allowedVideoContentTypes = map[string]string{
 }
 
 var ErrInvalidImageType = errors.New("invalid image type")
+var ErrInvalidAssetName = errors.New("invalid asset name")
 var ErrInvalidRemoteURL = errors.New("invalid remote image url")
 var ErrBlockedRemoteURL = errors.New("blocked remote image url")
+
+var uuidAssetNamePattern = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$`)
 
 type AssetStore struct {
 	baseDir string
@@ -57,7 +61,7 @@ func NewAssetStore(baseDir string, proxyURL string, timeout time.Duration) *Asse
 }
 
 func (s *AssetStore) SaveUploadedAsset(
-	gameID int64,
+	gamePublicID string,
 	assetType string,
 	assetName string,
 	file io.Reader,
@@ -67,8 +71,11 @@ func (s *AssetStore) SaveUploadedAsset(
 	if err != nil {
 		return "", err
 	}
+	if !uuidAssetNamePattern.MatchString(strings.ToLower(strings.TrimSpace(assetName))) {
+		return "", ErrInvalidAssetName
+	}
 
-	dir, filename := assetTarget(gameID, assetType, assetName, extension)
+	dir, filename := assetTarget(gamePublicID, assetName, extension)
 	targetDir := filepath.Join(s.baseDir, dir)
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return "", fmt.Errorf("create asset directory: %w", err)
@@ -89,7 +96,7 @@ func (s *AssetStore) SaveUploadedAsset(
 }
 
 func (s *AssetStore) DownloadRemoteAsset(
-	gameID int64,
+	gamePublicID string,
 	assetType string,
 	assetName string,
 	remoteURL string,
@@ -121,7 +128,7 @@ func (s *AssetStore) DownloadRemoteAsset(
 		contentType = contentType[:idx]
 	}
 
-	return s.SaveUploadedAsset(gameID, assetType, assetName, resp.Body, contentType)
+	return s.SaveUploadedAsset(gamePublicID, assetType, assetName, resp.Body, contentType)
 }
 
 func (s *AssetStore) DeleteAsset(assetPath string) error {
@@ -162,18 +169,12 @@ func validateAssetContentType(assetType string, contentType string) (string, err
 	return "", ErrInvalidImageType
 }
 
-func assetTarget(gameID int64, assetType string, assetName string, extension string) (string, string) {
-	dir := fmt.Sprintf("%d", gameID)
-	if strings.TrimSpace(assetName) == "" {
-		switch assetType {
-		case "cover":
-			assetName = "cover"
-		case "banner":
-			assetName = "banner"
-		default:
-			assetName = "asset"
-		}
+func assetTarget(gamePublicID string, assetName string, extension string) (string, string) {
+	dir := strings.ToLower(strings.TrimSpace(gamePublicID))
+	if dir == "" {
+		dir = "unknown-game"
 	}
+	assetName = strings.ToLower(strings.TrimSpace(assetName))
 	return dir, assetName + extension
 }
 

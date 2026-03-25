@@ -37,7 +37,7 @@ export const timelineRoute = {
  * Game detail route
  */
 export const gameDetailRoute = {
-  path: '/games/:id',
+  path: '/games/:publicId',
   name: 'game-detail',
   component: () => import('@/views/GameDetailView.vue'),
   meta: {
@@ -71,7 +71,7 @@ export const pendingCenterRoute = {
  * Wiki edit route
  */
 export const wikiEditRoute = {
-  path: '/wiki/:gameId/edit',
+  path: '/wiki/:publicId/edit',
   name: 'wiki-edit',
   component: () => import('@/views/WikiEditView.vue'),
   meta: {

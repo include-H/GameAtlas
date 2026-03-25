@@ -34,6 +34,14 @@ func NewReviewIssueOverrideService(
 	}
 }
 
+func (s *ReviewIssueOverrideService) ResolveGameID(publicID string) (int64, error) {
+	id, err := s.gamesRepo.ResolveIDByPublicID(publicID)
+	if err != nil {
+		return 0, normalizeRepoError(err)
+	}
+	return id, nil
+}
+
 func (s *ReviewIssueOverrideService) List(gameIDs []int64) ([]domain.ReviewIssueOverride, error) {
 	return s.overridesRepo.List(gameIDs)
 }

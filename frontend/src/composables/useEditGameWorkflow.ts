@@ -312,7 +312,10 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
           return item.asset_uid
         })
         .filter((assetUid): assetUid is string => Boolean(assetUid))
-      const aggregateResult = await gamesService.updateGameAggregate(String(game.id), {
+      if (!game.public_id) {
+        throw new Error('missing game public_id')
+      }
+      const aggregateResult = await gamesService.updateGameAggregate(game.public_id, {
         game: createUpdatePayload({
           form: options.form.value,
           platformIds,

@@ -33,19 +33,19 @@ export const useGamesStore = defineStore('games', () => {
     }
 
     const sourceGame =
-      games.value.find(game => String(game.id) === gameId)
-      || (currentGame.value && String(currentGame.value.id) === gameId ? currentGame.value : null)
-      || stats.value?.recent_games.find(game => String(game.id) === gameId)
-      || stats.value?.popular_games.find(game => String(game.id) === gameId)
+      games.value.find(game => game.public_id === gameId)
+      || (currentGame.value && currentGame.value.public_id === gameId ? currentGame.value : null)
+      || stats.value?.recent_games.find(game => game.public_id === gameId)
+      || stats.value?.popular_games.find(game => game.public_id === gameId)
       || null
 
     games.value.forEach(game => {
-      if (String(game.id) === gameId) {
+      if (game.public_id === gameId) {
         updateGame(game)
       }
     })
 
-    if (currentGame.value && String(currentGame.value.id) === gameId) {
+    if (currentGame.value && currentGame.value.public_id === gameId) {
       updateGame(currentGame.value)
     }
 
@@ -54,13 +54,13 @@ export const useGamesStore = defineStore('games', () => {
     }
 
     stats.value.recent_games.forEach(game => {
-      if (String(game.id) === gameId) {
+      if (game.public_id === gameId) {
         updateGame(game)
       }
     })
 
     stats.value.popular_games.forEach(game => {
-      if (String(game.id) === gameId) {
+      if (game.public_id === gameId) {
         updateGame(game)
       }
     })
@@ -200,7 +200,9 @@ export const useGamesStore = defineStore('games', () => {
         case 'game:wiki_updated':
           // 如果当前正在查看该游戏，刷新详情
           if (currentGame.value && event.gameId === currentGame.value.id) {
-            fetchGame(String(event.gameId))
+            if (currentGame.value.public_id) {
+              fetchGame(currentGame.value.public_id)
+            }
           }
           break
       }

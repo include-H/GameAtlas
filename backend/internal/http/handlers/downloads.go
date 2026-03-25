@@ -32,7 +32,7 @@ func NewDownloadsHandler(service *services.GameFilesService, authService *servic
 }
 
 func (h *DownloadsHandler) Download(c *gin.Context) {
-	gameID, ok := parseIDParam(c, "id")
+	gameID, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}
@@ -75,7 +75,7 @@ func (h *DownloadsHandler) Download(c *gin.Context) {
 }
 
 func (h *DownloadsHandler) RecordDownload(c *gin.Context) {
-	gameID, ok := parseIDParam(c, "id")
+	gameID, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}
@@ -131,7 +131,7 @@ func (h *DownloadsHandler) shouldRecordDownload(gameID, fileID int64, sourceKey 
 }
 
 func (h *DownloadsHandler) LaunchScript(c *gin.Context) {
-	gameID, ok := parseIDParam(c, "id")
+	gameID, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}

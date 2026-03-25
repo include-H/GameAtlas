@@ -28,7 +28,7 @@
         <game-card
           :game="game"
           @view="openGame"
-          @toggle-favorite="toggleFavorite(game.id)"
+          @toggle-favorite="toggleFavorite"
         />
       </div>
     </div>
@@ -85,19 +85,21 @@ const loadSeriesDetail = async () => {
   })
 }
 
-const openGame = (id: string | number) => {
+const openGame = (publicId: string) => {
+  if (!publicId) return
   router.push({
     name: 'game-detail',
-    params: { id: String(id) },
+    params: { publicId },
     query: createDetailRouteQuery(route),
   })
 }
 
-const toggleFavorite = async (id: number) => {
+const toggleFavorite = async (gameRef: string) => {
+  if (!gameRef) return
   try {
-    await gamesService.toggleFavorite(String(id))
+    await gamesService.toggleFavorite(gameRef)
     games.value = games.value.map((game) =>
-      game.id === id ? { ...game, isFavorite: !game.isFavorite } : game,
+      game.public_id === gameRef ? { ...game, isFavorite: !game.isFavorite } : game,
     )
   } catch {
     uiStore.addAlert('更新收藏失败', 'error')

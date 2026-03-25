@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -76,21 +75,21 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.GET("/games", gamesHandler.List)
 	api.GET("/games/timeline", gamesHandler.ListTimeline)
 	api.GET("/games/stats", gamesHandler.Stats)
-	api.GET("/games/:id", gamesHandler.Get)
+	api.GET("/games/:publicId", gamesHandler.Get)
 	api.POST("/games", gamesHandler.Create)
-	api.PUT("/games/:id", gamesHandler.Update)
-	api.PUT("/games/:id/aggregate", gamesHandler.UpdateAggregate)
-	api.DELETE("/games/:id", gamesHandler.Delete)
-	api.GET("/games/:id/files", gameFilesHandler.List)
-	api.POST("/games/:id/files", gameFilesHandler.Create)
-	api.PUT("/games/:id/files/:fileId", gameFilesHandler.Update)
-	api.DELETE("/games/:id/files/:fileId", gameFilesHandler.Delete)
-	api.POST("/games/:id/files/:fileId/downloads", downloadsHandler.RecordDownload)
-	api.GET("/games/:id/files/:fileId/download", downloadsHandler.Download)
-	api.GET("/games/:id/files/:fileId/launch-script", downloadsHandler.LaunchScript)
-	api.GET("/games/:id/wiki", wikiHandler.Get)
-	api.PUT("/games/:id/wiki", wikiHandler.Update)
-	api.GET("/games/:id/wiki/history", wikiHandler.History)
+	api.PUT("/games/:publicId", gamesHandler.Update)
+	api.PUT("/games/:publicId/aggregate", gamesHandler.UpdateAggregate)
+	api.DELETE("/games/:publicId", gamesHandler.Delete)
+	api.GET("/games/:publicId/files", gameFilesHandler.List)
+	api.POST("/games/:publicId/files", gameFilesHandler.Create)
+	api.PUT("/games/:publicId/files/:fileId", gameFilesHandler.Update)
+	api.DELETE("/games/:publicId/files/:fileId", gameFilesHandler.Delete)
+	api.POST("/games/:publicId/files/:fileId/downloads", downloadsHandler.RecordDownload)
+	api.GET("/games/:publicId/files/:fileId/download", downloadsHandler.Download)
+	api.GET("/games/:publicId/files/:fileId/launch-script", downloadsHandler.LaunchScript)
+	api.GET("/games/:publicId/wiki", wikiHandler.Get)
+	api.PUT("/games/:publicId/wiki", wikiHandler.Update)
+	api.GET("/games/:publicId/wiki/history", wikiHandler.History)
 	api.GET("/series", seriesHandler.List)
 	api.GET("/series/:id", seriesHandler.Get)
 	api.POST("/series", seriesHandler.Create)
@@ -105,8 +104,8 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.GET("/tags", tagsHandler.ListTags)
 	api.POST("/tags", tagsHandler.CreateTag)
 	api.GET("/review-issue-overrides", reviewIssueOverrideHandler.List)
-	api.PUT("/games/:id/review-issues/:issueKey/ignore", reviewIssueOverrideHandler.Ignore)
-	api.DELETE("/games/:id/review-issues/:issueKey/ignore", reviewIssueOverrideHandler.Delete)
+	api.PUT("/games/:publicId/review-issues/:issueKey/ignore", reviewIssueOverrideHandler.Ignore)
+	api.DELETE("/games/:publicId/review-issues/:issueKey/ignore", reviewIssueOverrideHandler.Delete)
 	api.POST("/assets/cover", assetsHandler.Upload("cover"))
 	api.POST("/assets/banner", assetsHandler.Upload("banner"))
 	api.POST("/assets/video", assetsHandler.Upload("video"))
@@ -147,13 +146,13 @@ func registerAssetRoutes(router *gin.Engine, assetsDir string, gamesRepo *reposi
 			return
 		}
 
-		gameID, err := strconv.ParseInt(strings.TrimSpace(segments[0]), 10, 64)
-		if err != nil || gameID <= 0 {
+		gamePublicID := strings.TrimSpace(segments[0])
+		if gamePublicID == "" {
 			c.Status(http.StatusNotFound)
 			return
 		}
 
-		game, err := gamesRepo.GetByID(gameID)
+		game, err := gamesRepo.GetByPublicID(gamePublicID)
 		if err != nil {
 			c.Status(http.StatusNotFound)
 			return

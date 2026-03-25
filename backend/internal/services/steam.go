@@ -147,12 +147,9 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 	releaseDate := ""
 	developers := []string{}
 	publishers := []string{}
-	videoDebug := []string{}
-	trailerCandidates := []string{}
 	screenshotURLs := []string{}
 	description = s.fetchDescriptionFromStorePage(appID, proxyOverride)
 	if primaryOK && primaryDetails.Success && primaryDetails.Data != nil {
-		videoDebug = append(videoDebug, fmt.Sprintf("appdetails(schinese).movies=%d", len(primaryDetails.Data.Movies)))
 		if primaryDetails.Data.Name != "" {
 			name = primaryDetails.Data.Name
 		}
@@ -166,8 +163,6 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 		releaseDate = normalizeSteamReleaseDate(primaryDetails.Data.ReleaseDate)
 		developers = cleanSteamNames(primaryDetails.Data.Developers)
 		publishers = cleanSteamNames(primaryDetails.Data.Publishers)
-		trailerCandidates = appendUniqueURLs(trailerCandidates, collectTrailerURLsFromMovies(primaryDetails.Data.Movies)...)
-		videoDebug = append(videoDebug, fmt.Sprintf("movies-candidates(schinese)=%d", len(trailerCandidates)))
 		screenshotURLs = make([]string, 0, len(primaryDetails.Data.Screenshots))
 		for _, screenshot := range primaryDetails.Data.Screenshots {
 			if screenshot.PathFull != "" {
@@ -175,11 +170,7 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 			}
 		}
 	}
-	if !primaryOK || (primaryOK && !primaryDetails.Success) {
-		videoDebug = append(videoDebug, "appdetails(schinese) unavailable")
-	}
 	if fallbackOK && fallbackDetails.Success && fallbackDetails.Data != nil {
-		videoDebug = append(videoDebug, fmt.Sprintf("appdetails(english).movies=%d", len(fallbackDetails.Data.Movies)))
 		if name == fmt.Sprintf("Steam App %d", appID) && fallbackDetails.Data.Name != "" {
 			name = fallbackDetails.Data.Name
 		}
@@ -199,10 +190,6 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 		if len(publishers) == 0 {
 			publishers = cleanSteamNames(fallbackDetails.Data.Publishers)
 		}
-		if len(trailerCandidates) == 0 {
-			trailerCandidates = appendUniqueURLs(trailerCandidates, collectTrailerURLsFromMovies(fallbackDetails.Data.Movies)...)
-			videoDebug = append(videoDebug, fmt.Sprintf("movies-candidates(english)=%d", len(trailerCandidates)))
-		}
 		if len(screenshotURLs) == 0 {
 			screenshotURLs = make([]string, 0, len(fallbackDetails.Data.Screenshots))
 			for _, screenshot := range fallbackDetails.Data.Screenshots {
@@ -212,29 +199,8 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 			}
 		}
 	}
-	if !fallbackOK || (fallbackOK && !fallbackDetails.Success) {
-		videoDebug = append(videoDebug, "appdetails(english) unavailable")
-	}
 	if len(screenshotURLs) == 0 {
 		screenshotURLs = s.fetchScreenshotURLsFromStorePage(appID, proxyOverride)
-	}
-	if len(trailerCandidates) == 0 {
-		videoDebug = append(videoDebug, "movies-candidates=0, fallback to store page extraction")
-		storePageCandidates, storePageDebug := s.fetchVideoURLsFromStorePage(appID, proxyOverride)
-		trailerCandidates = storePageCandidates
-		videoDebug = append(videoDebug, storePageDebug...)
-		videoDebug = append(videoDebug, fmt.Sprintf("store-page-candidates=%d", len(trailerCandidates)))
-	}
-	previewVideos := buildSteamVideoCandidates(trailerCandidates)
-	previewVideoURL := choosePreferredTrailerCandidate(candidateURLs(previewVideos))
-	previewVideoName := trailerDisplayName(previewVideoURL)
-	if previewVideoURL == nil {
-		videoDebug = append(videoDebug, "no downloadable trailer source found")
-	} else {
-		if strings.Contains(strings.ToLower(*previewVideoURL), ".mpd") || strings.Contains(strings.ToLower(*previewVideoURL), ".m3u8") {
-			videoDebug = append(videoDebug, "selected=dash-manifest")
-		}
-		videoDebug = append(videoDebug, "selected="+truncateDebugURL(*previewVideoURL))
 	}
 
 	coverURL := s.resolveSteamAssetURL(appID, proxyOverride,
@@ -247,19 +213,15 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 	)
 
 	return &domain.SteamAssetsPreview{
-		AppID:             appID,
-		Name:              name,
-		Description:       description,
-		ReleaseDate:       releaseDate,
-		Developers:        developers,
-		Publishers:        publishers,
-		PreviewVideos:     previewVideos,
-		PreviewVideoURL:   previewVideoURL,
-		PreviewVideoName:  previewVideoName,
-		PreviewVideoDebug: videoDebug,
-		CoverURL:          coverURL,
-		BannerURL:         bannerURL,
-		ScreenshotURLs:    screenshotURLs,
+		AppID:          appID,
+		Name:           name,
+		Description:    description,
+		ReleaseDate:    releaseDate,
+		Developers:     developers,
+		Publishers:     publishers,
+		CoverURL:       coverURL,
+		BannerURL:      bannerURL,
+		ScreenshotURLs: screenshotURLs,
 	}, nil
 }
 
@@ -271,7 +233,6 @@ func (s *SteamService) ApplyAssets(appID int64, input domain.SteamApplyAssetsInp
 	sortOrder := 0
 	var appliedCover *string
 	var appliedBanner *string
-	var appliedPreviewVideo *string
 	appliedScreenshots := make([]string, 0, len(input.ScreenshotURLs))
 
 	if input.CoverURL != nil && *input.CoverURL != "" {
@@ -288,36 +249,6 @@ func (s *SteamService) ApplyAssets(appID int64, input domain.SteamApplyAssetsInp
 		}
 		appliedBanner = &path
 	}
-	if input.PreviewVideoURL != nil && *input.PreviewVideoURL != "" {
-		videoURL := strings.TrimSpace(*input.PreviewVideoURL)
-		lowered := strings.ToLower(videoURL)
-		if strings.Contains(lowered, ".mpd") || strings.Contains(lowered, ".m3u8") {
-			progressiveURL, _ := s.resolveProgressiveTrailerFromManifest(videoURL, "")
-			if progressiveURL != "" {
-				path, err := s.assets.ApplyRemoteAsset(input.GameID, "video", progressiveURL, 0)
-				if err != nil {
-					return nil, err
-				}
-				appliedPreviewVideo = &path
-			} else {
-				videoData, _, dashErr := s.downloadDashVideoTrack(videoURL, "")
-				if dashErr != nil {
-					return nil, dashErr
-				}
-				path, err := s.assets.ApplyRawAsset(input.GameID, "video", videoData, "video/mp4", 0)
-				if err != nil {
-					return nil, err
-				}
-				appliedPreviewVideo = &path
-			}
-		} else {
-			path, err := s.assets.ApplyRemoteAsset(input.GameID, "video", videoURL, 0)
-			if err != nil {
-				return nil, err
-			}
-			appliedPreviewVideo = &path
-		}
-	}
 	for _, rawURL := range input.ScreenshotURLs {
 		if rawURL == "" {
 			continue
@@ -331,27 +262,14 @@ func (s *SteamService) ApplyAssets(appID int64, input domain.SteamApplyAssetsInp
 	}
 
 	return &domain.SteamAssetsPreview{
-		AppID:             appID,
-		ReleaseDate:       "",
-		Developers:        []string{},
-		Publishers:        []string{},
-		PreviewVideos:     []domain.SteamVideoCandidate{},
-		PreviewVideoURL:   appliedPreviewVideo,
-		PreviewVideoName:  trailerDisplayName(appliedPreviewVideo),
-		PreviewVideoDebug: []string{},
-		CoverURL:          appliedCover,
-		BannerURL:         appliedBanner,
-		ScreenshotURLs:    appliedScreenshots,
+		AppID:          appID,
+		ReleaseDate:    "",
+		Developers:     []string{},
+		Publishers:     []string{},
+		CoverURL:       appliedCover,
+		BannerURL:      appliedBanner,
+		ScreenshotURLs: appliedScreenshots,
 	}, nil
-}
-
-func truncateDebugURL(value string) string {
-	const limit = 140
-	trimmed := strings.TrimSpace(value)
-	if len(trimmed) <= limit {
-		return trimmed
-	}
-	return trimmed[:limit] + "..."
 }
 
 func cleanSteamNames(values []string) []string {

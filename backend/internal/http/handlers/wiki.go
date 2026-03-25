@@ -18,7 +18,7 @@ func NewWikiHandler(service *services.WikiService) *WikiHandler {
 }
 
 func (h *WikiHandler) Get(c *gin.Context) {
-	gameID, ok := parseIDParam(c, "id")
+	gameID, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}
@@ -36,7 +36,7 @@ func (h *WikiHandler) Get(c *gin.Context) {
 }
 
 func (h *WikiHandler) Update(c *gin.Context) {
-	gameID, ok := parseIDParam(c, "id")
+	gameID, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}
@@ -69,7 +69,7 @@ func (h *WikiHandler) History(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
 	}
-	gameID, ok := parseIDParam(c, "id")
+	gameID, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}

@@ -2,6 +2,7 @@ package domain
 
 type Game struct {
 	ID                   int64   `db:"id"`
+	PublicID             string  `db:"public_id"`
 	Title                string  `db:"title"`
 	TitleAlt             *string `db:"title_alt"`
 	Visibility           string  `db:"visibility"`
@@ -153,6 +154,7 @@ type GamesTimelineParams struct {
 
 type TimelineGame struct {
 	ID          int64   `db:"id"`
+	PublicID    string  `db:"public_id"`
 	Title       string  `db:"title"`
 	ReleaseDate *string `db:"release_date"`
 	CoverImage  *string `db:"cover_image"`

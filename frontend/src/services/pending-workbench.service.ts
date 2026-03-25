@@ -28,7 +28,11 @@ const pendingWorkbenchService = {
     })
 
     const queueGames = response.data
-    const overrides = await reviewIssuesService.list(queueGames.map((game) => game.id))
+    const overrides = await reviewIssuesService.list(
+      queueGames
+        .map((game) => game.public_id)
+        .filter((value): value is string => Boolean(value)),
+    )
 
     return {
       queueGames,

@@ -175,7 +175,7 @@ func (h *GamesHandler) Stats(c *gin.Context) {
 }
 
 func (h *GamesHandler) Get(c *gin.Context) {
-	id, ok := parseIDParam(c, "id")
+	id, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}
@@ -221,7 +221,7 @@ func (h *GamesHandler) Update(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
 	}
-	id, ok := parseIDParam(c, "id")
+	id, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}
@@ -273,7 +273,7 @@ func (h *GamesHandler) UpdateAggregate(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
 	}
-	id, ok := parseIDParam(c, "id")
+	id, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}
@@ -334,7 +334,7 @@ func (h *GamesHandler) Delete(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
 	}
-	id, ok := parseIDParam(c, "id")
+	id, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}
@@ -378,6 +378,7 @@ func parseQueryInt64(c *gin.Context, key string, fallback int64) int64 {
 
 type gameListItemResponse struct {
 	ID                int64   `json:"id"`
+	PublicID          string  `json:"public_id"`
 	Title             string  `json:"title"`
 	TitleAlt          *string `json:"title_alt"`
 	Visibility        string  `json:"visibility"`
@@ -400,6 +401,7 @@ type gameListItemResponse struct {
 
 type timelineGameItemResponse struct {
 	ID          int64   `json:"id"`
+	PublicID    string  `json:"public_id"`
 	Title       string  `json:"title"`
 	ReleaseDate *string `json:"release_date"`
 	CoverImage  *string `json:"cover_image"`
@@ -436,6 +438,7 @@ type gameFileResponse struct {
 
 type gameDetailResponse struct {
 	ID              int64                  `json:"id"`
+	PublicID        string                 `json:"public_id"`
 	Title           string                 `json:"title"`
 	TitleAlt        *string                `json:"title_alt"`
 	Visibility      string                 `json:"visibility"`
@@ -488,6 +491,7 @@ type gameTagGroupResponse struct {
 func toGameListItemResponse(game domain.Game) gameListItemResponse {
 	return gameListItemResponse{
 		ID:                game.ID,
+		PublicID:          game.PublicID,
 		Title:             game.Title,
 		TitleAlt:          game.TitleAlt,
 		Visibility:        game.Visibility,
@@ -512,6 +516,7 @@ func toGameListItemResponse(game domain.Game) gameListItemResponse {
 func toTimelineGameItemResponse(game domain.TimelineGame) timelineGameItemResponse {
 	return timelineGameItemResponse{
 		ID:          game.ID,
+		PublicID:    game.PublicID,
 		Title:       game.Title,
 		ReleaseDate: game.ReleaseDate,
 		CoverImage:  game.CoverImage,
@@ -583,6 +588,7 @@ func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDe
 
 	return gameDetailResponse{
 		ID:              detail.Game.ID,
+		PublicID:        detail.Game.PublicID,
 		Title:           detail.Game.Title,
 		TitleAlt:        detail.Game.TitleAlt,
 		Visibility:      detail.Game.Visibility,

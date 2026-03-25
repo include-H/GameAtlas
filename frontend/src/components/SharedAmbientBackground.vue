@@ -228,9 +228,12 @@ const pickQualifiedScreenshotBackground = async (
   const candidateGames = shuffleArray(games).slice(0, DETAIL_CANDIDATE_LIMIT)
 
   for (const game of candidateGames) {
+    if (!game.public_id) {
+      continue
+    }
     let detail
     try {
-      detail = await gamesService.getGame(String(game.id))
+      detail = await gamesService.getGame(game.public_id)
     } catch {
       continue
     }
@@ -268,7 +271,7 @@ const pickBackgroundFromGames = async () => {
 
 const loadBackground = async () => {
   const detailBackground = await gameDetailRouteGuard.runWhenActive(async () => {
-    const gameId = getRouteParamString(route, 'id')
+    const gameId = getRouteParamString(route, 'publicId')
     return gameId ? pickGameDetailBackground(gameId) : ''
   })
   if (typeof detailBackground === 'string') {
@@ -276,7 +279,7 @@ const loadBackground = async () => {
   }
 
   const wikiBackground = await wikiEditRouteGuard.runWhenActive(async () => {
-    const gameId = getRouteParamString(route, 'gameId')
+    const gameId = getRouteParamString(route, 'publicId')
     if (!gameId) {
       return ''
     }

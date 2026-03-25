@@ -1,11 +1,15 @@
 package repositories
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sort"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 
@@ -23,6 +27,8 @@ var allowedGameSortFields = map[string]string{
 type GamesRepository struct {
 	db *sqlx.DB
 }
+
+var fallbackPublicIDCounter uint64
 
 func NewGamesRepository(db *sqlx.DB) *GamesRepository {
 	return &GamesRepository{db: db}
@@ -110,6 +116,7 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 	listQuery := fmt.Sprintf(`
 		SELECT
 			g.id,
+			g.public_id,
 			g.title,
 			g.title_alt,
 			g.visibility,
@@ -181,6 +188,7 @@ func (r *GamesRepository) GetByID(id int64) (*domain.Game, error) {
 	const query = `
 		SELECT
 			id,
+			public_id,
 			title,
 			title_alt,
 			visibility,
@@ -211,6 +219,56 @@ func (r *GamesRepository) GetByID(id int64) (*domain.Game, error) {
 	}
 
 	return &game, nil
+}
+
+func (r *GamesRepository) GetByPublicID(publicID string) (*domain.Game, error) {
+	const query = `
+		SELECT
+			id,
+			public_id,
+			title,
+			title_alt,
+			visibility,
+			summary,
+			release_date,
+			engine,
+			cover_image,
+			banner_image,
+			wiki_content,
+			wiki_content_html,
+			needs_review,
+			preview_video_asset_uid,
+			downloads,
+			NULL AS primary_screenshot,
+			0 AS screenshot_count,
+			0 AS file_count,
+			0 AS developer_count,
+			0 AS publisher_count,
+			0 AS platform_count,
+			created_at,
+			updated_at
+		FROM games
+		WHERE lower(public_id) = lower(?)`
+
+	var game domain.Game
+	if err := r.db.Get(&game, query, strings.TrimSpace(publicID)); err != nil {
+		return nil, err
+	}
+
+	return &game, nil
+}
+
+func (r *GamesRepository) ResolveIDByPublicID(publicID string) (int64, error) {
+	trimmed := strings.TrimSpace(publicID)
+	if trimmed == "" {
+		return 0, sql.ErrNoRows
+	}
+
+	var id int64
+	if err := r.db.Get(&id, "SELECT id FROM games WHERE lower(public_id) = lower(?) LIMIT 1", trimmed); err != nil {
+		return 0, err
+	}
+	return id, nil
 }
 
 func (r *GamesRepository) ListTimeline(params domain.GamesTimelineParams) ([]domain.TimelineGame, bool, error) {
@@ -244,6 +302,7 @@ func (r *GamesRepository) ListTimeline(params domain.GamesTimelineParams) ([]dom
 	query := fmt.Sprintf(`
 		SELECT
 			g.id,
+			g.public_id,
 			g.title,
 			g.release_date,
 			g.cover_image
@@ -367,16 +426,17 @@ func (r *GamesRepository) HasOlderTimelineGame(params domain.GamesTimelineParams
 func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, error) {
 	const query = `
 		INSERT INTO games (
-			title, title_alt, title_sort_key, visibility, summary, release_date, engine, cover_image, banner_image, needs_review, preview_video_asset_uid
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			public_id, title, title_alt, title_sort_key, visibility, summary, release_date, engine, cover_image, banner_image, needs_review, preview_video_asset_uid
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING
-			id, title, title_alt, visibility, summary, release_date, engine, cover_image, banner_image,
+			id, public_id, title, title_alt, visibility, summary, release_date, engine, cover_image, banner_image,
 			wiki_content, wiki_content_html, needs_review, preview_video_asset_uid, downloads, created_at, updated_at`
 
 	var game domain.Game
 	if err := r.db.Get(
 		&game,
 		query,
+		newGamePublicID(),
 		input.Title,
 		input.TitleAlt,
 		buildTitleSortKey(input.Title, input.TitleAlt),
@@ -865,6 +925,7 @@ func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStat
 	const baseSelect = `
 		SELECT
 			g.id,
+			g.public_id,
 			g.title,
 			g.title_alt,
 			g.visibility,
@@ -1163,4 +1224,39 @@ func boolToInt(value bool) int {
 		return 1
 	}
 	return 0
+}
+
+func newGamePublicID() string {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return fallbackGamePublicID()
+	}
+
+	// UUIDv4 bits.
+	buf[6] = (buf[6] & 0x0f) | 0x40
+	buf[8] = (buf[8] & 0x3f) | 0x80
+
+	hexText := hex.EncodeToString(buf)
+	return fmt.Sprintf(
+		"%s-%s-%s-%s-%s",
+		hexText[0:8],
+		hexText[8:12],
+		hexText[12:16],
+		hexText[16:20],
+		hexText[20:32],
+	)
+}
+
+func fallbackGamePublicID() string {
+	now := time.Now().UnixNano()
+	sequence := atomic.AddUint64(&fallbackPublicIDCounter, 1)
+	return fmt.Sprintf(
+		"f%07x-%04x-4%03x-a%03x-%010x%02x",
+		now&0x0fffffff,
+		now&0xffff,
+		now&0x0fff,
+		now&0x0fff,
+		now&0x0fffffffff,
+		sequence&0xff,
+	)
 }

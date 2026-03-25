@@ -162,6 +162,14 @@ func (s *GamesService) LatestTimelineReleaseDate(includeAll bool) (string, bool,
 	return normalized, true, nil
 }
 
+func (s *GamesService) ResolveGameID(publicID string) (int64, error) {
+	id, err := s.gamesRepo.ResolveIDByPublicID(publicID)
+	if err != nil {
+		return 0, normalizeRepoError(err)
+	}
+	return id, nil
+}
+
 func (s *GamesService) GetDetail(id int64, includeAll bool) (*GameDetail, error) {
 	game, err := s.gamesRepo.GetByID(id)
 	if err != nil {

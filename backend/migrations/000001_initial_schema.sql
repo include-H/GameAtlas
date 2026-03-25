@@ -1,7 +1,9 @@
 CREATE TABLE IF NOT EXISTS games (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    public_id TEXT NOT NULL DEFAULT '',
     title TEXT NOT NULL,
     title_alt TEXT,
+    title_sort_key TEXT NOT NULL DEFAULT '',
     visibility TEXT NOT NULL DEFAULT 'public',
     summary TEXT,
     release_date TEXT,
@@ -183,10 +185,12 @@ CREATE INDEX IF NOT EXISTS idx_game_assets_game_id ON game_assets (game_id);
 CREATE INDEX IF NOT EXISTS idx_wiki_history_game_id ON wiki_history (game_id);
 CREATE INDEX IF NOT EXISTS idx_game_review_issue_overrides_game_id ON game_review_issue_overrides (game_id);
 CREATE INDEX IF NOT EXISTS idx_games_title ON games (title);
+CREATE INDEX IF NOT EXISTS idx_games_title_sort_key ON games (title_sort_key, id);
 CREATE INDEX IF NOT EXISTS idx_games_visibility ON games (visibility);
 CREATE INDEX IF NOT EXISTS idx_games_updated_at ON games (updated_at);
 CREATE INDEX IF NOT EXISTS idx_games_preview_video_asset_uid ON games (preview_video_asset_uid);
 CREATE INDEX IF NOT EXISTS idx_games_release_date_id ON games (release_date DESC, id DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_games_public_id ON games (public_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_game_assets_game_type_path_unique ON game_assets (game_id, asset_type, path);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_game_assets_asset_uid_unique ON game_assets (asset_uid);
 CREATE INDEX IF NOT EXISTS idx_tags_group_id ON tags (group_id);

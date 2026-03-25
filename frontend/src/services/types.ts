@@ -121,6 +121,7 @@ export interface VideoAssetItem {
 
 export interface Game {
   id: number
+  public_id?: string
   title: string
   title_alt?: string | null
   visibility?: 'public' | 'private'
@@ -231,9 +232,6 @@ export interface SteamGameDetails {
   developers: string[]
   publishers: string[]
   previewVideos: Array<{ url: string; name: string; isDash: boolean }>
-  previewVideoUrl?: string
-  previewVideoName?: string
-  previewVideoDebug?: string[]
   genres: string[]
   tags: string[]
   platforms: string[]
@@ -247,7 +245,6 @@ export interface SteamGameDetails {
 export interface SteamFetchImagesResponse {
   coverImage: string
   bannerImage: string
-  previewVideo?: string
   screenshots: string[]
 }
 

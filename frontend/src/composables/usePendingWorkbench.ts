@@ -36,6 +36,14 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   const queueGames = ref<Game[]>([])
   const activeGame = ref<Game | null>(null)
   const reviewIssueOverrides = ref<ReviewIssueOverride[]>([])
+  const gamePublicIDByInternalID = computed<Record<number, string>>(() => {
+    return queueGames.value.reduce<Record<number, string>>((acc, game) => {
+      if (game.public_id) {
+        acc[game.id] = game.public_id
+      }
+      return acc
+    }, {})
+  })
 
   const currentPage = ref(1)
   const totalPages = ref(0)
@@ -50,7 +58,10 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
 
   const reviewOverrideMap = computed<Record<string, ReviewIssueOverride[]>>(() => {
     return reviewIssueOverrides.value.reduce<Record<string, ReviewIssueOverride[]>>((acc, item) => {
-      const key = String(item.game_id)
+      const key = gamePublicIDByInternalID.value[item.game_id]
+      if (!key) {
+        return acc
+      }
       if (!acc[key]) {
         acc[key] = []
       }
@@ -71,19 +82,28 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     }, {})
   })
 
-  const getIgnoredDetails = (gameId: number | string): PendingIssueDetailKey[] => {
-    return ignoredDetailMap.value[String(gameId)] || []
+  const getIgnoredDetails = (game: Game): PendingIssueDetailKey[] => {
+    if (!game.public_id) {
+      return []
+    }
+    return ignoredDetailMap.value[game.public_id] || []
   }
 
   const gameIssueEvaluationMap = computed<Record<string, PendingIssueEvaluation>>(() => {
     return queueGames.value.reduce<Record<string, PendingIssueEvaluation>>((acc, game) => {
-      acc[String(game.id)] = evaluatePendingIssues(game, getIgnoredDetails(game.id))
+      if (!game.public_id) {
+        return acc
+      }
+      acc[game.public_id] = evaluatePendingIssues(game, getIgnoredDetails(game))
       return acc
     }, {})
   })
 
   const getIssueEvaluation = (game: Game): PendingIssueEvaluation => {
-    return gameIssueEvaluationMap.value[String(game.id)] || emptyEvaluation
+    if (!game.public_id) {
+      return emptyEvaluation
+    }
+    return gameIssueEvaluationMap.value[game.public_id] || emptyEvaluation
   }
 
   const isSevereGame = (game: Game) => {
@@ -166,9 +186,9 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
         return
       }
 
-      const currentActiveId = activeGame.value ? String(activeGame.value.id) : null
+      const currentActiveId = activeGame.value?.public_id || null
       const matched = currentActiveId
-        ? games.find((game) => String(game.id) === currentActiveId)
+        ? games.find((game) => game.public_id === currentActiveId)
         : null
 
       activeGame.value = matched || games[0]
@@ -210,8 +230,9 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   }
 
   const ignoreIssue = async (game: Game, issueKey: PendingIssueDetailKey) => {
+    if (!game.public_id) return
     try {
-      const override = await reviewIssuesService.ignore(String(game.id), issueKey)
+      const override = await reviewIssuesService.ignore(game.public_id, issueKey)
       reviewIssueOverrides.value = [
         ...reviewIssueOverrides.value.filter(
           (item) => !(item.game_id === override.game_id && item.issue_key === override.issue_key),
@@ -226,10 +247,14 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   }
 
   const restoreIssue = async (game: Game, issueKey: PendingIssueDetailKey) => {
+    if (!game.public_id) return
     try {
-      await reviewIssuesService.restore(String(game.id), issueKey)
+      await reviewIssuesService.restore(game.public_id, issueKey)
       reviewIssueOverrides.value = reviewIssueOverrides.value.filter(
-        (item) => !(item.game_id === game.id && item.issue_key === issueKey),
+        (item) => !(
+          gamePublicIDByInternalID.value[item.game_id] === game.public_id
+          && item.issue_key === issueKey
+        ),
       )
       options.addAlert('已恢复待处理项', 'success')
       await refreshCurrentPage()

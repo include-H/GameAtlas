@@ -29,7 +29,7 @@
         <a-button
           type="primary"
           size="large"
-          @click="viewGame(game.id)"
+          @click="viewGame(game.public_id)"
         >
           查看详情
         </a-button>
@@ -107,10 +107,11 @@ const getMetaInfo = (game: Game) => {
   return parts.join(' · ')
 }
 
-const viewGame = (id: number) => {
+const viewGame = (publicId?: string) => {
+  if (!publicId) return
   router.push({
     name: 'game-detail',
-    params: { id: String(id) },
+    params: { publicId },
     query: createDetailRouteQuery(route),
   })
 }

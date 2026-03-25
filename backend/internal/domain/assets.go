@@ -30,32 +30,21 @@ type SteamSearchResult struct {
 	TinyImage   *string `json:"tiny_image"`
 }
 
-type SteamVideoCandidate struct {
-	URL    string `json:"url"`
-	Name   string `json:"name"`
-	IsDash bool   `json:"is_dash"`
-}
-
 type SteamAssetsPreview struct {
-	AppID             int64                 `json:"app_id"`
-	Name              string                `json:"name"`
-	Description       string                `json:"description"`
-	ReleaseDate       string                `json:"release_date"`
-	Developers        []string              `json:"developers"`
-	Publishers        []string              `json:"publishers"`
-	PreviewVideos     []SteamVideoCandidate `json:"preview_videos"`
-	PreviewVideoURL   *string               `json:"preview_video_url"`
-	PreviewVideoName  *string               `json:"preview_video_name"`
-	PreviewVideoDebug []string              `json:"preview_video_debug"`
-	CoverURL          *string               `json:"cover_url"`
-	BannerURL         *string               `json:"banner_url"`
-	ScreenshotURLs    []string              `json:"screenshot_urls"`
+	AppID          int64    `json:"app_id"`
+	Name           string   `json:"name"`
+	Description    string   `json:"description"`
+	ReleaseDate    string   `json:"release_date"`
+	Developers     []string `json:"developers"`
+	Publishers     []string `json:"publishers"`
+	CoverURL       *string  `json:"cover_url"`
+	BannerURL      *string  `json:"banner_url"`
+	ScreenshotURLs []string `json:"screenshot_urls"`
 }
 
 type SteamApplyAssetsInput struct {
-	GameID          int64    `json:"game_id"`
-	CoverURL        *string  `json:"cover_url"`
-	BannerURL       *string  `json:"banner_url"`
-	PreviewVideoURL *string  `json:"preview_video_url"`
-	ScreenshotURLs  []string `json:"screenshot_urls"`
+	GameID         int64    `json:"game_id"`
+	CoverURL       *string  `json:"cover_url"`
+	BannerURL      *string  `json:"banner_url"`
+	ScreenshotURLs []string `json:"screenshot_urls"`
 }

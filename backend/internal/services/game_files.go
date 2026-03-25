@@ -45,6 +45,14 @@ func NewGameFilesService(cfg config.Config, gamesRepo *repositories.GamesReposit
 	}
 }
 
+func (s *GameFilesService) ResolveGameID(publicID string) (int64, error) {
+	id, err := s.gamesRepo.ResolveIDByPublicID(publicID)
+	if err != nil {
+		return 0, normalizeRepoError(err)
+	}
+	return id, nil
+}
+
 func (s *GameFilesService) List(gameID int64, includeAll bool) ([]domain.GameFile, error) {
 	game, err := s.gamesRepo.GetByID(gameID)
 	if err != nil {

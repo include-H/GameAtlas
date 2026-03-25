@@ -105,6 +105,7 @@ func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([
 	query := fmt.Sprintf(`
 		SELECT
 			g.id,
+			g.public_id,
 			g.title,
 			g.title_alt,
 			g.visibility,

@@ -18,7 +18,7 @@ func NewGameFilesHandler(service *services.GameFilesService) *GameFilesHandler {
 }
 
 func (h *GameFilesHandler) List(c *gin.Context) {
-	gameID, ok := parseIDParam(c, "id")
+	gameID, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}
@@ -36,7 +36,7 @@ func (h *GameFilesHandler) List(c *gin.Context) {
 }
 
 func (h *GameFilesHandler) Create(c *gin.Context) {
-	gameID, ok := parseIDParam(c, "id")
+	gameID, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}
@@ -66,7 +66,7 @@ func (h *GameFilesHandler) Create(c *gin.Context) {
 }
 
 func (h *GameFilesHandler) Update(c *gin.Context) {
-	gameID, ok := parseIDParam(c, "id")
+	gameID, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}
@@ -100,7 +100,7 @@ func (h *GameFilesHandler) Update(c *gin.Context) {
 }
 
 func (h *GameFilesHandler) Delete(c *gin.Context) {
-	gameID, ok := parseIDParam(c, "id")
+	gameID, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
 	}

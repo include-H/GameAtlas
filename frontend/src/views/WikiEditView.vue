@@ -170,13 +170,13 @@ const wikiData = ref({
 const isExisting = computed(() => Boolean(wiki.value?.content))
 
 const getGameDetailRoute = () => {
-  if (!game.value) {
+  if (!game.value?.public_id) {
     return { name: 'games' as const }
   }
 
   return {
     name: 'game-detail' as const,
-    params: { id: String(game.value.id) },
+    params: { publicId: game.value.public_id },
   }
 }
 
@@ -185,7 +185,7 @@ const handleCancel = () => {
 }
 
 const handleSave = async () => {
-  if (!game.value) return
+  if (!game.value?.public_id) return
 
   isSaving.value = true
 
@@ -195,10 +195,10 @@ const handleSave = async () => {
       change_summary: wikiData.value.change_summary.trim() || undefined,
     }
 
-    await wikiService.updateWikiPage(String(game.value.id), wikiDataToSend)
+    await wikiService.updateWikiPage(game.value.public_id, wikiDataToSend)
     uiStore.addAlert(isExisting.value ? 'Wiki 已更新' : 'Wiki 已创建', 'success')
     wikiData.value.change_summary = ''
-    await loadHistory(String(game.value.id))
+    await loadHistory(game.value.public_id)
 
     router.push(resolveReturnRoute(route, getGameDetailRoute()))
   } catch (error) {
@@ -305,7 +305,7 @@ const loadWikiEditorData = async (gameId: string) => {
 watchRouteParamWhenActive(
   route,
   'wiki-edit',
-  'gameId',
+  'publicId',
   async (gameId) => {
     await loadWikiEditorData(gameId)
   },

@@ -4,6 +4,7 @@ const FAVORITES_KEY = 'game-library-favorites'
 
 export interface GameListApiItem {
   id: number
+  public_id: string
   title: string
   title_alt: string | null
   visibility: 'public' | 'private'
@@ -49,13 +50,14 @@ export function applyFavorite(game: Game, favoriteIds?: Set<string>): Game {
   const favorites = favoriteIds ?? new Set(readFavorites())
   return {
     ...game,
-    isFavorite: favorites.has(String(game.id)),
+    isFavorite: Boolean(game.public_id) && favorites.has(String(game.public_id)),
   }
 }
 
 export function mapGameListItem(item: GameListApiItem, favoriteIds?: Set<string>): Game {
   return applyFavorite({
     id: item.id,
+    public_id: item.public_id,
     title: item.title,
     title_alt: item.title_alt,
     visibility: item.visibility,

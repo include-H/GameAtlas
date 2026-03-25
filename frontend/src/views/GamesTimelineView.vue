@@ -199,8 +199,8 @@ const timelineRows = computed<TimelineRow[]>(() => {
 
 const appendTimelineChunk = (games: Game[]) => {
   if (games.length === 0) return
-  const existingIDs = new Set(allGames.value.map((game) => String(game.id)))
-  const incoming = games.filter((game) => !existingIDs.has(String(game.id)))
+  const existingIDs = new Set(allGames.value.map((game) => game.public_id).filter(Boolean) as string[])
+  const incoming = games.filter((game) => Boolean(game.public_id) && !existingIDs.has(String(game.public_id)))
   if (incoming.length > 0) {
     allGames.value.push(...incoming)
   }
@@ -287,10 +287,11 @@ const loadTimeline = async () => {
   }
 }
 
-const openGame = (id: string | number) => {
+const openGame = (publicId: string) => {
+  if (!publicId) return
   router.push({
     name: 'game-detail',
-    params: { id: String(id) },
+    params: { publicId },
     query: createDetailRouteQuery(route),
   })
 }

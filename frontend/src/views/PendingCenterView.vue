@@ -452,8 +452,9 @@ const toggleIssueFilter = (key: PendingIssueKey) => {
 }
 
 const openEdit = async (game: Game) => {
+  if (!game.public_id) return
   try {
-    editingGame.value = await gamesService.getGame(String(game.id))
+    editingGame.value = await gamesService.getGame(game.public_id)
     showEditModal.value = true
   } catch {
     uiStore.addAlert('加载游戏详情失败', 'error')
@@ -461,17 +462,19 @@ const openEdit = async (game: Game) => {
 }
 
 const openWiki = (game: Game) => {
+  if (!game.public_id) return
   router.push({
     name: 'wiki-edit',
-    params: { gameId: String(game.id) },
+    params: { publicId: game.public_id },
     query: createDetailRouteQuery(route),
   })
 }
 
 const viewGame = (game: Game) => {
+  if (!game.public_id) return
   router.push({
     name: 'game-detail',
-    params: { id: String(game.id) },
+    params: { publicId: game.public_id },
     query: createDetailRouteQuery(route),
   })
 }
