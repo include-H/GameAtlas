@@ -15,7 +15,7 @@ const locales: Record<Locale, LocaleMessages> = {
       dashboard: 'Dashboard',
       games: 'Games',
       pending: {
-        center: 'Pending Center',
+        center: 'Pending Workbench',
       },
       notFound: 'Not Found',
       'game.detail': 'Game Detail',

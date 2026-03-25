@@ -2,25 +2,27 @@
   <div class="pending-center">
     <div class="pending-center__header page-hero">
       <div class="page-hero__content">
-        <h1 class="pending-center__title page-hero__title text-gradient">待处理中心</h1>
-        <p class="pending-center__subtitle page-hero__subtitle">集中补齐图片、Wiki、文件和基础信息。</p>
+        <h1 class="pending-center__title page-hero__title text-gradient">待处理工作台</h1>
+        <p class="pending-center__subtitle page-hero__subtitle">
+          流式窗口视图：仅展示最近 {{ PENDING_WORKBENCH_WINDOW_SIZE }} 条更新记录中的待处理项。
+        </p>
       </div>
 
       <a-space>
-        <a-button class="app-text-action-btn" type="text" @click="loadPendingGames">
+        <a-button class="app-text-action-btn" type="text" @click="loadWorkbenchGames">
           <template #icon>
             <icon-refresh />
           </template>
-          刷新
+          刷新窗口
         </a-button>
       </a-space>
     </div>
 
     <div class="pending-center__stats">
       <a-card class="stat-card stat-card--total" :bordered="false">
-        <div class="stat-card__label">待处理总数</div>
+        <div class="stat-card__label">窗口待处理数</div>
         <div class="stat-card__value">{{ totalPendingCount }}</div>
-        <div class="stat-card__hint">当前命中待处理规则的游戏</div>
+        <div class="stat-card__hint">窗口容量 {{ PENDING_WORKBENCH_WINDOW_SIZE }}，当前采样 {{ totalWindowCount }} 条</div>
       </a-card>
       <a-card
         v-for="definition in pendingIssueDefinitions"
@@ -39,22 +41,15 @@
     <a-card class="pending-center__filters" :bordered="false">
       <a-row :gutter="[12, 12]">
         <a-col :xs="24" :sm="12" :md="8" :lg="8">
-          <div class="app-input-action-row">
-            <a-input
-              v-model="searchQuery"
-              class="app-input-action-row__field"
-              placeholder="搜索待处理游戏"
-              allow-clear
-              @press-enter="loadPendingGames"
-            >
-              <template #prefix>
-                <icon-search />
-              </template>
-            </a-input>
-            <a-button class="app-text-action-btn app-input-action-row__action" type="text" @click="loadPendingGames">
-              搜索
-            </a-button>
-          </div>
+          <a-input
+            v-model="searchQuery"
+            placeholder="筛选窗口内游戏"
+            allow-clear
+          >
+            <template #prefix>
+              <icon-search />
+            </template>
+          </a-input>
         </a-col>
         <a-col :xs="24" :sm="12" :md="6" :lg="5">
           <a-select v-model="selectedIssue" placeholder="问题类型" allow-clear>
@@ -98,17 +93,16 @@
 
     <div class="pending-center__result-meta">
       <span>
-        显示 {{ pageStart }}-{{ pageEnd }} / {{ filteredGames.length }} 个待处理游戏，已忽略 {{ ignoredOverridesCount }} 个问题
+        当前筛选显示 {{ filteredGames.length }} 条，窗口命中 {{ totalPendingCount }} / {{ totalWindowCount }} 条，已忽略 {{ ignoredOverridesCount }} 个问题
       </span>
       <div class="pending-center__result-actions">
-        <a-select v-model="itemsPerPage" :options="pageSizeOptions" size="small" />
         <a-button class="app-text-action-btn" type="text" size="small" @click="resetFilters">重置筛选</a-button>
       </div>
     </div>
 
     <div v-if="isLoading" class="pending-center__loading">
       <a-spin :size="24" />
-      <p>正在整理待处理列表...</p>
+      <p>正在整理工作台窗口...</p>
     </div>
 
     <a-empty v-else-if="filteredGames.length === 0" class="pending-center__empty">
@@ -123,7 +117,7 @@
     <div v-else class="pending-center__content">
       <div class="pending-center__list">
         <div
-          v-for="game in paginatedGames"
+          v-for="game in filteredGames"
           :key="game.id"
           class="pending-game"
           :class="{ 'pending-game--active': activeGame?.id === game.id }"
@@ -177,16 +171,6 @@
               </a-tag>
             </a-space>
           </div>
-        </div>
-
-        <div v-if="totalPages > 1" class="pending-center__pagination">
-          <a-pagination
-            v-model:current="currentPage"
-            :total="filteredGames.length"
-            :page-size="itemsPerPage"
-            show-total
-            show-jumper
-          />
         </div>
       </div>
 
@@ -330,29 +314,19 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import gamesService from '@/services/games.service'
-import reviewIssuesService from '@/services/review-issues.service'
-import type { Game, ReviewIssueOverride } from '@/services/types'
+import type { Game } from '@/services/types'
 import EditGameModal from '@/components/EditGameModal.vue'
 import {
   getPendingIssueDetailLabel,
-  getIgnoredPendingIssueDetails,
-  getPendingIssueDetails,
   getPendingIssueLabel,
-  getPendingIssues,
   isSeverePendingGame,
   pendingIssueDefinitions,
   pendingIssueDetailDefinitions,
-  type PendingIssueDetailKey,
   type PendingIssueKey,
 } from '@/utils/pendingIssues'
 import { createDetailRouteQuery } from '@/utils/navigation'
-import {
-  IconBook,
-  IconEdit,
-  IconRefresh,
-  IconRight,
-  IconSearch,
-} from '@arco-design/web-vue/es/icon'
+import { PENDING_WORKBENCH_WINDOW_SIZE, usePendingWorkbench } from '@/composables/usePendingWorkbench'
+import { IconBook, IconEdit, IconRefresh, IconRight, IconSearch } from '@arco-design/web-vue/es/icon'
 
 defineOptions({
   name: 'PendingCenterView',
@@ -362,172 +336,38 @@ const route = useRoute()
 const router = useRouter()
 const uiStore = useUiStore()
 
-const isLoading = ref(false)
-const pendingGames = ref<Game[]>([])
-const activeGame = ref<Game | null>(null)
 const editingGame = ref<Game | null>(null)
 const showEditModal = ref(false)
-const reviewIssueOverrides = ref<ReviewIssueOverride[]>([])
-
-const searchQuery = ref('')
-const selectedIssue = ref<PendingIssueKey | undefined>()
-const sortBy = ref<'issue-count' | 'created-desc' | 'updated-asc' | 'downloads-desc'>('issue-count')
-const onlySevere = ref(false)
-const onlyRecent = ref(false)
-const showIgnored = ref(false)
-const currentPage = ref(1)
-const itemsPerPage = ref(5)
 const detailHeroFit = ref<'cover' | 'contain'>('cover')
 
-const pageSizeOptions = [
-  { label: '5 / 页', value: 5 },
-  { label: '10 / 页', value: 10 },
-  { label: '20 / 页', value: 20 },
-]
+const {
+  activeGame,
+  filteredGames,
+  getIgnoredDetails,
+  getIgnoredIssueDetails,
+  getVisibleIssueDetails,
+  getVisibleIssueGroups,
+  ignoredOverridesCount,
+  ignoreIssue,
+  isLoading,
+  issueCounts,
+  loadWorkbenchGames,
+  onlyRecent,
+  onlySevere,
+  resetFilters,
+  restoreIssue,
+  reviewOverrideMap,
+  searchQuery,
+  selectedIssue,
+  showIgnored,
+  sortBy,
+  totalPendingCount,
+  totalWindowCount,
+} = usePendingWorkbench({
+  addAlert: (message, type) => uiStore.addAlert(message, type),
+})
 
 const placeholderImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23424242" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/%3E%3C/svg%3E'
-
-const reviewOverrideMap = computed<Record<string, ReviewIssueOverride[]>>(() => {
-  return reviewIssueOverrides.value.reduce<Record<string, ReviewIssueOverride[]>>((acc, item) => {
-    const key = String(item.game_id)
-    if (!acc[key]) {
-      acc[key] = []
-    }
-    acc[key].push(item)
-    return acc
-  }, {})
-})
-
-const ignoredOverridesCount = computed(() => reviewIssueOverrides.value.length)
-
-const totalPendingCount = computed(() => pendingGames.value.filter((game) => hasVisibleIssues(game)).length)
-
-const getIgnoredDetails = (gameId: number | string): PendingIssueDetailKey[] => {
-  return (reviewOverrideMap.value[String(gameId)] || [])
-    .filter((item) => item.status === 'ignored')
-    .map((item) => item.issue_key as PendingIssueDetailKey)
-}
-
-const getVisibleIssueGroups = (game: Game) => getPendingIssues(game, getIgnoredDetails(game.id))
-const getVisibleIssueDetails = (game: Game) => getPendingIssueDetails(game, getIgnoredDetails(game.id))
-const getIgnoredIssueDetails = (game: Game) => getIgnoredPendingIssueDetails(game, getIgnoredDetails(game.id))
-const hasVisibleIssues = (game: Game) => getVisibleIssueDetails(game).length > 0
-
-const issueCounts = computed(() => {
-  const counts = {} as Record<PendingIssueKey, number>
-  pendingIssueDefinitions.forEach((definition) => {
-    counts[definition.key] = pendingGames.value.filter((game) =>
-      getVisibleIssueGroups(game).includes(definition.key),
-    ).length
-  })
-  return counts
-})
-
-const filteredGames = computed(() => {
-  const keyword = searchQuery.value.trim().toLowerCase()
-  const recentThreshold = Date.now() - 7 * 24 * 60 * 60 * 1000
-
-  const games = pendingGames.value.filter((game) => {
-    if (!showIgnored.value && !hasVisibleIssues(game)) {
-      return false
-    }
-
-    if (selectedIssue.value && !getVisibleIssueGroups(game).includes(selectedIssue.value)) {
-      return false
-    }
-
-    if (onlySevere.value && !isSeverePendingGame(game, getIgnoredDetails(game.id))) {
-      return false
-    }
-
-    if (onlyRecent.value) {
-      const createdAt = new Date(game.created_at).getTime()
-      if (Number.isNaN(createdAt) || createdAt < recentThreshold) {
-        return false
-      }
-    }
-
-    if (!keyword) {
-      return true
-    }
-
-    const metadata = [
-      game.title,
-      game.summary || '',
-      ...(game.developers || []).map((item) => item.name),
-      ...(game.publishers || []).map((item) => item.name),
-      ...(game.platforms || []),
-    ]
-
-    return metadata.join(' ').toLowerCase().includes(keyword)
-  })
-
-  return [...games].sort((left, right) => {
-    if (sortBy.value === 'created-desc') {
-      return new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
-    }
-    if (sortBy.value === 'updated-asc') {
-      return new Date(left.updated_at).getTime() - new Date(right.updated_at).getTime()
-    }
-    if (sortBy.value === 'downloads-desc') {
-      return (right.downloads || 0) - (left.downloads || 0)
-    }
-    return getVisibleIssueDetails(right).length - getVisibleIssueDetails(left).length
-  })
-})
-
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredGames.value.length / itemsPerPage.value)))
-
-const paginatedGames = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage.value
-  const end = start + itemsPerPage.value
-  return filteredGames.value.slice(start, end)
-})
-
-const pageStart = computed(() => {
-  if (filteredGames.value.length === 0) return 0
-  return (currentPage.value - 1) * itemsPerPage.value + 1
-})
-
-const pageEnd = computed(() => {
-  if (filteredGames.value.length === 0) return 0
-  return Math.min(currentPage.value * itemsPerPage.value, filteredGames.value.length)
-})
-
-watch(
-  filteredGames,
-  () => {
-    currentPage.value = 1
-  },
-)
-
-watch(
-  [filteredGames, itemsPerPage],
-  () => {
-    if (currentPage.value > totalPages.value) {
-      currentPage.value = totalPages.value
-    }
-  },
-  { immediate: true },
-)
-
-watch(
-  paginatedGames,
-  (games) => {
-    if (games.length === 0) {
-      activeGame.value = null
-      return
-    }
-
-    const currentActiveId = activeGame.value ? String(activeGame.value.id) : null
-    const matched = currentActiveId
-      ? games.find((game) => String(game.id) === currentActiveId)
-      : null
-
-    activeGame.value = matched || games[0]
-  },
-  { immediate: true },
-)
 
 watch(
   activeGame,
@@ -545,15 +385,11 @@ const activeGameDetails = computed(() => {
   return [
     ...getVisibleIssueDetails(activeGame.value).map((key) => {
       const definition = pendingIssueDetailDefinitions.find((item) => item.key === key)
-      return definition
-        ? { ...definition, ignored: false, reason: '' }
-        : null
+      return definition ? { ...definition, ignored: false, reason: '' } : null
     }),
     ...getIgnoredIssueDetails(activeGame.value).map((key) => {
       const definition = pendingIssueDetailDefinitions.find((item) => item.key === key)
-      return definition
-        ? { ...definition, ignored: true, reason: activeOverrideReasonMap[key] || '' }
-        : null
+      return definition ? { ...definition, ignored: true, reason: activeOverrideReasonMap[key] || '' } : null
     }),
   ].filter((item): item is NonNullable<typeof item> => Boolean(item))
 })
@@ -568,7 +404,6 @@ const getDetailHeroImage = (game: Game) => {
 
 const updateDetailHeroFit = (event: Event) => {
   const target = event.target as HTMLImageElement | null
-
   if (!target?.naturalWidth || !target.naturalHeight) {
     detailHeroFit.value = 'cover'
     return
@@ -591,41 +426,6 @@ const selectGame = (game: Game) => {
 
 const toggleIssueFilter = (key: PendingIssueKey) => {
   selectedIssue.value = selectedIssue.value === key ? undefined : key
-}
-
-const resetFilters = () => {
-  searchQuery.value = ''
-  selectedIssue.value = undefined
-  sortBy.value = 'issue-count'
-  onlySevere.value = false
-  onlyRecent.value = false
-  showIgnored.value = false
-  currentPage.value = 1
-}
-
-const ignoreIssue = async (game: Game, issueKey: PendingIssueDetailKey) => {
-  try {
-    const override = await reviewIssuesService.ignore(String(game.id), issueKey)
-    reviewIssueOverrides.value = [
-      ...reviewIssueOverrides.value.filter((item) => !(item.game_id === override.game_id && item.issue_key === override.issue_key)),
-      override,
-    ]
-    uiStore.addAlert(`已忽略 ${getPendingIssueDetailLabel(issueKey)}`, 'success')
-  } catch {
-    uiStore.addAlert('忽略问题失败', 'error')
-  }
-}
-
-const restoreIssue = async (game: Game, issueKey: PendingIssueDetailKey) => {
-  try {
-    await reviewIssuesService.restore(String(game.id), issueKey)
-    reviewIssueOverrides.value = reviewIssueOverrides.value.filter(
-      (item) => !(item.game_id === game.id && item.issue_key === issueKey),
-    )
-    uiStore.addAlert(`已恢复 ${getPendingIssueDetailLabel(issueKey)}`, 'success')
-  } catch {
-    uiStore.addAlert('恢复问题失败', 'error')
-  }
 }
 
 const openEdit = async (game: Game) => {
@@ -653,34 +453,13 @@ const viewGame = (game: Game) => {
   })
 }
 
-const loadPendingGames = async () => {
-  isLoading.value = true
-  try {
-    const response = await gamesService.getGames({
-      page: 1,
-      pageSize: 500,
-      sort: {
-        field: 'updated_at',
-        order: 'desc',
-      },
-    })
-
-    reviewIssueOverrides.value = await reviewIssuesService.list(response.data.map((game) => game.id))
-    pendingGames.value = response.data.filter((game) => getPendingIssueDetails(game).length > 0)
-  } catch {
-    uiStore.addAlert('加载待处理中心失败', 'error')
-  } finally {
-    isLoading.value = false
-  }
-}
-
 const handleEditSuccess = async () => {
   showEditModal.value = false
-  await loadPendingGames()
+  await loadWorkbenchGames()
 }
 
 onMounted(async () => {
-  await loadPendingGames()
+  await loadWorkbenchGames()
 })
 </script>
 
@@ -806,12 +585,6 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.pending-center__pagination {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 4px;
 }
 
 .pending-game {

@@ -10,7 +10,7 @@ export default {
     games: '游戏库',
     series: '系列库',
     pending: {
-      center: '待处理中心',
+      center: '待处理工作台',
     },
     notFound: '未找到页面',
     'game.detail': '游戏详情',
