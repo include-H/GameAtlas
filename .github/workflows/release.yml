@@ -14,20 +14,26 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.22'
           cache-dependency-path: backend/go.sum
+
+      - name: Ensure embedded web placeholder
+        working-directory: backend
+        run: |
+          mkdir -p web/dist
+          touch web/dist/.gitkeep
 
       - name: Install frontend dependencies
         working-directory: frontend
@@ -45,9 +51,9 @@ jobs:
         working-directory: backend
         run: go mod download
 
-      - name: Run backend tests
+      - name: Run backend checks
         working-directory: backend
-        run: go test ./...
+        run: bash check.sh
 
       - name: Build release package
         env:
