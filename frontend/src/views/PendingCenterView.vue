@@ -9,7 +9,7 @@
       </div>
 
       <a-space>
-        <a-button class="app-text-action-btn" type="text" @click="loadWorkbenchGames">
+        <a-button class="app-text-action-btn" type="text" @click="refreshWorkbench">
           <template #icon>
             <icon-refresh />
           </template>
@@ -140,7 +140,7 @@
                 <a-tag v-if="getIgnoredIssueDetails(game).length > 0" color="gray">
                   已忽略 {{ getIgnoredIssueDetails(game).length }} 项
                 </a-tag>
-                <a-tag v-if="isSeverePendingGame(game, getIgnoredDetails(game.id))" color="orangered">严重</a-tag>
+                <a-tag v-if="isSevereGame(game)" color="orangered">严重</a-tag>
               </a-space>
             </div>
 
@@ -329,9 +329,9 @@ import EditGameModal from '@/components/EditGameModal.vue'
 import {
   getPendingIssueDetailLabel,
   getPendingIssueLabel,
-  isSeverePendingGame,
   pendingIssueDefinitions,
   pendingIssueDetailDefinitions,
+  type PendingIssueDetailKey,
   type PendingIssueKey,
 } from '@/utils/pendingIssues'
 import { createDetailRouteQuery } from '@/utils/navigation'
@@ -356,12 +356,13 @@ const {
   currentBatchCount,
   currentPage,
   filteredGames,
-  getIgnoredDetails,
+  getIssueEvaluation,
   getIgnoredIssueDetails,
   getVisibleIssueDetails,
   getVisibleIssueGroups,
   ignoredOverridesCount,
   ignoreIssue,
+  isSevereGame,
   isLoading,
   issueCounts,
   loadWorkbenchGames,
@@ -382,6 +383,14 @@ const {
 
 const placeholderImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23424242" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/%3E%3C/svg%3E'
 
+type PendingIssueDetailDefinition = (typeof pendingIssueDetailDefinitions)[number]
+const pendingIssueDetailDefinitionMap = pendingIssueDetailDefinitions.reduce<
+  Record<PendingIssueDetailKey, PendingIssueDetailDefinition>
+>((acc, item) => {
+  acc[item.key] = item
+  return acc
+}, {} as Record<PendingIssueDetailKey, PendingIssueDetailDefinition>)
+
 watch(
   activeGame,
   () => {
@@ -394,14 +403,15 @@ const activeGameDetails = computed(() => {
   if (!activeGame.value) return []
   const activeOverrides = reviewOverrideMap.value[String(activeGame.value.id)] || []
   const activeOverrideReasonMap = Object.fromEntries(activeOverrides.map((item) => [item.issue_key, item.reason || '']))
+  const evaluation = getIssueEvaluation(activeGame.value)
 
   return [
-    ...getVisibleIssueDetails(activeGame.value).map((key) => {
-      const definition = pendingIssueDetailDefinitions.find((item) => item.key === key)
+    ...evaluation.details.map((key) => {
+      const definition = pendingIssueDetailDefinitionMap[key]
       return definition ? { ...definition, ignored: false, reason: '' } : null
     }),
-    ...getIgnoredIssueDetails(activeGame.value).map((key) => {
-      const definition = pendingIssueDetailDefinitions.find((item) => item.key === key)
+    ...evaluation.ignoredDetails.map((key) => {
+      const definition = pendingIssueDetailDefinitionMap[key]
       return definition ? { ...definition, ignored: true, reason: activeOverrideReasonMap[key] || '' } : null
     }),
   ].filter((item): item is NonNullable<typeof item> => Boolean(item))
@@ -464,6 +474,10 @@ const viewGame = (game: Game) => {
     params: { id: String(game.id) },
     query: createDetailRouteQuery(route),
   })
+}
+
+const refreshWorkbench = async () => {
+  await loadWorkbenchGames()
 }
 
 const handleEditSuccess = async () => {

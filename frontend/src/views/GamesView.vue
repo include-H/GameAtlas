@@ -193,6 +193,9 @@
       <span class="results-count">
         显示 {{ games?.length || 0 }} / {{ pagination?.total || 0 }} 个游戏
       </span>
+      <span v-if="pendingStats" class="results-count">
+        待处理统计: 共 {{ pendingStats.total }} 条，命中 {{ pendingStats.matched }} 条，严重 {{ pendingStats.severe }} 条
+      </span>
     </div>
 
     <!-- Loading State -->
@@ -288,7 +291,13 @@ import { useUiStore } from '@/stores/ui'
 import gamesService from '@/services/games.service'
 import platformService from '@/services/platforms.service'
 import tagsService from '@/services/tags.service'
-import { getPendingIssueLabel, matchesPendingIssue } from '@/utils/pendingIssues'
+import {
+  evaluatePendingIssues,
+  getPendingIssueLabel,
+  matchesPendingIssueEvaluation,
+  type PendingIssueEvaluation,
+  type PendingIssueKey,
+} from '@/utils/pendingIssues'
 import { createDetailRouteQuery } from '@/utils/navigation'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import type { Game, GameFilter, GameSort, Tag, TagGroup } from '@/services/types'
@@ -342,6 +351,7 @@ const sortOptions = ref([
 ])
 
 const visibleGames = ref<Game[]>([])
+const pendingEvaluatedGames = ref<Array<{ game: Game; evaluation: PendingIssueEvaluation }>>([])
 const visiblePagination = ref({
   total: 0,
   page: 1,
@@ -423,6 +433,26 @@ const pageTitle = computed(() => {
   if (needsFilter.value) return `${needsFilterLabel.value}`
   if (route.query.status === 'pending-review') return '待处理的游戏'
   return '所有游戏'
+})
+
+const pendingStats = computed<null | { total: number; matched: number; severe: number }>(() => {
+  if (!needsFilter.value || pendingEvaluatedGames.value.length === 0) return null
+
+  const targetKey = needsFilter.value as PendingIssueKey
+  const matched = pendingEvaluatedGames.value.filter(({ evaluation }) =>
+    matchesPendingIssueEvaluation(evaluation, targetKey),
+  )
+  const severe = matched.filter(({ evaluation }) =>
+    evaluation.details.length >= 3 ||
+    evaluation.groups.includes('missing-files') ||
+    (evaluation.groups.includes('missing-assets') && evaluation.groups.includes('missing-wiki')),
+  )
+
+  return {
+    total: pendingEvaluatedGames.value.length,
+    matched: matched.length,
+    severe: severe.length,
+  }
 })
 
 const platformLabelMap = computed<Record<string, string>>(() => {
@@ -639,7 +669,14 @@ const loadGames = async () => {
           }
         }),
       )
-      const filteredGames = detailedGames.filter((game) => matchesPendingIssue(game, needsFilter.value))
+      const evaluatedGames = detailedGames.map((game) => ({
+        game,
+        evaluation: evaluatePendingIssues(game),
+      }))
+      pendingEvaluatedGames.value = evaluatedGames
+      const filteredGames = evaluatedGames
+        .filter(({ evaluation }) => matchesPendingIssueEvaluation(evaluation, needsFilter.value))
+        .map(({ game }) => game)
       visibleGames.value = filteredGames
       visiblePagination.value = {
         total: filteredGames.length,
@@ -648,6 +685,7 @@ const loadGames = async () => {
         totalPages: 1,
       }
     } else if (sort.field === 'title') {
+      pendingEvaluatedGames.value = []
       const allGames = await gamesService.getAllGames({
         pageSize: 200,
         filter,
@@ -675,6 +713,7 @@ const loadGames = async () => {
         totalPages,
       }
     } else {
+      pendingEvaluatedGames.value = []
       const response = await gamesStore.fetchGames({
         page,
         pageSize: itemsPerPage.value,

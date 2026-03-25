@@ -29,7 +29,7 @@ interface PendingIssueDetailDefinition {
   group: PendingIssueKey
 }
 
-interface PendingIssueEvaluation {
+export interface PendingIssueEvaluation {
   groups: PendingIssueKey[]
   details: PendingIssueDetailKey[]
   ignoredDetails: PendingIssueDetailKey[]
@@ -106,6 +106,14 @@ export const pendingIssueDetailDefinitions: PendingIssueDetailDefinition[] = [
   },
 ]
 
+const pendingIssueDetailGroupMap = pendingIssueDetailDefinitions.reduce<Record<PendingIssueDetailKey, PendingIssueKey>>(
+  (acc, item) => {
+    acc[item.key] = item.group
+    return acc
+  },
+  {} as Record<PendingIssueDetailKey, PendingIssueKey>,
+)
+
 export function getPendingIssueLabel(key?: string | null) {
   return pendingIssueDefinitions.find((item) => item.key === key)?.label || '待处理'
 }
@@ -114,7 +122,7 @@ export function getPendingIssueDetailLabel(key?: string | null) {
   return pendingIssueDetailDefinitions.find((item) => item.key === key)?.label || '待补充'
 }
 
-function evaluatePendingIssues(game: Game, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueEvaluation {
+export function evaluatePendingIssues(game: Game, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueEvaluation {
   const details: PendingIssueDetailKey[] = []
   const ignoredSet = new Set(ignoredDetails)
 
@@ -172,7 +180,7 @@ function evaluatePendingIssues(game: Game, ignoredDetails: PendingIssueDetailKey
   const visibleDetails = details.filter((detail) => !ignoredSet.has(detail))
   const groups = Array.from(new Set(
     visibleDetails
-      .map((detail) => pendingIssueDetailDefinitions.find((item) => item.key === detail)?.group)
+      .map((detail) => pendingIssueDetailGroupMap[detail])
       .filter((group): group is PendingIssueKey => Boolean(group)),
   ))
 
@@ -181,6 +189,14 @@ function evaluatePendingIssues(game: Game, ignoredDetails: PendingIssueDetailKey
     details: visibleDetails,
     ignoredDetails: details.filter((detail) => ignoredSet.has(detail)),
   }
+}
+
+export function isSeverePendingEvaluation(evaluation: PendingIssueEvaluation) {
+  return (
+    evaluation.details.length >= 3 ||
+    evaluation.groups.includes('missing-files') ||
+    (evaluation.groups.includes('missing-assets') && evaluation.groups.includes('missing-wiki'))
+  )
 }
 
 export function getPendingIssues(game: Game, ignoredDetails: PendingIssueDetailKey[] = []): PendingIssueKey[] {
@@ -196,15 +212,14 @@ export function getIgnoredPendingIssueDetails(game: Game, ignoredDetails: Pendin
 }
 
 export function isSeverePendingGame(game: Game, ignoredDetails: PendingIssueDetailKey[] = []) {
-  const evaluation = evaluatePendingIssues(game, ignoredDetails)
-  return (
-    evaluation.details.length >= 3 ||
-    evaluation.groups.includes('missing-files') ||
-    (evaluation.groups.includes('missing-assets') && evaluation.groups.includes('missing-wiki'))
-  )
+  return isSeverePendingEvaluation(evaluatePendingIssues(game, ignoredDetails))
+}
+
+export function matchesPendingIssueEvaluation(evaluation: PendingIssueEvaluation, key?: string | null) {
+  if (!key) return true
+  return evaluation.groups.includes(key as PendingIssueKey)
 }
 
 export function matchesPendingIssue(game: Game, key?: string | null) {
-  if (!key) return true
-  return evaluatePendingIssues(game).groups.includes(key as PendingIssueKey)
+  return matchesPendingIssueEvaluation(evaluatePendingIssues(game), key)
 }

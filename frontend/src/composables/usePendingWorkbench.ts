@@ -5,11 +5,10 @@ import pendingWorkbenchService, {
 import reviewIssuesService from '@/services/review-issues.service'
 import type { Game, ReviewIssueOverride } from '@/services/types'
 import {
-  getIgnoredPendingIssueDetails,
-  getPendingIssueDetails,
-  getPendingIssues,
-  isSeverePendingGame,
+  evaluatePendingIssues,
+  isSeverePendingEvaluation,
   pendingIssueDefinitions,
+  type PendingIssueEvaluation,
   type PendingIssueDetailKey,
   type PendingIssueKey,
 } from '@/utils/pendingIssues'
@@ -27,6 +26,12 @@ interface UsePendingWorkbenchOptions {
 }
 
 export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
+  const emptyEvaluation: PendingIssueEvaluation = {
+    groups: [],
+    details: [],
+    ignoredDetails: [],
+  }
+
   const isLoading = ref(false)
   const queueGames = ref<Game[]>([])
   const activeGame = ref<Game | null>(null)
@@ -57,16 +62,38 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   const ignoredOverridesCount = computed(() => reviewIssueOverrides.value.length)
   const currentBatchCount = computed(() => queueGames.value.length)
 
+  const ignoredDetailMap = computed<Record<string, PendingIssueDetailKey[]>>(() => {
+    return Object.entries(reviewOverrideMap.value).reduce<Record<string, PendingIssueDetailKey[]>>((acc, [gameId, items]) => {
+      acc[gameId] = items
+        .filter((item) => item.status === 'ignored')
+        .map((item) => item.issue_key as PendingIssueDetailKey)
+      return acc
+    }, {})
+  })
+
   const getIgnoredDetails = (gameId: number | string): PendingIssueDetailKey[] => {
-    return (reviewOverrideMap.value[String(gameId)] || [])
-      .filter((item) => item.status === 'ignored')
-      .map((item) => item.issue_key as PendingIssueDetailKey)
+    return ignoredDetailMap.value[String(gameId)] || []
   }
 
-  const getVisibleIssueGroups = (game: Game) => getPendingIssues(game, getIgnoredDetails(game.id))
-  const getVisibleIssueDetails = (game: Game) => getPendingIssueDetails(game, getIgnoredDetails(game.id))
-  const getIgnoredIssueDetails = (game: Game) => getIgnoredPendingIssueDetails(game, getIgnoredDetails(game.id))
-  const hasVisibleIssues = (game: Game) => getVisibleIssueDetails(game).length > 0
+  const gameIssueEvaluationMap = computed<Record<string, PendingIssueEvaluation>>(() => {
+    return queueGames.value.reduce<Record<string, PendingIssueEvaluation>>((acc, game) => {
+      acc[String(game.id)] = evaluatePendingIssues(game, getIgnoredDetails(game.id))
+      return acc
+    }, {})
+  })
+
+  const getIssueEvaluation = (game: Game): PendingIssueEvaluation => {
+    return gameIssueEvaluationMap.value[String(game.id)] || emptyEvaluation
+  }
+
+  const isSevereGame = (game: Game) => {
+    return isSeverePendingEvaluation(getIssueEvaluation(game))
+  }
+
+  const getVisibleIssueGroups = (game: Game) => getIssueEvaluation(game).groups
+  const getVisibleIssueDetails = (game: Game) => getIssueEvaluation(game).details
+  const getIgnoredIssueDetails = (game: Game) => getIssueEvaluation(game).ignoredDetails
+  const hasVisibleIssues = (game: Game) => getIssueEvaluation(game).details.length > 0
 
   const issueCounts = computed(() => {
     const counts = {} as Record<PendingIssueKey, number>
@@ -91,7 +118,7 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
         return false
       }
 
-      if (onlySevere.value && !isSeverePendingGame(game, getIgnoredDetails(game.id))) {
+      if (onlySevere.value && !isSevereGame(game)) {
         return false
       }
 
@@ -127,7 +154,7 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
       if (sortBy.value === 'downloads-desc') {
         return (right.downloads || 0) - (left.downloads || 0)
       }
-      return getVisibleIssueDetails(right).length - getVisibleIssueDetails(left).length
+      return getIssueEvaluation(right).details.length - getIssueEvaluation(left).details.length
     })
   })
 
@@ -237,6 +264,8 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     totalPendingCount,
     reviewOverrideMap,
     getIgnoredDetails,
+    getIssueEvaluation,
+    isSevereGame,
     getIgnoredIssueDetails,
     getVisibleIssueDetails,
     getVisibleIssueGroups,
