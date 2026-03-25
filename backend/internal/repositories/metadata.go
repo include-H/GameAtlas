@@ -94,7 +94,7 @@ func (r *MetadataRepository) CreateSimple(table string, input domain.MetadataWri
 }
 
 func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([]domain.Game, error) {
-	where := "WHERE gs.series_id = ?"
+	where := "WHERE g.series_id = ?"
 	args := []any{seriesID}
 	if !includeAll {
 		where += " AND g.visibility = ?"
@@ -134,9 +134,8 @@ func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([
 			g.created_at,
 			g.updated_at
 		FROM games g
-		INNER JOIN game_series gs ON gs.game_id = g.id
 		%s
-		ORDER BY g.updated_at DESC, gs.sort_order ASC, g.id DESC
+		ORDER BY g.updated_at DESC, g.id DESC
 	`, where)
 
 	if err := r.db.Select(&games, query, args...); err != nil {
@@ -144,6 +143,23 @@ func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([
 	}
 
 	return games, nil
+}
+
+func (r *MetadataRepository) DeleteUnusedSeries() error {
+	const query = `
+		DELETE FROM series
+		WHERE id NOT IN (
+			SELECT DISTINCT series_id
+			FROM games
+			WHERE series_id IS NOT NULL
+		)
+	`
+
+	if _, err := r.db.Exec(query); err != nil {
+		return fmt.Errorf("delete unused series: %w", err)
+	}
+
+	return nil
 }
 
 func (r *MetadataRepository) DeleteUnused(table, joinTable, joinColumn string) error {

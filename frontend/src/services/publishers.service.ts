@@ -1,9 +1,9 @@
 import { get, post } from './api'
-import type { ApiResponse, Publisher } from './types'
+import type { ApiEnvelope, Publisher } from './types'
 
 async function listPublishers(): Promise<Publisher[]> {
-  const response = await get<ApiResponse<Publisher[]>>('/publishers')
-  return response.data || []
+  const response = await get<ApiEnvelope<Publisher[]>>('/publishers')
+  return response.data
 }
 
 export const publishersService = {
@@ -25,7 +25,7 @@ export const publishersService = {
     slug?: string
     sort_order?: number
   }): Promise<Publisher> {
-    const response = await post<ApiResponse<Publisher>>('/publishers', data)
+    const response = await post<ApiEnvelope<Publisher>>('/publishers', data)
     return response.data
   },
 }

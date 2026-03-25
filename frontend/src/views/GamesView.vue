@@ -283,7 +283,7 @@ import platformService from '@/services/platforms.service'
 import tagsService from '@/services/tags.service'
 import { createDetailRouteQuery } from '@/utils/navigation'
 import { getHttpErrorMessage } from '@/utils/http-error'
-import type { Game, GameFilter, GameSort, Tag, TagGroup } from '@/services/types'
+import type { GameListItem, GameListQuery, GameSort, Tag, TagGroup } from '@/services/types'
 import GameCard from '@/components/GameCard.vue'
 import AddGameModal from '@/components/AddGameModal.vue'
 import { Modal, Message } from '@arco-design/web-vue'
@@ -333,11 +333,11 @@ const sortOptions = ref([
   { label: '随机', value: 'random_desc' },
 ])
 
-const visibleGames = ref<Game[]>([])
+const visibleGames = ref<GameListItem[]>([])
 const visiblePagination = ref({
   total: 0,
   page: 1,
-  pageSize: 24,
+  limit: 24,
   totalPages: 0,
 })
 const games = computed(() => visibleGames.value)
@@ -377,9 +377,9 @@ const sortBy = computed({
   },
 })
 const itemsPerPage = computed({
-  get: () => parseInt(route.query.pageSize as string) || 24,
-  set: (pageSize: number) => {
-    updateRoute({ pageSize: pageSize.toString(), page: '1' })
+  get: () => parseInt(route.query.limit as string) || 24,
+  set: (limit: number) => {
+    updateRoute({ limit: limit.toString(), page: '1' })
   },
 })
 
@@ -402,14 +402,14 @@ const hasActiveFilters = computed(() => {
     selectedPlatform.value ||
     selectedTagIds.value.length > 0 ||
     filterFavorites.value ||
-    route.query.status === 'pending-review'
+    route.query.needs_review === 'true'
 })
 
 const pageTitle = computed(() => {
   const filter = props.filter || route.query.filter
   if (filter === 'favorites') return '收藏的游戏'
   if (filter === 'recent') return '最近下载'
-  if (route.query.status === 'pending-review') return '待处理的游戏'
+  if (route.query.needs_review === 'true') return '待处理的游戏'
   return '所有游戏'
 })
 
@@ -433,7 +433,7 @@ const updateRoute = (newParams: LocationQueryRaw) => {
   })
   
   // Reset page when filters or search change
-  if (newParams.search !== undefined || newParams.platform !== undefined || newParams.tag !== undefined || newParams.filter !== undefined || newParams.status !== undefined) {
+  if (newParams.search !== undefined || newParams.platform !== undefined || newParams.tag !== undefined || newParams.filter !== undefined || newParams.needs_review !== undefined) {
     query.page = '1'
   }
   
@@ -593,12 +593,14 @@ const loadGames = async () => {
     field === 'created' || field === 'title' || field === 'release' || field === 'downloads' || field === 'random'
       ? field
       : 'created'
-  const filter: GameFilter = {
+  const query: GameListQuery = {
+    page,
+    limit: itemsPerPage.value,
     search: (route.query.search as string) || undefined,
     platform: (route.query.platform as string) || undefined,
-    tag_ids: selectedTagIds.value,
+    tag: selectedTagIds.value,
     favorite: filterFavorites.value || undefined,
-    status: (route.query.status as string) || undefined,
+    needs_review: route.query.needs_review === 'true' ? true : undefined,
   }
   const resolvedSortOrder: GameSort['order'] = order === 'asc' ? 'asc' : 'desc'
   const sort: GameSort = {
@@ -609,16 +611,14 @@ const loadGames = async () => {
 
   try {
     const response = await gamesStore.fetchGames({
-      page,
-      pageSize: itemsPerPage.value,
-      filter,
+      query,
       sort,
     })
     visibleGames.value = response.data
     visiblePagination.value = {
       total: response.pagination.total,
       page: response.pagination.page,
-      pageSize: response.pagination.limit,
+      limit: response.pagination.limit,
       totalPages: response.pagination.totalPages,
     }
   } catch {

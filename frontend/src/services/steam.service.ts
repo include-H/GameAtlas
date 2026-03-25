@@ -1,5 +1,5 @@
 import { API_BASE_URL, get, post } from './api'
-import type { ApiResponse, SteamFetchImagesResponse, SteamGameDetails, SteamGameSearchResult } from './types'
+import type { ApiEnvelope, SteamFetchImagesResponse, SteamGameDetails, SteamGameSearchResult } from './types'
 
 interface SteamSearchApiItem {
   app_id: number
@@ -62,7 +62,7 @@ export function proxySteamAssetUrl(rawUrl?: string | null): string {
 const steamService = {
   async searchGames(query: string): Promise<SteamGameSearchResult[]> {
     if (!query || query.trim().length === 0) return []
-    const response = await get<ApiResponse<SteamSearchApiItem[]>>('/steam/search', {
+    const response = await get<ApiEnvelope<SteamSearchApiItem[]>>('/steam/search', {
       params: {
         q: query.trim(),
       },
@@ -71,7 +71,7 @@ const steamService = {
   },
 
   async getGameDetails(appId: string): Promise<SteamGameDetails> {
-    const response = await get<ApiResponse<SteamAssetsApiItem>>(`/steam/${appId}/assets`)
+    const response = await get<ApiEnvelope<SteamAssetsApiItem>>(`/steam/${appId}/assets`)
     const data = response.data
     return {
       name: data.name,
@@ -91,7 +91,7 @@ const steamService = {
   },
 
   async applyAssets(appId: string, payload: { game_id: number; cover_url?: string; banner_url?: string; screenshot_urls: string[] }): Promise<SteamFetchImagesResponse> {
-    const response = await post<ApiResponse<SteamAssetsApiItem>>(`/steam/${appId}/apply-assets`, payload, {
+    const response = await post<ApiEnvelope<SteamAssetsApiItem>>(`/steam/${appId}/apply-assets`, payload, {
       // DASH trailer import can take longer than default API timeout.
       timeout: 5 * 60 * 1000,
     })

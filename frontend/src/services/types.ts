@@ -1,11 +1,11 @@
-export interface ApiResponse<T> {
+export interface ApiEnvelope<T> {
   success?: boolean
   data: T
   message?: string
   error?: string
 }
 
-export interface PaginatedResponse<T> {
+export interface ApiPageEnvelope<T> {
   data: T[]
   pagination: {
     page: number
@@ -29,7 +29,7 @@ export interface Series {
 
 export interface SeriesDetail {
   series: Series
-  games: Game[]
+  games: GameListItemView[]
 }
 
 export interface Platform {
@@ -106,59 +106,66 @@ export interface GameFileEntry {
 }
 
 export interface ScreenshotItem {
-  id?: number
-  asset_uid?: string
+  id: number
+  asset_uid: string
   path: string
-  sort_order?: number
+  sort_order: number
 }
 
 export interface VideoAssetItem {
-  id?: number
-  asset_uid?: string
+  id: number
+  asset_uid: string
   path: string
-  sort_order?: number
+  sort_order: number
 }
 
-export interface Game {
+export interface GameListItemDto {
   id: number
-  public_id?: string
+  public_id: string
   title: string
-  title_alt?: string | null
-  visibility?: 'public' | 'private'
-  summary?: string | null
-  developer?: string
-  publisher?: string
-  release_date?: string | null
-  engine?: string | null
-  platform?: string
-  platforms?: string[]
-  series?: Series[]
-  developers?: Developer[]
-  publishers?: Publisher[]
-  tags?: Tag[]
-  tag_groups?: GameTagGroup[]
-  cover_image?: string | null
-  banner_image?: string | null
-  preview_videos?: VideoAssetItem[]
-  screenshot_items?: ScreenshotItem[]
-  wiki_content?: string | null
-  wiki_content_html?: string | null
-  files?: GameFileEntry[]
-  needs_review?: boolean
-  primary_screenshot?: string | null
-  screenshot_count?: number
-  file_count?: number
-  developer_count?: number
-  publisher_count?: number
-  platform_count?: number
+  title_alt: string | null
+  visibility: 'public' | 'private'
+  summary: string | null
+  release_date: string | null
+  engine: string | null
+  cover_image: string | null
+  banner_image: string | null
+  wiki_content: string | null
+  wiki_content_html: string | null
+  needs_review: boolean
+  primary_screenshot: string | null
+  screenshot_count: number
+  file_count: number
+  developer_count: number
+  publisher_count: number
+  platform_count: number
   downloads: number
   created_at: string
   updated_at: string
-  wiki_updated_at?: string
-  isFavorite?: boolean
 }
 
-export interface GameInput {
+export interface GameDetailDto extends Omit<GameListItemDto, 'primary_screenshot' | 'screenshot_count' | 'file_count' | 'developer_count' | 'publisher_count' | 'platform_count'> {
+  preview_video: VideoAssetItem | null
+  preview_videos: VideoAssetItem[]
+  screenshots: ScreenshotItem[]
+  series: Series | null
+  platforms: Platform[]
+  developers: Developer[]
+  publishers: Publisher[]
+  tags: Tag[]
+  tag_groups: GameTagGroup[]
+  files: GameFileEntry[]
+}
+
+export interface TimelineGameResponse {
+  id: number
+  public_id: string
+  title: string
+  release_date: string | null
+  cover_image: string | null
+}
+
+export interface GameWriteRequest {
   title: string
   title_alt?: string | null
   visibility?: 'public' | 'private'
@@ -168,13 +175,35 @@ export interface GameInput {
   cover_image?: string | null
   banner_image?: string | null
   needs_review?: boolean
-  series?: number[]
-  developers?: number[]
-  publishers?: number[]
-  platforms?: Array<number | string>
+  series_id?: number | null
+  developer_ids?: number[]
+  publisher_ids?: number[]
+  platform_ids?: number[]
   preview_video_asset_uid?: string | null
   tag_ids?: number[]
 }
+
+export interface GameListQuery {
+  page?: number
+  limit?: number
+  search?: string
+  series?: string
+  platform?: string
+  tag?: number[]
+  needs_review?: boolean
+  pending?: boolean
+  favorite?: boolean
+}
+
+export interface Favoritable {
+  isFavorite?: boolean
+}
+
+export type GameListItemView = GameListItemDto & Favoritable
+export type GameDetailView = GameDetailDto & Favoritable
+export type GameListItem = GameListItemView
+export type GameDetail = GameDetailView
+export type TimelineGame = TimelineGameResponse & Favoritable
 
 export interface GameVersion {
   id: string
@@ -195,20 +224,10 @@ export interface GameStats {
   total_games: number
   total_downloads: number
   total_size: number
-  recent_games: Game[]
-  popular_games: Game[]
+  recent_games: GameListItem[]
+  popular_games: GameListItem[]
   favorite_count: number
   pending_reviews: number
-}
-
-export interface GameFilter {
-  search?: string
-  series?: string
-  platform?: string
-  tag_ids?: number[]
-  favorite?: boolean
-  status?: string
-  pending_queue?: boolean
 }
 
 export interface GameSort {

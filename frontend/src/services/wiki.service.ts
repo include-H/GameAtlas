@@ -1,10 +1,10 @@
 import { get, put } from './api'
-import type { ApiResponse } from './types'
+import type { ApiEnvelope } from './types'
 
-export interface WikiContent {
-  content?: string
-  html?: string
-  updated_at?: string
+export interface WikiDocumentResponse {
+  content: string | null
+  content_html: string | null
+  updated_at: string
 }
 
 export interface WikiHistoryEntry {
@@ -15,18 +15,10 @@ export interface WikiHistoryEntry {
 }
 
 const wikiService = {
-  async getWikiPage(gameId: string): Promise<WikiContent | null> {
+  async getWikiPage(gameId: string): Promise<WikiDocumentResponse | null> {
     try {
-      const response = await get<ApiResponse<{
-        content: string | null
-        content_html: string | null
-        updated_at: string
-      }>>(`/games/${gameId}/wiki`)
-      return {
-        content: response.data.content || '',
-        html: response.data.content_html || '',
-        updated_at: response.data.updated_at,
-      }
+      const response = await get<ApiEnvelope<WikiDocumentResponse>>(`/games/${gameId}/wiki`)
+      return response.data
     } catch {
       return null
     }
@@ -35,24 +27,16 @@ const wikiService = {
   async updateWikiPage(gameId: string, data: {
     content: string
     change_summary?: string
-  }): Promise<WikiContent | null> {
-    const response = await put<ApiResponse<{
-      content: string | null
-      content_html: string | null
-      updated_at: string
-    }>>(`/games/${gameId}/wiki`, data)
-    return {
-      content: response.data.content || '',
-      html: response.data.content_html || '',
-      updated_at: response.data.updated_at,
-    }
+  }): Promise<WikiDocumentResponse | null> {
+    const response = await put<ApiEnvelope<WikiDocumentResponse>>(`/games/${gameId}/wiki`, data)
+    return response.data
   },
 
   async getWikiHistory(gameId: string, limit = 50): Promise<WikiHistoryEntry[]> {
-    const response = await get<ApiResponse<WikiHistoryEntry[]>>(`/games/${gameId}/wiki/history`, {
+    const response = await get<ApiEnvelope<WikiHistoryEntry[]>>(`/games/${gameId}/wiki/history`, {
       params: { limit },
     })
-    return response.data || []
+    return response.data
   },
 }
 

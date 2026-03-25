@@ -1,5 +1,5 @@
 import { get } from './api'
-import type { ApiResponse } from './types'
+import type { ApiEnvelope } from './types'
 
 export interface DirectoryItem {
   name: string
@@ -34,11 +34,11 @@ interface DirectoryListData {
 
 export const directoryService = {
   getDefaultDirectory(): Promise<string> {
-    return get<ApiResponse<DirectoryDefaultData>>('/directory/default').then((res) => res.data.path)
+    return get<ApiEnvelope<DirectoryDefaultData>>('/directory/default').then((res) => res.data.path)
   },
 
   listDirectory(path?: string): Promise<DirectoryListResponse> {
-    return get<ApiResponse<DirectoryListData>>('/directory/list', { params: path ? { path } : undefined }).then((res) => ({
+    return get<ApiEnvelope<DirectoryListData>>('/directory/list', { params: path ? { path } : undefined }).then((res) => ({
       currentPath: res.data.current_path,
       parentPath: res.data.parent_path,
       items: (res.data.items || []).map((item) => ({

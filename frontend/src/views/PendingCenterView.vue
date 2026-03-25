@@ -144,16 +144,6 @@
               </a-space>
             </div>
 
-            <a-space wrap size="small" class="pending-game__tags">
-              <a-tag
-                v-for="issue in getVisibleIssueGroups(game)"
-                :key="issue"
-                color="arcoblue"
-              >
-                {{ getPendingIssueLabel(issue) }}
-              </a-tag>
-            </a-space>
-
             <a-space wrap size="small" class="pending-game__detail-tags">
               <a-tag
                 v-for="detail in getVisibleIssueDetails(game)"
@@ -265,19 +255,19 @@
             <div class="detail-overview">
               <div class="detail-overview__item">
                 <span>文件</span>
-                <strong>{{ activeGame.files?.length || activeGame.file_count || 0 }}</strong>
+                <strong>{{ activeGame.file_count || 0 }}</strong>
               </div>
               <div class="detail-overview__item">
                 <span>截图</span>
-                <strong>{{ activeGame.screenshot_items?.length || activeGame.screenshot_count || 0 }}</strong>
+                <strong>{{ activeGame.screenshot_count || 0 }}</strong>
               </div>
               <div class="detail-overview__item">
                 <span>开发商</span>
-                <strong>{{ activeGame.developers?.length || activeGame.developer_count || 0 }}</strong>
+                <strong>{{ activeGame.developer_count || 0 }}</strong>
               </div>
               <div class="detail-overview__item">
                 <span>平台</span>
-                <strong>{{ activeGame.platforms?.length || (activeGame.platform ? 1 : 0) || activeGame.platform_count || 0 }}</strong>
+                <strong>{{ activeGame.platform_count || 0 }}</strong>
               </div>
             </div>
           </div>
@@ -324,7 +314,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import gamesService from '@/services/games.service'
-import type { Game } from '@/services/types'
+import type { GameDetail, GameListItem } from '@/services/types'
 import EditGameModal from '@/components/EditGameModal.vue'
 import {
   getPendingIssueDetailLabel,
@@ -346,7 +336,7 @@ const route = useRoute()
 const router = useRouter()
 const uiStore = useUiStore()
 
-const editingGame = ref<Game | null>(null)
+const editingGame = ref<GameDetail | null>(null)
 const showEditModal = ref(false)
 const detailHeroFit = ref<'cover' | 'contain'>('cover')
 
@@ -358,8 +348,8 @@ const {
   filteredGames,
   getIssueEvaluation,
   getIgnoredIssueDetails,
-  getVisibleIssueDetails,
   getVisibleIssueGroups,
+  getVisibleIssueDetails,
   ignoredOverridesCount,
   ignoreIssue,
   isSevereGame,
@@ -417,12 +407,12 @@ const activeGameDetails = computed(() => {
   ].filter((item): item is NonNullable<typeof item> => Boolean(item))
 })
 
-const getDisplayImage = (game: Game) => {
-  return game.cover_image || game.banner_image || game.primary_screenshot || game.screenshot_items?.[0]?.path || placeholderImage
+const getDisplayImage = (game: GameListItem) => {
+  return game.cover_image || game.banner_image || game.primary_screenshot || placeholderImage
 }
 
-const getDetailHeroImage = (game: Game) => {
-  return game.banner_image || game.cover_image || game.primary_screenshot || game.screenshot_items?.[0]?.path || placeholderImage
+const getDetailHeroImage = (game: GameListItem) => {
+  return game.banner_image || game.cover_image || game.primary_screenshot || placeholderImage
 }
 
 const updateDetailHeroFit = (event: Event) => {
@@ -443,7 +433,7 @@ const formatDate = (value?: string | null) => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
-const selectGame = (game: Game) => {
+const selectGame = (game: GameListItem) => {
   activeGame.value = game
 }
 
@@ -451,7 +441,7 @@ const toggleIssueFilter = (key: PendingIssueKey) => {
   selectedIssue.value = selectedIssue.value === key ? undefined : key
 }
 
-const openEdit = async (game: Game) => {
+const openEdit = async (game: GameListItem) => {
   if (!game.public_id) return
   try {
     editingGame.value = await gamesService.getGame(game.public_id)
@@ -461,7 +451,7 @@ const openEdit = async (game: Game) => {
   }
 }
 
-const openWiki = (game: Game) => {
+const openWiki = (game: GameListItem) => {
   if (!game.public_id) return
   router.push({
     name: 'wiki-edit',
@@ -470,7 +460,7 @@ const openWiki = (game: Game) => {
   })
 }
 
-const viewGame = (game: Game) => {
+const viewGame = (game: GameListItem) => {
   if (!game.public_id) return
   router.push({
     name: 'game-detail',
@@ -684,7 +674,6 @@ onMounted(async () => {
   font-size: 12px;
 }
 
-.pending-game__tags,
 .pending-game__detail-tags {
   display: flex;
 }

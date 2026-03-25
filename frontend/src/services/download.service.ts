@@ -1,5 +1,5 @@
 import { post } from './api'
-import type { ApiResponse } from './types'
+import type { ApiEnvelope } from './types'
 
 const downloadService = {
   getDownloadUrl(gameId: string): string {
@@ -33,7 +33,7 @@ const downloadService = {
   },
 
   async recordDownload(gameId: string, fileId: string): Promise<void> {
-    await post<ApiResponse<{ recorded: boolean }>>(`/games/${gameId}/files/${fileId}/downloads`)
+    await post<ApiEnvelope<{ recorded: boolean }>>(`/games/${gameId}/files/${fileId}/downloads`)
   },
 
   async startDownload(gameId: string, versionId?: string): Promise<{

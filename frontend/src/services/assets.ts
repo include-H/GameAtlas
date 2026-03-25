@@ -1,5 +1,5 @@
 import api from './api'
-import type { ApiResponse } from './types'
+import type { ApiEnvelope } from './types'
 
 export interface UploadedAssetResult {
   path: string
@@ -19,7 +19,7 @@ export async function uploadAsset(
   form.append('sort_order', String(sortOrder))
   form.append('file', file)
 
-  const { data } = await api.post<ApiResponse<UploadedAssetResult>>(`/assets/${assetType}`, form, {
+  const { data } = await api.post<ApiEnvelope<UploadedAssetResult>>(`/assets/${assetType}`, form, {
     headers: { 'Content-Type': 'multipart/form-data' },
     onUploadProgress: (event) => {
       if (!onProgress || !event.total) return
@@ -37,7 +37,7 @@ export async function deleteAsset(
   assetId?: number,
   assetUid?: string,
 ) {
-  const { data } = await api.delete<ApiResponse<{ deleted: boolean }>>('/assets', {
+  const { data } = await api.delete<ApiEnvelope<{ deleted: boolean }>>('/assets', {
     data: {
       game_id: gameId,
       asset_id: assetId,
@@ -51,7 +51,7 @@ export async function deleteAsset(
 }
 
 export async function reorderScreenshots(gameId: number, assetUids: string[]) {
-  const { data } = await api.put<ApiResponse<{ updated: boolean }>>('/assets/screenshot/order', {
+  const { data } = await api.put<ApiEnvelope<{ updated: boolean }>>('/assets/screenshot/order', {
     game_id: gameId,
     asset_uids: assetUids,
   })
@@ -60,7 +60,7 @@ export async function reorderScreenshots(gameId: number, assetUids: string[]) {
 }
 
 export async function reorderVideos(gameId: number, assetUids: string[]) {
-  const { data } = await api.put<ApiResponse<{ updated: boolean }>>('/assets/video/order', {
+  const { data } = await api.put<ApiEnvelope<{ updated: boolean }>>('/assets/video/order', {
     game_id: gameId,
     asset_uids: assetUids,
   })

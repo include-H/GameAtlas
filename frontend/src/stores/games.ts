@@ -2,33 +2,33 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import gamesService from '@/services/games.service'
 import { getWebSocketService, type WebSocketEvent } from '@/services/websocket'
-import type { Game, GameVersion, GameFilter, GameSort, GameStats } from '@/services/types'
+import type { GameDetail, GameListItem, GameListQuery, GameSort, GameStats, GameVersion } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
 
 export const useGamesStore = defineStore('games', () => {
   // State
-  const games = ref<Game[]>([])
-  const currentGame = ref<Game | null>(null)
+  const games = ref<GameListItem[]>([])
+  const currentGame = ref<GameDetail | null>(null)
   const currentVersions = ref<GameVersion[]>([])
   const stats = ref<GameStats | null>(null)
 
   const pagination = ref({
     total: 0,
     page: 1,
-    pageSize: 20,
+    limit: 20,
     totalPages: 0,
   })
 
   const isLoading = ref(false)
   const error = ref<string | null>(null)
-  let lastListQuery: { page: number; pageSize: number; filter?: GameFilter; sort?: GameSort } | null = null
+  let lastListQuery: { query: GameListQuery; sort?: GameSort } | null = null
 
   // Computed
   const hasMorePages = computed(() => pagination.value.page < pagination.value.totalPages)
   const totalPages = computed(() => pagination.value.totalPages)
 
   const applyFavoriteState = (gameId: string, isFavorite: boolean) => {
-    const updateGame = (game: Game) => {
+    const updateGame = (game: { isFavorite?: boolean }) => {
       game.isFavorite = isFavorite
     }
 
@@ -79,9 +79,7 @@ export const useGamesStore = defineStore('games', () => {
   // Actions
   const fetchGames = async (
     params: {
-      page?: number
-      pageSize?: number
-      filter?: GameFilter
+      query?: GameListQuery
       sort?: GameSort
       append?: boolean
     } = {}
@@ -89,22 +87,26 @@ export const useGamesStore = defineStore('games', () => {
     isLoading.value = true
     error.value = null
 
-    const page = params.page ?? 1
-    const pageSize = params.pageSize ?? pagination.value.pageSize
+    const page = params.query?.page ?? 1
+    const limit = params.query?.limit ?? pagination.value.limit
     const append = params.append ?? false
 
     lastListQuery = {
-      page,
-      pageSize,
-      filter: params.filter,
+      query: {
+        ...params.query,
+        page,
+        limit,
+      },
       sort: params.sort,
     }
 
     try {
       const response = await gamesService.getGames({
-        page,
-        pageSize,
-        filter: params.filter,
+        query: {
+          ...params.query,
+          page,
+          limit,
+        },
         sort: params.sort,
       })
 
@@ -117,7 +119,7 @@ export const useGamesStore = defineStore('games', () => {
       pagination.value = {
         total: response.pagination.total,
         page: response.pagination.page,
-        pageSize: response.pagination.limit,
+        limit: response.pagination.limit,
         totalPages: response.pagination.totalPages,
       }
 

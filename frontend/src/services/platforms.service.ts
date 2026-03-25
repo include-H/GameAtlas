@@ -1,10 +1,10 @@
 import { get, post } from './api'
-import type { ApiResponse, Platform } from './types'
+import type { ApiEnvelope, Platform } from './types'
 
 const platformService = {
   async getAllPlatforms(): Promise<Platform[]> {
-    const response = await get<ApiResponse<Platform[]>>('/platforms')
-    return response.data || []
+    const response = await get<ApiEnvelope<Platform[]>>('/platforms')
+    return response.data
   },
 
   async searchPlatforms(query: string, limit?: number): Promise<Platform[]> {
@@ -20,7 +20,7 @@ const platformService = {
     slug?: string
     sort_order?: number
   }): Promise<Platform> {
-    const response = await post<ApiResponse<Platform>>('/platforms', data)
+    const response = await post<ApiEnvelope<Platform>>('/platforms', data)
     return response.data
   },
 }

@@ -56,7 +56,7 @@ type GameDetail struct {
 	PreviewVideo  *domain.GameAsset
 	PreviewVideos []domain.GameAsset
 	Screenshots   []domain.GameAsset
-	Series        []domain.MetadataItem
+	Series        *domain.MetadataItem
 	Platforms     []domain.MetadataItem
 	Developers    []domain.MetadataItem
 	Publishers    []domain.MetadataItem
@@ -187,7 +187,7 @@ func (s *GamesService) GetDetail(id int64, includeAll bool) (*GameDetail, error)
 	if err != nil {
 		return nil, err
 	}
-	series, err := s.gamesRepo.ListMetadata("series", "game_series", "series_id", id)
+	primarySeries, err := s.gamesRepo.GetSeriesMetadata(id)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +232,7 @@ func (s *GamesService) GetDetail(id int64, includeAll bool) (*GameDetail, error)
 		PreviewVideo:  previewVideo,
 		PreviewVideos: videos,
 		Screenshots:   screenshots,
-		Series:        emptyMetadata(series),
+		Series:        primarySeries,
 		Platforms:     emptyMetadata(platforms),
 		Developers:    emptyMetadata(developers),
 		Publishers:    emptyMetadata(publishers),
@@ -391,12 +391,15 @@ func (s *GamesService) Delete(id int64) error {
 }
 
 func (s *GamesService) cleanupUnusedMetadata() error {
+	if err := s.metadataRepo.DeleteUnusedSeries(); err != nil {
+		return err
+	}
+
 	targets := []struct {
 		table      string
 		joinTable  string
 		joinColumn string
 	}{
-		{table: "series", joinTable: "game_series", joinColumn: "series_id"},
 		{table: "platforms", joinTable: "game_platforms", joinColumn: "platform_id"},
 		{table: "developers", joinTable: "game_developers", joinColumn: "developer_id"},
 		{table: "publishers", joinTable: "game_publishers", joinColumn: "publisher_id"},
@@ -455,7 +458,6 @@ func trimGameInput(input domain.GameWriteInput) domain.GameWriteInput {
 	input.CoverImage = trimStringPtr(input.CoverImage)
 	input.BannerImage = trimStringPtr(input.BannerImage)
 	input.PreviewVideoAssetUID = trimStringPtr(input.PreviewVideoAssetUID)
-	input.SeriesIDs = uniqueIDs(input.SeriesIDs)
 	input.PlatformIDs = uniqueIDs(input.PlatformIDs)
 	input.DeveloperIDs = uniqueIDs(input.DeveloperIDs)
 	input.PublisherIDs = uniqueIDs(input.PublisherIDs)

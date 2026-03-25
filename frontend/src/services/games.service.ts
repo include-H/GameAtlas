@@ -1,27 +1,28 @@
-import { get, post, put, del } from './api'
+import { del, get, post, put } from './api'
 import type {
-  ApiResponse,
+  ApiEnvelope,
+  ApiPageEnvelope,
   Developer,
-  Game,
+  GameDetail,
+  GameDetailDto,
   GameFileEntry,
-  GameFilter,
-  GameInput,
-  GameTagGroup,
+  GameListItem,
+  GameListItemDto,
+  GameListQuery,
   GameSort,
   GameStats,
   GameVersion,
-  PaginatedResponse,
+  GameWriteRequest,
   Platform,
   Publisher,
   Series,
-  Tag,
+  TimelineGame,
+  TimelineGameResponse,
 } from './types'
 import {
   applyFavorite,
   getFavoriteCount,
-  mapGameListItem,
   readFavorites,
-  type GameListApiItem,
   writeFavorites,
 } from './game-list-helpers'
 
@@ -33,56 +34,13 @@ interface MetadataApiItem {
   created_at: string
 }
 
-interface GameFileApiItem {
-  id: number
-  game_id: number
-  file_name: string
-  file_path?: string
-  label: string | null
-  notes: string | null
-  size_bytes: number | null
-  sort_order: number
-  source_created_at: string | null
-  created_at: string
-  updated_at: string
-}
-
-interface ScreenshotApiItem {
-  id: number
-  asset_uid: string
-  path: string
-  sort_order: number
-}
-
-interface GameDetailApiItem extends GameListApiItem {
-  wiki_content: string | null
-  wiki_content_html: string | null
-  preview_videos: ScreenshotApiItem[]
-  screenshots: ScreenshotApiItem[]
-  series: MetadataApiItem[]
-  platforms: MetadataApiItem[]
-  developers: MetadataApiItem[]
-  publishers: MetadataApiItem[]
-  tags: Tag[]
-  tag_groups: GameTagGroup[]
-  files: GameFileApiItem[]
-}
-
 interface GameStatsApiResponse {
   total_games: number
   total_downloads: number
   total_size: number
-  recent_games: GameListApiItem[]
-  popular_games: GameListApiItem[]
+  recent_games: GameListItemDto[]
+  popular_games: GameListItemDto[]
   pending_reviews: number
-}
-
-interface TimelineGameApiItem {
-  id: number
-  public_id: string
-  title: string
-  release_date: string | null
-  cover_image: string | null
 }
 
 interface TimelinePaginationApi {
@@ -94,7 +52,7 @@ interface TimelinePaginationApi {
 }
 
 interface TimelineGamesApiResponse {
-  data: TimelineGameApiItem[]
+  data: TimelineGameResponse[]
   pagination: TimelinePaginationApi
 }
 
@@ -114,7 +72,7 @@ export interface AggregateDeleteAssetInput {
 }
 
 export interface AggregateUpdateInput {
-  game: Partial<GameInput>
+  game: Partial<GameWriteRequest>
   files: AggregateFileInput[]
   delete_assets: AggregateDeleteAssetInput[]
   screenshot_order_asset_uids: string[]
@@ -122,55 +80,44 @@ export interface AggregateUpdateInput {
 }
 
 interface AggregateUpdateApiResponse {
-  game: GameListApiItem
+  game: GameListItemDto
   warnings?: {
     asset_delete_paths?: string[]
   }
 }
 
 type TimelineGamesResult = {
-  data: Game[]
+  data: TimelineGame[]
   hasMore: boolean
   nextCursor: string | null
   from: string | null
   to: string | null
 }
 
-function mapMetadataItem<T extends Series | Platform | Developer | Publisher>(item: MetadataApiItem): T {
-  return item as T
+type GameFileReleaseSource = Pick<GameFileEntry, 'source_created_at' | 'created_at'>
+
+function annotateFavorite<T extends { public_id: string }>(item: T, favoriteIds?: Set<string>) {
+  return applyFavorite(item, favoriteIds)
 }
 
-function mapFile(file: GameFileApiItem): GameFileEntry {
-  return { ...file }
+function sortByOrder<T extends { sort_order: number }>(items: T[]): T[] {
+  return [...items].sort((a, b) => a.sort_order - b.sort_order)
 }
 
-function mapGameDetail(item: GameDetailApiItem): Game {
-  const screenshots = [...item.screenshots].sort((a, b) => a.sort_order - b.sort_order)
-  const files = [...item.files].sort((a, b) => a.sort_order - b.sort_order)
+function normalizeGameDetail(item: GameDetailDto): GameDetail {
   const favoriteIds = new Set(readFavorites())
-
-  return applyFavorite({
-    ...mapGameListItem(item, favoriteIds),
-    series: item.series.map((value) => mapMetadataItem<Series>(value)),
-    developers: item.developers.map((value) => mapMetadataItem<Developer>(value)),
-    publishers: item.publishers.map((value) => mapMetadataItem<Publisher>(value)),
+  return annotateFavorite({
+    ...item,
+    preview_videos: sortByOrder(item.preview_videos || []),
+    screenshots: sortByOrder(item.screenshots || []),
+    files: sortByOrder(item.files || []),
+    series: item.series || null,
+    platforms: item.platforms || [],
+    developers: item.developers || [],
+    publishers: item.publishers || [],
     tags: item.tags || [],
     tag_groups: item.tag_groups || [],
-    platforms: item.platforms.map((value) => value.name),
-    platform: item.platforms[0]?.name,
-    wiki_content: item.wiki_content,
-    wiki_content_html: item.wiki_content_html,
-    preview_videos: [...(item.preview_videos || [])].sort((a, b) => a.sort_order - b.sort_order),
-    screenshot_items: screenshots,
-    files: files.map(mapFile),
   }, favoriteIds)
-}
-
-function mapPlatformValues(values?: Array<number | string>): number[] {
-  if (!values || values.length === 0) return []
-  return values
-    .map((value) => Number(value))
-    .filter((value) => !Number.isNaN(value))
 }
 
 function getFileName(filePath?: string | null): string {
@@ -186,8 +133,6 @@ function canLaunchFromFileName(fileName?: string | null): boolean {
   return normalized.endsWith('.vhd') || normalized.endsWith('.vhdx')
 }
 
-type GameFileReleaseSource = Pick<GameFileEntry, 'source_created_at' | 'created_at'>
-
 function getGameFileReleaseDate(file: GameFileReleaseSource): string {
   return file.source_created_at || file.created_at || ''
 }
@@ -202,44 +147,26 @@ function getLatestGameFileTimestamp(files: GameFileReleaseSource[]): number {
   }, Number.NEGATIVE_INFINITY)
 }
 
-function mapTimelineItem(item: TimelineGameApiItem, favoriteIds?: Set<string>): Game {
-  return applyFavorite({
-    id: item.id,
-    public_id: item.public_id,
-    title: item.title,
-    release_date: item.release_date,
-    cover_image: item.cover_image,
-    downloads: 0,
-    created_at: '',
-    updated_at: '',
-    preview_videos: [],
-    screenshot_items: [],
-    files: [],
-  }, favoriteIds)
-}
-
 async function listMetadata<T extends Series | Platform | Developer | Publisher>(resource: string): Promise<T[]> {
-  const response = await get<ApiResponse<MetadataApiItem[]>>(`/${resource}`)
-  return (response.data || []).map((item) => mapMetadataItem<T>(item))
+  const response = await get<ApiEnvelope<MetadataApiItem[]>>(`/${resource}`)
+  return response.data.map((item) => item as T)
 }
 
 const gamesService = {
   async getGames(params?: {
-    page?: number
-    pageSize?: number
-    filter?: GameFilter
+    query?: GameListQuery
     sort?: GameSort
-  }): Promise<PaginatedResponse<Game>> {
+  }): Promise<ApiPageEnvelope<GameListItem>> {
     const queryParams = new URLSearchParams()
-    if (params?.page) queryParams.append('page', String(params.page))
-    if (params?.pageSize) queryParams.append('limit', String(params.pageSize))
-    if (params?.filter?.search) queryParams.append('search', params.filter.search)
-    if (params?.filter?.series) queryParams.append('series', params.filter.series)
-    if (params?.filter?.platform) queryParams.append('platform', params.filter.platform)
-    if (params?.filter?.status === 'pending-review') queryParams.append('needs_review', 'true')
-    if (params?.filter?.pending_queue) queryParams.append('pending', 'true')
-    if (params?.filter?.tag_ids?.length) {
-      params.filter.tag_ids.forEach((tagId) => {
+    if (params?.query?.page) queryParams.append('page', String(params.query.page))
+    if (params?.query?.limit) queryParams.append('limit', String(params.query.limit))
+    if (params?.query?.search) queryParams.append('search', params.query.search)
+    if (params?.query?.series) queryParams.append('series', params.query.series)
+    if (params?.query?.platform) queryParams.append('platform', params.query.platform)
+    if (typeof params?.query?.needs_review === 'boolean') queryParams.append('needs_review', String(params.query.needs_review))
+    if (typeof params?.query?.pending === 'boolean') queryParams.append('pending', String(params.query.pending))
+    if (params?.query?.tag?.length) {
+      params.query.tag.forEach((tagId) => {
         queryParams.append('tag', String(tagId))
       })
     }
@@ -251,12 +178,12 @@ const gamesService = {
       }
     }
 
-    const response = await get<PaginatedResponse<GameListApiItem>>('/games', { params: queryParams })
-    let games = response.data.map((item) => mapGameListItem(item))
+    const response = await get<ApiPageEnvelope<GameListItemDto>>('/games', { params: queryParams })
+    const favoriteIds = new Set(readFavorites())
+    let games = response.data.map((item) => annotateFavorite(item, favoriteIds))
 
-    if (params?.filter?.favorite) {
-      const favoriteIds = new Set(readFavorites())
-      games = games.filter((game) => Boolean(game.public_id) && favoriteIds.has(String(game.public_id)))
+    if (params?.query?.favorite) {
+      games = games.filter((game) => favoriteIds.has(String(game.public_id)))
     }
 
     return {
@@ -266,19 +193,21 @@ const gamesService = {
   },
 
   async getAllGames(params?: {
-    filter?: GameFilter
+    query?: Omit<GameListQuery, 'page' | 'limit'>
     sort?: GameSort
-    pageSize?: number
-  }): Promise<Game[]> {
-    const pageSize = Math.max(1, Math.min(params?.pageSize || 100, 200))
-    const allGames: Game[] = []
+    limit?: number
+  }): Promise<GameListItem[]> {
+    const limit = Math.max(1, Math.min(params?.limit || 100, 200))
+    const allGames: GameListItem[] = []
     let page = 1
 
     while (true) {
       const response = await this.getGames({
-        page,
-        pageSize,
-        filter: params?.filter,
+        query: {
+          ...params?.query,
+          page,
+          limit,
+        },
         sort: params?.sort,
       })
 
@@ -310,8 +239,9 @@ const gamesService = {
     if (params?.to) queryParams.append('to', params.to)
     const response = await get<TimelineGamesApiResponse>('/games/timeline', { params: queryParams })
     const favoriteIds = new Set(readFavorites())
+
     return {
-      data: (response.data || []).map((item) => mapTimelineItem(item, favoriteIds)),
+      data: response.data.map((item) => annotateFavorite(item, favoriteIds)),
       hasMore: Boolean(response.pagination?.hasMore),
       nextCursor: response.pagination?.nextCursor || null,
       from: response.pagination?.from || null,
@@ -319,13 +249,17 @@ const gamesService = {
     }
   },
 
-  async getGame(id: string): Promise<Game> {
-    const response = await get<ApiResponse<GameDetailApiItem>>(`/games/${id}`)
-    return mapGameDetail(response.data)
+  async getGame(id: string): Promise<GameDetail> {
+    const response = await get<ApiEnvelope<GameDetailDto>>(`/games/${id}`)
+    return normalizeGameDetail(response.data)
   },
 
-  async createGame(data: { title: string; visibility?: 'public' | 'private'; file_path?: string }): Promise<Game> {
-    const payload = {
+  async createGame(data: {
+    title: string
+    visibility?: 'public' | 'private'
+    file_path?: string
+  }): Promise<GameListItem> {
+    const payload: GameWriteRequest = {
       title: data.title,
       title_alt: null,
       visibility: data.visibility ?? 'public',
@@ -335,18 +269,18 @@ const gamesService = {
       cover_image: null,
       banner_image: null,
       needs_review: false,
-      series_ids: [],
+      series_id: null,
       platform_ids: [],
       developer_ids: [],
       publisher_ids: [],
       tag_ids: [],
     }
-    const response = await post<ApiResponse<GameListApiItem>>('/games', payload)
-    return mapGameListItem(response.data)
+    const response = await post<ApiEnvelope<GameListItemDto>>('/games', payload)
+    return annotateFavorite(response.data)
   },
 
-  async updateGame(id: string, data: Partial<GameInput>): Promise<Game> {
-    const payload = {
+  async updateGame(id: string, data: Partial<GameWriteRequest>): Promise<GameListItem> {
+    const payload: GameWriteRequest = {
       title: data.title || '',
       title_alt: data.title_alt ?? null,
       visibility: data.visibility ?? 'public',
@@ -357,17 +291,17 @@ const gamesService = {
       banner_image: data.banner_image ?? null,
       needs_review: data.needs_review ?? false,
       preview_video_asset_uid: data.preview_video_asset_uid ?? null,
-      series_ids: data.series || [],
-      platform_ids: mapPlatformValues(data.platforms),
-      developer_ids: data.developers || [],
-      publisher_ids: data.publishers || [],
+      series_id: data.series_id ?? null,
+      platform_ids: data.platform_ids || [],
+      developer_ids: data.developer_ids || [],
+      publisher_ids: data.publisher_ids || [],
       tag_ids: data.tag_ids || [],
     }
-    const response = await put<ApiResponse<GameListApiItem>>(`/games/${id}`, payload)
-    return mapGameListItem(response.data)
+    const response = await put<ApiEnvelope<GameListItemDto>>(`/games/${id}`, payload)
+    return annotateFavorite(response.data)
   },
 
-  async updateGameAggregate(id: string, data: AggregateUpdateInput): Promise<{ game: Game; warnings: string[] }> {
+  async updateGameAggregate(id: string, data: AggregateUpdateInput): Promise<{ game: GameListItem; warnings: string[] }> {
     const payload = {
       title: data.game.title || '',
       title_alt: data.game.title_alt ?? null,
@@ -379,10 +313,10 @@ const gamesService = {
       banner_image: data.game.banner_image ?? null,
       needs_review: data.game.needs_review ?? false,
       preview_video_asset_uid: data.game.preview_video_asset_uid ?? null,
-      series_ids: data.game.series || [],
-      platform_ids: mapPlatformValues(data.game.platforms),
-      developer_ids: data.game.developers || [],
-      publisher_ids: data.game.publishers || [],
+      series_id: data.game.series_id ?? null,
+      platform_ids: data.game.platform_ids || [],
+      developer_ids: data.game.developer_ids || [],
+      publisher_ids: data.game.publisher_ids || [],
       tag_ids: data.game.tag_ids || [],
       files: data.files.map((item) => ({
         id: item.id,
@@ -401,10 +335,10 @@ const gamesService = {
       video_order_asset_uids: data.video_order_asset_uids,
     }
 
-    const response = await put<ApiResponse<AggregateUpdateApiResponse>>(`/games/${id}/aggregate`, payload)
+    const response = await put<ApiEnvelope<AggregateUpdateApiResponse>>(`/games/${id}/aggregate`, payload)
     const warnings = response.data.warnings?.asset_delete_paths || []
     return {
-      game: mapGameListItem(response.data.game),
+      game: annotateFavorite(response.data.game),
       warnings,
     }
   },
@@ -415,8 +349,8 @@ const gamesService = {
     notes?: string | null
     sort_order: number
   }): Promise<GameFileEntry> {
-    const response = await post<ApiResponse<GameFileApiItem>>(`/games/${gameId}/files`, data)
-    return mapFile(response.data)
+    const response = await post<ApiEnvelope<GameFileEntry>>(`/games/${gameId}/files`, data)
+    return response.data
   },
 
   async updateGameFile(gameId: string, fileId: string, data: {
@@ -425,21 +359,21 @@ const gamesService = {
     notes?: string | null
     sort_order: number
   }): Promise<GameFileEntry> {
-    const response = await put<ApiResponse<GameFileApiItem>>(`/games/${gameId}/files/${fileId}`, data)
-    return mapFile(response.data)
+    const response = await put<ApiEnvelope<GameFileEntry>>(`/games/${gameId}/files/${fileId}`, data)
+    return response.data
   },
 
   async deleteGameFile(gameId: string, fileId: string): Promise<void> {
-    await del<ApiResponse<void>>(`/games/${gameId}/files/${fileId}`)
+    await del<ApiEnvelope<void>>(`/games/${gameId}/files/${fileId}`)
   },
 
   async deleteGame(id: string): Promise<void> {
-    await del<ApiResponse<void>>(`/games/${id}`)
+    await del<ApiEnvelope<void>>(`/games/${id}`)
   },
 
   async getGameVersions(gameId: string): Promise<GameVersion[]> {
     const game = await this.getGame(gameId)
-    const files = [...(game.files || [])].sort((a, b) => a.sort_order - b.sort_order)
+    const files = [...game.files].sort((a, b) => a.sort_order - b.sort_order)
     const latestTimestamp = getLatestGameFileTimestamp(files)
 
     return files.map((file, index) => ({
@@ -469,19 +403,20 @@ const gamesService = {
   },
 
   async getStats(): Promise<GameStats> {
-    const response = await get<ApiResponse<GameStatsApiResponse>>('/games/stats')
+    const response = await get<ApiEnvelope<GameStatsApiResponse>>('/games/stats')
+    const favoriteIds = new Set(readFavorites())
     return {
       total_games: response.data.total_games,
       total_downloads: response.data.total_downloads,
       total_size: response.data.total_size,
-      recent_games: response.data.recent_games.map((item) => mapGameListItem(item)),
-      popular_games: response.data.popular_games.map((item) => mapGameListItem(item)),
+      recent_games: response.data.recent_games.map((item) => annotateFavorite(item, favoriteIds)),
+      popular_games: response.data.popular_games.map((item) => annotateFavorite(item, favoriteIds)),
       favorite_count: getFavoriteCount(),
       pending_reviews: response.data.pending_reviews,
     }
   },
 
-  async addGameFromFile(filePath: string): Promise<{ success: Game[]; failed: never[] }> {
+  async addGameFromFile(filePath: string): Promise<{ success: GameListItem[]; failed: never[] }> {
     const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || 'Unknown Game'
     const title = fileName.replace(/\.[^/.]+$/, '')
     const game = await this.createGame({ title, file_path: filePath })

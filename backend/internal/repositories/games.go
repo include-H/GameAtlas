@@ -60,7 +60,7 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 		}
 	}
 	if params.SeriesID > 0 {
-		where = append(where, "EXISTS (SELECT 1 FROM game_series gs WHERE gs.game_id = g.id AND gs.series_id = :series_id)")
+		where = append(where, "g.series_id = :series_id")
 		args["series_id"] = params.SeriesID
 	}
 	if params.PlatformID > 0 {
@@ -455,8 +455,8 @@ func (r *GamesRepository) HasOlderTimelineGame(params domain.GamesTimelineParams
 func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, error) {
 	const query = `
 		INSERT INTO games (
-			public_id, title, title_alt, title_sort_key, visibility, summary, release_date, engine, cover_image, banner_image, needs_review, preview_video_asset_uid
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			public_id, title, title_alt, title_sort_key, visibility, summary, release_date, engine, cover_image, banner_image, needs_review, preview_video_asset_uid, series_id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING
 			id, public_id, title, title_alt, visibility, summary, release_date, engine, cover_image, banner_image,
 			wiki_content, wiki_content_html, needs_review, preview_video_asset_uid, downloads, created_at, updated_at`
@@ -477,6 +477,7 @@ func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, err
 		input.BannerImage,
 		boolToInt(input.NeedsReview),
 		input.PreviewVideoAssetUID,
+		input.SeriesID,
 	); err != nil {
 		return nil, fmt.Errorf("create game: %w", err)
 	}
@@ -503,6 +504,7 @@ func (r *GamesRepository) Update(id int64, input domain.GameWriteInput) (*domain
 			banner_image = ?,
 			needs_review = ?,
 			preview_video_asset_uid = ?,
+			series_id = ?,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`
 
@@ -519,6 +521,7 @@ func (r *GamesRepository) Update(id int64, input domain.GameWriteInput) (*domain
 		input.BannerImage,
 		boolToInt(input.NeedsReview),
 		input.PreviewVideoAssetUID,
+		input.SeriesID,
 		id,
 	)
 	if err != nil {
@@ -630,6 +633,7 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 			banner_image = ?,
 			needs_review = ?,
 			preview_video_asset_uid = ?,
+			series_id = ?,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`,
@@ -644,6 +648,7 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 		input.BannerImage,
 		boolToInt(input.NeedsReview),
 		input.PreviewVideoAssetUID,
+		input.SeriesID,
 		id,
 	)
 	if err != nil {
@@ -662,9 +667,6 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 }
 
 func (r *GamesRepository) replaceRelationsTx(tx *sqlx.Tx, gameID int64, input domain.GameWriteInput) error {
-	if err := replaceRelationRows(tx, "game_series", "series_id", gameID, input.SeriesIDs); err != nil {
-		return err
-	}
 	if err := replaceRelationRows(tx, "game_platforms", "platform_id", gameID, input.PlatformIDs); err != nil {
 		return err
 	}
@@ -1144,6 +1146,26 @@ func (r *GamesRepository) ListVideos(gameID int64) ([]domain.GameAsset, error) {
 	return r.listAssetsByType(gameID, "video")
 }
 
+func (r *GamesRepository) GetSeriesMetadata(gameID int64) (*domain.MetadataItem, error) {
+	const query = `
+		SELECT s.id, s.name, s.slug, s.sort_order, s.created_at
+		FROM games g
+		INNER JOIN series s ON s.id = g.series_id
+		WHERE g.id = ?
+		LIMIT 1
+	`
+
+	var item domain.MetadataItem
+	if err := r.db.Get(&item, query, gameID); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get series metadata: %w", err)
+	}
+
+	return &item, nil
+}
+
 func (r *GamesRepository) ListMetadata(table, joinTable, joinColumn string, gameID int64) ([]domain.MetadataItem, error) {
 	query := fmt.Sprintf(`
 		SELECT m.id, m.name, m.slug, m.sort_order, m.created_at
@@ -1167,10 +1189,6 @@ func (r *GamesRepository) replaceRelations(gameID int64, input domain.GameWriteI
 		return fmt.Errorf("begin relations update: %w", err)
 	}
 
-	if err := replaceRelationRows(tx, "game_series", "series_id", gameID, input.SeriesIDs); err != nil {
-		_ = tx.Rollback()
-		return err
-	}
 	if err := replaceRelationRows(tx, "game_platforms", "platform_id", gameID, input.PlatformIDs); err != nil {
 		_ = tx.Rollback()
 		return err

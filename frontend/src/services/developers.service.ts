@@ -1,9 +1,9 @@
 import { get, post } from './api'
-import type { ApiResponse, Developer } from './types'
+import type { ApiEnvelope, Developer } from './types'
 
 async function listDevelopers(): Promise<Developer[]> {
-  const response = await get<ApiResponse<Developer[]>>('/developers')
-  return response.data || []
+  const response = await get<ApiEnvelope<Developer[]>>('/developers')
+  return response.data
 }
 
 export const developersService = {
@@ -25,7 +25,7 @@ export const developersService = {
     slug?: string
     sort_order?: number
   }): Promise<Developer> {
-    const response = await post<ApiResponse<Developer>>('/developers', data)
+    const response = await post<ApiEnvelope<Developer>>('/developers', data)
     return response.data
   },
 }

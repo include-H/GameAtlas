@@ -1,6 +1,6 @@
 import { get, post } from './api'
-import type { ApiResponse, Series, SeriesDetail } from './types'
-import { mapGameListItem, readFavorites, type GameListApiItem } from './game-list-helpers'
+import type { ApiEnvelope, GameListItem, GameListItemDto, Series, SeriesDetail } from './types'
+import { applyFavorite, readFavorites } from './game-list-helpers'
 
 async function listSeriesWithParams(params?: {
   search?: string
@@ -11,7 +11,7 @@ async function listSeriesWithParams(params?: {
   if (params?.search) queryParams.append('search', params.search)
   if (params?.limit) queryParams.append('limit', String(params.limit))
   if (params?.sort) queryParams.append('sort', params.sort)
-  const response = await get<ApiResponse<Series[]>>('/series', { params: queryParams })
+  const response = await get<ApiEnvelope<Series[]>>('/series', { params: queryParams })
   return response.data || []
 }
 
@@ -25,11 +25,11 @@ export const seriesService = {
   },
 
   async getSeriesDetail(id: number | string): Promise<SeriesDetail> {
-    const response = await get<ApiResponse<{ series: Series; games: GameListApiItem[] }>>(`/series/${id}`)
+    const response = await get<ApiEnvelope<{ series: Series; games: GameListItemDto[] }>>(`/series/${id}`)
     const favoriteIds = new Set(readFavorites())
     return {
       series: response.data.series,
-      games: (response.data.games || []).map((item) => mapGameListItem(item, favoriteIds)),
+      games: response.data.games.map((item): GameListItem => applyFavorite(item, favoriteIds)),
     }
   },
 
@@ -47,7 +47,7 @@ export const seriesService = {
     slug?: string
     sort_order?: number
   }): Promise<Series> {
-    const response = await post<ApiResponse<Series>>('/series', data)
+    const response = await post<ApiEnvelope<Series>>('/series', data)
     return response.data
   },
 }

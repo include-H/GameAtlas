@@ -1,10 +1,10 @@
 import { get, post } from './api'
-import type { ApiResponse, Tag, TagGroup } from './types'
+import type { ApiEnvelope, Tag, TagGroup } from './types'
 
 const tagsService = {
   async getTagGroups(): Promise<TagGroup[]> {
-    const response = await get<ApiResponse<TagGroup[]>>('/tag-groups')
-    return response.data || []
+    const response = await get<ApiEnvelope<TagGroup[]>>('/tag-groups')
+    return response.data
   },
 
   async getTags(params?: {
@@ -17,10 +17,10 @@ const tagsService = {
     if (params?.group_key) searchParams.append('group_key', params.group_key)
     if (typeof params?.active === 'boolean') searchParams.append('active', String(params.active))
 
-    const response = await get<ApiResponse<Tag[]>>('/tags', {
+    const response = await get<ApiEnvelope<Tag[]>>('/tags', {
       params: searchParams,
     })
-    return response.data || []
+    return response.data
   },
 
   async createTagGroup(data: {
@@ -31,7 +31,7 @@ const tagsService = {
     allow_multiple?: boolean
     is_filterable?: boolean
   }): Promise<TagGroup> {
-    const response = await post<ApiResponse<TagGroup>>('/tag-groups', data)
+    const response = await post<ApiEnvelope<TagGroup>>('/tag-groups', data)
     return response.data
   },
 
@@ -43,7 +43,7 @@ const tagsService = {
     sort_order?: number
     is_active?: boolean
   }): Promise<Tag> {
-    const response = await post<ApiResponse<Tag>>('/tags', data)
+    const response = await post<ApiEnvelope<Tag>>('/tags', data)
     return response.data
   },
 }
