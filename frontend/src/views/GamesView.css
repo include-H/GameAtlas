@@ -1,0 +1,259 @@
+.games-view {
+  animation: fadeInUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.search-card {
+  border-radius: var(--radius-lg);
+  margin-bottom: 10px;
+}
+
+.search-card :deep(.arco-card-body) {
+  padding: 16px 20px;
+}
+
+.view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 10px;
+  gap: 10px;
+}
+
+.view-title {
+  margin: 0;
+  font-family: var(--font-family-base);
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.view-subtitle {
+  margin: 8px 0 0;
+  font-family: var(--font-family-base);
+  color: var(--color-text-2);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+@media (max-width: 767px) {
+  .view-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .view-title {
+    font-size: 28px;
+  }
+
+  .view-subtitle {
+    margin-top: 6px;
+    font-size: 14px;
+  }
+}
+
+.mb-4 {
+  margin-bottom: 16px;
+}
+
+.mt-3 {
+  margin-top: 12px;
+}
+
+.games-filters-col {
+  min-width: 0;
+}
+
+.games-filters-col :deep(.arco-input-wrapper),
+.games-filters-col :deep(.arco-select-view) {
+  width: 100%;
+}
+
+.tag-filter-section {
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border-2);
+}
+
+.tag-filter-section__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tag-filter-section__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-1);
+}
+
+.tag-filter-section__hint,
+.tag-filter-section__empty {
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.tag-filter-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tag-filter-grid-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tag-filter-drawer__group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tag-filter-drawer__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-2);
+}
+
+.results-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.results-count {
+  color: var(--color-text-3);
+  font-size: 14px;
+}
+
+.filter-label {
+  color: var(--color-text-3);
+  font-size: 14px;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+.loading-text {
+  color: var(--color-text-3);
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.games-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.games-grid__item {
+  min-width: 0;
+}
+
+.empty-state {
+  padding: 48px 0;
+}
+
+.empty-description h3 {
+  font-size: 16px;
+  margin: 16px 0 8px;
+  color: var(--color-text-1);
+}
+
+.empty-description p {
+  color: var(--color-text-3);
+  margin: 0;
+}
+
+@media (max-width: 1199px) {
+  .games-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1100px) {
+  .games-filters-row {
+    row-gap: 8px;
+  }
+
+  .games-filters-col--search,
+  .games-filters-col--platform,
+  .games-filters-col--sort,
+  .games-filters-col--page-size {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+
+  .games-filters-col--tags {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 576px) {
+  .games-filters-col--search,
+  .games-filters-col--platform,
+  .games-filters-col--sort,
+  .games-filters-col--page-size,
+  .games-filters-col--tags {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 991px) {
+  .games-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .games-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .games-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1600px) {
+  .games-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 2200px) {
+  .games-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+}

@@ -1,0 +1,583 @@
+.game-detail {
+  animation: fadeIn 0.3s ease;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.game-detail__container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.game-detail__top {
+  display: grid;
+  grid-template-columns: minmax(0, 68fr) minmax(280px, 30fr);
+  column-gap: 10px;
+  align-items: stretch;
+  margin-top: 10px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.game-detail__header {
+  position: relative;
+  z-index: 10;
+  padding: 24px 0 12px;
+}
+
+.header-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.header-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.header-title {
+  font-size: clamp(28px, 3.2vw, 36px);
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.back-button {
+  align-self: flex-start;
+}
+
+.game-detail__content {
+  width: 100%;
+  display: flex;
+  min-width: 0;
+}
+
+.game-detail__main {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  min-height: 420px;
+  height: 100%;
+}
+
+.game-detail__main > :deep(.screenshot-carousel) {
+  min-width: 0;
+  margin-bottom: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.game-detail__main > :deep(.screenshot-carousel__viewport) {
+  border-radius: var(--radius-lg);
+  min-height: 420px;
+}
+
+.game-detail__main > :deep(.screenshot-carousel__main) {
+  min-height: 420px;
+}
+
+.game-detail__main > :deep(.screenshot-carousel__filmstrip) {
+  border-radius: var(--radius-lg);
+}
+
+.game-detail__main > :deep(.screenshot-carousel__filmstrip-inner) {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.game-detail__card {
+  margin-bottom: 0;
+}
+
+.game-detail__card:last-child {
+  margin-bottom: 0;
+}
+
+.game-detail__wiki-section {
+  padding: 12px 0;
+  min-width: 0;
+}
+
+.game-detail__download-section {
+  padding: 10px 0 0;
+  min-width: 0;
+}
+
+.game-detail__wiki-wrapper {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.game-detail__wiki-card {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-radius: var(--radius-lg);
+  width: auto;
+}
+
+.game-detail__wiki-placeholder {
+  max-width: 100%;
+  margin: 0;
+  border-radius: var(--radius-lg);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.game-detail__wiki-placeholder :deep(.arco-card-body) {
+  padding: 0;
+}
+
+.game-detail__card :deep(.arco-card-header) {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--color-border-2);
+}
+
+.game-detail__card :deep(.arco-card-header-title) {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.game-detail__card :deep(.arco-card-body) {
+  padding: 20px;
+}
+
+.game-detail__wiki-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.game-detail__no-wiki {
+  text-align: center;
+  padding: 10px 12px;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.game-detail__no-wiki-text {
+  color: var(--color-text-3);
+  margin: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.game-detail__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  height: 100%;
+}
+
+.sidebar-card {
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-soft);
+}
+
+.sidebar-card--meta {
+  padding-top: 4px;
+  flex: 1;
+}
+
+.sidebar-header-image {
+  width: 100%;
+  aspect-ratio: 460 / 215;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.sidebar-header-image__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.sidebar-header-image__img--contain {
+  object-fit: contain;
+}
+
+.sidebar-header-image__placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  color: rgba(255, 255, 255, 0.1);
+  background: transparent;
+}
+
+.sidebar-summary {
+  padding: 12px;
+  font-size: 13px;
+  color: var(--color-text-2);
+  line-height: 1.5;
+  background: transparent;
+}
+
+.sidebar-info {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: min-content;
+  align-content: start;
+  gap: 12px 16px;
+  padding: 12px;
+}
+
+.sidebar-info__item {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sidebar-info__item--wide {
+  grid-column: 1 / -1;
+}
+
+.sidebar-info__item:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.sidebar-info__label {
+  font-size: 11px;
+  color: var(--color-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.sidebar-info__value {
+  font-size: 13px;
+  color: var(--color-text-1);
+  line-height: 1.4;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.sidebar-info__value :deep(.arco-space) {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  column-gap: 6px;
+}
+
+.sidebar-info__value :deep(.arco-space-item) {
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.sidebar-info__value :deep(.arco-tag) {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  height: auto;
+  min-height: 24px;
+  padding: 4px 8px;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.game-detail__loading {
+  text-align: center;
+  padding: 32px 24px;
+}
+
+.game-detail__loading-text {
+  margin-top: 12px;
+  color: var(--color-text-3);
+}
+
+.download-version-panel {
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  box-shadow: var(--shadow-soft);
+}
+
+.download-version-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 156px;
+  overflow-y: auto;
+  padding-right: 2px;
+  background: transparent;
+}
+
+.download-version-item {
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 10px;
+}
+
+.download-version-item + .download-version-item {
+  border-top: 1px solid var(--color-border-1);
+  padding-top: 8px;
+}
+
+.version-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 6px;
+}
+
+.version-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 0;
+}
+
+.version-name__text {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-1);
+  line-height: 1;
+}
+
+.version-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 14px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.version-badge--latest {
+  background: var(--color-fill-2);
+  color: var(--color-text-2);
+}
+
+.version-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.version-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 14px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-fill-2);
+  color: var(--color-text-2);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.version-meta-pill__label {
+  color: var(--color-text-3);
+}
+
+.version-size {
+  color: inherit;
+}
+
+.version-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.download-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 46px;
+  padding: 8px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  box-shadow: var(--shadow-soft);
+  gap: 4px;
+}
+
+.download-empty-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-1);
+  line-height: 1;
+}
+
+@media (max-width: 992px) {
+  .header-info {
+    align-items: center;
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+
+  .header-title {
+    font-size: 28px;
+  }
+
+  .game-detail__top {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .game-detail__sidebar {
+    width: 100%;
+    height: auto;
+    gap: 10px;
+  }
+
+  .game-detail__content,
+  .game-detail__main,
+  .game-detail__download-section,
+  .game-detail__wiki-section {
+    width: 100%;
+  }
+
+  .game-detail__content,
+  .game-detail__main {
+    min-height: auto;
+    height: auto;
+  }
+
+  .game-detail__main > :deep(.screenshot-carousel) {
+    height: auto;
+  }
+
+  .game-detail__wiki-wrapper {
+    flex-direction: column;
+  }
+
+  .game-detail__download-section {
+    padding-top: 10px;
+  }
+
+  .game-detail__wiki-section {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .game-detail__main > :deep(.screenshot-carousel__viewport) {
+    min-height: 320px;
+  }
+
+  .game-detail__main > :deep(.screenshot-carousel__main) {
+    min-height: 320px;
+  }
+
+  .sidebar-header-image {
+    aspect-ratio: 21 / 9;
+    max-height: 200px;
+  }
+
+  .sidebar-info {
+    grid-template-columns: 1fr;
+  }
+
+  .download-version-panel {
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .download-empty {
+    min-height: 46px;
+    padding: 8px 10px;
+  }
+
+  .download-version-item {
+    min-height: auto;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .download-version-item + .download-version-item {
+    padding-top: 10px;
+  }
+
+  .version-actions {
+    width: 100%;
+  }
+
+  .download-version-list {
+    max-height: 220px;
+  }
+
+  .version-info {
+    width: 100%;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+}

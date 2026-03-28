@@ -1,0 +1,667 @@
+/* =========================================================================
+   Arcodesign Theme Overrides & Premium Utility Classes
+   ========================================================================= */
+
+/* -----------------------------------------------------------------------
+   Arco Design Responsive Breakpoints Reference
+   -----------------------------------------------------------------------
+   xs: < 576px        (Mobile phones)
+   sm: >= 576px       (Large phones)
+   md: >= 768px       (Tablets)
+   lg: >= 992px       (Small laptops)
+   xl: >= 1200px      (Desktops)
+   xxl: >= 1600px     (Large screens)
+
+   Usage in Vue templates:
+   <a-col :xs="24" :sm="12" :md="8" :lg="6" :xl="4" :xxl="3">
+
+   Usage in CSS:
+   @media (max-width: 768px) { ... }  // md breakpoint
+   ----------------------------------------------------------------------- */
+
+@font-face {
+  font-family: 'CustomDataFont';
+  src: url('./fonts/LXGWWenKaiGBScreen.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+:root {
+  /* -----------------------------------------------------------------------
+     1. Color Palette (Deeper dark mode, vibrant accents)
+     ----------------------------------------------------------------------- */
+  /* Primary brand colors - Vibrant Blue gradient feel */
+  --color-primary-light-1: #e8f5ff;
+  --color-primary-light-2: #b5e3ff;
+  --color-primary-light-3: #82ccff;
+  --color-primary-light-4: #4fb3ff;
+  --color-primary-6: #1a9fff; /* Main primary */
+  --arcoblue-6: var(--color-primary-6);
+  --color-primary-7: #0084f0;
+  
+  /* Accent colors */
+  --accent-color: #6200EE;
+  --accent-color-hover: #7b2cbf;
+  --color-danger-6: #ff4d4f;
+  --color-success-6: #00b42a;
+  
+  /* -----------------------------------------------------------------------
+     2. Shadows and Glows
+     ----------------------------------------------------------------------- */
+  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.05);
+  --shadow-hover: 0 10px 30px rgba(0, 0, 0, 0.15);
+  --shadow-float: 0 20px 40px rgba(0, 0, 0, 0.2);
+  --glow-primary: 0 0 15px rgba(26, 159, 255, 0.4);
+
+  /* -----------------------------------------------------------------------
+     3. Border Radius
+     ----------------------------------------------------------------------- */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 9999px;
+  
+  /* Override default arco radii */
+  --border-radius-small: var(--radius-sm);
+  --border-radius-medium: var(--radius-md);
+  --border-radius-large: var(--radius-lg);
+
+  /* -----------------------------------------------------------------------
+     4. Animations
+     ----------------------------------------------------------------------- */
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  --font-family-base: 'CustomDataFont', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --app-card-surface: rgba(255, 255, 255, 0.8);
+  --app-card-border: rgba(0, 0, 0, 0.05);
+  --app-card-backdrop-blur: 12px;
+  --app-glass-border-hover: color-mix(in srgb, var(--color-primary-6) 28%, var(--app-card-border));
+  --app-glass-shadow-rest: var(--shadow-soft);
+  --app-glass-shadow-hover: var(--shadow-hover);
+  /* Frame hierarchy is intentional: header stays the deepest, sider follows, footer is the lightest glass layer. */
+  --app-header-surface: color-mix(in srgb, var(--app-card-surface) 88%, rgba(26, 159, 255, 0.08));
+  --app-header-border: color-mix(in srgb, var(--app-card-border) 78%, rgba(26, 159, 255, 0.18));
+  --app-header-shadow: 0 10px 28px rgba(19, 26, 40, 0.08);
+  --app-header-highlight: linear-gradient(90deg, rgba(26, 159, 255, 0.12), rgba(26, 159, 255, 0));
+  --app-header-hover: rgba(26, 159, 255, 0.08);
+  --app-sider-surface: color-mix(in srgb, var(--app-header-surface) 52%, transparent);
+  --app-sider-border: color-mix(in srgb, var(--app-card-border) 84%, rgba(26, 159, 255, 0.12));
+  --app-sider-hover: color-mix(in srgb, var(--app-sider-surface) 72%, rgba(26, 159, 255, 0.06));
+  --app-footer-surface: color-mix(in srgb, var(--app-header-surface) 48%, transparent);
+  --app-footer-border: color-mix(in srgb, var(--app-header-border) 78%, transparent);
+  --app-footer-shadow: 0 -10px 24px rgba(19, 26, 40, 0.06);
+}
+
+/* -----------------------------------------------------------------------
+   Dark Mode Specific Overrides
+   ----------------------------------------------------------------------- */
+body[arco-theme='dark'] {
+  /* Richer, deeper dark colors instead of flat grays */
+  --color-bg-1: #0d1117; /* App background */
+  --color-bg-2: #141b24; /* Content/card background */
+  --color-bg-3: #1a2330; /* Component background */
+  --color-bg-4: #233041; /* Hover background */
+  --color-bg-popup: rgba(18, 24, 34, 0.88);
+  --color-fill-1: #1a2330;
+  --color-fill-2: #233041;
+  --color-fill-3: #2c3a4d;
+  --color-fill-4: #37485f;
+  
+  --color-border-1: rgba(255, 255, 255, 0.04);
+  --color-border-2: rgba(255, 255, 255, 0.08);
+  --color-border-3: rgba(255, 255, 255, 0.12);
+  --color-border-4: rgba(255, 255, 255, 0.16);
+
+  --shadow-soft: 0 8px 24px rgba(3, 8, 14, 0.28);
+  --shadow-hover: 0 14px 34px rgba(3, 8, 14, 0.42);
+  --shadow-float: 0 22px 44px rgba(2, 6, 12, 0.62);
+  --app-card-surface: rgba(18, 24, 34, 0.66);
+  --app-card-border: rgba(176, 196, 216, 0.1);
+  --app-glass-border-hover: color-mix(in srgb, #9ab7d3 30%, var(--app-card-border));
+  /* Keep the dark-mode frame gradient readable: header anchors the page, sider supports navigation, footer closes the frame without feeling heavier than content. */
+  --app-header-surface: color-mix(in srgb, rgba(10, 14, 21, 0.92) 84%, rgba(92, 126, 160, 0.16));
+  --app-header-border: color-mix(in srgb, var(--app-card-border) 82%, rgba(168, 190, 214, 0.16));
+  --app-header-shadow: 0 16px 36px rgba(2, 7, 13, 0.36);
+  --app-header-highlight: linear-gradient(90deg, rgba(154, 183, 211, 0.1), rgba(154, 183, 211, 0));
+  --app-header-hover: rgba(154, 183, 211, 0.08);
+  --app-sider-surface: color-mix(in srgb, var(--app-header-surface) 56%, transparent);
+  --app-sider-border: color-mix(in srgb, var(--app-card-border) 84%, rgba(168, 190, 214, 0.12));
+  --app-sider-hover: color-mix(in srgb, var(--app-sider-surface) 74%, rgba(122, 162, 199, 0.08));
+  --app-footer-surface: color-mix(in srgb, var(--app-header-surface) 52%, transparent);
+  --app-footer-border: color-mix(in srgb, var(--app-header-border) 82%, transparent);
+  --app-footer-shadow: 0 -14px 28px rgba(2, 7, 13, 0.22);
+}
+
+/* -----------------------------------------------------------------------
+   Global Body Adjustments
+   ----------------------------------------------------------------------- */
+body {
+  font-family: var(--font-family-base);
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-bg-1);
+  color: var(--color-text-1);
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: var(--font-family-base);
+}
+
+/* -----------------------------------------------------------------------
+   Global Scrollbar
+   ----------------------------------------------------------------------- */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.24) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.24);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.36);
+  background-clip: content-box;
+}
+
+body[arco-theme='light'] {
+  scrollbar-color: rgba(36, 46, 67, 0.22) transparent;
+}
+
+body[arco-theme='light'] *::-webkit-scrollbar-thumb {
+  background: rgba(36, 46, 67, 0.22);
+  background-clip: content-box;
+}
+
+body[arco-theme='light'] *::-webkit-scrollbar-thumb:hover {
+  background: rgba(36, 46, 67, 0.34);
+  background-clip: content-box;
+}
+
+.arco-scrollbar-thumb-bar {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.arco-scrollbar-thumb:hover .arco-scrollbar-thumb-bar,
+.arco-scrollbar-thumb-dragging .arco-scrollbar-thumb-bar {
+  background: rgba(255, 255, 255, 0.36);
+}
+
+body[arco-theme='light'] .arco-scrollbar-thumb-bar {
+  background: rgba(36, 46, 67, 0.22);
+}
+
+body[arco-theme='light'] .arco-scrollbar-thumb:hover .arco-scrollbar-thumb-bar,
+body[arco-theme='light'] .arco-scrollbar-thumb-dragging .arco-scrollbar-thumb-bar {
+  background: rgba(36, 46, 67, 0.34);
+}
+
+/* Add a very subtle gradient background to the entire app to make cards pop */
+body[arco-theme='dark'] {
+  background-color: var(--color-bg-1);
+}
+
+body[arco-theme='dark'] #app {
+  background: radial-gradient(circle at top right, rgba(110, 146, 181, 0.07), transparent 42%),
+              radial-gradient(circle at bottom left, rgba(67, 87, 110, 0.08), transparent 40%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* -----------------------------------------------------------------------
+   Utility Classes (Glassmorphism & Layouts)
+   ----------------------------------------------------------------------- */
+.glass-panel {
+  background: var(--app-card-surface);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  border: 1px solid var(--app-card-border);
+  box-shadow: var(--app-glass-shadow-rest);
+}
+
+.app-glass-surface {
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  box-shadow: var(--app-glass-shadow-rest);
+}
+
+.app-glass-surface--interactive {
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.app-glass-surface--interactive:hover {
+  border-color: var(--app-glass-border-hover);
+  box-shadow: var(--app-glass-shadow-hover);
+}
+
+.app-input-action-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+
+.app-input-action-row__field {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-input-action-row__action {
+  flex-shrink: 0;
+}
+
+@media (max-width: 576px) {
+  .app-input-action-row {
+    flex-direction: column;
+  }
+
+  .app-input-action-row__action {
+    width: 100%;
+  }
+}
+
+body[arco-theme='light'] .glass-panel {
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+}
+
+.glass-header {
+  background: var(--app-header-surface) !important;
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-bottom: 1px solid var(--app-header-border) !important;
+  box-shadow: var(--app-header-shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-header::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: var(--app-header-highlight);
+  pointer-events: none;
+}
+
+body[arco-theme='light'] .glass-header {
+  background: var(--app-header-surface) !important;
+  border-bottom: 1px solid var(--app-header-border) !important;
+}
+
+/* -----------------------------------------------------------------------
+   Utility Classes (Animations)
+   ----------------------------------------------------------------------- */
+.hover-lift {
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--color-primary-light-2), var(--color-primary-6) 58%, #5fc5ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* -----------------------------------------------------------------------
+   Utility Classes (Text Action Buttons)
+   ----------------------------------------------------------------------- */
+.app-text-action-btn,
+.app-text-action-btn.arco-btn,
+body .arco-btn-text {
+  color: var(--color-text-2) !important;
+  background-color: transparent;
+}
+
+.app-text-action-btn:hover,
+.app-text-action-btn.arco-btn:hover,
+body .arco-btn-text:hover {
+  color: var(--color-text-1) !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.app-text-action-btn .arco-icon,
+.app-text-action-btn.arco-btn .arco-icon,
+body .arco-btn-text .arco-icon {
+  color: inherit;
+}
+
+.app-text-action-btn.arco-btn-status-danger,
+body .arco-btn-text.arco-btn-status-danger {
+  color: var(--color-danger-6) !important;
+}
+
+.app-text-action-btn.arco-btn-status-danger:hover,
+body .arco-btn-text.arco-btn-status-danger:hover {
+  background-color: rgba(255, 77, 79, 0.1) !important;
+}
+
+.app-text-action-btn.arco-btn-status-success,
+body .arco-btn-text.arco-btn-status-success {
+  color: var(--color-success-6) !important;
+}
+
+.app-text-action-btn.arco-btn-status-success:hover,
+body .arco-btn-text.arco-btn-status-success:hover {
+  background-color: rgba(0, 180, 42, 0.1) !important;
+}
+
+.app-text-action-btn.arco-btn-status-warning,
+body .arco-btn-text.arco-btn-status-warning {
+  color: var(--color-warning-6) !important;
+}
+
+.app-text-action-btn.arco-btn-status-warning:hover,
+body .arco-btn-text.arco-btn-status-warning:hover {
+  background-color: rgba(255, 150, 0, 0.1) !important;
+}
+
+.page-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.page-hero__content {
+  min-width: 0;
+}
+
+.page-hero__title {
+  margin: 0;
+  font-family: var(--font-family-base);
+  font-size: clamp(30px, 3vw, 36px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+}
+
+.page-hero__subtitle {
+  margin: 8px 0 0;
+  max-width: 640px;
+  font-family: var(--font-family-base);
+  color: var(--color-text-2);
+  font-size: 15px;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+}
+
+@media (max-width: 767px) {
+  .page-hero {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+
+  .page-hero__content {
+    padding-left: 4px;
+  }
+
+  .page-hero__title {
+    font-size: 28px;
+  }
+
+  .page-hero__subtitle {
+    margin-top: 6px;
+    font-size: 14px;
+  }
+}
+
+/* Fade in animation for page routing */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.route-fade-enter-active,
+.route-fade-leave-active {
+  transition: opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.route-fade-enter-from,
+.route-fade-leave-to {
+  opacity: 0;
+}
+
+.route-fade-enter-to,
+.route-fade-leave-from {
+  opacity: 1;
+}
+
+.route-fade-shell {
+  min-height: 100%;
+}
+
+/* -----------------------------------------------------------------------
+   Arco Component Overrides for Premium Feel
+   ----------------------------------------------------------------------- */
+/* Cards */
+.arco-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--app-card-border);
+  background: var(--app-card-surface);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  box-shadow: var(--app-glass-shadow-rest);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+body[arco-theme='light'] .arco-card {
+  background: var(--app-card-surface);
+  border-color: var(--app-card-border);
+}
+
+.arco-modal {
+  background: var(--app-card-surface);
+  background-color: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  box-shadow: var(--shadow-float);
+}
+
+.arco-select-dropdown,
+.arco-tree-select-popup,
+.arco-cascader-panel,
+.arco-picker-container,
+.arco-picker-range-container,
+.arco-timepicker-container {
+  background: var(--color-bg-popup);
+  background-color: var(--color-bg-popup);
+  border: 1px solid var(--app-card-border);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  box-shadow: var(--shadow-float);
+}
+
+.arco-select-dropdown .arco-select-option,
+.arco-select-dropdown .arco-select-option-selected,
+.arco-select-dropdown .arco-select-option-disabled {
+  background-color: transparent;
+}
+
+.arco-select-dropdown .arco-select-option-active,
+.arco-select-dropdown .arco-select-option:not(.arco-select-dropdown .arco-select-option-disabled):hover {
+  background-color: var(--color-bg-3);
+}
+
+.arco-cascader-option:hover,
+.arco-cascader-search-option-hover,
+.arco-cascader-option-active,
+.arco-cascader-option-active:hover,
+.arco-cascader-option-active.arco-cascader-option-disabled,
+.arco-cascader-option-active.arco-cascader-option-disabled:hover {
+  background-color: var(--color-bg-3);
+}
+
+.arco-tree-select-popup .arco-tree-node-title:hover,
+.arco-tree-select-popup .arco-tree-node-selected .arco-tree-node-title,
+.arco-tree-select-popup .arco-tree-node-selected .arco-tree-node-title:hover {
+  background-color: var(--color-bg-3);
+}
+
+.arco-picker-header-icon {
+  background-color: transparent;
+}
+
+.arco-picker-header-icon:not(.arco-picker-header-icon-hidden):hover,
+.arco-picker-header-label:hover,
+.arco-picker-cell-in-view:not(.arco-picker-cell-selected):not(.arco-picker-cell-range-start):not(.arco-picker-cell-range-end):not(.arco-picker-cell-disabled):not(.arco-picker-cell-week) .arco-picker-date-value:hover {
+  background-color: var(--color-bg-3);
+}
+
+/* Inputs / Selects */
+.arco-input-wrapper,
+.arco-select-view,
+.arco-cascader-view,
+.arco-tree-select-view,
+.arco-input-tag,
+.arco-picker,
+.arco-textarea,
+.arco-textarea-wrapper,
+.arco-radio-group-button {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-2);
+  background-color: var(--color-bg-2);
+  transition: all var(--transition-fast);
+}
+
+.arco-input-wrapper:hover,
+.arco-select-view:hover,
+.arco-cascader:hover .arco-cascader-view,
+.arco-tree-select:hover .arco-tree-select-view,
+.arco-input-tag:hover,
+.arco-picker:hover,
+.arco-textarea:hover,
+.arco-textarea-wrapper:hover,
+.arco-radio-group-button:hover {
+  border-color: var(--color-primary-6);
+  background-color: var(--color-bg-3);
+}
+
+.arco-input-wrapper.arco-input-focus,
+.arco-select-view.arco-select-view-focus,
+.arco-cascader.arco-cascader-focus .arco-cascader-view,
+.arco-tree-select.arco-tree-select-focus .arco-tree-select-view,
+.arco-input-tag:focus-within,
+.arco-input-tag.arco-input-tag-focus,
+.arco-picker-focused,
+.arco-picker-focused:hover,
+.arco-textarea:focus,
+.arco-textarea:focus-visible,
+.arco-textarea-wrapper:focus-within,
+.arco-radio-group-button:focus-within {
+  border-color: var(--color-primary-6);
+  box-shadow: 0 0 0 2px rgba(26, 159, 255, 0.2);
+  background-color: var(--color-bg-1);
+}
+
+.arco-textarea {
+  background-color: transparent;
+}
+
+.arco-radio-button:hover,
+.arco-radio-button.arco-radio-checked,
+body[arco-theme='dark'] .arco-radio-button.arco-radio-checked,
+body[arco-theme='dark'] .arco-radio-button:not(.arco-radio-disabled):hover {
+  background-color: var(--color-bg-3);
+}
+
+/* Tags */
+.arco-tag {
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+}
+
+/* -----------------------------------------------------------------------
+   Mobile Adaptation & Touch Optimization
+   ----------------------------------------------------------------------- */
+
+/* Mobile viewport optimization */
+@supports (-webkit-touch-callout: none) {
+  /* iOS specific fixes */
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  /* Remove hover effects on touch devices */
+  .hover-lift:hover {
+    transform: none;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .arco-menu-item,
+  .arco-menu-inline-header {
+    min-height: 48px;
+  }
+
+  /* Better scrolling on mobile */
+  .app-layout {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Mobile-specific adjustments (xs breakpoint) */
+@media (max-width: 576px) {
+  /* Reduce padding on mobile */
+  .content {
+    padding: 12px !important;
+  }
+
+  /* Smaller header on mobile */
+  .pro-header {
+    height: 56px !important;
+    line-height: 56px !important;
+  }
+
+  /* Adjust sidebar for mobile */
+  .arco-layout-sider {
+    position: fixed !important;
+    z-index: 100;
+    height: 100vh;
+  }
+
+  /* Better form inputs on mobile */
+  .arco-input-wrapper,
+  .arco-select-view {
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+}
