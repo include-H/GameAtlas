@@ -25,4 +25,9 @@ uiStore.initializeCardSize()
 uiStore.initializeItemsPerPage()
 uiStore.initializeSidebarCollapsed()
 
-app.mount('#app')
+const bootstrap = async () => {
+  await uiStore.initializeSharedBackgroundAvailability()
+  app.mount('#app')
+}
+
+void bootstrap()

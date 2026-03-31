@@ -29,7 +29,7 @@ import { resolveAssetUrl } from '@/utils/asset-url'
 
 const route = useRoute()
 const uiStore = useUiStore()
-const { ambientBackgroundOverride } = storeToRefs(uiStore)
+const { ambientBackgroundOverride, sharedBackgroundAvailability } = storeToRefs(uiStore)
 const gameDetailRouteGuard = useNamedRouteGuard(route, 'game-detail')
 const wikiEditRouteGuard = useNamedRouteGuard(route, 'wiki-edit')
 
@@ -105,14 +105,7 @@ const preloadImage = (url: string) => {
   })
 }
 
-const loadCustomBackground = async () => {
-  const customBackgroundUrl = CUSTOM_BACKGROUND_PATH
-  if (!(await preloadImage(customBackgroundUrl))) {
-    return ''
-  }
-
-  return customBackgroundUrl
-}
+const canUseCustomBackground = computed(() => sharedBackgroundAvailability.value === 'available')
 
 const pickRandomFromUrls = async (urls: Array<string | null | undefined>) => {
   for (const url of shuffleArray(urls)) {
@@ -188,9 +181,8 @@ const loadBackground = async () => {
     return wikiBackground
   }
 
-  const customBackgroundUrl = await loadCustomBackground()
-  if (customBackgroundUrl) {
-    return customBackgroundUrl
+  if (canUseCustomBackground.value) {
+    return CUSTOM_BACKGROUND_PATH
   }
 
   return pickBackgroundFromGames()
@@ -241,7 +233,13 @@ const applyBackground = async () => {
 }
 
 watch(
-  [() => route.fullPath, isEnabled, () => pendingCenterOverrideUrl.value, () => ambientBackgroundOverride.value?.key || ''],
+  [
+    () => route.fullPath,
+    isEnabled,
+    () => pendingCenterOverrideUrl.value,
+    () => ambientBackgroundOverride.value?.key || '',
+    () => sharedBackgroundAvailability.value,
+  ],
   async () => {
     await applyBackground()
   },

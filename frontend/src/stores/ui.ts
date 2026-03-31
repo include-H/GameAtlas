@@ -9,6 +9,10 @@ type AmbientBackgroundOverride = {
   url: string
 } | null
 
+type SharedBackgroundAvailability = 'unknown' | 'available' | 'missing'
+
+const CUSTOM_BACKGROUND_PATH = '/data/bg.jpg'
+
 export const useUiStore = defineStore('ui', () => {
   // Theme
   const isDark = ref(true)
@@ -23,6 +27,7 @@ export const useUiStore = defineStore('ui', () => {
   const showFilters = ref(false)
   const showSortOptions = ref(false)
   const ambientBackgroundOverride = ref<AmbientBackgroundOverride>(null)
+  const sharedBackgroundAvailability = ref<SharedBackgroundAvailability>('unknown')
 
   // Pagination
   const itemsPerPage = ref(20)
@@ -113,6 +118,18 @@ export const useUiStore = defineStore('ui', () => {
     ambientBackgroundOverride.value = null
   }
 
+  const initializeSharedBackgroundAvailability = async () => {
+    try {
+      const response = await fetch(CUSTOM_BACKGROUND_PATH, {
+        method: 'HEAD',
+        cache: 'no-store',
+      })
+      sharedBackgroundAvailability.value = response.ok ? 'available' : 'missing'
+    } catch {
+      sharedBackgroundAvailability.value = 'missing'
+    }
+  }
+
   // Alert methods
   const addAlert = (
     message: string,
@@ -177,6 +194,7 @@ export const useUiStore = defineStore('ui', () => {
     showFilters,
     showSortOptions,
     ambientBackgroundOverride,
+    sharedBackgroundAvailability,
     itemsPerPage,
     alerts,
     // Actions
@@ -192,6 +210,7 @@ export const useUiStore = defineStore('ui', () => {
     toggleSortOptions,
     setAmbientBackgroundOverride,
     clearAmbientBackgroundOverride,
+    initializeSharedBackgroundAvailability,
     addAlert,
     removeAlert,
     clearAlerts,
