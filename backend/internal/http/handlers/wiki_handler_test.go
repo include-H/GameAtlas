@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/hao/game/internal/domain"
-	"github.com/hao/game/internal/markdown"
 	"github.com/hao/game/internal/repositories"
 	"github.com/hao/game/internal/services"
 )
@@ -34,7 +33,6 @@ func TestWikiHandlerHistoryReturnsFormattedAdminResponse(t *testing.T) {
 	service := services.NewWikiService(
 		repositories.NewGamesRepository(db),
 		repositories.NewWikiRepository(db),
-		markdown.NewRenderer(),
 		10,
 	)
 	handler := NewWikiHandler(service)
@@ -88,7 +86,6 @@ func TestWikiHandlerGetReturnsNotFoundForUnknownGame(t *testing.T) {
 	service := services.NewWikiService(
 		repositories.NewGamesRepository(db),
 		repositories.NewWikiRepository(db),
-		markdown.NewRenderer(),
 		10,
 	)
 	handler := NewWikiHandler(service)
@@ -122,7 +119,6 @@ func TestWikiHandlerUpdateRejectsInvalidJSONAfterResolvingGame(t *testing.T) {
 	service := services.NewWikiService(
 		repositories.NewGamesRepository(db),
 		repositories.NewWikiRepository(db),
-		markdown.NewRenderer(),
 		10,
 	)
 	handler := NewWikiHandler(service)

@@ -160,7 +160,6 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 			g.cover_image,
 			g.banner_image,
 			g.wiki_content,
-			g.wiki_content_html,
 			g.needs_review,
 			g.downloads,
 			ss.primary_screenshot,
@@ -318,7 +317,6 @@ func (r *GamesRepository) GetByID(id int64) (*domain.Game, error) {
 			cover_image,
 			banner_image,
 			wiki_content,
-			wiki_content_html,
 			needs_review,
 			downloads,
 			NULL AS primary_screenshot,
@@ -354,7 +352,6 @@ func (r *GamesRepository) GetByPublicID(publicID string) (*domain.Game, error) {
 			cover_image,
 			banner_image,
 			wiki_content,
-			wiki_content_html,
 			needs_review,
 			downloads,
 			NULL AS primary_screenshot,
@@ -555,7 +552,7 @@ func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, err
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING
 			id, public_id, title, title_alt, visibility, summary, release_date, engine, cover_image, banner_image,
-			wiki_content, wiki_content_html, needs_review, downloads, created_at, updated_at`
+			wiki_content, needs_review, downloads, created_at, updated_at`
 
 	var game domain.Game
 	if err := tx.Get(
@@ -1067,7 +1064,6 @@ func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStat
 				g.cover_image,
 				g.banner_image,
 				g.wiki_content,
-				g.wiki_content_html,
 				g.needs_review,
 				g.downloads,
 				ss.primary_screenshot,
@@ -1364,7 +1360,7 @@ func pendingMissingRelationCondition(table string, predicate string) string {
 }
 
 func pendingMissingWikiCondition() string {
-	return "(COALESCE(TRIM(g.wiki_content), '') = '' AND COALESCE(TRIM(g.wiki_content_html), '') = '')"
+	return "COALESCE(TRIM(g.wiki_content), '') = ''"
 }
 
 func pendingVisibleIssueCondition(condition string, issueKey string) string {

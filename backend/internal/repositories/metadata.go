@@ -115,7 +115,6 @@ func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([
 			g.cover_image,
 			g.banner_image,
 			g.wiki_content,
-			g.wiki_content_html,
 			g.needs_review,
 			g.downloads,
 			(
@@ -171,7 +170,6 @@ func (r *MetadataRepository) ListSeriesGamesBySeriesIDs(seriesIDs []int64, inclu
 			g.cover_image,
 			g.banner_image,
 			g.wiki_content,
-			g.wiki_content_html,
 			g.needs_review,
 			g.downloads,
 			(

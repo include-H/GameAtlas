@@ -13,7 +13,6 @@ CREATE TABLE IF NOT EXISTS games (
     cover_image TEXT,
     banner_image TEXT,
     wiki_content TEXT,
-    wiki_content_html TEXT,
     needs_review INTEGER NOT NULL DEFAULT 0,
     downloads INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
