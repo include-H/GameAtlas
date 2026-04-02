@@ -147,17 +147,17 @@
             <a-space wrap size="small" class="pending-game__detail-tags">
               <a-tag
                 v-for="detail in getVisibleIssueDetails(game)"
-                :key="detail"
+                :key="detail.key"
                 bordered
               >
-                {{ getPendingIssueDetailLabel(detail) }}
+                {{ getPendingIssueDetailLabel(detail.key) }}
               </a-tag>
               <a-tag
                 v-for="detail in getIgnoredIssueDetails(game)"
-                :key="`ignored-${detail}`"
+                :key="`ignored-${detail.key}`"
                 color="gray"
               >
-                已忽略 {{ getPendingIssueDetailLabel(detail) }}
+                已忽略 {{ getPendingIssueDetailLabel(detail.key) }}
               </a-tag>
             </a-space>
           </div>
@@ -208,10 +208,10 @@
               </a-tag>
               <a-tag
                 v-for="detail in getIgnoredIssueDetails(activeGame)"
-                :key="`active-ignored-${detail}`"
+                :key="`active-ignored-${detail.key}`"
                 color="gray"
               >
-                已忽略 {{ getPendingIssueDetailLabel(detail) }}
+                已忽略 {{ getPendingIssueDetailLabel(detail.key) }}
               </a-tag>
             </a-space>
           </div>
@@ -318,9 +318,6 @@
 import { useRoute, useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import EditGameModal from '@/components/EditGameModal.vue'
-import {
-  pendingIssueDefinitions,
-} from '@/utils/pendingIssues'
 import { PENDING_WORKBENCH_PAGE_SIZE } from '@/composables/usePendingWorkbench'
 import { usePendingCenterView } from '@/composables/usePendingCenterView'
 import { IconBook, IconEdit, IconRefresh, IconRight, IconSearch } from '@arco-design/web-vue/es/icon'
@@ -360,6 +357,7 @@ const {
   onlySevere,
   openEdit,
   openWiki,
+  pendingIssueDefinitions,
   refreshWorkbench,
   resetFilters,
   restoreIssue,

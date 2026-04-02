@@ -129,6 +129,25 @@ function getLatestGameFileTimestamp(files: GameFileReleaseSource[]): number {
   }, Number.NEGATIVE_INFINITY)
 }
 
+export function mapGameVersions(game: Pick<GameDetail, 'public_id' | 'files'>): GameVersion[] {
+  const gameId = game.public_id
+  const files = [...game.files].sort((a, b) => a.sort_order - b.sort_order)
+  const latestTimestamp = getLatestGameFileTimestamp(files)
+
+  return files.map((file, index) => ({
+    id: String(file.id),
+    gameId,
+    version: file.label?.trim() || getFileName(file.file_name) || `文件 ${index + 1}`,
+    releaseDate: getGameFileReleaseDate(file),
+    size: file.size_bytes ?? 0,
+    isLatest: !Number.isNaN(Date.parse(getGameFileReleaseDate(file))) && Date.parse(getGameFileReleaseDate(file)) === latestTimestamp,
+    canLaunch: canLaunchFromFileName(file.file_name),
+    downloadUrl: buildApiUrl(`/games/${gameId}/files/${file.id}/download`),
+    launchScriptUrl: buildApiUrl(`/games/${gameId}/files/${file.id}/launch-script`),
+    changelog: file.notes || undefined,
+  }))
+}
+
 function serializeGameCoreRequest(data: GameCoreRequest): GameCoreRequest {
   return {
     title: data.title || '',
@@ -356,25 +375,6 @@ const gamesService = {
 
   async deleteGame(id: string): Promise<void> {
     await del<ApiEnvelope<void>>(`/games/${id}`)
-  },
-
-  async getGameVersions(gameId: string): Promise<GameVersion[]> {
-    const game = await this.getGame(gameId)
-    const files = [...game.files].sort((a, b) => a.sort_order - b.sort_order)
-    const latestTimestamp = getLatestGameFileTimestamp(files)
-
-    return files.map((file, index) => ({
-      id: String(file.id),
-      gameId,
-      version: file.label?.trim() || getFileName(file.file_name) || `文件 ${index + 1}`,
-      releaseDate: getGameFileReleaseDate(file),
-      size: file.size_bytes ?? 0,
-      isLatest: !Number.isNaN(Date.parse(getGameFileReleaseDate(file))) && Date.parse(getGameFileReleaseDate(file)) === latestTimestamp,
-      canLaunch: canLaunchFromFileName(file.file_name),
-      downloadUrl: buildApiUrl(`/games/${gameId}/files/${file.id}/download`),
-      launchScriptUrl: buildApiUrl(`/games/${gameId}/files/${file.id}/launch-script`),
-      changelog: file.notes || undefined,
-    }))
   },
 
   async toggleFavorite(gameId: string): Promise<{ isFavorite: boolean }> {

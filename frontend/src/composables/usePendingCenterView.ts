@@ -1,14 +1,14 @@
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import gamesService from '@/services/games.service'
-import type { GameDetail, GameListItem } from '@/services/types'
-import {
-  getPendingIssueDetailLabel,
-  getPendingIssueLabel,
-  pendingIssueDetailDefinitions,
-  type PendingIssueDetailKey,
-  type PendingIssueKey,
-} from '@/utils/pendingIssues'
+import pendingIssuesService from '@/services/pending-issues.service'
+import type {
+  GameDetail,
+  GameListItem,
+  PendingIssueCatalog,
+  PendingIssueDefinition,
+  PendingIssueDetailDefinition,
+} from '@/services/types'
 import { formatDisplayDate } from '@/utils/date'
 import { createDetailRouteQuery } from '@/utils/navigation'
 import { usePendingWorkbench } from '@/composables/usePendingWorkbench'
@@ -16,20 +16,11 @@ import { useUiStore } from '@/stores/ui'
 
 const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23424242" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/%3E%3C/svg%3E'
 
-type PendingIssueDetailDefinition = (typeof pendingIssueDetailDefinitions)[number]
-
 interface UsePendingCenterViewOptions {
   route: RouteLocationNormalizedLoaded
   router: Router
   uiStore: ReturnType<typeof useUiStore>
 }
-
-const pendingIssueDetailDefinitionMap = pendingIssueDetailDefinitions.reduce<
-  Record<PendingIssueDetailKey, PendingIssueDetailDefinition>
->((acc, item) => {
-  acc[item.key] = item
-  return acc
-}, {} as Record<PendingIssueDetailKey, PendingIssueDetailDefinition>)
 
 export const getPendingCenterVisualImage = (game: GameListItem) => {
   return game.banner_image || game.primary_screenshot || game.cover_image || PLACEHOLDER_IMAGE
@@ -49,6 +40,10 @@ export const usePendingCenterView = ({
   router,
   uiStore,
 }: UsePendingCenterViewOptions) => {
+  const pendingIssueCatalog = ref<PendingIssueCatalog>({
+    groups: [],
+    details: [],
+  })
   const editingGame = ref<GameDetail | null>(null)
   const showEditModal = ref(false)
   const detailHeroFit = ref<'cover' | 'contain'>('cover')
@@ -75,7 +70,6 @@ export const usePendingCenterView = ({
     onlySevere,
     resetFilters,
     restoreIssue,
-    reviewOverrideMap,
     searchQuery,
     selectedIssue,
     showIgnored,
@@ -85,6 +79,41 @@ export const usePendingCenterView = ({
   } = usePendingWorkbench({
     addAlert: (message, type) => uiStore.addAlert(message, type),
   })
+
+  const issueDefinitionFallbacks = computed<PendingIssueDefinition[]>(() => {
+    return Object.keys(issueCounts.value).map((key) => ({
+      key,
+      label: key,
+      description: '待处理问题',
+    }))
+  })
+  const pendingIssueDefinitions = computed<PendingIssueDefinition[]>(() => {
+    return pendingIssueCatalog.value.groups.length > 0
+      ? pendingIssueCatalog.value.groups
+      : issueDefinitionFallbacks.value
+  })
+  const pendingIssueDefinitionMap = computed<Record<string, PendingIssueDefinition>>(() => {
+    return pendingIssueDefinitions.value.reduce<Record<string, PendingIssueDefinition>>((acc, item) => {
+      acc[item.key] = item
+      return acc
+    }, {})
+  })
+  const pendingIssueDetailDefinitionMap = computed<Record<string, PendingIssueDetailDefinition>>(() => {
+    return pendingIssueCatalog.value.details.reduce<Record<string, PendingIssueDetailDefinition>>((acc, item) => {
+      acc[item.key] = item
+      return acc
+    }, {})
+  })
+
+  const getPendingIssueLabel = (key?: string | null) => {
+    if (!key) return '待处理'
+    return pendingIssueDefinitionMap.value[key]?.label || '待处理'
+  }
+
+  const getPendingIssueDetailLabel = (key?: string | null) => {
+    if (!key) return '待补充'
+    return pendingIssueDetailDefinitionMap.value[key]?.label || '待补充'
+  }
 
   const syncAmbientBackground = () => {
     if (!activeGame.value?.public_id) {
@@ -156,27 +185,24 @@ export const usePendingCenterView = ({
 
   const activeGameDetails = computed(() => {
     if (!activeGame.value) return []
-    const activeOverrides = reviewOverrideMap.value[String(activeGame.value.id)] || []
-    const activeOverrideReasonMap = Object.fromEntries(activeOverrides.map((item) => [item.issue_key, item.reason || '']))
-    const evaluation = getIssueEvaluation(activeGame.value)
 
-    return [
-      ...evaluation.details.map((key) => {
-        const definition = pendingIssueDetailDefinitionMap[key]
-        return definition ? { ...definition, ignored: false, reason: '' } : null
-      }),
-      ...evaluation.ignoredDetails.map((key) => {
-        const definition = pendingIssueDetailDefinitionMap[key]
-        return definition ? { ...definition, ignored: true, reason: activeOverrideReasonMap[key] || '' } : null
-      }),
-    ].filter((item): item is NonNullable<typeof item> => Boolean(item))
+    return getIssueEvaluation(activeGame.value).details.map((detail) => {
+      const definition = pendingIssueDetailDefinitionMap.value[detail.key]
+      return {
+        key: detail.key,
+        group: detail.group,
+        label: definition?.label || getPendingIssueDetailLabel(detail.key),
+        ignored: detail.ignored,
+        reason: detail.reason || '',
+      }
+    })
   })
 
   const selectGame = (game: GameListItem) => {
     activeGame.value = game
   }
 
-  const toggleIssueFilter = (key: PendingIssueKey) => {
+  const toggleIssueFilter = (key: string) => {
     selectedIssue.value = selectedIssue.value === key ? undefined : key
   }
 
@@ -218,6 +244,11 @@ export const usePendingCenterView = ({
   }
 
   onMounted(async () => {
+    try {
+      pendingIssueCatalog.value = await pendingIssuesService.getCatalog()
+    } catch {
+      uiStore.addAlert('加载待处理问题目录失败，已使用后端队列数据继续渲染', 'warning')
+    }
     await loadWorkbenchGames()
   })
 
@@ -260,6 +291,7 @@ export const usePendingCenterView = ({
     onlySevere,
     openEdit,
     openWiki,
+    pendingIssueDefinitions,
     refreshWorkbench,
     resetFilters,
     restoreIssue,

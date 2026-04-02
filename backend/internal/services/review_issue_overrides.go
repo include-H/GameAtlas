@@ -7,18 +7,6 @@ import (
 	"github.com/hao/game/internal/repositories"
 )
 
-var allowedReviewIssueKeys = map[string]struct{}{
-	"missing-cover":        {},
-	"missing-banner":       {},
-	"missing-screenshots":  {},
-	"missing-wiki-content": {},
-	"missing-files-list":   {},
-	"missing-developer":    {},
-	"missing-publisher":    {},
-	"missing-platform":     {},
-	"missing-summary":      {},
-}
-
 type ReviewIssueOverrideService struct {
 	gamesRepo     *repositories.GamesRepository
 	overridesRepo *repositories.ReviewIssueOverrideRepository
@@ -74,7 +62,7 @@ func (s *ReviewIssueOverrideService) Delete(gameID int64, issueKey string) error
 
 func normalizeReviewOverrideInput(issueKey string, reason *string) (string, *string, error) {
 	normalizedIssueKey := strings.TrimSpace(issueKey)
-	if _, ok := allowedReviewIssueKeys[normalizedIssueKey]; !ok {
+	if !domain.IsAllowedPendingIssueDetail(normalizedIssueKey) {
 		return "", nil, ErrValidation
 	}
 

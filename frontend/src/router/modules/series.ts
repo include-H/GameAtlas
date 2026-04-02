@@ -6,7 +6,7 @@ export default {
   name: 'series-library',
   component: () => import('@/views/SeriesLibraryView.vue'),
   meta: {
-    locale: 'menu.series',
+    title: '系列库',
     keepAlive: true,
     icon: IconApps,
   },
@@ -17,7 +17,7 @@ export const seriesDetailRoute = {
   name: 'series-detail',
   component: () => import('@/views/SeriesDetailView.vue'),
   meta: {
-    locale: 'menu.series.detail',
+    title: '系列详情',
     keepAlive: true,
     hideInMenu: true,
     activeMenu: 'series-library',

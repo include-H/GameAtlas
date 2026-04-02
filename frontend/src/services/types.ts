@@ -12,14 +12,41 @@ export interface ApiPageEnvelope<T> {
     limit: number
     total: number
     totalPages: number
-    pending_group_counts?: {
-      missing_assets: number
-      missing_wiki: number
-      missing_files: number
-      missing_metadata: number
+    pending_issue_counts?: {
+      groups: Record<string, number>
       ignored_total: number
     } | null
   }
+}
+
+export interface PendingIssueDefinition {
+  key: string
+  label: string
+  description: string
+}
+
+export interface PendingIssueDetailDefinition {
+  key: string
+  label: string
+  group: string
+}
+
+export interface PendingIssueCatalog {
+  groups: PendingIssueDefinition[]
+  details: PendingIssueDetailDefinition[]
+}
+
+export interface PendingIssueDetailState {
+  key: string
+  group: string
+  ignored: boolean
+  reason?: string | null
+}
+
+export interface PendingIssueEvaluation {
+  groups: string[]
+  details: PendingIssueDetailState[]
+  severe: boolean
 }
 
 export interface Series {
@@ -138,7 +165,6 @@ export interface GameListItemDto {
   cover_image: string | null
   banner_image: string | null
   wiki_content: string | null
-  wiki_content_html: string | null
   needs_review: boolean
   primary_screenshot: string | null
   screenshot_count: number
@@ -146,6 +172,7 @@ export interface GameListItemDto {
   developer_count: number
   publisher_count: number
   platform_count: number
+  pending_issues?: PendingIssueEvaluation | null
   downloads: number
   created_at: string
   updated_at: string

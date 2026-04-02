@@ -420,13 +420,10 @@ func TestGamesHandlerListPendingUsesNativePendingQueryOptions(t *testing.T) {
 		} `json:"data"`
 		Pagination struct {
 			Total              int `json:"total"`
-			PendingGroupCounts struct {
-				MissingAssets   int `json:"missing_assets"`
-				MissingWiki     int `json:"missing_wiki"`
-				MissingFiles    int `json:"missing_files"`
-				MissingMetadata int `json:"missing_metadata"`
-				IgnoredTotal    int `json:"ignored_total"`
-			} `json:"pending_group_counts"`
+			PendingIssueCounts struct {
+				Groups       map[string]int `json:"groups"`
+				IgnoredTotal int            `json:"ignored_total"`
+			} `json:"pending_issue_counts"`
 		} `json:"pagination"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
@@ -442,14 +439,14 @@ func TestGamesHandlerListPendingUsesNativePendingQueryOptions(t *testing.T) {
 	if response.Data[0].ID != severeID || response.Data[1].ID != recentID {
 		t.Fatalf("data = %+v, want severe then recent", response.Data)
 	}
-	if response.Pagination.PendingGroupCounts.MissingAssets != 2 ||
-		response.Pagination.PendingGroupCounts.MissingWiki != 2 ||
-		response.Pagination.PendingGroupCounts.MissingFiles != 1 ||
-		response.Pagination.PendingGroupCounts.MissingMetadata != 1 {
-		t.Fatalf("pending_group_counts = %+v, want aggregated native counts", response.Pagination.PendingGroupCounts)
+	if response.Pagination.PendingIssueCounts.Groups["missing-assets"] != 2 ||
+		response.Pagination.PendingIssueCounts.Groups["missing-wiki"] != 2 ||
+		response.Pagination.PendingIssueCounts.Groups["missing-files"] != 1 ||
+		response.Pagination.PendingIssueCounts.Groups["missing-metadata"] != 1 {
+		t.Fatalf("pending_issue_counts = %+v, want aggregated native counts", response.Pagination.PendingIssueCounts)
 	}
-	if response.Pagination.PendingGroupCounts.IgnoredTotal != 0 {
-		t.Fatalf("pending_group_counts.ignored_total = %d, want 0 after native queue filters", response.Pagination.PendingGroupCounts.IgnoredTotal)
+	if response.Pagination.PendingIssueCounts.IgnoredTotal != 0 {
+		t.Fatalf("pending_issue_counts.ignored_total = %d, want 0 after native queue filters", response.Pagination.PendingIssueCounts.IgnoredTotal)
 	}
 }
 

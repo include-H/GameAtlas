@@ -1,6 +1,5 @@
 import gamesService from './games.service'
-import reviewIssuesService from './review-issues.service'
-import type { GameListItem, ReviewIssueOverride } from './types'
+import type { GameListItem } from './types'
 
 export const PENDING_WORKBENCH_PAGE_SIZE = 10
 
@@ -21,8 +20,7 @@ interface PendingWorkbenchQuery {
 
 interface PendingWorkbenchSnapshot {
   queueGames: GameListItem[]
-  overrides: ReviewIssueOverride[]
-  issueCounts: Record<'missing-assets' | 'missing-wiki' | 'missing-files' | 'missing-metadata', number>
+  issueCounts: Record<string, number>
   ignoredTotal: number
   total: number
   totalPages: number
@@ -52,22 +50,11 @@ const pendingWorkbenchService = {
     })
 
     const queueGames = response.data
-    const overrides = await reviewIssuesService.list(
-      queueGames
-        .map((game) => game.public_id)
-        .filter((value): value is string => Boolean(value)),
-    )
 
     return {
       queueGames,
-      overrides,
-      issueCounts: {
-        'missing-assets': response.pagination.pending_group_counts?.missing_assets || 0,
-        'missing-wiki': response.pagination.pending_group_counts?.missing_wiki || 0,
-        'missing-files': response.pagination.pending_group_counts?.missing_files || 0,
-        'missing-metadata': response.pagination.pending_group_counts?.missing_metadata || 0,
-      },
-      ignoredTotal: response.pagination.pending_group_counts?.ignored_total || 0,
+      issueCounts: response.pagination.pending_issue_counts?.groups || {},
+      ignoredTotal: response.pagination.pending_issue_counts?.ignored_total || 0,
       total: response.pagination.total,
       totalPages: response.pagination.totalPages,
       page: response.pagination.page,

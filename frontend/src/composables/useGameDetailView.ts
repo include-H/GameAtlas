@@ -86,10 +86,7 @@ export const useGameDetailView = ({
 
   const handleEditSuccess = async () => {
     if (game.value?.public_id) {
-      await Promise.all([
-        gamesStore.fetchGame(game.value.public_id),
-        gamesStore.fetchGameVersions(game.value.public_id),
-      ])
+      await gamesStore.fetchGame(game.value.public_id)
     }
   }
 
@@ -132,10 +129,7 @@ export const useGameDetailView = ({
   const loadGameDetail = async (gameId: string) => {
     await runWhenActive(async () => {
       try {
-        await Promise.all([
-          gamesStore.fetchGame(gameId),
-          gamesStore.fetchGameVersions(gameId),
-        ])
+        await gamesStore.fetchGame(gameId)
 
         wiki.value = null
         try {

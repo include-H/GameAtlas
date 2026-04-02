@@ -183,20 +183,6 @@ html {
   background-clip: content-box;
 }
 
-body[arco-theme='light'] {
-  scrollbar-color: rgba(36, 46, 67, 0.22) transparent;
-}
-
-body[arco-theme='light'] *::-webkit-scrollbar-thumb {
-  background: rgba(36, 46, 67, 0.22);
-  background-clip: content-box;
-}
-
-body[arco-theme='light'] *::-webkit-scrollbar-thumb:hover {
-  background: rgba(36, 46, 67, 0.34);
-  background-clip: content-box;
-}
-
 .arco-scrollbar-thumb-bar {
   background: rgba(255, 255, 255, 0.24);
 }
@@ -204,15 +190,6 @@ body[arco-theme='light'] *::-webkit-scrollbar-thumb:hover {
 .arco-scrollbar-thumb:hover .arco-scrollbar-thumb-bar,
 .arco-scrollbar-thumb-dragging .arco-scrollbar-thumb-bar {
   background: rgba(255, 255, 255, 0.36);
-}
-
-body[arco-theme='light'] .arco-scrollbar-thumb-bar {
-  background: rgba(36, 46, 67, 0.22);
-}
-
-body[arco-theme='light'] .arco-scrollbar-thumb:hover .arco-scrollbar-thumb-bar,
-body[arco-theme='light'] .arco-scrollbar-thumb-dragging .arco-scrollbar-thumb-bar {
-  background: rgba(36, 46, 67, 0.34);
 }
 
 /* Add a very subtle gradient background to the entire app to make cards pop */
@@ -281,11 +258,6 @@ body[arco-theme='dark'] #app {
   }
 }
 
-body[arco-theme='light'] .glass-panel {
-  background: var(--app-card-surface);
-  border: 1px solid var(--app-card-border);
-}
-
 .glass-header {
   background: var(--app-header-surface) !important;
   backdrop-filter: blur(18px) saturate(140%);
@@ -303,11 +275,6 @@ body[arco-theme='light'] .glass-panel {
   height: 1px;
   background: var(--app-header-highlight);
   pointer-events: none;
-}
-
-body[arco-theme='light'] .glass-header {
-  background: var(--app-header-surface) !important;
-  border-bottom: 1px solid var(--app-header-border) !important;
 }
 
 /* -----------------------------------------------------------------------
@@ -479,11 +446,6 @@ body .arco-btn-text.arco-btn-status-warning:hover {
   -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   box-shadow: var(--app-glass-shadow-rest);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-body[arco-theme='light'] .arco-card {
-  background: var(--app-card-surface);
-  border-color: var(--app-card-border);
 }
 
 .arco-modal {

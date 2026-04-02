@@ -20,29 +20,14 @@ import (
 var ErrNotFound = errors.New("resource not found")
 var ErrValidation = errors.New("validation error")
 
-var allowedPendingIssueFilters = map[string]struct{}{
-	"missing-assets":       {},
-	"missing-wiki":         {},
-	"missing-files":        {},
-	"missing-metadata":     {},
-	"missing-cover":        {},
-	"missing-banner":       {},
-	"missing-screenshots":  {},
-	"missing-wiki-content": {},
-	"missing-files-list":   {},
-	"missing-developer":    {},
-	"missing-publisher":    {},
-	"missing-platform":     {},
-	"missing-summary":      {},
-}
-
 type GamesService struct {
-	gamesRepo     *repositories.GamesRepository
-	gameFilesRepo *repositories.GameFilesRepository
-	metadataRepo  *repositories.MetadataRepository
-	tagsRepo      *repositories.TagsRepository
-	fileGuard     *files.Guard
-	assetStore    *files.AssetStore
+	gamesRepo                *repositories.GamesRepository
+	gameFilesRepo            *repositories.GameFilesRepository
+	metadataRepo             *repositories.MetadataRepository
+	tagsRepo                 *repositories.TagsRepository
+	reviewIssueOverridesRepo *repositories.ReviewIssueOverrideRepository
+	fileGuard                *files.Guard
+	assetStore               *files.AssetStore
 }
 
 type GamesListResult struct {
@@ -51,7 +36,7 @@ type GamesListResult struct {
 	Limit              int
 	Total              int
 	TotalPages         int
-	PendingGroupCounts *domain.PendingGroupCounts
+	PendingIssueCounts *domain.PendingIssueCountSummary
 }
 
 type TimelineCursor struct {
@@ -70,6 +55,7 @@ type GamesTimelineResult struct {
 
 type GameDetail struct {
 	Game          *domain.Game
+	PendingIssues *domain.PendingIssueEvaluation
 	PreviewVideo  *domain.GameAsset
 	PreviewVideos []domain.GameAsset
 	Screenshots   []domain.GameAsset
@@ -82,14 +68,20 @@ type GameDetail struct {
 	Files         []domain.GameFile
 }
 
-func NewGamesService(cfg config.Config, gamesRepo *repositories.GamesRepository, gameFilesRepo *repositories.GameFilesRepository, metadataRepo *repositories.MetadataRepository, tagsRepo *repositories.TagsRepository) *GamesService {
+func NewGamesService(cfg config.Config, gamesRepo *repositories.GamesRepository, gameFilesRepo *repositories.GameFilesRepository, metadataRepo *repositories.MetadataRepository, tagsRepo *repositories.TagsRepository, reviewIssueOverridesRepo ...*repositories.ReviewIssueOverrideRepository) *GamesService {
+	var overridesRepo *repositories.ReviewIssueOverrideRepository
+	if len(reviewIssueOverridesRepo) > 0 {
+		overridesRepo = reviewIssueOverridesRepo[0]
+	}
+
 	return &GamesService{
-		gamesRepo:     gamesRepo,
-		gameFilesRepo: gameFilesRepo,
-		metadataRepo:  metadataRepo,
-		tagsRepo:      tagsRepo,
-		fileGuard:     files.NewGuard(cfg.PrimaryROMRoot),
-		assetStore:    files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
+		gamesRepo:                gamesRepo,
+		gameFilesRepo:            gameFilesRepo,
+		metadataRepo:             metadataRepo,
+		tagsRepo:                 tagsRepo,
+		reviewIssueOverridesRepo: overridesRepo,
+		fileGuard:                files.NewGuard(cfg.PrimaryROMRoot),
+		assetStore:               files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
 	}
 }
 
@@ -102,14 +94,24 @@ func (s *GamesService) List(params domain.GamesListParams) (*GamesListResult, er
 		return nil, err
 	}
 
-	var pendingGroupCounts *domain.PendingGroupCounts
+	var pendingIssueCounts *domain.PendingIssueCountSummary
 	if params.PendingOnly {
 		counts, err := s.gamesRepo.CountPendingGroups(params)
 		if err != nil {
 			return nil, err
 		}
-		pendingGroupCounts = counts
+		pendingIssueCounts = &domain.PendingIssueCountSummary{
+			Groups: map[domain.PendingIssueKey]int{
+				domain.PendingIssueMissingAssets:   counts.MissingAssets,
+				domain.PendingIssueMissingWiki:     counts.MissingWiki,
+				domain.PendingIssueMissingFiles:    counts.MissingFiles,
+				domain.PendingIssueMissingMetadata: counts.MissingMetadata,
+			},
+			IgnoredTotal: counts.IgnoredTotal,
+		}
 	}
+
+	s.attachPendingIssues(games)
 
 	totalPages := 0
 	if total > 0 {
@@ -122,7 +124,7 @@ func (s *GamesService) List(params domain.GamesListParams) (*GamesListResult, er
 		Limit:              params.Limit,
 		Total:              total,
 		TotalPages:         totalPages,
-		PendingGroupCounts: pendingGroupCounts,
+		PendingIssueCounts: pendingIssueCounts,
 	}, nil
 }
 
@@ -242,6 +244,10 @@ func (s *GamesService) GetDetail(id int64, includeAll bool) (*GameDetail, error)
 	if err != nil {
 		return nil, err
 	}
+	pendingIssues, err := s.getPendingIssueEvaluation(*game)
+	if err != nil {
+		return nil, err
+	}
 
 	var previewVideo *domain.GameAsset
 	if len(videos) > 0 {
@@ -251,6 +257,7 @@ func (s *GamesService) GetDetail(id int64, includeAll bool) (*GameDetail, error)
 
 	return &GameDetail{
 		Game:          game,
+		PendingIssues: pendingIssues,
 		PreviewVideo:  previewVideo,
 		PreviewVideos: videos,
 		Screenshots:   screenshots,
@@ -388,6 +395,68 @@ func (s *GamesService) cleanupUnusedMetadata() error {
 	return nil
 }
 
+func (s *GamesService) attachPendingIssues(games []domain.Game) {
+	if len(games) == 0 {
+		return
+	}
+	if s.reviewIssueOverridesRepo == nil {
+		for index := range games {
+			evaluation := domain.EvaluatePendingIssues(games[index], nil)
+			games[index].PendingIssues = &evaluation
+		}
+		return
+	}
+
+	gameIDs := make([]int64, 0, len(games))
+	for _, game := range games {
+		gameIDs = append(gameIDs, game.ID)
+	}
+
+	overrides, err := s.reviewIssueOverridesRepo.List(gameIDs)
+	if err != nil {
+		return
+	}
+
+	ignoredReasonsByGameID := make(map[int64]map[domain.PendingIssueDetailKey]*string, len(games))
+	for _, item := range overrides {
+		if item.Status != "ignored" || !domain.IsAllowedPendingIssueDetail(item.IssueKey) {
+			continue
+		}
+		if ignoredReasonsByGameID[item.GameID] == nil {
+			ignoredReasonsByGameID[item.GameID] = make(map[domain.PendingIssueDetailKey]*string)
+		}
+		ignoredReasonsByGameID[item.GameID][domain.PendingIssueDetailKey(item.IssueKey)] = item.Reason
+	}
+
+	for index := range games {
+		evaluation := domain.EvaluatePendingIssues(games[index], ignoredReasonsByGameID[games[index].ID])
+		games[index].PendingIssues = &evaluation
+	}
+}
+
+func (s *GamesService) getPendingIssueEvaluation(game domain.Game) (*domain.PendingIssueEvaluation, error) {
+	if s.reviewIssueOverridesRepo == nil {
+		evaluation := domain.EvaluatePendingIssues(game, nil)
+		return &evaluation, nil
+	}
+
+	overrides, err := s.reviewIssueOverridesRepo.List([]int64{game.ID})
+	if err != nil {
+		return nil, err
+	}
+
+	ignoredReasons := make(map[domain.PendingIssueDetailKey]*string)
+	for _, item := range overrides {
+		if item.Status != "ignored" || !domain.IsAllowedPendingIssueDetail(item.IssueKey) {
+			continue
+		}
+		ignoredReasons[domain.PendingIssueDetailKey(item.IssueKey)] = item.Reason
+	}
+
+	evaluation := domain.EvaluatePendingIssues(game, ignoredReasons)
+	return &evaluation, nil
+}
+
 // normalizeGameCoreInput keeps game core field cleanup in services, where this
 // project already normalizes request inputs, without introducing another DTO
 // that mirrors domain.GameCoreInput.
@@ -498,7 +567,7 @@ func normalizeListParams(params *domain.GamesListParams) error {
 	}
 	params.PendingIssue = strings.TrimSpace(params.PendingIssue)
 	if params.PendingIssue != "" {
-		if _, ok := allowedPendingIssueFilters[params.PendingIssue]; !ok {
+		if !domain.IsAllowedPendingIssueFilter(params.PendingIssue) {
 			return ErrValidation
 		}
 	}

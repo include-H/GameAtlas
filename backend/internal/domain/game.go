@@ -12,7 +12,6 @@ type Game struct {
 	CoverImage        *string `db:"cover_image"`
 	BannerImage       *string `db:"banner_image"`
 	WikiContent       *string `db:"wiki_content"`
-	WikiContentHTML   *string `db:"wiki_content_html"`
 	NeedsReview       bool    `db:"needs_review"`
 	Downloads         int64   `db:"downloads"`
 	PrimaryScreenshot *string `db:"primary_screenshot"`
@@ -21,8 +20,9 @@ type Game struct {
 	DeveloperCount    int64   `db:"developer_count"`
 	PublisherCount    int64   `db:"publisher_count"`
 	PlatformCount     int64   `db:"platform_count"`
-	CreatedAt         string  `db:"created_at"`
-	UpdatedAt         string  `db:"updated_at"`
+	PendingIssues     *PendingIssueEvaluation
+	CreatedAt         string `db:"created_at"`
+	UpdatedAt         string `db:"updated_at"`
 }
 
 type GameAsset struct {

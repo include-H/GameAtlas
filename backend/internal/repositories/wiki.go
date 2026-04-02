@@ -19,7 +19,7 @@ func NewWikiRepository(db *sqlx.DB) *WikiRepository {
 func (r *WikiRepository) Get(gameID int64) (*domain.Game, error) {
 	var game domain.Game
 	err := r.db.Get(&game, `
-		SELECT id, title, wiki_content, wiki_content_html, updated_at
+		SELECT id, title, wiki_content, updated_at
 		FROM games
 		WHERE id = ?
 	`, gameID)
@@ -29,7 +29,7 @@ func (r *WikiRepository) Get(gameID int64) (*domain.Game, error) {
 	return &game, nil
 }
 
-func (r *WikiRepository) Update(gameID int64, content, html string, changeSummary *string, historyLimit int) (*domain.Game, error) {
+func (r *WikiRepository) Update(gameID int64, content string, changeSummary *string, historyLimit int) (*domain.Game, error) {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return nil, fmt.Errorf("begin wiki update: %w", err)
@@ -37,9 +37,9 @@ func (r *WikiRepository) Update(gameID int64, content, html string, changeSummar
 
 	if _, err := tx.Exec(`
 		UPDATE games
-		SET wiki_content = ?, wiki_content_html = ?, updated_at = CURRENT_TIMESTAMP
+		SET wiki_content = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, content, html, gameID); err != nil {
+	`, content, gameID); err != nil {
 		_ = tx.Rollback()
 		return nil, fmt.Errorf("update wiki content: %w", err)
 	}
@@ -71,7 +71,7 @@ func (r *WikiRepository) Update(gameID int64, content, html string, changeSummar
 
 	var game domain.Game
 	if err := tx.Get(&game, `
-		SELECT id, title, wiki_content, wiki_content_html, updated_at
+		SELECT id, title, wiki_content, updated_at
 		FROM games
 		WHERE id = ?
 	`, gameID); err != nil {

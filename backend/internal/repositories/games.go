@@ -32,15 +32,15 @@ type pendingIssueDefinition struct {
 }
 
 var pendingIssueDefinitions = []pendingIssueDefinition{
-	newPendingFieldIssue("missing-cover", "missing-assets", "g.cover_image"),
-	newPendingFieldIssue("missing-banner", "missing-assets", "g.banner_image"),
-	newPendingRelationIssue("missing-screenshots", "missing-assets", "game_assets ga", "ga.game_id = g.id AND ga.asset_type = 'screenshot'"),
+	newPendingFieldIssue(string(domain.PendingIssueDetailMissingCover), string(domain.PendingIssueMissingAssets), "g.cover_image"),
+	newPendingFieldIssue(string(domain.PendingIssueDetailMissingBanner), string(domain.PendingIssueMissingAssets), "g.banner_image"),
+	newPendingRelationIssue(string(domain.PendingIssueDetailMissingScreenshots), string(domain.PendingIssueMissingAssets), "game_assets ga", "ga.game_id = g.id AND ga.asset_type = 'screenshot'"),
 	newPendingWikiIssue(),
-	newPendingRelationIssue("missing-files-list", "missing-files", "game_files gf", "gf.game_id = g.id"),
-	newPendingRelationIssue("missing-developer", "missing-metadata", "game_developers gd", "gd.game_id = g.id"),
-	newPendingRelationIssue("missing-publisher", "missing-metadata", "game_publishers gp", "gp.game_id = g.id"),
-	newPendingRelationIssue("missing-platform", "missing-metadata", "game_platforms gp", "gp.game_id = g.id"),
-	newPendingFieldIssue("missing-summary", "missing-metadata", "g.summary"),
+	newPendingRelationIssue(string(domain.PendingIssueDetailMissingFilesList), string(domain.PendingIssueMissingFiles), "game_files gf", "gf.game_id = g.id"),
+	newPendingRelationIssue(string(domain.PendingIssueDetailMissingDeveloper), string(domain.PendingIssueMissingMetadata), "game_developers gd", "gd.game_id = g.id"),
+	newPendingRelationIssue(string(domain.PendingIssueDetailMissingPublisher), string(domain.PendingIssueMissingMetadata), "game_publishers gp", "gp.game_id = g.id"),
+	newPendingRelationIssue(string(domain.PendingIssueDetailMissingPlatform), string(domain.PendingIssueMissingMetadata), "game_platforms gp", "gp.game_id = g.id"),
+	newPendingFieldIssue(string(domain.PendingIssueDetailMissingSummary), string(domain.PendingIssueMissingMetadata), "g.summary"),
 }
 
 type GamesRepository struct {
@@ -160,7 +160,6 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 			g.cover_image,
 			g.banner_image,
 			g.wiki_content,
-			g.wiki_content_html,
 			g.needs_review,
 			g.downloads,
 			ss.primary_screenshot,
@@ -282,10 +281,10 @@ func (r *GamesRepository) CountPendingGroups(params domain.GamesListParams) (*do
 		FROM games g
 		WHERE %s
 	`,
-		pendingGroupCondition("missing-assets", params.PendingIncludeIgnored),
-		pendingGroupCondition("missing-wiki", params.PendingIncludeIgnored),
-		pendingGroupCondition("missing-files", params.PendingIncludeIgnored),
-		pendingGroupCondition("missing-metadata", params.PendingIncludeIgnored),
+		pendingGroupCondition(string(domain.PendingIssueMissingAssets), params.PendingIncludeIgnored),
+		pendingGroupCondition(string(domain.PendingIssueMissingWiki), params.PendingIncludeIgnored),
+		pendingGroupCondition(string(domain.PendingIssueMissingFiles), params.PendingIncludeIgnored),
+		pendingGroupCondition(string(domain.PendingIssueMissingMetadata), params.PendingIncludeIgnored),
 		baseWhere,
 		baseWhere,
 	)
@@ -318,7 +317,6 @@ func (r *GamesRepository) GetByID(id int64) (*domain.Game, error) {
 			cover_image,
 			banner_image,
 			wiki_content,
-			wiki_content_html,
 			needs_review,
 			downloads,
 			NULL AS primary_screenshot,
@@ -354,7 +352,6 @@ func (r *GamesRepository) GetByPublicID(publicID string) (*domain.Game, error) {
 			cover_image,
 			banner_image,
 			wiki_content,
-			wiki_content_html,
 			needs_review,
 			downloads,
 			NULL AS primary_screenshot,
@@ -555,7 +552,7 @@ func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, err
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING
 			id, public_id, title, title_alt, visibility, summary, release_date, engine, cover_image, banner_image,
-			wiki_content, wiki_content_html, needs_review, downloads, created_at, updated_at`
+			wiki_content, needs_review, downloads, created_at, updated_at`
 
 	var game domain.Game
 	if err := tx.Get(
@@ -1067,7 +1064,6 @@ func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStat
 				g.cover_image,
 				g.banner_image,
 				g.wiki_content,
-				g.wiki_content_html,
 				g.needs_review,
 				g.downloads,
 				ss.primary_screenshot,
@@ -1348,10 +1344,10 @@ func newPendingRelationIssue(key string, group string, table string, predicate s
 func newPendingWikiIssue() pendingIssueDefinition {
 	condition := pendingMissingWikiCondition()
 	return pendingIssueDefinition{
-		Key:              "missing-wiki-content",
-		Group:            "missing-wiki",
+		Key:              string(domain.PendingIssueDetailMissingWikiContent),
+		Group:            string(domain.PendingIssueMissingWiki),
 		AnyCondition:     condition,
-		VisibleCondition: pendingVisibleIssueCondition(condition, "missing-wiki-content"),
+		VisibleCondition: pendingVisibleIssueCondition(condition, string(domain.PendingIssueDetailMissingWikiContent)),
 	}
 }
 
@@ -1364,7 +1360,7 @@ func pendingMissingRelationCondition(table string, predicate string) string {
 }
 
 func pendingMissingWikiCondition() string {
-	return "(COALESCE(TRIM(g.wiki_content), '') = '' AND COALESCE(TRIM(g.wiki_content_html), '') = '')"
+	return "COALESCE(TRIM(g.wiki_content), '') = ''"
 }
 
 func pendingVisibleIssueCondition(condition string, issueKey string) string {
@@ -1422,9 +1418,9 @@ func pendingVisibleIssueCountExpression() string {
 }
 
 func pendingSevereCondition() string {
-	missingFiles := strings.Join(pendingIssueConditionsForFilter("missing-files", false), " OR ")
-	missingAssets := strings.Join(pendingIssueConditionsForFilter("missing-assets", false), " OR ")
-	missingWiki := strings.Join(pendingIssueConditionsForFilter("missing-wiki", false), " OR ")
+	missingFiles := strings.Join(pendingIssueConditionsForFilter(string(domain.PendingIssueMissingFiles), false), " OR ")
+	missingAssets := strings.Join(pendingIssueConditionsForFilter(string(domain.PendingIssueMissingAssets), false), " OR ")
+	missingWiki := strings.Join(pendingIssueConditionsForFilter(string(domain.PendingIssueMissingWiki), false), " OR ")
 	return fmt.Sprintf(
 		"(%s >= 3 OR (%s) OR ((%s) AND (%s)))",
 		pendingVisibleIssueCountExpression(),

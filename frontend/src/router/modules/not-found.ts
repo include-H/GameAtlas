@@ -8,7 +8,7 @@ export default {
   name: 'not-found',
   component: () => import('@/views/NotFoundView.vue'),
   meta: {
-    locale: 'menu.notFound',
+    title: '未找到页面',
     hideInMenu: true,
     keepAlive: false,
   },

@@ -76,7 +76,6 @@ describe('useEditGameFormBootstrap', () => {
       cover_image: null,
       banner_image: null,
       wiki_content: null,
-      wiki_content_html: null,
       needs_review: false,
       downloads: 0,
       preview_video: {

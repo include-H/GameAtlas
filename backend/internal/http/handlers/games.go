@@ -81,7 +81,7 @@ func (h *GamesHandler) List(c *gin.Context) {
 			"limit":                result.Limit,
 			"total":                result.Total,
 			"totalPages":           result.TotalPages,
-			"pending_group_counts": result.PendingGroupCounts,
+			"pending_issue_counts": result.PendingIssueCounts,
 		},
 	})
 }
@@ -409,28 +409,28 @@ func parseQueryInt64(c *gin.Context, key string, fallback int64) int64 {
 }
 
 type gameListItemResponse struct {
-	ID                int64   `json:"id"`
-	PublicID          string  `json:"public_id"`
-	Title             string  `json:"title"`
-	TitleAlt          *string `json:"title_alt"`
-	Visibility        string  `json:"visibility"`
-	Summary           *string `json:"summary"`
-	ReleaseDate       *string `json:"release_date"`
-	Engine            *string `json:"engine"`
-	CoverImage        *string `json:"cover_image"`
-	BannerImage       *string `json:"banner_image"`
-	WikiContent       *string `json:"wiki_content"`
-	WikiContentHTML   *string `json:"wiki_content_html"`
-	NeedsReview       bool    `json:"needs_review"`
-	Downloads         int64   `json:"downloads"`
-	PrimaryScreenshot *string `json:"primary_screenshot"`
-	ScreenshotCount   int64   `json:"screenshot_count"`
-	FileCount         int64   `json:"file_count"`
-	DeveloperCount    int64   `json:"developer_count"`
-	PublisherCount    int64   `json:"publisher_count"`
-	PlatformCount     int64   `json:"platform_count"`
-	CreatedAt         string  `json:"created_at"`
-	UpdatedAt         string  `json:"updated_at"`
+	ID                int64                          `json:"id"`
+	PublicID          string                         `json:"public_id"`
+	Title             string                         `json:"title"`
+	TitleAlt          *string                        `json:"title_alt"`
+	Visibility        string                         `json:"visibility"`
+	Summary           *string                        `json:"summary"`
+	ReleaseDate       *string                        `json:"release_date"`
+	Engine            *string                        `json:"engine"`
+	CoverImage        *string                        `json:"cover_image"`
+	BannerImage       *string                        `json:"banner_image"`
+	WikiContent       *string                        `json:"wiki_content"`
+	NeedsReview       bool                           `json:"needs_review"`
+	Downloads         int64                          `json:"downloads"`
+	PrimaryScreenshot *string                        `json:"primary_screenshot"`
+	ScreenshotCount   int64                          `json:"screenshot_count"`
+	FileCount         int64                          `json:"file_count"`
+	DeveloperCount    int64                          `json:"developer_count"`
+	PublisherCount    int64                          `json:"publisher_count"`
+	PlatformCount     int64                          `json:"platform_count"`
+	PendingIssues     *domain.PendingIssueEvaluation `json:"pending_issues,omitempty"`
+	CreatedAt         string                         `json:"created_at"`
+	UpdatedAt         string                         `json:"updated_at"`
 }
 
 type timelineGameItemResponse struct {
@@ -472,32 +472,32 @@ type gameFileResponse struct {
 }
 
 type gameDetailResponse struct {
-	ID              int64                  `json:"id"`
-	PublicID        string                 `json:"public_id"`
-	Title           string                 `json:"title"`
-	TitleAlt        *string                `json:"title_alt"`
-	Visibility      string                 `json:"visibility"`
-	Summary         *string                `json:"summary"`
-	ReleaseDate     *string                `json:"release_date"`
-	Engine          *string                `json:"engine"`
-	CoverImage      *string                `json:"cover_image"`
-	BannerImage     *string                `json:"banner_image"`
-	WikiContent     *string                `json:"wiki_content"`
-	WikiContentHTML *string                `json:"wiki_content_html"`
-	NeedsReview     bool                   `json:"needs_review"`
-	Downloads       int64                  `json:"downloads"`
-	PreviewVideo    *gameAssetResponse     `json:"preview_video"`
-	PreviewVideos   []gameAssetResponse    `json:"preview_videos"`
-	Screenshots     []gameAssetResponse    `json:"screenshots"`
-	Series          *metadataItemResponse  `json:"series"`
-	Platforms       []metadataItemResponse `json:"platforms"`
-	Developers      []metadataItemResponse `json:"developers"`
-	Publishers      []metadataItemResponse `json:"publishers"`
-	Tags            []tagResponse          `json:"tags"`
-	TagGroups       []gameTagGroupResponse `json:"tag_groups"`
-	Files           []gameFileResponse     `json:"files"`
-	CreatedAt       string                 `json:"created_at"`
-	UpdatedAt       string                 `json:"updated_at"`
+	ID            int64                          `json:"id"`
+	PublicID      string                         `json:"public_id"`
+	Title         string                         `json:"title"`
+	TitleAlt      *string                        `json:"title_alt"`
+	Visibility    string                         `json:"visibility"`
+	Summary       *string                        `json:"summary"`
+	ReleaseDate   *string                        `json:"release_date"`
+	Engine        *string                        `json:"engine"`
+	CoverImage    *string                        `json:"cover_image"`
+	BannerImage   *string                        `json:"banner_image"`
+	WikiContent   *string                        `json:"wiki_content"`
+	NeedsReview   bool                           `json:"needs_review"`
+	Downloads     int64                          `json:"downloads"`
+	PreviewVideo  *gameAssetResponse             `json:"preview_video"`
+	PreviewVideos []gameAssetResponse            `json:"preview_videos"`
+	Screenshots   []gameAssetResponse            `json:"screenshots"`
+	Series        *metadataItemResponse          `json:"series"`
+	Platforms     []metadataItemResponse         `json:"platforms"`
+	Developers    []metadataItemResponse         `json:"developers"`
+	Publishers    []metadataItemResponse         `json:"publishers"`
+	Tags          []tagResponse                  `json:"tags"`
+	TagGroups     []gameTagGroupResponse         `json:"tag_groups"`
+	Files         []gameFileResponse             `json:"files"`
+	PendingIssues *domain.PendingIssueEvaluation `json:"pending_issues,omitempty"`
+	CreatedAt     string                         `json:"created_at"`
+	UpdatedAt     string                         `json:"updated_at"`
 }
 
 type tagResponse struct {
@@ -536,7 +536,6 @@ func toGameListItemResponse(game domain.Game) gameListItemResponse {
 		CoverImage:        game.CoverImage,
 		BannerImage:       game.BannerImage,
 		WikiContent:       game.WikiContent,
-		WikiContentHTML:   game.WikiContentHTML,
 		NeedsReview:       game.NeedsReview,
 		Downloads:         game.Downloads,
 		PrimaryScreenshot: game.PrimaryScreenshot,
@@ -545,6 +544,7 @@ func toGameListItemResponse(game domain.Game) gameListItemResponse {
 		DeveloperCount:    game.DeveloperCount,
 		PublisherCount:    game.PublisherCount,
 		PlatformCount:     game.PlatformCount,
+		PendingIssues:     game.PendingIssues,
 		CreatedAt:         game.CreatedAt,
 		UpdatedAt:         game.UpdatedAt,
 	}
@@ -636,32 +636,32 @@ func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDe
 	}
 
 	return gameDetailResponse{
-		ID:              detail.Game.ID,
-		PublicID:        detail.Game.PublicID,
-		Title:           detail.Game.Title,
-		TitleAlt:        detail.Game.TitleAlt,
-		Visibility:      detail.Game.Visibility,
-		Summary:         detail.Game.Summary,
-		ReleaseDate:     detail.Game.ReleaseDate,
-		Engine:          detail.Game.Engine,
-		CoverImage:      detail.Game.CoverImage,
-		BannerImage:     detail.Game.BannerImage,
-		WikiContent:     detail.Game.WikiContent,
-		WikiContentHTML: detail.Game.WikiContentHTML,
-		NeedsReview:     detail.Game.NeedsReview,
-		Downloads:       detail.Game.Downloads,
-		PreviewVideo:    previewVideo,
-		PreviewVideos:   previewVideos,
-		Screenshots:     screenshots,
-		Series:          series,
-		Platforms:       toMetadataResponses(detail.Platforms),
-		Developers:      toMetadataResponses(detail.Developers),
-		Publishers:      toMetadataResponses(detail.Publishers),
-		Tags:            toTagResponses(detail.Tags),
-		TagGroups:       toGameTagGroupResponses(detail.TagGroups),
-		Files:           toGameFileResponses(detail.Files, includePaths),
-		CreatedAt:       detail.Game.CreatedAt,
-		UpdatedAt:       detail.Game.UpdatedAt,
+		ID:            detail.Game.ID,
+		PublicID:      detail.Game.PublicID,
+		Title:         detail.Game.Title,
+		TitleAlt:      detail.Game.TitleAlt,
+		Visibility:    detail.Game.Visibility,
+		Summary:       detail.Game.Summary,
+		ReleaseDate:   detail.Game.ReleaseDate,
+		Engine:        detail.Game.Engine,
+		CoverImage:    detail.Game.CoverImage,
+		BannerImage:   detail.Game.BannerImage,
+		WikiContent:   detail.Game.WikiContent,
+		NeedsReview:   detail.Game.NeedsReview,
+		Downloads:     detail.Game.Downloads,
+		PreviewVideo:  previewVideo,
+		PreviewVideos: previewVideos,
+		Screenshots:   screenshots,
+		Series:        series,
+		Platforms:     toMetadataResponses(detail.Platforms),
+		Developers:    toMetadataResponses(detail.Developers),
+		Publishers:    toMetadataResponses(detail.Publishers),
+		Tags:          toTagResponses(detail.Tags),
+		TagGroups:     toGameTagGroupResponses(detail.TagGroups),
+		Files:         toGameFileResponses(detail.Files, includePaths),
+		PendingIssues: detail.PendingIssues,
+		CreatedAt:     detail.Game.CreatedAt,
+		UpdatedAt:     detail.Game.UpdatedAt,
 	}
 }
 

@@ -4,14 +4,7 @@ import pendingWorkbenchService, {
   type PendingWorkbenchSortBy,
 } from '@/services/pending-workbench.service'
 import reviewIssuesService from '@/services/review-issues.service'
-import type { GameListItem, ReviewIssueOverride } from '@/services/types'
-import {
-  evaluatePendingIssues,
-  isSeverePendingEvaluation,
-  type PendingIssueEvaluation,
-  type PendingIssueDetailKey,
-  type PendingIssueKey,
-} from '@/utils/pendingIssues'
+import type { GameListItem, PendingIssueDetailState, PendingIssueEvaluation } from '@/services/types'
 
 export { PENDING_WORKBENCH_PAGE_SIZE }
 
@@ -23,103 +16,46 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   const emptyEvaluation: PendingIssueEvaluation = {
     groups: [],
     details: [],
-    ignoredDetails: [],
+    severe: false,
   }
 
   const isLoading = ref(false)
   const queueGames = ref<GameListItem[]>([])
   const activeGame = ref<GameListItem | null>(null)
-  const reviewIssueOverrides = ref<ReviewIssueOverride[]>([])
-  const gamePublicIDByInternalID = computed<Record<number, string>>(() => {
-    return queueGames.value.reduce<Record<number, string>>((acc, game) => {
-      if (game.public_id) {
-        acc[game.id] = game.public_id
-      }
-      return acc
-    }, {})
-  })
 
   const currentPage = ref(1)
   const totalPages = ref(0)
   const totalPendingCount = ref(0)
 
   const searchQuery = ref('')
-  const selectedIssue = ref<PendingIssueKey | undefined>()
+  const selectedIssue = ref<string | undefined>()
   const sortBy = ref<PendingWorkbenchSortBy>('issue-count')
   const onlySevere = ref(false)
   const onlyRecent = ref(false)
   const showIgnored = ref(false)
   const backendIgnoredOverridesCount = ref(0)
-  const backendIssueCounts = ref<Record<PendingIssueKey, number>>({
-    'missing-assets': 0,
-    'missing-wiki': 0,
-    'missing-files': 0,
-    'missing-metadata': 0,
-  })
-
-  const reviewOverrideMap = computed<Record<string, ReviewIssueOverride[]>>(() => {
-    return reviewIssueOverrides.value.reduce<Record<string, ReviewIssueOverride[]>>((acc, item) => {
-      const key = gamePublicIDByInternalID.value[item.game_id]
-      if (!key) {
-        return acc
-      }
-      if (!acc[key]) {
-        acc[key] = []
-      }
-      acc[key].push(item)
-      return acc
-    }, {})
-  })
+  const backendIssueCounts = ref<Record<string, number>>({})
 
   const ignoredOverridesCount = computed(() => backendIgnoredOverridesCount.value)
   const currentBatchCount = computed(() => queueGames.value.length)
 
-  const ignoredDetailMap = computed<Record<string, PendingIssueDetailKey[]>>(() => {
-    return Object.entries(reviewOverrideMap.value).reduce<Record<string, PendingIssueDetailKey[]>>((acc, [gameId, items]) => {
-      acc[gameId] = items
-        .filter((item) => item.status === 'ignored')
-        .map((item) => item.issue_key as PendingIssueDetailKey)
-      return acc
-    }, {})
-  })
-
-  const getIgnoredDetails = (game: GameListItem): PendingIssueDetailKey[] => {
-    if (!game.public_id) {
-      return []
-    }
-    return ignoredDetailMap.value[game.public_id] || []
-  }
-
-  const gameIssueEvaluationMap = computed<Record<string, PendingIssueEvaluation>>(() => {
-    // The pending queue itself is decided by the backend.
-    // evaluatePendingIssues only explains the already-returned rows for badges, detail panels, and ignored markers.
-    return queueGames.value.reduce<Record<string, PendingIssueEvaluation>>((acc, game) => {
-      if (!game.public_id) {
-        return acc
-      }
-      acc[game.public_id] = evaluatePendingIssues(game, getIgnoredDetails(game))
-      return acc
-    }, {})
-  })
-
   const getIssueEvaluation = (game: GameListItem): PendingIssueEvaluation => {
-    if (!game.public_id) {
-      return emptyEvaluation
-    }
-    return gameIssueEvaluationMap.value[game.public_id] || emptyEvaluation
+    return game.pending_issues || emptyEvaluation
   }
 
   const isSevereGame = (game: GameListItem) => {
-    return isSeverePendingEvaluation(getIssueEvaluation(game))
+    return getIssueEvaluation(game).severe
   }
 
   const getVisibleIssueGroups = (game: GameListItem) => getIssueEvaluation(game).groups
-  const getVisibleIssueDetails = (game: GameListItem) => getIssueEvaluation(game).details
-  const getIgnoredIssueDetails = (game: GameListItem) => getIssueEvaluation(game).ignoredDetails
-  const hasVisibleIssues = (game: GameListItem) => getIssueEvaluation(game).details.length > 0
+  const getVisibleIssueDetails = (game: GameListItem): PendingIssueDetailState[] => (
+    getIssueEvaluation(game).details.filter((detail) => !detail.ignored)
+  )
+  const getIgnoredIssueDetails = (game: GameListItem): PendingIssueDetailState[] => (
+    getIssueEvaluation(game).details.filter((detail) => detail.ignored)
+  )
 
   const issueCounts = computed(() => backendIssueCounts.value)
-
   const filteredGames = computed(() => queueGames.value)
 
   watch(
@@ -167,7 +103,6 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
         buildWorkbenchQuery(),
       )
       queueGames.value = snapshot.queueGames
-      reviewIssueOverrides.value = snapshot.overrides
       backendIgnoredOverridesCount.value = snapshot.ignoredTotal
       backendIssueCounts.value = snapshot.issueCounts
       currentPage.value = snapshot.page
@@ -195,16 +130,10 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     await loadWorkbenchGames(currentPage.value)
   }
 
-  const ignoreIssue = async (game: GameListItem, issueKey: PendingIssueDetailKey) => {
+  const ignoreIssue = async (game: GameListItem, issueKey: string) => {
     if (!game.public_id) return
     try {
-      const override = await reviewIssuesService.ignore(game.public_id, issueKey)
-      reviewIssueOverrides.value = [
-        ...reviewIssueOverrides.value.filter(
-          (item) => !(item.game_id === override.game_id && item.issue_key === override.issue_key),
-        ),
-        override,
-      ]
+      await reviewIssuesService.ignore(game.public_id, issueKey)
       options.addAlert('已忽略待处理项', 'success')
       await refreshCurrentPage()
     } catch {
@@ -212,16 +141,10 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     }
   }
 
-  const restoreIssue = async (game: GameListItem, issueKey: PendingIssueDetailKey) => {
+  const restoreIssue = async (game: GameListItem, issueKey: string) => {
     if (!game.public_id) return
     try {
       await reviewIssuesService.restore(game.public_id, issueKey)
-      reviewIssueOverrides.value = reviewIssueOverrides.value.filter(
-        (item) => !(
-          gamePublicIDByInternalID.value[item.game_id] === game.public_id
-          && item.issue_key === issueKey
-        ),
-      )
       options.addAlert('已恢复待处理项', 'success')
       await refreshCurrentPage()
     } catch {
@@ -253,18 +176,15 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     sortBy,
     totalPages,
     totalPendingCount,
-    reviewOverrideMap,
-    getIgnoredDetails,
     getIssueEvaluation,
     isSevereGame,
     getIgnoredIssueDetails,
     getVisibleIssueDetails,
     getVisibleIssueGroups,
-    hasVisibleIssues,
-    changePage,
-    ignoreIssue,
     loadWorkbenchGames,
-    resetFilters,
+    ignoreIssue,
     restoreIssue,
+    changePage,
+    resetFilters,
   }
 }

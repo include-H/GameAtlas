@@ -9,7 +9,7 @@ export default {
   name: 'dashboard',
   component: () => import('@/views/DashboardView.vue'),
   meta: {
-    locale: 'menu.dashboard',
+    title: '首页',
     keepAlive: true,
     icon: IconHome,
   },

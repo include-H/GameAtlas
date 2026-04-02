@@ -171,54 +171,56 @@
             </div>
           </div>
           <div v-else class="media-frame media-frame--cover screenshots-frame">
-            <a-image-preview-group infinite>
-              <div class="screenshots-grid">
-                <div
-                  v-for="screenshot in screenshots"
-                  :key="screenshot.asset_uid || screenshot.client_key"
-                  class="screenshot-thumb"
-                  :class="{
-                    'is-dragging': draggedScreenshotKey === screenshot.client_key,
-                    'is-drop-target': dragOverScreenshotKey === screenshot.client_key,
-                  }"
-                  draggable="true"
-                  @dragstart="emit('screenshot-drag-start', screenshot.client_key)"
-                  @dragenter.prevent="emit('screenshot-drag-enter', screenshot.client_key)"
-                  @dragover.prevent
-                  @drop.prevent="emit('screenshot-drop', screenshot.client_key)"
-                  @dragend="emit('screenshot-drag-end')"
-                >
-                  <a-image
-                    :src="screenshot.path"
-                    width="100%"
-                    height="100%"
-                    fit="cover"
-                    hide-footer
-                  />
-                  <div class="screenshot-overlay">
-                    <a-button
-                      class="app-text-action-btn media-action-button media-action-button--danger"
-                      type="text"
-                      status="danger"
-                      shape="circle"
-                      size="small"
-                      html-type="button"
-                      @click.stop="emit('remove-screenshot', screenshot.client_key)"
-                    >
-                      <icon-delete />
-                    </a-button>
+            <div class="screenshots-scroll">
+              <a-image-preview-group infinite>
+                <div class="screenshots-grid">
+                  <div
+                    v-for="screenshot in screenshots"
+                    :key="screenshot.asset_uid || screenshot.client_key"
+                    class="screenshot-thumb"
+                    :class="{
+                      'is-dragging': draggedScreenshotKey === screenshot.client_key,
+                      'is-drop-target': dragOverScreenshotKey === screenshot.client_key,
+                    }"
+                    draggable="true"
+                    @dragstart="emit('screenshot-drag-start', screenshot.client_key)"
+                    @dragenter.prevent="emit('screenshot-drag-enter', screenshot.client_key)"
+                    @dragover.prevent
+                    @drop.prevent="emit('screenshot-drop', screenshot.client_key)"
+                    @dragend="emit('screenshot-drag-end')"
+                  >
+                    <a-image
+                      :src="screenshot.path"
+                      width="100%"
+                      height="100%"
+                      fit="cover"
+                      hide-footer
+                    />
+                    <div class="screenshot-overlay">
+                      <a-button
+                        class="app-text-action-btn media-action-button media-action-button--danger"
+                        type="text"
+                        status="danger"
+                        shape="circle"
+                        size="small"
+                        html-type="button"
+                        @click.stop="emit('remove-screenshot', screenshot.client_key)"
+                      >
+                        <icon-delete />
+                      </a-button>
+                    </div>
+                  </div>
+                  <div
+                    class="screenshot-add-tile"
+                    role="button"
+                    tabindex="0"
+                    @click="emit('open-screenshot-selector')"
+                  >
+                    <span class="screenshot-add-tile__label">添加截图</span>
                   </div>
                 </div>
-                <div
-                  class="screenshot-add-tile"
-                  role="button"
-                  tabindex="0"
-                  @click="emit('open-screenshot-selector')"
-                >
-                  <span class="screenshot-add-tile__label">添加截图</span>
-                </div>
-              </div>
-            </a-image-preview-group>
+              </a-image-preview-group>
+            </div>
           </div>
         </div>
       </a-form-item>
@@ -416,10 +418,21 @@ const emit = defineEmits<{
 .screenshots-frame {
   align-items: stretch;
   justify-content: stretch;
+}
+
+.screenshots-scroll {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   padding: 10px;
   box-sizing: border-box;
   overflow-x: hidden;
   overflow-y: auto;
+}
+
+.screenshots-scroll :deep(.arco-image-preview-group) {
+  display: block;
+  width: 100%;
 }
 
 .screenshot-thumb {

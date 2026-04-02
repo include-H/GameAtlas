@@ -3,7 +3,6 @@ import type { ApiEnvelope } from './types'
 
 export interface WikiDocumentResponse {
   content: string | null
-  content_html: string | null
   updated_at: string
 }
 

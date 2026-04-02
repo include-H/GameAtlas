@@ -7,7 +7,7 @@ import usePermission from './permission'
 export interface MenuItem {
   name: string
   path: string
-  locale: string
+  title: string
   icon?: Component
   children?: MenuItem[]
   parentNames?: string[]
@@ -34,8 +34,8 @@ function generateMenuItems(
       continue
     }
 
-    // Skip routes without locale key
-    if (!route.meta?.locale) {
+    // Skip routes without a menu title
+    if (!route.meta?.title) {
       continue
     }
 
@@ -57,7 +57,7 @@ function generateMenuItems(
     const menuItem: MenuItem = {
       name: route.name as string,
       path: route.path,
-      locale: route.meta.locale as string,
+      title: route.meta.title as string,
       icon: iconComponent,
       parentNames,
       hideInMenu: route.meta?.hideInMenu as boolean | undefined,

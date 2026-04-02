@@ -18,7 +18,7 @@ vi.mock('./api', async (importOriginal) => {
   }
 })
 
-import gamesService from './games.service'
+import gamesService, { mapGameVersions } from './games.service'
 
 const baseGame = {
   id: 1,
@@ -32,7 +32,6 @@ const baseGame = {
   cover_image: null,
   banner_image: null,
   wiki_content: null,
-  wiki_content_html: null,
   needs_review: false,
   primary_screenshot: null,
   screenshot_count: 0,
@@ -159,51 +158,38 @@ describe('games service', () => {
     expect(getMock).toHaveBeenCalledTimes(2)
   })
 
-  it('maps game files to version metadata', async () => {
-    getMock.mockResolvedValue({
-      data: {
-        ...baseGame,
-        preview_video: null,
-        preview_videos: [],
-        screenshots: [],
-        series: null,
-        platforms: [],
-        developers: [],
-        publishers: [],
-        tags: [],
-        tag_groups: [],
-        files: [
-          {
-            id: 10,
-            game_id: 1,
-            file_name: 'Alpha.vhdx',
-            file_path: '/roms/Alpha.vhdx',
-            label: '',
-            notes: 'latest build',
-            size_bytes: 123,
-            sort_order: 2,
-            source_created_at: '2026-03-25T00:00:00Z',
-            created_at: '2026-03-24T00:00:00Z',
-            updated_at: '2026-03-25T00:00:00Z',
-          },
-          {
-            id: 9,
-            game_id: 1,
-            file_name: 'Legacy.iso',
-            file_path: '/roms/Legacy.iso',
-            label: 'Legacy',
-            notes: null,
-            size_bytes: 99,
-            sort_order: 1,
-            source_created_at: '2026-03-20T00:00:00Z',
-            created_at: '2026-03-20T00:00:00Z',
-            updated_at: '2026-03-20T00:00:00Z',
-          },
-        ],
-      },
+  it('maps game files to version metadata', () => {
+    const result = mapGameVersions({
+      public_id: 'game-1',
+      files: [
+        {
+          id: 10,
+          game_id: 1,
+          file_name: 'Alpha.vhdx',
+          file_path: '/roms/Alpha.vhdx',
+          label: '',
+          notes: 'latest build',
+          size_bytes: 123,
+          sort_order: 2,
+          source_created_at: '2026-03-25T00:00:00Z',
+          created_at: '2026-03-24T00:00:00Z',
+          updated_at: '2026-03-25T00:00:00Z',
+        },
+        {
+          id: 9,
+          game_id: 1,
+          file_name: 'Legacy.iso',
+          file_path: '/roms/Legacy.iso',
+          label: 'Legacy',
+          notes: null,
+          size_bytes: 99,
+          sort_order: 1,
+          source_created_at: '2026-03-20T00:00:00Z',
+          created_at: '2026-03-20T00:00:00Z',
+          updated_at: '2026-03-20T00:00:00Z',
+        },
+      ],
     })
-
-    const result = await gamesService.getGameVersions('game-1')
 
     expect(result).toEqual([
       {

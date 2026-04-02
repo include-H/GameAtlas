@@ -13,7 +13,6 @@ import (
 	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/http/handlers"
-	"github.com/hao/game/internal/markdown"
 	"github.com/hao/game/internal/repositories"
 	"github.com/hao/game/internal/services"
 	webassets "github.com/hao/game/web"
@@ -38,16 +37,16 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	tagsRepo := repositories.NewTagsRepository(db)
 	reviewIssueOverridesRepo := repositories.NewReviewIssueOverrideRepository(db)
 	wikiRepo := repositories.NewWikiRepository(db)
-	markdownRenderer := markdown.NewRenderer()
-	gamesService := services.NewGamesService(cfg, gamesRepo, gameFilesRepo, metadataRepo, tagsRepo)
+	gamesService := services.NewGamesService(cfg, gamesRepo, gameFilesRepo, metadataRepo, tagsRepo, reviewIssueOverridesRepo)
 	gameFilesService := services.NewGameFilesService(cfg, gamesRepo, gameFilesRepo)
 	assetsService := services.NewAssetsService(cfg, gamesRepo, assetsRepo)
 	directoryService := services.NewDirectoryService(cfg)
 	metadataService := services.NewMetadataService(cfg, metadataRepo)
+	pendingIssuesService := services.NewPendingIssuesService()
 	tagsService := services.NewTagsService(tagsRepo)
 	reviewIssueOverrideService := services.NewReviewIssueOverrideService(gamesRepo, reviewIssueOverridesRepo)
 	steamService := services.NewSteamService(cfg, assetsService)
-	wikiService := services.NewWikiService(gamesRepo, wikiRepo, markdownRenderer, cfg.WikiHistoryLimit)
+	wikiService := services.NewWikiService(gamesRepo, wikiRepo, cfg.WikiHistoryLimit)
 	hitokotoService := services.NewHitokotoService()
 	assetsHandler := handlers.NewAssetsHandler(assetsService)
 	directoryHandler := handlers.NewDirectoryHandler(directoryService)
@@ -59,6 +58,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	developersHandler := handlers.NewMetadataHandler(metadataService, services.MetadataResource{Table: "developers", ResourceName: "developers"})
 	publishersHandler := handlers.NewMetadataHandler(metadataService, services.MetadataResource{Table: "publishers", ResourceName: "publishers"})
 	reviewIssueOverrideHandler := handlers.NewReviewIssueOverrideHandler(reviewIssueOverrideService)
+	pendingIssuesHandler := handlers.NewPendingIssuesHandler(pendingIssuesService)
 	steamHandler := handlers.NewSteamHandler(steamService)
 	wikiHandler := handlers.NewWikiHandler(wikiService)
 	tagsHandler := handlers.NewTagsHandler(tagsService)
@@ -76,6 +76,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.POST("/auth/logout", authHandler.Logout)
 	api.GET("/auth/me", authHandler.Me)
 	api.GET("/hitokoto", hitokotoHandler.Get)
+	api.GET("/pending-issues", pendingIssuesHandler.List)
 	api.GET("/games", gamesHandler.List)
 	api.GET("/games/timeline", gamesHandler.ListTimeline)
 	api.GET("/games/stats", gamesHandler.Stats)

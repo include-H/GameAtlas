@@ -9,7 +9,7 @@ export default {
   name: 'games',
   component: () => import('@/views/GamesView.vue'),
   meta: {
-    locale: 'menu.games',
+    title: '游戏库',
     keepAlive: true,
     icon: IconTrophy,
   },
@@ -23,7 +23,7 @@ export const timelineRoute = {
   name: 'games-timeline',
   component: () => import('@/views/GamesTimelineView.vue'),
   meta: {
-    locale: 'menu.games.timeline',
+    title: '发售时间线',
     keepAlive: true,
     icon: IconCalendarClock,
   },
@@ -37,7 +37,7 @@ export const gameDetailRoute = {
   name: 'game-detail',
   component: () => import('@/views/GameDetailView.vue'),
   meta: {
-    locale: 'menu.game.detail',
+    title: '游戏详情',
     keepAlive: true,
     hideInMenu: true,
     activeMenu: 'games',
@@ -55,7 +55,7 @@ export const pendingCenterRoute = {
     // PendingCenter compact-layout adaptation is intentionally deferred for now,
     // so we hide this entry on phone/tablet widths by default to avoid exposing a broken workflow.
     hideOnCompactNavigation: true,
-    locale: 'menu.pending.center',
+    title: '待处理工作台',
     requiresAdmin: true,
     keepAlive: true,
     icon: IconExclamationCircle,
@@ -70,7 +70,7 @@ export const wikiEditRoute = {
   name: 'wiki-edit',
   component: () => import('@/views/WikiEditView.vue'),
   meta: {
-    locale: 'menu.wiki.edit',
+    title: '编辑Wiki',
     requiresAdmin: true,
     keepAlive: true,
     hideInMenu: true,

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import gamesService from '@/services/games.service'
+import gamesService, { mapGameVersions } from '@/services/games.service'
 import type { GameDetail, GameListItem, GameListQuery, GameSort, GameStats, GameVersion } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
 
@@ -128,23 +128,13 @@ export const useGamesStore = defineStore('games', () => {
     try {
       const game = await gamesService.getGame(id)
       currentGame.value = game
+      currentVersions.value = mapGameVersions(game)
       return game
     } catch (err) {
       error.value = getHttpErrorMessage(err, 'Failed to fetch game')
       throw err
     } finally {
       isLoading.value = false
-    }
-  }
-
-  const fetchGameVersions = async (gameId: string) => {
-    try {
-      const versions = await gamesService.getGameVersions(gameId)
-      currentVersions.value = versions
-      return versions
-    } catch (err) {
-      error.value = getHttpErrorMessage(err, 'Failed to fetch versions')
-      throw err
     }
   }
 
@@ -185,7 +175,6 @@ export const useGamesStore = defineStore('games', () => {
     // Actions
     fetchGames,
     fetchGame,
-    fetchGameVersions,
     fetchStats,
     toggleFavorite,
   }

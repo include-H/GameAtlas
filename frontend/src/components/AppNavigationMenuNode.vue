@@ -4,7 +4,7 @@
       <component :is="item.icon" />
     </template>
     <template #title>
-      {{ t(item.locale) }}
+      {{ item.title }}
     </template>
     <app-navigation-menu-node
       v-for="child in item.children"
@@ -17,20 +17,17 @@
     <template v-if="item.icon" #icon>
       <component :is="item.icon" />
     </template>
-    {{ t(item.locale) }}
+    {{ item.title }}
   </a-menu-item>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { MenuItem } from '@/hooks/useMenu'
-import useLocale from '@/hooks/useLocale'
 
 const props = defineProps<{
   item: MenuItem
 }>()
-
-const { t } = useLocale()
 
 const hasChildren = computed(() => (props.item.children?.length ?? 0) > 0)
 
