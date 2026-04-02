@@ -4,12 +4,14 @@ import (
 	"strings"
 
 	"github.com/hao/game/internal/domain"
+	"github.com/hao/game/internal/markdown"
 	"github.com/hao/game/internal/repositories"
 )
 
 type WikiService struct {
 	gamesRepo        *repositories.GamesRepository
 	wikiRepo         *repositories.WikiRepository
+	renderer         *markdown.Renderer
 	wikiHistoryLimit int
 }
 
@@ -17,14 +19,16 @@ type WikiDocument struct {
 	GameID       int64   `json:"game_id"`
 	Title        string  `json:"title"`
 	Content      *string `json:"content"`
+	ContentHTML  *string `json:"content_html"`
 	UpdatedAt    string  `json:"updated_at"`
 	HistoryCount int     `json:"history_count,omitempty"`
 }
 
-func NewWikiService(gamesRepo *repositories.GamesRepository, wikiRepo *repositories.WikiRepository, wikiHistoryLimit int) *WikiService {
+func NewWikiService(gamesRepo *repositories.GamesRepository, wikiRepo *repositories.WikiRepository, renderer *markdown.Renderer, wikiHistoryLimit int) *WikiService {
 	return &WikiService{
 		gamesRepo:        gamesRepo,
 		wikiRepo:         wikiRepo,
+		renderer:         renderer,
 		wikiHistoryLimit: wikiHistoryLimit,
 	}
 }
@@ -47,10 +51,11 @@ func (s *WikiService) Get(gameID int64, includeAll bool) (*WikiDocument, error) 
 	}
 
 	return &WikiDocument{
-		GameID:    game.ID,
-		Title:     game.Title,
-		Content:   game.WikiContent,
-		UpdatedAt: game.UpdatedAt,
+		GameID:      game.ID,
+		Title:       game.Title,
+		Content:     game.WikiContent,
+		ContentHTML: game.WikiContentHTML,
+		UpdatedAt:   game.UpdatedAt,
 	}, nil
 }
 
@@ -60,17 +65,23 @@ func (s *WikiService) Update(gameID int64, input domain.WikiWriteInput) (*WikiDo
 	}
 
 	content := strings.TrimSpace(input.Content)
+	html, err := s.renderer.Render(content)
+	if err != nil {
+		return nil, err
+	}
+
 	changeSummary := trimStringPtr(input.ChangeSummary)
-	game, err := s.wikiRepo.Update(gameID, content, changeSummary, s.wikiHistoryLimit)
+	game, err := s.wikiRepo.Update(gameID, content, html, changeSummary, s.wikiHistoryLimit)
 	if err != nil {
 		return nil, normalizeRepoError(err)
 	}
 
 	return &WikiDocument{
-		GameID:    game.ID,
-		Title:     game.Title,
-		Content:   game.WikiContent,
-		UpdatedAt: game.UpdatedAt,
+		GameID:      game.ID,
+		Title:       game.Title,
+		Content:     game.WikiContent,
+		ContentHTML: game.WikiContentHTML,
+		UpdatedAt:   game.UpdatedAt,
 	}, nil
 }
 

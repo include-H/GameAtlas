@@ -2,9 +2,11 @@ package services
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/hao/game/internal/domain"
+	"github.com/hao/game/internal/markdown"
 	"github.com/hao/game/internal/repositories"
 )
 
@@ -16,6 +18,7 @@ func TestWikiServiceGetRejectsPrivateGameForPublicRequest(t *testing.T) {
 	service := NewWikiService(
 		repositories.NewGamesRepository(db),
 		repositories.NewWikiRepository(db),
+		markdown.NewRenderer(),
 		2,
 	)
 
@@ -33,6 +36,7 @@ func TestWikiServiceUpdateRendersMarkdownAndPrunesHistory(t *testing.T) {
 	service := NewWikiService(
 		repositories.NewGamesRepository(db),
 		repositories.NewWikiRepository(db),
+		markdown.NewRenderer(),
 		2,
 	)
 
@@ -64,6 +68,10 @@ func TestWikiServiceUpdateRendersMarkdownAndPrunesHistory(t *testing.T) {
 	if document.Content == nil || *document.Content != "# Third Title" {
 		t.Fatalf("document.Content = %v, want trimmed markdown", document.Content)
 	}
+	if document.ContentHTML == nil || !strings.Contains(*document.ContentHTML, "<h1>Third Title</h1>") {
+		t.Fatalf("document.ContentHTML = %v, want rendered heading", document.ContentHTML)
+	}
+
 	history, err := service.History(gameID, true)
 	if err != nil {
 		t.Fatalf("History returned error: %v", err)
@@ -93,6 +101,7 @@ func TestWikiServiceHistoryReturnsEmptySliceWhenNoEntriesExist(t *testing.T) {
 	service := NewWikiService(
 		repositories.NewGamesRepository(db),
 		repositories.NewWikiRepository(db),
+		markdown.NewRenderer(),
 		2,
 	)
 

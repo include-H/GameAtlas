@@ -233,8 +233,9 @@
       <div v-if="totalPages > 1" class="pagination-container">
         <a-pagination
           v-model:current="currentPage"
+          v-model:page-size="itemsPerPage"
           :total="pagination?.total || 0"
-          :page-size="itemsPerPage"
+          :page-size-options="itemsPerPageOptions.map((item) => item.value)"
           show-total
           show-jumper
           show-page-size

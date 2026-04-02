@@ -33,6 +33,7 @@ describe('useGamesView helpers', () => {
     const result = buildGamesRouteQuery(
       {
         page: '3',
+        limit: '48',
         needs: 'legacy',
         filter: 'favorites',
       },
@@ -44,6 +45,7 @@ describe('useGamesView helpers', () => {
 
     expect(result).toEqual({
       page: '1',
+      limit: '48',
       search: 'halo',
     })
   })

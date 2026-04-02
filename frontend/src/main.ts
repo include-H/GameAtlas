@@ -17,12 +17,11 @@ app.use(router)
 // Register directives
 registerDirectives(app)
 
-// Initialize UI store (theme, view mode, etc.)
+document.body.setAttribute('arco-theme', 'dark')
+
+// Initialize persisted UI state
 const uiStore = useUiStore()
-uiStore.initializeTheme()
 uiStore.initializeViewMode()
-uiStore.initializeCardSize()
-uiStore.initializeItemsPerPage()
 uiStore.initializeSidebarCollapsed()
 
 const bootstrap = async () => {

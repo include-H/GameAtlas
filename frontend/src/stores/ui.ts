@@ -1,9 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { safeLocalStorageGetItem, safeLocalStorageSetItem } from '@/utils/safe-local-storage'
 
 type ViewMode = 'grid' | 'list'
-type CardSize = 'small' | 'medium' | 'large'
 type AmbientBackgroundOverride = {
   key: string
   url: string
@@ -14,23 +13,13 @@ type SharedBackgroundAvailability = 'unknown' | 'available' | 'missing'
 const CUSTOM_BACKGROUND_PATH = '/data/bg.jpg'
 
 export const useUiStore = defineStore('ui', () => {
-  // Theme
-  const isDark = ref(true)
-  const theme = computed(() => (isDark.value ? 'dark' : 'light'))
-
   // View modes
   const gamesViewMode = ref<ViewMode>('grid')
-  const cardSize = ref<CardSize>('medium')
 
   // UI state
   const sidebarCollapsed = ref(false)
-  const showFilters = ref(false)
-  const showSortOptions = ref(false)
   const ambientBackgroundOverride = ref<AmbientBackgroundOverride>(null)
   const sharedBackgroundAvailability = ref<SharedBackgroundAvailability>('unknown')
-
-  // Pagination
-  const itemsPerPage = ref(20)
 
   // Alerts
   const alerts = ref<Array<{
@@ -40,54 +29,16 @@ export const useUiStore = defineStore('ui', () => {
     dismissible?: boolean
   }>>([])
 
-  // Apply theme to DOM (Arco Design Vue specific)
-  const applyTheme = (dark: boolean) => {
-    if (dark) {
-      document.body.setAttribute('arco-theme', 'dark')
-    } else {
-      document.body.removeAttribute('arco-theme')
-    }
-  }
-
-  // Theme methods - Fixed to dark mode
-  const initializeTheme = () => {
-    // Always use dark mode
-    isDark.value = true
-    applyTheme(true)
-  }
-
-  // Toggle theme - disabled, always dark
-  const toggleTheme = () => {
-    // Dark mode is fixed, do nothing
-  }
-
   // View mode methods
   const setGamesViewMode = (mode: ViewMode) => {
     gamesViewMode.value = mode
     safeLocalStorageSetItem('gamesViewMode', mode)
   }
 
-  const toggleGamesViewMode = () => {
-    setGamesViewMode(gamesViewMode.value === 'grid' ? 'list' : 'grid')
-  }
-
   const initializeViewMode = () => {
     const stored = safeLocalStorageGetItem('gamesViewMode')
     if (stored && (stored === 'grid' || stored === 'list')) {
       gamesViewMode.value = stored as ViewMode
-    }
-  }
-
-  // Card size methods
-  const setCardSize = (size: CardSize) => {
-    cardSize.value = size
-    safeLocalStorageSetItem('cardSize', size)
-  }
-
-  const initializeCardSize = () => {
-    const stored = safeLocalStorageGetItem('cardSize')
-    if (stored && (stored === 'small' || stored === 'medium' || stored === 'large')) {
-      cardSize.value = stored as CardSize
     }
   }
 
@@ -100,14 +51,6 @@ export const useUiStore = defineStore('ui', () => {
   const setSidebarCollapsed = (value: boolean) => {
     sidebarCollapsed.value = value
     safeLocalStorageSetItem('sidebarCollapsed', String(value))
-  }
-
-  const toggleFilters = () => {
-    showFilters.value = !showFilters.value
-  }
-
-  const toggleSortOptions = () => {
-    showSortOptions.value = !showSortOptions.value
   }
 
   const setAmbientBackgroundOverride = (value: AmbientBackgroundOverride) => {
@@ -161,22 +104,6 @@ export const useUiStore = defineStore('ui', () => {
     alerts.value = []
   }
 
-  // Items per page
-  const setItemsPerPage = (count: number) => {
-    itemsPerPage.value = count
-    safeLocalStorageSetItem('itemsPerPage', count.toString())
-  }
-
-  const initializeItemsPerPage = () => {
-    const stored = safeLocalStorageGetItem('itemsPerPage')
-    if (stored) {
-      const count = parseInt(stored, 10)
-      if (count > 0 && count <= 100) {
-        itemsPerPage.value = count
-      }
-    }
-  }
-
   const initializeSidebarCollapsed = () => {
     const stored = safeLocalStorageGetItem('sidebarCollapsed')
     if (stored === 'true' || stored === 'false') {
@@ -186,36 +113,21 @@ export const useUiStore = defineStore('ui', () => {
 
   return {
     // State
-    isDark,
-    theme,
     gamesViewMode,
-    cardSize,
     sidebarCollapsed,
-    showFilters,
-    showSortOptions,
     ambientBackgroundOverride,
     sharedBackgroundAvailability,
-    itemsPerPage,
     alerts,
     // Actions
-    initializeTheme,
-    toggleTheme,
     setGamesViewMode,
-    toggleGamesViewMode,
     initializeViewMode,
-    setCardSize,
-    initializeCardSize,
     toggleSidebar,
-    toggleFilters,
-    toggleSortOptions,
     setAmbientBackgroundOverride,
     clearAmbientBackgroundOverride,
     initializeSharedBackgroundAvailability,
     addAlert,
     removeAlert,
     clearAlerts,
-    setItemsPerPage,
-    initializeItemsPerPage,
     initializeSidebarCollapsed,
     setSidebarCollapsed,
   }

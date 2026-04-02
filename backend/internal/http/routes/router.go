@@ -13,6 +13,7 @@ import (
 	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/http/handlers"
+	"github.com/hao/game/internal/markdown"
 	"github.com/hao/game/internal/repositories"
 	"github.com/hao/game/internal/services"
 	webassets "github.com/hao/game/web"
@@ -37,6 +38,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	tagsRepo := repositories.NewTagsRepository(db)
 	reviewIssueOverridesRepo := repositories.NewReviewIssueOverrideRepository(db)
 	wikiRepo := repositories.NewWikiRepository(db)
+	markdownRenderer := markdown.NewRenderer()
 	gamesService := services.NewGamesService(cfg, gamesRepo, gameFilesRepo, metadataRepo, tagsRepo)
 	gameFilesService := services.NewGameFilesService(cfg, gamesRepo, gameFilesRepo)
 	assetsService := services.NewAssetsService(cfg, gamesRepo, assetsRepo)
@@ -45,7 +47,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	tagsService := services.NewTagsService(tagsRepo)
 	reviewIssueOverrideService := services.NewReviewIssueOverrideService(gamesRepo, reviewIssueOverridesRepo)
 	steamService := services.NewSteamService(cfg, assetsService)
-	wikiService := services.NewWikiService(gamesRepo, wikiRepo, cfg.WikiHistoryLimit)
+	wikiService := services.NewWikiService(gamesRepo, wikiRepo, markdownRenderer, cfg.WikiHistoryLimit)
 	hitokotoService := services.NewHitokotoService()
 	assetsHandler := handlers.NewAssetsHandler(assetsService)
 	directoryHandler := handlers.NewDirectoryHandler(directoryService)
