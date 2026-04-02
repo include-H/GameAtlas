@@ -24,6 +24,25 @@ var allowedGameSortFields = map[string]string{
 	"downloads":    "g.downloads",
 }
 
+type pendingIssueDefinition struct {
+	Key              string
+	Group            string
+	AnyCondition     string
+	VisibleCondition string
+}
+
+var pendingIssueDefinitions = []pendingIssueDefinition{
+	newPendingFieldIssue("missing-cover", "missing-assets", "g.cover_image"),
+	newPendingFieldIssue("missing-banner", "missing-assets", "g.banner_image"),
+	newPendingRelationIssue("missing-screenshots", "missing-assets", "game_assets ga", "ga.game_id = g.id AND ga.asset_type = 'screenshot'"),
+	newPendingWikiIssue(),
+	newPendingRelationIssue("missing-files-list", "missing-files", "game_files gf", "gf.game_id = g.id"),
+	newPendingRelationIssue("missing-developer", "missing-metadata", "game_developers gd", "gd.game_id = g.id"),
+	newPendingRelationIssue("missing-publisher", "missing-metadata", "game_publishers gp", "gp.game_id = g.id"),
+	newPendingRelationIssue("missing-platform", "missing-metadata", "game_platforms gp", "gp.game_id = g.id"),
+	newPendingFieldIssue("missing-summary", "missing-metadata", "g.summary"),
+}
+
 type GamesRepository struct {
 	db *sqlx.DB
 }
@@ -35,53 +54,17 @@ func NewGamesRepository(db *sqlx.DB) *GamesRepository {
 }
 
 func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, int, error) {
-	where := []string{"1 = 1"}
-	args := map[string]any{}
-
-	if !params.IncludeAll {
-		visibility := strings.TrimSpace(params.Visibility)
-		if visibility == "" {
-			visibility = domain.GameVisibilityPublic
-		}
-		where = append(where, "g.visibility = :visibility")
-		args["visibility"] = visibility
-	}
-
-	if params.Search != "" {
-		where = append(where, "(g.title LIKE :search OR COALESCE(g.title_alt, '') LIKE :search)")
-		args["search"] = "%" + params.Search + "%"
-	}
-	if params.NeedsReview != nil {
-		where = append(where, "g.needs_review = :needs_review")
-		if *params.NeedsReview {
-			args["needs_review"] = 1
-		} else {
-			args["needs_review"] = 0
-		}
-	}
-	if params.SeriesID > 0 {
-		where = append(where, "g.series_id = :series_id")
-		args["series_id"] = params.SeriesID
-	}
-	if params.PlatformID > 0 {
-		where = append(where, "EXISTS (SELECT 1 FROM game_platforms gp WHERE gp.game_id = g.id AND gp.platform_id = :platform_id)")
-		args["platform_id"] = params.PlatformID
-	}
-	if len(params.TagIDs) > 0 {
-		tagFilters, tagArgs, err := r.buildTagFilters(params.TagIDs)
-		if err != nil {
-			return nil, 0, fmt.Errorf("build tag filters: %w", err)
-		}
-		where = append(where, tagFilters...)
-		for key, value := range tagArgs {
-			args[key] = value
-		}
+	where, args, err := r.buildGamesListWhere(params, false)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	sortField := allowedGameSortFields[params.Sort]
 	if params.Sort == "random" {
 		sortField = "ABS((g.id * :sort_seed) % 2147483647)"
 		args["sort_seed"] = params.SortSeed
+	} else if params.Sort == "pending_issue_count" {
+		sortField = pendingVisibleIssueCountExpression()
 	}
 	if sortField == "" {
 		sortField = allowedGameSortFields["updated_at"]
@@ -179,7 +162,6 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 			g.wiki_content,
 			g.wiki_content_html,
 			g.needs_review,
-			g.preview_video_asset_uid,
 			g.downloads,
 			ss.primary_screenshot,
 			COALESCE(ss.screenshot_count, 0) AS screenshot_count,
@@ -213,6 +195,115 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 	return games, total, nil
 }
 
+func (r *GamesRepository) buildGamesListWhere(params domain.GamesListParams, excludePendingIssueFilter bool) ([]string, map[string]any, error) {
+	where := []string{"1 = 1"}
+	args := map[string]any{}
+
+	if !params.IncludeAll {
+		visibility := strings.TrimSpace(params.Visibility)
+		if visibility == "" {
+			visibility = domain.GameVisibilityPublic
+		}
+		where = append(where, "g.visibility = :visibility")
+		args["visibility"] = visibility
+	}
+
+	if params.Search != "" {
+		where = append(where, "(g.title LIKE :search OR COALESCE(g.title_alt, '') LIKE :search OR COALESCE(g.summary, '') LIKE :search)")
+		args["search"] = "%" + params.Search + "%"
+	}
+	if params.NeedsReview != nil {
+		where = append(where, "g.needs_review = :needs_review")
+		if *params.NeedsReview {
+			args["needs_review"] = 1
+		} else {
+			args["needs_review"] = 0
+		}
+	}
+	if params.PendingOnly {
+		where = append(where, "("+pendingAnyIssueCondition(params.PendingIncludeIgnored)+")")
+		if !excludePendingIssueFilter && params.PendingIssue != "" {
+			pendingIssueConditions := pendingIssueConditionsForFilter(params.PendingIssue, params.PendingIncludeIgnored)
+			if len(pendingIssueConditions) == 0 {
+				where = append(where, "1 = 0")
+			} else {
+				where = append(where, "("+strings.Join(pendingIssueConditions, " OR ")+")")
+			}
+		}
+		if params.PendingSevereOnly {
+			where = append(where, "("+pendingSevereCondition()+")")
+		}
+		if params.PendingRecentDays > 0 {
+			args["pending_recent_days"] = fmt.Sprintf("-%d days", params.PendingRecentDays)
+			where = append(where, "datetime(g.created_at) >= datetime('now', :pending_recent_days)")
+		}
+	}
+	if params.SeriesID > 0 {
+		where = append(where, "g.series_id = :series_id")
+		args["series_id"] = params.SeriesID
+	}
+	if params.PlatformID > 0 {
+		where = append(where, "EXISTS (SELECT 1 FROM game_platforms gp WHERE gp.game_id = g.id AND gp.platform_id = :platform_id)")
+		args["platform_id"] = params.PlatformID
+	}
+	if len(params.TagIDs) > 0 {
+		tagFilters, tagArgs, err := r.buildTagFilters(params.TagIDs)
+		if err != nil {
+			return nil, nil, fmt.Errorf("build tag filters: %w", err)
+		}
+		where = append(where, tagFilters...)
+		for key, value := range tagArgs {
+			args[key] = value
+		}
+	}
+
+	return where, args, nil
+}
+
+func (r *GamesRepository) CountPendingGroups(params domain.GamesListParams) (*domain.PendingGroupCounts, error) {
+	where, args, err := r.buildGamesListWhere(params, true)
+	if err != nil {
+		return nil, err
+	}
+	baseWhere := strings.Join(where, " AND ")
+
+	query := fmt.Sprintf(`
+		SELECT
+			COALESCE(SUM(CASE WHEN %s THEN 1 ELSE 0 END), 0) AS missing_assets,
+			COALESCE(SUM(CASE WHEN %s THEN 1 ELSE 0 END), 0) AS missing_wiki,
+			COALESCE(SUM(CASE WHEN %s THEN 1 ELSE 0 END), 0) AS missing_files,
+			COALESCE(SUM(CASE WHEN %s THEN 1 ELSE 0 END), 0) AS missing_metadata,
+			COALESCE((
+				SELECT COUNT(*)
+				FROM game_review_issue_overrides gio
+				WHERE gio.status = 'ignored'
+					AND EXISTS (SELECT 1 FROM games g WHERE %s AND g.id = gio.game_id)
+			), 0) AS ignored_total
+		FROM games g
+		WHERE %s
+	`,
+		pendingGroupCondition("missing-assets", params.PendingIncludeIgnored),
+		pendingGroupCondition("missing-wiki", params.PendingIncludeIgnored),
+		pendingGroupCondition("missing-files", params.PendingIncludeIgnored),
+		pendingGroupCondition("missing-metadata", params.PendingIncludeIgnored),
+		baseWhere,
+		baseWhere,
+	)
+
+	stmt, queryArgs, err := sqlx.Named(query, args)
+	if err != nil {
+		return nil, fmt.Errorf("build pending group counts query: %w", err)
+	}
+	stmt = r.db.Rebind(stmt)
+
+	var counts domain.PendingGroupCounts
+	if err := r.db.Get(&counts, stmt, queryArgs...); err != nil {
+		return nil, fmt.Errorf("count pending groups: %w", err)
+	}
+
+	return &counts, nil
+}
+
 func (r *GamesRepository) GetByID(id int64) (*domain.Game, error) {
 	const query = `
 		SELECT
@@ -229,7 +320,6 @@ func (r *GamesRepository) GetByID(id int64) (*domain.Game, error) {
 			wiki_content,
 			wiki_content_html,
 			needs_review,
-			preview_video_asset_uid,
 			downloads,
 			NULL AS primary_screenshot,
 			0 AS screenshot_count,
@@ -266,7 +356,6 @@ func (r *GamesRepository) GetByPublicID(publicID string) (*domain.Game, error) {
 			wiki_content,
 			wiki_content_html,
 			needs_review,
-			preview_video_asset_uid,
 			downloads,
 			NULL AS primary_screenshot,
 			0 AS screenshot_count,
@@ -454,16 +543,22 @@ func (r *GamesRepository) HasOlderTimelineGame(params domain.GamesTimelineParams
 }
 
 func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, error) {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return nil, fmt.Errorf("begin create game tx: %w", err)
+	}
+	defer tx.Rollback()
+
 	const query = `
 		INSERT INTO games (
-			public_id, title, title_alt, title_sort_key, visibility, summary, release_date, engine, cover_image, banner_image, needs_review, preview_video_asset_uid, series_id
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			public_id, title, title_alt, title_sort_key, visibility, summary, release_date, engine, cover_image, banner_image, needs_review, series_id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING
 			id, public_id, title, title_alt, visibility, summary, release_date, engine, cover_image, banner_image,
-			wiki_content, wiki_content_html, needs_review, preview_video_asset_uid, downloads, created_at, updated_at`
+			wiki_content, wiki_content_html, needs_review, downloads, created_at, updated_at`
 
 	var game domain.Game
-	if err := r.db.Get(
+	if err := tx.Get(
 		&game,
 		query,
 		newGamePublicID(),
@@ -477,71 +572,26 @@ func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, err
 		input.CoverImage,
 		input.BannerImage,
 		boolToInt(input.NeedsReview),
-		input.PreviewVideoAssetUID,
 		input.SeriesID,
 	); err != nil {
 		return nil, fmt.Errorf("create game: %w", err)
 	}
 
-	if err := r.replaceRelations(game.ID, input); err != nil {
-		return nil, err
+	if err := r.replaceRelationsTx(tx, game.ID, domain.GameAggregatePatchInput{
+		GameCoreInput: domain.GameCoreInput{},
+		PlatformIDs:   domain.Int64SlicePatch{Present: true, Values: input.PlatformIDs},
+		DeveloperIDs:  domain.Int64SlicePatch{Present: true, Values: input.DeveloperIDs},
+		PublisherIDs:  domain.Int64SlicePatch{Present: true, Values: input.PublisherIDs},
+		TagIDs:        domain.Int64SlicePatch{Present: true, Values: input.TagIDs},
+	}); err != nil {
+		return nil, fmt.Errorf("create game relations: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit create game tx: %w", err)
 	}
 
 	return r.GetByID(game.ID)
-}
-
-func (r *GamesRepository) Update(id int64, input domain.GameWriteInput) (*domain.Game, error) {
-	const query = `
-		UPDATE games
-		SET
-			title = ?,
-			title_alt = ?,
-			title_sort_key = ?,
-			visibility = ?,
-			summary = ?,
-			release_date = ?,
-			engine = ?,
-			cover_image = ?,
-			banner_image = ?,
-			needs_review = ?,
-			preview_video_asset_uid = ?,
-			series_id = ?,
-			updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?`
-
-	result, err := r.db.Exec(
-		query,
-		input.Title,
-		input.TitleAlt,
-		buildTitleSortKey(input.Title, input.TitleAlt),
-		input.Visibility,
-		input.Summary,
-		input.ReleaseDate,
-		input.Engine,
-		input.CoverImage,
-		input.BannerImage,
-		boolToInt(input.NeedsReview),
-		input.PreviewVideoAssetUID,
-		input.SeriesID,
-		id,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("update game: %w", err)
-	}
-
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return nil, fmt.Errorf("read updated rows: %w", err)
-	}
-	if rows == 0 {
-		return nil, sql.ErrNoRows
-	}
-
-	if err := r.replaceRelations(id, input); err != nil {
-		return nil, err
-	}
-
-	return r.GetByID(id)
 }
 
 func (r *GamesRepository) UpdateAggregate(id int64, input domain.GameAggregateUpdateInput) ([]string, error) {
@@ -557,18 +607,18 @@ func (r *GamesRepository) UpdateAggregate(id int64, input domain.GameAggregateUp
 	if err := r.replaceRelationsTx(tx, id, input.Game); err != nil {
 		return nil, err
 	}
-	if err := r.syncGameFilesTx(tx, id, input.Files); err != nil {
+	if err := r.syncGameFilesTx(tx, id, input.Assets.Files); err != nil {
 		return nil, err
 	}
 
-	deletedAssetPaths, err := r.deleteAssetsTx(tx, id, input.DeleteAssets)
+	deletedAssetPaths, err := r.deleteAssetsTx(tx, id, input.Assets.DeleteAssets)
 	if err != nil {
 		return nil, err
 	}
-	if err := r.reorderAssetsTx(tx, id, "screenshot", input.ScreenshotOrderAssetUIDs); err != nil {
+	if err := r.reorderAssetsTx(tx, id, "screenshot", input.Assets.ScreenshotOrderAssetUIDs); err != nil {
 		return nil, err
 	}
-	if err := r.reorderAssetsTx(tx, id, "video", input.VideoOrderAssetUIDs); err != nil {
+	if err := r.reorderAssetsTx(tx, id, "video", input.Assets.VideoOrderAssetUIDs); err != nil {
 		return nil, err
 	}
 
@@ -631,7 +681,6 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 		"cover_image = ?",
 		"banner_image = ?",
 		"needs_review = ?",
-		"preview_video_asset_uid = ?",
 	}
 	args := []any{
 		input.Title,
@@ -644,7 +693,6 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 		input.CoverImage,
 		input.BannerImage,
 		boolToInt(input.NeedsReview),
-		input.PreviewVideoAssetUID,
 	}
 	if input.SeriesID.Present {
 		setClauses = append(setClauses, "series_id = ?")
@@ -760,12 +808,6 @@ func (r *GamesRepository) syncGameFilesTx(tx *sqlx.Tx, gameID int64, files []dom
 func (r *GamesRepository) deleteAssetsTx(tx *sqlx.Tx, gameID int64, deleteAssets []domain.GameAssetDeleteInput) ([]string, error) {
 	assetPaths := make([]string, 0, len(deleteAssets))
 
-	var currentPrimaryVideoUID sql.NullString
-	if err := tx.Get(&currentPrimaryVideoUID, "SELECT preview_video_asset_uid FROM games WHERE id = ?", gameID); err != nil {
-		return nil, fmt.Errorf("load game preview video uid: %w", err)
-	}
-	needsPrimaryVideoFallback := false
-
 	for _, item := range deleteAssets {
 		switch strings.TrimSpace(item.AssetType) {
 		case "cover":
@@ -787,52 +829,15 @@ func (r *GamesRepository) deleteAssetsTx(tx *sqlx.Tx, gameID int64, deleteAssets
 				assetPaths = append(assetPaths, deletedPath)
 			}
 		case "video":
-			deletedPath, deletedUID, deleted, err := r.deleteSingleAssetTx(tx, gameID, "video", item)
+			deletedPath, _, deleted, err := r.deleteSingleAssetTx(tx, gameID, "video", item)
 			if err != nil {
 				return nil, err
 			}
 			if deleted {
 				assetPaths = append(assetPaths, deletedPath)
-				if currentPrimaryVideoUID.Valid && strings.TrimSpace(currentPrimaryVideoUID.String) == strings.TrimSpace(deletedUID) {
-					needsPrimaryVideoFallback = true
-					currentPrimaryVideoUID = sql.NullString{}
-				}
 			}
 		default:
 			return nil, fmt.Errorf("invalid asset type: %s", strings.TrimSpace(item.AssetType))
-		}
-	}
-
-	if needsPrimaryVideoFallback {
-		var fallbackUID sql.NullString
-		if err := tx.Get(&fallbackUID, `
-			SELECT asset_uid
-			FROM game_assets
-			WHERE game_id = ? AND asset_type = 'video'
-			ORDER BY sort_order ASC, id ASC
-			LIMIT 1
-		`, gameID); err != nil {
-			if !errors.Is(err, sql.ErrNoRows) {
-				return nil, fmt.Errorf("load fallback primary video: %w", err)
-			}
-			fallbackUID = sql.NullString{}
-		}
-
-		if fallbackUID.Valid {
-			if _, err := tx.Exec(
-				"UPDATE games SET preview_video_asset_uid = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-				fallbackUID.String,
-				gameID,
-			); err != nil {
-				return nil, fmt.Errorf("set fallback primary video: %w", err)
-			}
-		} else {
-			if _, err := tx.Exec(
-				"UPDATE games SET preview_video_asset_uid = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-				gameID,
-			); err != nil {
-				return nil, fmt.Errorf("clear primary video: %w", err)
-			}
 		}
 	}
 
@@ -1064,7 +1069,6 @@ func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStat
 				g.wiki_content,
 				g.wiki_content_html,
 				g.needs_review,
-				g.preview_video_asset_uid,
 				g.downloads,
 				ss.primary_screenshot,
 				COALESCE(ss.screenshot_count, 0) AS screenshot_count,
@@ -1200,36 +1204,6 @@ func (r *GamesRepository) ListMetadata(table, joinTable, joinColumn string, game
 	return items, nil
 }
 
-func (r *GamesRepository) replaceRelations(gameID int64, input domain.GameWriteInput) error {
-	tx, err := r.db.Beginx()
-	if err != nil {
-		return fmt.Errorf("begin relations update: %w", err)
-	}
-
-	if err := replaceRelationRows(tx, "game_platforms", "platform_id", gameID, input.PlatformIDs); err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-	if err := replaceRelationRows(tx, "game_developers", "developer_id", gameID, input.DeveloperIDs); err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-	if err := replaceRelationRows(tx, "game_publishers", "publisher_id", gameID, input.PublisherIDs); err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-	if err := replaceRelationRows(tx, "game_tags", "tag_id", gameID, input.TagIDs); err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit relations update: %w", err)
-	}
-
-	return nil
-}
-
 func (r *GamesRepository) buildTagFilters(tagIDs []int64) ([]string, map[string]any, error) {
 	normalized := uniquePositiveIDs(tagIDs)
 	if len(normalized) == 0 {
@@ -1348,5 +1322,114 @@ func fallbackGamePublicID() string {
 		now&0x0fff,
 		now&0x0fffffffff,
 		sequence&0xff,
+	)
+}
+
+func newPendingFieldIssue(key string, group string, fieldExpr string) pendingIssueDefinition {
+	condition := pendingMissingFieldCondition(fieldExpr)
+	return pendingIssueDefinition{
+		Key:              key,
+		Group:            group,
+		AnyCondition:     condition,
+		VisibleCondition: pendingVisibleIssueCondition(condition, key),
+	}
+}
+
+func newPendingRelationIssue(key string, group string, table string, predicate string) pendingIssueDefinition {
+	condition := pendingMissingRelationCondition(table, predicate)
+	return pendingIssueDefinition{
+		Key:              key,
+		Group:            group,
+		AnyCondition:     condition,
+		VisibleCondition: pendingVisibleIssueCondition(condition, key),
+	}
+}
+
+func newPendingWikiIssue() pendingIssueDefinition {
+	condition := pendingMissingWikiCondition()
+	return pendingIssueDefinition{
+		Key:              "missing-wiki-content",
+		Group:            "missing-wiki",
+		AnyCondition:     condition,
+		VisibleCondition: pendingVisibleIssueCondition(condition, "missing-wiki-content"),
+	}
+}
+
+func pendingMissingFieldCondition(fieldExpr string) string {
+	return fmt.Sprintf("COALESCE(TRIM(%s), '') = ''", fieldExpr)
+}
+
+func pendingMissingRelationCondition(table string, predicate string) string {
+	return fmt.Sprintf("NOT EXISTS (SELECT 1 FROM %s WHERE %s)", table, predicate)
+}
+
+func pendingMissingWikiCondition() string {
+	return "(COALESCE(TRIM(g.wiki_content), '') = '' AND COALESCE(TRIM(g.wiki_content_html), '') = '')"
+}
+
+func pendingVisibleIssueCondition(condition string, issueKey string) string {
+	return fmt.Sprintf("(%s AND %s)", condition, pendingIssueNotIgnoredCondition(issueKey))
+}
+
+func pendingIssueNotIgnoredCondition(issueKey string) string {
+	return fmt.Sprintf(
+		"NOT EXISTS (SELECT 1 FROM game_review_issue_overrides gio WHERE gio.game_id = g.id AND gio.issue_key = '%s' AND gio.status = 'ignored')",
+		issueKey,
+	)
+}
+
+func pendingAnyIssueCondition(includeIgnored bool) string {
+	conditions := make([]string, 0, len(pendingIssueDefinitions))
+	for _, definition := range pendingIssueDefinitions {
+		if includeIgnored {
+			conditions = append(conditions, definition.AnyCondition)
+			continue
+		}
+		conditions = append(conditions, definition.VisibleCondition)
+	}
+	return strings.Join(conditions, " OR ")
+}
+
+func pendingIssueConditionsForFilter(filterKey string, includeIgnored bool) []string {
+	conditions := make([]string, 0)
+	for _, definition := range pendingIssueDefinitions {
+		if definition.Key != filterKey && definition.Group != filterKey {
+			continue
+		}
+		if includeIgnored {
+			conditions = append(conditions, definition.AnyCondition)
+		} else {
+			conditions = append(conditions, definition.VisibleCondition)
+		}
+	}
+	return conditions
+}
+
+func pendingGroupCondition(groupKey string, includeIgnored bool) string {
+	conditions := pendingIssueConditionsForFilter(groupKey, includeIgnored)
+	if len(conditions) == 0 {
+		return "0 = 1"
+	}
+	return "(" + strings.Join(conditions, " OR ") + ")"
+}
+
+func pendingVisibleIssueCountExpression() string {
+	parts := make([]string, 0, len(pendingIssueDefinitions))
+	for _, definition := range pendingIssueDefinitions {
+		parts = append(parts, fmt.Sprintf("CASE WHEN %s THEN 1 ELSE 0 END", definition.VisibleCondition))
+	}
+	return "(" + strings.Join(parts, " + ") + ")"
+}
+
+func pendingSevereCondition() string {
+	missingFiles := strings.Join(pendingIssueConditionsForFilter("missing-files", false), " OR ")
+	missingAssets := strings.Join(pendingIssueConditionsForFilter("missing-assets", false), " OR ")
+	missingWiki := strings.Join(pendingIssueConditionsForFilter("missing-wiki", false), " OR ")
+	return fmt.Sprintf(
+		"(%s >= 3 OR (%s) OR ((%s) AND (%s)))",
+		pendingVisibleIssueCountExpression(),
+		missingFiles,
+		missingAssets,
+		missingWiki,
 	)
 }

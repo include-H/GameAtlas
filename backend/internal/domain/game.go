@@ -1,29 +1,28 @@
 package domain
 
 type Game struct {
-	ID                   int64   `db:"id"`
-	PublicID             string  `db:"public_id"`
-	Title                string  `db:"title"`
-	TitleAlt             *string `db:"title_alt"`
-	Visibility           string  `db:"visibility"`
-	Summary              *string `db:"summary"`
-	ReleaseDate          *string `db:"release_date"`
-	Engine               *string `db:"engine"`
-	CoverImage           *string `db:"cover_image"`
-	BannerImage          *string `db:"banner_image"`
-	WikiContent          *string `db:"wiki_content"`
-	WikiContentHTML      *string `db:"wiki_content_html"`
-	NeedsReview          bool    `db:"needs_review"`
-	PreviewVideoAssetUID *string `db:"preview_video_asset_uid"`
-	Downloads            int64   `db:"downloads"`
-	PrimaryScreenshot    *string `db:"primary_screenshot"`
-	ScreenshotCount      int64   `db:"screenshot_count"`
-	FileCount            int64   `db:"file_count"`
-	DeveloperCount       int64   `db:"developer_count"`
-	PublisherCount       int64   `db:"publisher_count"`
-	PlatformCount        int64   `db:"platform_count"`
-	CreatedAt            string  `db:"created_at"`
-	UpdatedAt            string  `db:"updated_at"`
+	ID                int64   `db:"id"`
+	PublicID          string  `db:"public_id"`
+	Title             string  `db:"title"`
+	TitleAlt          *string `db:"title_alt"`
+	Visibility        string  `db:"visibility"`
+	Summary           *string `db:"summary"`
+	ReleaseDate       *string `db:"release_date"`
+	Engine            *string `db:"engine"`
+	CoverImage        *string `db:"cover_image"`
+	BannerImage       *string `db:"banner_image"`
+	WikiContent       *string `db:"wiki_content"`
+	WikiContentHTML   *string `db:"wiki_content_html"`
+	NeedsReview       bool    `db:"needs_review"`
+	Downloads         int64   `db:"downloads"`
+	PrimaryScreenshot *string `db:"primary_screenshot"`
+	ScreenshotCount   int64   `db:"screenshot_count"`
+	FileCount         int64   `db:"file_count"`
+	DeveloperCount    int64   `db:"developer_count"`
+	PublisherCount    int64   `db:"publisher_count"`
+	PlatformCount     int64   `db:"platform_count"`
+	CreatedAt         string  `db:"created_at"`
+	UpdatedAt         string  `db:"updated_at"`
 }
 
 type GameAsset struct {
@@ -80,17 +79,19 @@ type TagGroup struct {
 }
 
 type Tag struct {
-	ID        int64  `db:"id" json:"id"`
-	GroupID   int64  `db:"group_id" json:"group_id"`
-	GroupKey  string `db:"group_key" json:"group_key"`
-	GroupName string `db:"group_name" json:"group_name"`
-	Name      string `db:"name" json:"name"`
-	Slug      string `db:"slug" json:"slug"`
-	ParentID  *int64 `db:"parent_id" json:"parent_id"`
-	SortOrder int    `db:"sort_order" json:"sort_order"`
-	IsActive  bool   `db:"is_active" json:"is_active"`
-	CreatedAt string `db:"created_at" json:"created_at"`
-	UpdatedAt string `db:"updated_at" json:"updated_at"`
+	ID                 int64  `db:"id" json:"id"`
+	GroupID            int64  `db:"group_id" json:"group_id"`
+	GroupKey           string `db:"group_key" json:"group_key"`
+	GroupName          string `db:"group_name" json:"group_name"`
+	GroupAllowMultiple bool   `db:"group_allow_multiple" json:"-"`
+	GroupIsFilterable  bool   `db:"group_is_filterable" json:"-"`
+	Name               string `db:"name" json:"name"`
+	Slug               string `db:"slug" json:"slug"`
+	ParentID           *int64 `db:"parent_id" json:"parent_id"`
+	SortOrder          int    `db:"sort_order" json:"sort_order"`
+	IsActive           bool   `db:"is_active" json:"is_active"`
+	CreatedAt          string `db:"created_at" json:"created_at"`
+	UpdatedAt          string `db:"updated_at" json:"updated_at"`
 }
 
 type GameTagGroup struct {
@@ -127,19 +128,23 @@ type TagsListParams struct {
 }
 
 type GamesListParams struct {
-	Page        int
-	Limit       int
-	Search      string
-	SeriesID    int64
-	PlatformID  int64
-	TagIDs      []int64
-	NeedsReview *bool
-	PendingOnly bool
-	Visibility  string
-	IncludeAll  bool
-	Sort        string
-	Order       string
-	SortSeed    int64
+	Page                  int
+	Limit                 int
+	Search                string
+	SeriesID              int64
+	PlatformID            int64
+	TagIDs                []int64
+	NeedsReview           *bool
+	PendingOnly           bool
+	PendingIncludeIgnored bool
+	PendingIssue          string
+	PendingSevereOnly     bool
+	PendingRecentDays     int
+	Visibility            string
+	IncludeAll            bool
+	Sort                  string
+	Order                 string
+	SortSeed              int64
 }
 
 type GamesTimelineParams struct {
@@ -152,6 +157,14 @@ type GamesTimelineParams struct {
 	IncludeAll        bool
 }
 
+type PendingGroupCounts struct {
+	MissingAssets   int `db:"missing_assets" json:"missing_assets"`
+	MissingWiki     int `db:"missing_wiki" json:"missing_wiki"`
+	MissingFiles    int `db:"missing_files" json:"missing_files"`
+	MissingMetadata int `db:"missing_metadata" json:"missing_metadata"`
+	IgnoredTotal    int `db:"ignored_total" json:"ignored_total"`
+}
+
 type TimelineGame struct {
 	ID          int64   `db:"id"`
 	PublicID    string  `db:"public_id"`
@@ -161,22 +174,25 @@ type TimelineGame struct {
 	BannerImage *string `db:"banner_image"`
 }
 
+type GameCoreInput struct {
+	Title       string  `json:"title"`
+	TitleAlt    *string `json:"title_alt"`
+	Visibility  string  `json:"visibility"`
+	Summary     *string `json:"summary"`
+	ReleaseDate *string `json:"release_date"`
+	Engine      *string `json:"engine"`
+	CoverImage  *string `json:"cover_image"`
+	BannerImage *string `json:"banner_image"`
+	NeedsReview bool    `json:"needs_review"`
+}
+
 type GameWriteInput struct {
-	Title                string  `json:"title"`
-	TitleAlt             *string `json:"title_alt"`
-	Visibility           string  `json:"visibility"`
-	Summary              *string `json:"summary"`
-	ReleaseDate          *string `json:"release_date"`
-	Engine               *string `json:"engine"`
-	CoverImage           *string `json:"cover_image"`
-	BannerImage          *string `json:"banner_image"`
-	NeedsReview          bool    `json:"needs_review"`
-	SeriesID             *int64  `json:"series_id"`
-	PlatformIDs          []int64 `json:"platform_ids"`
-	DeveloperIDs         []int64 `json:"developer_ids"`
-	PublisherIDs         []int64 `json:"publisher_ids"`
-	TagIDs               []int64 `json:"tag_ids"`
-	PreviewVideoAssetUID *string `json:"preview_video_asset_uid"`
+	GameCoreInput
+	SeriesID     *int64  `json:"series_id"`
+	PlatformIDs  []int64 `json:"platform_ids"`
+	DeveloperIDs []int64 `json:"developer_ids"`
+	PublisherIDs []int64 `json:"publisher_ids"`
+	TagIDs       []int64 `json:"tag_ids"`
 }
 
 type OptionalInt64Patch struct {
@@ -190,21 +206,12 @@ type Int64SlicePatch struct {
 }
 
 type GameAggregatePatchInput struct {
-	Title                string  `json:"title"`
-	TitleAlt             *string `json:"title_alt"`
-	Visibility           string  `json:"visibility"`
-	Summary              *string `json:"summary"`
-	ReleaseDate          *string `json:"release_date"`
-	Engine               *string `json:"engine"`
-	CoverImage           *string `json:"cover_image"`
-	BannerImage          *string `json:"banner_image"`
-	NeedsReview          bool    `json:"needs_review"`
-	SeriesID             OptionalInt64Patch
-	PlatformIDs          Int64SlicePatch
-	DeveloperIDs         Int64SlicePatch
-	PublisherIDs         Int64SlicePatch
-	TagIDs               Int64SlicePatch
-	PreviewVideoAssetUID *string `json:"preview_video_asset_uid"`
+	GameCoreInput
+	SeriesID     OptionalInt64Patch
+	PlatformIDs  Int64SlicePatch
+	DeveloperIDs Int64SlicePatch
+	PublisherIDs Int64SlicePatch
+	TagIDs       Int64SlicePatch
 }
 
 type GameFileWriteInput struct {
@@ -230,11 +237,15 @@ type GameAssetDeleteInput struct {
 }
 
 type GameAggregateUpdateInput struct {
-	Game                     GameAggregatePatchInput `json:"game"`
-	Files                    []GameFileUpsertInput   `json:"files"`
-	DeleteAssets             []GameAssetDeleteInput  `json:"delete_assets"`
-	ScreenshotOrderAssetUIDs []string                `json:"screenshot_order_asset_uids"`
-	VideoOrderAssetUIDs      []string                `json:"video_order_asset_uids"`
+	Game   GameAggregatePatchInput  `json:"game"`
+	Assets GameAggregateAssetsInput `json:"assets"`
+}
+
+type GameAggregateAssetsInput struct {
+	Files                    []GameFileUpsertInput  `json:"files"`
+	DeleteAssets             []GameAssetDeleteInput `json:"delete_assets"`
+	ScreenshotOrderAssetUIDs []string               `json:"screenshot_order_asset_uids"`
+	VideoOrderAssetUIDs      []string               `json:"video_order_asset_uids"`
 }
 
 type WikiWriteInput struct {

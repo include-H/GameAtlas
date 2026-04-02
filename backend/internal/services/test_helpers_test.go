@@ -46,18 +46,6 @@ func insertServicesTestGame(t *testing.T, db *sqlx.DB, publicID string, title st
 	return id
 }
 
-func updateServicesGamePreviewVideo(t *testing.T, db *sqlx.DB, gameID int64, assetUID *string) {
-	t.Helper()
-
-	if _, err := db.Exec(`
-		UPDATE games
-		SET preview_video_asset_uid = ?
-		WHERE id = ?
-	`, assetUID, gameID); err != nil {
-		t.Fatalf("update test game preview video: %v", err)
-	}
-}
-
 func insertServicesGameAsset(t *testing.T, db *sqlx.DB, gameID int64, assetUID string, assetType string, path string, sortOrder int) int64 {
 	t.Helper()
 
@@ -86,6 +74,25 @@ func insertServicesTagGroup(t *testing.T, db *sqlx.DB, key string, name string) 
 	`, key, name)
 	if err != nil {
 		t.Fatalf("insert test tag group: %v", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		t.Fatalf("LastInsertId returned error: %v", err)
+	}
+
+	return id
+}
+
+func insertServicesTagGroupWithOptions(t *testing.T, db *sqlx.DB, key string, name string, allowMultiple bool, isFilterable bool) int64 {
+	t.Helper()
+
+	result, err := db.Exec(`
+		INSERT INTO tag_groups (key, name, allow_multiple, is_filterable)
+		VALUES (?, ?, ?, ?)
+	`, key, name, allowMultiple, isFilterable)
+	if err != nil {
+		t.Fatalf("insert test tag group with options: %v", err)
 	}
 
 	id, err := result.LastInsertId()
@@ -198,7 +205,6 @@ func mustLoadServicesGame(t *testing.T, db *sqlx.DB, gameID int64) domain.Game {
 			wiki_content,
 			wiki_content_html,
 			needs_review,
-			preview_video_asset_uid,
 			downloads,
 			NULL AS primary_screenshot,
 			0 AS screenshot_count,

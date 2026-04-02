@@ -1,4 +1,8 @@
 import { ref, watch, type Ref } from 'vue'
+import type {
+  EditGameEditableScreenshot,
+  EditGameForm,
+} from '@/composables/edit-game-form'
 import steamService, { proxySteamAssetUrl } from '@/services/steam.service'
 import { useSteamPicker } from '@/composables/useSteamPicker'
 import type { SteamGameSearchResult } from '@/services/types'
@@ -17,28 +21,6 @@ interface UploadedAssetLike {
   sort_order?: number
 }
 
-interface EditableScreenshotLike {
-  id?: number
-  asset_uid?: string
-  path: string
-  sort_order?: number
-  client_key: string
-}
-
-interface SteamImportFormBridge {
-  summary: string
-  title: string
-  title_alt: string
-  release_date: string | undefined
-  engine: string
-  developer_ids: Array<string | number>
-  publisher_ids: Array<string | number>
-  platform_ids: Array<string | number>
-  cover_image: string
-  banner_image: string
-  screenshots: EditableScreenshotLike[]
-}
-
 interface SteamScreenshotsData {
   name: string
   cover: string
@@ -48,8 +30,7 @@ interface SteamScreenshotsData {
 }
 
 interface UseSteamImportOptions {
-  form: Ref<SteamImportFormBridge>
-  releaseDate: Ref<Date | null>
+  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'engine' | 'developer_ids' | 'publisher_ids' | 'platform_ids' | 'cover_image' | 'banner_image' | 'screenshots'>>
   gameId: Ref<number | undefined>
   getWikiContent: () => string
   uploadAssetFromUrl: (
@@ -66,7 +47,7 @@ interface UseSteamImportOptions {
   createEditableScreenshot: (
     asset: UploadedAssetLike | string,
     index: number,
-  ) => EditableScreenshotLike
+  ) => EditGameEditableScreenshot
   addAlert: (message: string, type: AlertType) => void
 }
 
@@ -120,7 +101,6 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     wikiMetadataPickerVisible,
   } = useSteamImportMetadata({
     form: options.form,
-    releaseDate: options.releaseDate,
     getWikiContent: options.getWikiContent,
     addAlert: options.addAlert,
   })

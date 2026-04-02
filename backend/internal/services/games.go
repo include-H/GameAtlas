@@ -20,6 +20,22 @@ import (
 var ErrNotFound = errors.New("resource not found")
 var ErrValidation = errors.New("validation error")
 
+var allowedPendingIssueFilters = map[string]struct{}{
+	"missing-assets":       {},
+	"missing-wiki":         {},
+	"missing-files":        {},
+	"missing-metadata":     {},
+	"missing-cover":        {},
+	"missing-banner":       {},
+	"missing-screenshots":  {},
+	"missing-wiki-content": {},
+	"missing-files-list":   {},
+	"missing-developer":    {},
+	"missing-publisher":    {},
+	"missing-platform":     {},
+	"missing-summary":      {},
+}
+
 type GamesService struct {
 	gamesRepo     *repositories.GamesRepository
 	gameFilesRepo *repositories.GameFilesRepository
@@ -30,11 +46,12 @@ type GamesService struct {
 }
 
 type GamesListResult struct {
-	Games      []domain.Game
-	Page       int
-	Limit      int
-	Total      int
-	TotalPages int
+	Games              []domain.Game
+	Page               int
+	Limit              int
+	Total              int
+	TotalPages         int
+	PendingGroupCounts *domain.PendingGroupCounts
 }
 
 type TimelineCursor struct {
@@ -77,10 +94,21 @@ func NewGamesService(cfg config.Config, gamesRepo *repositories.GamesRepository,
 }
 
 func (s *GamesService) List(params domain.GamesListParams) (*GamesListResult, error) {
-	normalizeListParams(&params)
+	if err := normalizeListParams(&params); err != nil {
+		return nil, err
+	}
 	games, total, err := s.gamesRepo.List(params)
 	if err != nil {
 		return nil, err
+	}
+
+	var pendingGroupCounts *domain.PendingGroupCounts
+	if params.PendingOnly {
+		counts, err := s.gamesRepo.CountPendingGroups(params)
+		if err != nil {
+			return nil, err
+		}
+		pendingGroupCounts = counts
 	}
 
 	totalPages := 0
@@ -89,16 +117,19 @@ func (s *GamesService) List(params domain.GamesListParams) (*GamesListResult, er
 	}
 
 	return &GamesListResult{
-		Games:      games,
-		Page:       params.Page,
-		Limit:      params.Limit,
-		Total:      total,
-		TotalPages: totalPages,
+		Games:              games,
+		Page:               params.Page,
+		Limit:              params.Limit,
+		Total:              total,
+		TotalPages:         totalPages,
+		PendingGroupCounts: pendingGroupCounts,
 	}, nil
 }
 
 func (s *GamesService) Stats(params domain.GamesListParams) (*domain.GameStats, error) {
-	normalizeListParams(&params)
+	if err := normalizeListParams(&params); err != nil {
+		return nil, err
+	}
 	return s.gamesRepo.Stats(params)
 }
 
@@ -214,17 +245,8 @@ func (s *GamesService) GetDetail(id int64, includeAll bool) (*GameDetail, error)
 
 	var previewVideo *domain.GameAsset
 	if len(videos) > 0 {
-		if game.PreviewVideoAssetUID != nil && strings.TrimSpace(*game.PreviewVideoAssetUID) != "" {
-			for index := range videos {
-				if videos[index].AssetUID == strings.TrimSpace(*game.PreviewVideoAssetUID) {
-					previewVideo = &videos[index]
-					break
-				}
-			}
-		}
-		if previewVideo == nil {
-			previewVideo = &videos[0]
-		}
+		// Preview video is derived from the first sorted video only.
+		previewVideo = &videos[0]
 	}
 
 	return &GameDetail{
@@ -254,64 +276,14 @@ func (s *GamesService) Create(input domain.GameWriteInput) (*domain.Game, error)
 	return game, nil
 }
 
-func (s *GamesService) Update(id int64, input domain.GameWriteInput) (*domain.Game, error) {
-	trimmedInput, err := s.validateAndTrimGameInput(input)
-	if err != nil {
-		return nil, err
-	}
-	if trimmedInput.PreviewVideoAssetUID != nil && strings.TrimSpace(*trimmedInput.PreviewVideoAssetUID) != "" {
-		videos, err := s.gamesRepo.ListVideos(id)
-		if err != nil {
-			return nil, err
-		}
-		targetUID := strings.TrimSpace(*trimmedInput.PreviewVideoAssetUID)
-		found := false
-		for _, video := range videos {
-			if video.AssetUID == targetUID {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return nil, ErrValidation
-		}
-	}
-	game, err := s.gamesRepo.Update(id, trimmedInput)
-	if err != nil {
-		return nil, normalizeRepoError(err)
-	}
-	if err := s.cleanupUnusedMetadata(); err != nil {
-		return nil, err
-	}
-	return game, nil
-}
-
 func (s *GamesService) UpdateAggregate(id int64, input domain.GameAggregateUpdateInput) (*domain.Game, []string, error) {
 	trimmedInput, err := s.validateAndTrimGameAggregatePatchInput(input.Game)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if trimmedInput.PreviewVideoAssetUID != nil && strings.TrimSpace(*trimmedInput.PreviewVideoAssetUID) != "" {
-		videos, err := s.gamesRepo.ListVideos(id)
-		if err != nil {
-			return nil, nil, normalizeRepoError(err)
-		}
-		targetUID := strings.TrimSpace(*trimmedInput.PreviewVideoAssetUID)
-		found := false
-		for _, video := range videos {
-			if video.AssetUID == targetUID {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return nil, nil, ErrValidation
-		}
-	}
-
-	normalizedFiles := make([]domain.GameFileUpsertInput, 0, len(input.Files))
-	for index, item := range input.Files {
+	normalizedFiles := make([]domain.GameFileUpsertInput, 0, len(input.Assets.Files))
+	for index, item := range input.Assets.Files {
 		fileInput := domain.GameFileWriteInput{
 			FilePath:  item.FilePath,
 			Label:     item.Label,
@@ -336,7 +308,7 @@ func (s *GamesService) UpdateAggregate(id int64, input domain.GameAggregateUpdat
 		})
 	}
 
-	for _, item := range input.DeleteAssets {
+	for _, item := range input.Assets.DeleteAssets {
 		assetType := strings.TrimSpace(item.AssetType)
 		switch assetType {
 		case "cover", "banner", "screenshot", "video":
@@ -346,11 +318,13 @@ func (s *GamesService) UpdateAggregate(id int64, input domain.GameAggregateUpdat
 	}
 
 	deletedAssetPaths, err := s.gamesRepo.UpdateAggregate(id, domain.GameAggregateUpdateInput{
-		Game:                     trimmedInput,
-		Files:                    normalizedFiles,
-		DeleteAssets:             input.DeleteAssets,
-		ScreenshotOrderAssetUIDs: input.ScreenshotOrderAssetUIDs,
-		VideoOrderAssetUIDs:      input.VideoOrderAssetUIDs,
+		Game: trimmedInput,
+		Assets: domain.GameAggregateAssetsInput{
+			Files:                    normalizedFiles,
+			DeleteAssets:             input.Assets.DeleteAssets,
+			ScreenshotOrderAssetUIDs: input.Assets.ScreenshotOrderAssetUIDs,
+			VideoOrderAssetUIDs:      input.Assets.VideoOrderAssetUIDs,
+		},
 	})
 	if err != nil {
 		return nil, nil, normalizeRepoError(err)
@@ -414,20 +388,28 @@ func (s *GamesService) cleanupUnusedMetadata() error {
 	return nil
 }
 
-func validateGameInput(input domain.GameWriteInput) error {
-	if strings.TrimSpace(input.Title) == "" {
-		return ErrValidation
+// normalizeGameCoreInput keeps game core field cleanup in services, where this
+// project already normalizes request inputs, without introducing another DTO
+// that mirrors domain.GameCoreInput.
+func normalizeGameCoreInput(input domain.GameCoreInput) domain.GameCoreInput {
+	input.Title = strings.TrimSpace(input.Title)
+	input.TitleAlt = trimStringPtr(input.TitleAlt)
+	input.Visibility = strings.TrimSpace(input.Visibility)
+	if input.Visibility == "" {
+		input.Visibility = domain.GameVisibilityPublic
 	}
-	if input.Visibility != "" &&
-		input.Visibility != domain.GameVisibilityPublic &&
-		input.Visibility != domain.GameVisibilityPrivate {
-		return ErrValidation
-	}
-	return nil
+	input.Summary = trimStringPtr(input.Summary)
+	input.ReleaseDate = trimStringPtr(input.ReleaseDate)
+	input.Engine = trimStringPtr(input.Engine)
+	input.CoverImage = trimStringPtr(input.CoverImage)
+	input.BannerImage = trimStringPtr(input.BannerImage)
+	return input
 }
 
-func validateGameAggregatePatchInput(input domain.GameAggregatePatchInput) error {
-	if strings.TrimSpace(input.Title) == "" {
+// validateGameCoreInput enforces the repository-facing invariants for the
+// always-written core columns in games.update/create flows.
+func validateGameCoreInput(input domain.GameCoreInput) error {
+	if input.Title == "" {
 		return ErrValidation
 	}
 	if input.Visibility != "" &&
@@ -439,78 +421,32 @@ func validateGameAggregatePatchInput(input domain.GameAggregatePatchInput) error
 }
 
 func (s *GamesService) validateAndTrimGameInput(input domain.GameWriteInput) (domain.GameWriteInput, error) {
-	if err := validateGameInput(input); err != nil {
+	input.GameCoreInput = normalizeGameCoreInput(input.GameCoreInput)
+	if err := validateGameCoreInput(input.GameCoreInput); err != nil {
 		return domain.GameWriteInput{}, err
 	}
-
-	trimmed := trimGameInput(input)
-	if trimmed.TagIDs == nil {
-		trimmed.TagIDs = []int64{}
-	}
-
-	tagIDs, err := s.tagsRepo.ValidateTagSelection(trimmed.TagIDs)
-	if err != nil {
-		return domain.GameWriteInput{}, ErrValidation
-	}
-	trimmed.TagIDs = tagIDs
-
-	return trimmed, nil
-}
-
-func (s *GamesService) validateAndTrimGameAggregatePatchInput(input domain.GameAggregatePatchInput) (domain.GameAggregatePatchInput, error) {
-	if err := validateGameAggregatePatchInput(input); err != nil {
-		return domain.GameAggregatePatchInput{}, err
-	}
-
-	trimmed := trimGameAggregatePatchInput(input)
-	if trimmed.TagIDs.Present && trimmed.TagIDs.Values == nil {
-		trimmed.TagIDs.Values = []int64{}
-	}
-
-	if trimmed.TagIDs.Present {
-		tagIDs, err := s.tagsRepo.ValidateTagSelection(trimmed.TagIDs.Values)
-		if err != nil {
-			return domain.GameAggregatePatchInput{}, ErrValidation
-		}
-		trimmed.TagIDs.Values = tagIDs
-	}
-
-	return trimmed, nil
-}
-
-func trimGameInput(input domain.GameWriteInput) domain.GameWriteInput {
-	input.Title = strings.TrimSpace(input.Title)
-	input.TitleAlt = trimStringPtr(input.TitleAlt)
-	input.Visibility = strings.TrimSpace(input.Visibility)
-	if input.Visibility == "" {
-		input.Visibility = domain.GameVisibilityPublic
-	}
-	input.Summary = trimStringPtr(input.Summary)
-	input.ReleaseDate = trimStringPtr(input.ReleaseDate)
-	input.Engine = trimStringPtr(input.Engine)
-	input.CoverImage = trimStringPtr(input.CoverImage)
-	input.BannerImage = trimStringPtr(input.BannerImage)
-	input.PreviewVideoAssetUID = trimStringPtr(input.PreviewVideoAssetUID)
 	input.PlatformIDs = uniqueIDs(input.PlatformIDs)
 	input.DeveloperIDs = uniqueIDs(input.DeveloperIDs)
 	input.PublisherIDs = uniqueIDs(input.PublisherIDs)
 	input.TagIDs = uniqueIDs(input.TagIDs)
-	return input
+	if input.TagIDs == nil {
+		input.TagIDs = []int64{}
+	}
+
+	tagIDs, err := s.tagsRepo.ValidateTagSelection(input.TagIDs)
+	if err != nil {
+		return domain.GameWriteInput{}, ErrValidation
+	}
+	input.TagIDs = tagIDs
+
+	return input, nil
 }
 
-func trimGameAggregatePatchInput(input domain.GameAggregatePatchInput) domain.GameAggregatePatchInput {
-	input.Title = strings.TrimSpace(input.Title)
-	input.TitleAlt = trimStringPtr(input.TitleAlt)
-	input.Visibility = strings.TrimSpace(input.Visibility)
-	if input.Visibility == "" {
-		input.Visibility = domain.GameVisibilityPublic
+func (s *GamesService) validateAndTrimGameAggregatePatchInput(input domain.GameAggregatePatchInput) (domain.GameAggregatePatchInput, error) {
+	input.GameCoreInput = normalizeGameCoreInput(input.GameCoreInput)
+	if err := validateGameCoreInput(input.GameCoreInput); err != nil {
+		return domain.GameAggregatePatchInput{}, err
 	}
-	input.Summary = trimStringPtr(input.Summary)
-	input.ReleaseDate = trimStringPtr(input.ReleaseDate)
-	input.Engine = trimStringPtr(input.Engine)
-	input.CoverImage = trimStringPtr(input.CoverImage)
-	input.BannerImage = trimStringPtr(input.BannerImage)
-	input.PreviewVideoAssetUID = trimStringPtr(input.PreviewVideoAssetUID)
 	if input.PlatformIDs.Present {
 		input.PlatformIDs.Values = uniqueIDs(input.PlatformIDs.Values)
 	}
@@ -523,10 +459,22 @@ func trimGameAggregatePatchInput(input domain.GameAggregatePatchInput) domain.Ga
 	if input.TagIDs.Present {
 		input.TagIDs.Values = uniqueIDs(input.TagIDs.Values)
 	}
-	return input
+	if input.TagIDs.Present && input.TagIDs.Values == nil {
+		input.TagIDs.Values = []int64{}
+	}
+
+	if input.TagIDs.Present {
+		tagIDs, err := s.tagsRepo.ValidateTagSelection(input.TagIDs.Values)
+		if err != nil {
+			return domain.GameAggregatePatchInput{}, ErrValidation
+		}
+		input.TagIDs.Values = tagIDs
+	}
+
+	return input, nil
 }
 
-func normalizeListParams(params *domain.GamesListParams) {
+func normalizeListParams(params *domain.GamesListParams) error {
 	if params.Page <= 0 {
 		params.Page = 1
 	}
@@ -548,6 +496,19 @@ func normalizeListParams(params *domain.GamesListParams) {
 	if !params.IncludeAll && strings.TrimSpace(params.Visibility) == "" {
 		params.Visibility = domain.GameVisibilityPublic
 	}
+	params.PendingIssue = strings.TrimSpace(params.PendingIssue)
+	if params.PendingIssue != "" {
+		if _, ok := allowedPendingIssueFilters[params.PendingIssue]; !ok {
+			return ErrValidation
+		}
+	}
+	if params.PendingRecentDays < 0 {
+		params.PendingRecentDays = 0
+	}
+	if params.PendingRecentDays > 365 {
+		params.PendingRecentDays = 365
+	}
+	return nil
 }
 
 func normalizeTimelineParams(params *domain.GamesTimelineParams) error {
@@ -658,8 +619,8 @@ func groupGameTags(tags []domain.Tag) []domain.GameTagGroup {
 				ID:            tag.GroupID,
 				Key:           tag.GroupKey,
 				Name:          tag.GroupName,
-				AllowMultiple: true,
-				IsFilterable:  true,
+				AllowMultiple: tag.GroupAllowMultiple,
+				IsFilterable:  tag.GroupIsFilterable,
 				Tags:          []domain.Tag{},
 			})
 			index = len(groups) - 1

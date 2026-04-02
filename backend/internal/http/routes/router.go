@@ -81,7 +81,6 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.GET("/games/stats", gamesHandler.Stats)
 	api.GET("/games/:publicId", gamesHandler.Get)
 	api.POST("/games", gamesHandler.Create)
-	api.PUT("/games/:publicId", gamesHandler.Update)
 	api.PUT("/games/:publicId/aggregate", gamesHandler.UpdateAggregate)
 	api.DELETE("/games/:publicId", gamesHandler.Delete)
 	api.GET("/games/:publicId/files", gameFilesHandler.List)
@@ -116,7 +115,6 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.POST("/assets/screenshot", assetsHandler.Upload("screenshot"))
 	api.PUT("/assets/screenshot/order", assetsHandler.ReorderScreenshots)
 	api.PUT("/assets/video/order", assetsHandler.ReorderVideos)
-	api.PUT("/assets/video/primary", assetsHandler.SetPrimaryVideo)
 	api.DELETE("/assets", assetsHandler.Delete)
 	api.GET("/directory/default", directoryHandler.Default)
 	api.GET("/directory/list", directoryHandler.List)
@@ -252,11 +250,8 @@ func registerStaticRoutesFromDisk(router *gin.Engine, staticDir string, indexPat
 	}
 
 	router.NoRoute(func(c *gin.Context) {
-		if c.Request.Method != http.MethodGet {
-			c.JSON(http.StatusNotFound, gin.H{
-				"success": false,
-				"error":   "route not found",
-			})
+		if !shouldServeSPAIndex(c) {
+			renderRouteNotFound(c)
 			return
 		}
 
@@ -278,23 +273,37 @@ func registerStaticRoutesFromEmbedded(router *gin.Engine) {
 	}
 
 	router.NoRoute(func(c *gin.Context) {
-		if c.Request.Method != http.MethodGet {
-			c.JSON(http.StatusNotFound, gin.H{
-				"success": false,
-				"error":   "route not found",
-			})
+		if !shouldServeSPAIndex(c) {
+			renderRouteNotFound(c)
 			return
 		}
 
 		content, readErr := fs.ReadFile(distFS, "index.html")
 		if readErr != nil {
-			c.JSON(http.StatusNotFound, gin.H{
-				"success": false,
-				"error":   "route not found",
-			})
+			renderRouteNotFound(c)
 			return
 		}
 
 		c.Data(http.StatusOK, "text/html; charset=utf-8", content)
+	})
+}
+
+func shouldServeSPAIndex(c *gin.Context) bool {
+	if c.Request.Method != http.MethodGet {
+		return false
+	}
+
+	path := c.Request.URL.Path
+	if path == "/api" || strings.HasPrefix(path, "/api/") {
+		return false
+	}
+
+	return true
+}
+
+func renderRouteNotFound(c *gin.Context) {
+	c.JSON(http.StatusNotFound, gin.H{
+		"success": false,
+		"error":   "route not found",
 	})
 }

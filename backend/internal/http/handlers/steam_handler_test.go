@@ -153,7 +153,7 @@ func TestSteamHandlerSearchReturnsBadGatewayWhenUpstreamFails(t *testing.T) {
 	}
 }
 
-func TestSteamHandlerPreviewReturnsDefaultFallbackPayloadWhenUpstreamFails(t *testing.T) {
+func TestSteamHandlerPreviewReturnsBadGatewayWhenUpstreamFails(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 
 	handler := NewSteamHandler(services.NewSteamService(config.Config{Proxy: "http://127.0.0.1:1"}, nil))
@@ -166,34 +166,11 @@ func TestSteamHandlerPreviewReturnsDefaultFallbackPayloadWhenUpstreamFails(t *te
 
 	handler.Preview(context)
 
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+	if recorder.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadGateway, recorder.Body.String())
 	}
-
-	var response struct {
-		Success bool `json:"success"`
-		Data    struct {
-			AppID          int64    `json:"app_id"`
-			Name           string   `json:"name"`
-			CoverURL       *string  `json:"cover_url"`
-			BannerURL      *string  `json:"banner_url"`
-			ScreenshotURLs []string `json:"screenshot_urls"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if !response.Success || response.Data.AppID != 321 || response.Data.Name != "Steam App 321" {
-		t.Fatalf("response = %s, want default preview payload", recorder.Body.String())
-	}
-	if response.Data.CoverURL == nil || *response.Data.CoverURL != "https://steamcdn-a.akamaihd.net/steam/apps/321/library_600x900.jpg" {
-		t.Fatalf("CoverURL = %v, want fallback cover candidate", response.Data.CoverURL)
-	}
-	if response.Data.BannerURL == nil || *response.Data.BannerURL != "https://steamcdn-a.akamaihd.net/steam/apps/321/library_hero.jpg" {
-		t.Fatalf("BannerURL = %v, want fallback banner candidate", response.Data.BannerURL)
-	}
-	if len(response.Data.ScreenshotURLs) != 0 {
-		t.Fatalf("ScreenshotURLs = %#v, want empty slice", response.Data.ScreenshotURLs)
+	if !strings.Contains(recorder.Body.String(), `"error":"upstream request failed:`) {
+		t.Fatalf("body = %s, want upstream error payload", recorder.Body.String())
 	}
 }
 

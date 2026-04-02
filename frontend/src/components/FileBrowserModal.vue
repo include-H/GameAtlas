@@ -11,7 +11,7 @@
       <div class="file-browser-header">
         <a-space>
           <a-button 
-            class="app-secondary-compact"
+            class="app-text-action-btn app-secondary-compact"
             type="text"
             size="small" 
             :disabled="!canGoUp" 
@@ -54,7 +54,7 @@
             <template #actions>
               <a-button 
                 v-if="item.type === 'file'" 
-                class="app-secondary-compact"
+                class="app-text-action-btn app-secondary-compact"
                 type="text" 
                 size="small"
                 @click.stop="selectFile(item)"

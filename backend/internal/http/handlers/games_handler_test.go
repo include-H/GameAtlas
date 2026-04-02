@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -215,6 +216,243 @@ func TestGamesHandlerGetHidesFilePathsForPublicAndIncludesThemForAdmin(t *testin
 	}
 }
 
+func TestGamesHandlerListPendingUsesNativePendingFilter(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	pendingID := insertGamesHandlerTestGame(t, db, "pending-visible", "Pending Visible", "public", "")
+	resolvedID := insertGamesHandlerTestGame(t, db, "pending-resolved", "Pending Resolved", "public", "")
+	ignoredID := insertGamesHandlerTestGame(t, db, "pending-ignored", "Pending Ignored", "public", "")
+
+	if _, err := db.Exec(`
+		UPDATE games
+		SET cover_image = ?, banner_image = ?, summary = ?, wiki_content = ?
+		WHERE id IN (?, ?)
+	`, "/assets/cover.png", "/assets/banner.png", "Ready", "# Ready", resolvedID, ignoredID); err != nil {
+		t.Fatalf("seed handler pending games: %v", err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO game_assets (game_id, asset_uid, asset_type, path, sort_order)
+		VALUES (?, 'resolved-shot', 'screenshot', '/assets/pending-resolved/shot.png', 0)
+	`, resolvedID); err != nil {
+		t.Fatalf("insert resolved screenshot: %v", err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO game_assets (game_id, asset_uid, asset_type, path, sort_order)
+		VALUES (?, 'ignored-shot', 'screenshot', '/assets/pending-ignored/shot.png', 0)
+	`, ignoredID); err != nil {
+		t.Fatalf("insert ignored screenshot: %v", err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO game_files (game_id, file_path, sort_order)
+		VALUES (?, '/roms/pending-resolved.rom', 0)
+	`, resolvedID); err != nil {
+		t.Fatalf("insert resolved file: %v", err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO game_files (game_id, file_path, sort_order)
+		VALUES (?, '/roms/pending-ignored.rom', 0)
+	`, ignoredID); err != nil {
+		t.Fatalf("insert ignored file: %v", err)
+	}
+
+	platformID := insertGamesHandlerMetadataItem(t, db, "platforms", "Windows", "windows")
+	developerID := insertGamesHandlerMetadataItem(t, db, "developers", "Studio", "studio")
+	publisherID := insertGamesHandlerMetadataItem(t, db, "publishers", "Publisher", "publisher")
+	linkGamesHandlerGameRelation(t, db, "game_platforms", "platform_id", resolvedID, platformID)
+	linkGamesHandlerGameRelation(t, db, "game_developers", "developer_id", resolvedID, developerID)
+	linkGamesHandlerGameRelation(t, db, "game_publishers", "publisher_id", resolvedID, publisherID)
+	linkGamesHandlerGameRelation(t, db, "game_platforms", "platform_id", ignoredID, platformID)
+	linkGamesHandlerGameRelation(t, db, "game_developers", "developer_id", ignoredID, developerID)
+	linkGamesHandlerGameRelation(t, db, "game_publishers", "publisher_id", ignoredID, publisherID)
+
+	if _, err := db.Exec(`
+		INSERT INTO game_review_issue_overrides (game_id, issue_key, status)
+		VALUES (?, 'missing-cover', 'ignored')
+	`, ignoredID); err != nil {
+		t.Fatalf("insert ignored override: %v", err)
+	}
+
+	service := services.NewGamesService(
+		config.Config{},
+		repositories.NewGamesRepository(db),
+		repositories.NewGameFilesRepository(db),
+		repositories.NewMetadataRepository(db),
+		repositories.NewTagsRepository(db),
+	)
+	handler := NewGamesHandler(service)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/games?pending=true&limit=10", nil)
+
+	handler.List(context)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+		Data    []struct {
+			ID       int64  `json:"id"`
+			PublicID string `json:"public_id"`
+		} `json:"data"`
+		Pagination struct {
+			Total int `json:"total"`
+		} `json:"pagination"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if !response.Success {
+		t.Fatalf("expected success=true")
+	}
+	if response.Pagination.Total != 1 {
+		t.Fatalf("pagination.total = %d, want 1", response.Pagination.Total)
+	}
+	if len(response.Data) != 1 || response.Data[0].ID != pendingID || response.Data[0].PublicID != "pending-visible" {
+		t.Fatalf("data = %+v, want only native pending game", response.Data)
+	}
+}
+
+func TestGamesHandlerListPendingUsesNativePendingQueryOptions(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	severeID := insertGamesHandlerTestGame(t, db, "pending-severe", "Pending Severe", "public", "")
+	recentID := insertGamesHandlerTestGame(t, db, "pending-recent", "Pending Recent", "public", "")
+	ignoredID := insertGamesHandlerTestGame(t, db, "pending-ignored-all", "Pending Ignored All", "public", "")
+
+	if _, err := db.Exec(`
+		UPDATE games
+		SET banner_image = ?, summary = ?
+		WHERE id = ?
+	`, "/assets/recent-banner.png", "Ready", recentID); err != nil {
+		t.Fatalf("seed handler native pending recent game: %v", err)
+	}
+	if _, err := db.Exec(`
+		UPDATE games
+		SET banner_image = ?, summary = ?, wiki_content = ?
+		WHERE id = ?
+	`, "/assets/ignored-banner.png", "Ready", "# Ready", ignoredID); err != nil {
+		t.Fatalf("seed handler native pending query games: %v", err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO game_assets (game_id, asset_uid, asset_type, path, sort_order)
+		VALUES (?, 'recent-shot', 'screenshot', '/assets/pending-recent/shot.png', 0),
+		       (?, 'ignored-shot', 'screenshot', '/assets/pending-ignored-all/shot.png', 0)
+	`, recentID, ignoredID); err != nil {
+		t.Fatalf("insert pending query screenshots: %v", err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO game_files (game_id, file_path, sort_order)
+		VALUES (?, '/roms/pending-recent.rom', 0),
+		       (?, '/roms/pending-ignored-all.rom', 0)
+	`, recentID, ignoredID); err != nil {
+		t.Fatalf("insert pending query files: %v", err)
+	}
+
+	platformID := insertGamesHandlerMetadataItem(t, db, "platforms", "Query Windows", "query-windows")
+	developerID := insertGamesHandlerMetadataItem(t, db, "developers", "Query Studio", "query-studio")
+	publisherID := insertGamesHandlerMetadataItem(t, db, "publishers", "Query Publisher", "query-publisher")
+	linkGamesHandlerGameRelation(t, db, "game_platforms", "platform_id", recentID, platformID)
+	linkGamesHandlerGameRelation(t, db, "game_developers", "developer_id", recentID, developerID)
+	linkGamesHandlerGameRelation(t, db, "game_publishers", "publisher_id", recentID, publisherID)
+	linkGamesHandlerGameRelation(t, db, "game_platforms", "platform_id", ignoredID, platformID)
+	linkGamesHandlerGameRelation(t, db, "game_developers", "developer_id", ignoredID, developerID)
+	linkGamesHandlerGameRelation(t, db, "game_publishers", "publisher_id", ignoredID, publisherID)
+
+	now := time.Now().UTC()
+	for _, item := range []struct {
+		id        int64
+		createdAt string
+	}{
+		{id: severeID, createdAt: now.Format("2006-01-02 15:04:05")},
+		{id: recentID, createdAt: now.AddDate(0, 0, -1).Format("2006-01-02 15:04:05")},
+		{id: ignoredID, createdAt: now.AddDate(0, 0, -1).Format("2006-01-02 15:04:05")},
+	} {
+		if _, err := db.Exec(`UPDATE games SET created_at = ?, updated_at = ? WHERE id = ?`, item.createdAt, item.createdAt, item.id); err != nil {
+			t.Fatalf("set handler pending query timestamps: %v", err)
+		}
+	}
+
+	for _, issueKey := range []string{"missing-cover", "missing-banner", "missing-summary"} {
+		if _, err := db.Exec(`
+			INSERT INTO game_review_issue_overrides (game_id, issue_key, status)
+			VALUES (?, ?, 'ignored')
+		`, ignoredID, issueKey); err != nil {
+			t.Fatalf("insert ignored override %s: %v", issueKey, err)
+		}
+	}
+
+	service := services.NewGamesService(
+		config.Config{},
+		repositories.NewGamesRepository(db),
+		repositories.NewGameFilesRepository(db),
+		repositories.NewMetadataRepository(db),
+		repositories.NewTagsRepository(db),
+	)
+	handler := NewGamesHandler(service)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(
+		http.MethodGet,
+		"/api/games?pending=true&pending_include_ignored=true&pending_issue=missing-assets&pending_severe=true&pending_recent_days=30&sort=pending_issue_count&order=desc&search=Pending",
+		nil,
+	)
+
+	handler.List(context)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+
+	var response struct {
+		Data []struct {
+			ID int64 `json:"id"`
+		} `json:"data"`
+		Pagination struct {
+			Total              int `json:"total"`
+			PendingGroupCounts struct {
+				MissingAssets   int `json:"missing_assets"`
+				MissingWiki     int `json:"missing_wiki"`
+				MissingFiles    int `json:"missing_files"`
+				MissingMetadata int `json:"missing_metadata"`
+				IgnoredTotal    int `json:"ignored_total"`
+			} `json:"pending_group_counts"`
+		} `json:"pagination"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if response.Pagination.Total != 2 {
+		t.Fatalf("pagination.total = %d, want 2", response.Pagination.Total)
+	}
+	if len(response.Data) != 2 {
+		t.Fatalf("len(data) = %d, want 2", len(response.Data))
+	}
+	if response.Data[0].ID != severeID || response.Data[1].ID != recentID {
+		t.Fatalf("data = %+v, want severe then recent", response.Data)
+	}
+	if response.Pagination.PendingGroupCounts.MissingAssets != 2 ||
+		response.Pagination.PendingGroupCounts.MissingWiki != 2 ||
+		response.Pagination.PendingGroupCounts.MissingFiles != 1 ||
+		response.Pagination.PendingGroupCounts.MissingMetadata != 1 {
+		t.Fatalf("pending_group_counts = %+v, want aggregated native counts", response.Pagination.PendingGroupCounts)
+	}
+	if response.Pagination.PendingGroupCounts.IgnoredTotal != 0 {
+		t.Fatalf("pending_group_counts.ignored_total = %d, want 0 after native queue filters", response.Pagination.PendingGroupCounts.IgnoredTotal)
+	}
+}
+
 func TestGamesHandlerCreateReturnsBadRequestWhenTitleMissing(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 
@@ -295,7 +533,7 @@ func TestGamesHandlerUpdateAggregateIncludesAssetDeleteWarnings(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-warning/aggregate", strings.NewReader(`{"title":"Aggregate Warning","delete_assets":[{"asset_type":"cover","path":"/assets/../bad-cover.png"}]}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-warning/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Warning"},"assets":{"delete_assets":[{"asset_type":"cover","path":"/assets/../bad-cover.png"}]}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-warning"}}
 	context.Set("is_admin", true)
@@ -358,7 +596,7 @@ func TestGamesHandlerUpdateAggregatePreservesOmittedRelations(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-preserve-relations/aggregate", strings.NewReader(`{"title":"Aggregate Preserve Relations Updated"}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-preserve-relations/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Preserve Relations Updated"},"assets":{}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-preserve-relations"}}
 	context.Set("is_admin", true)
@@ -396,7 +634,7 @@ func TestGamesHandlerUpdateAggregateRejectsNullRelationPatch(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-null-relations/aggregate", strings.NewReader(`{"title":"Aggregate Null Relations","developer_ids":null}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-null-relations/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Null Relations","developer_ids":null},"assets":{}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-null-relations"}}
 	context.Set("is_admin", true)
@@ -408,104 +646,6 @@ func TestGamesHandlerUpdateAggregateRejectsNullRelationPatch(t *testing.T) {
 	}
 	if !strings.Contains(recorder.Body.String(), `"error":"invalid game payload"`) {
 		t.Fatalf("body = %s, want invalid game payload", recorder.Body.String())
-	}
-}
-
-func TestGamesHandlerUpdateReturnsNotFoundForMissingGame(t *testing.T) {
-	t.Setenv("GIN_MODE", gin.TestMode)
-
-	db := openGamesHandlerTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
-
-	recorder := httptest.NewRecorder()
-	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/missing", strings.NewReader(`{"title":"Updated"}`))
-	context.Request.Header.Set("Content-Type", "application/json")
-	context.Params = gin.Params{{Key: "publicId", Value: "missing"}}
-	context.Set("is_admin", true)
-
-	handler.Update(context)
-
-	if recorder.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusNotFound, recorder.Body.String())
-	}
-	if !strings.Contains(recorder.Body.String(), `"error":"resource not found"`) {
-		t.Fatalf("body = %s, want resource not found error", recorder.Body.String())
-	}
-}
-
-func TestGamesHandlerUpdateRejectsInvalidJSONAfterResolvingGame(t *testing.T) {
-	t.Setenv("GIN_MODE", gin.TestMode)
-
-	db := openGamesHandlerTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	insertGamesHandlerTestGame(t, db, "update-invalid-json", "Update Invalid JSON", "public", "")
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
-
-	recorder := httptest.NewRecorder()
-	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/update-invalid-json", strings.NewReader("{"))
-	context.Request.Header.Set("Content-Type", "application/json")
-	context.Params = gin.Params{{Key: "publicId", Value: "update-invalid-json"}}
-	context.Set("is_admin", true)
-
-	handler.Update(context)
-
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
-	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid game payload"`) {
-		t.Fatalf("body = %s, want invalid game payload", recorder.Body.String())
-	}
-}
-
-func TestGamesHandlerUpdateReturnsBadRequestForUnknownPreviewVideo(t *testing.T) {
-	t.Setenv("GIN_MODE", gin.TestMode)
-
-	db := openGamesHandlerTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	insertGamesHandlerTestGame(t, db, "update-preview-missing", "Update Preview Missing", "public", "")
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
-
-	recorder := httptest.NewRecorder()
-	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/update-preview-missing", strings.NewReader(`{"title":"Update Preview Missing","preview_video_asset_uid":"missing-video"}`))
-	context.Request.Header.Set("Content-Type", "application/json")
-	context.Params = gin.Params{{Key: "publicId", Value: "update-preview-missing"}}
-	context.Set("is_admin", true)
-
-	handler.Update(context)
-
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
-	}
-	if !strings.Contains(recorder.Body.String(), `"error":"title is required"`) {
-		t.Fatalf("body = %s, want current validation mapping", recorder.Body.String())
 	}
 }
 
@@ -603,7 +743,7 @@ func TestGamesHandlerUpdateAggregateReturnsBadRequestForInvalidDeleteAssetType(t
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-invalid-type/aggregate", strings.NewReader(`{"title":"Aggregate Invalid Type","delete_assets":[{"asset_type":"manual","path":"/assets/manual.pdf"}]}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-invalid-type/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Invalid Type"},"assets":{"delete_assets":[{"asset_type":"manual","path":"/assets/manual.pdf"}]}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-invalid-type"}}
 	context.Set("is_admin", true)
@@ -668,7 +808,7 @@ func TestGamesHandlerUpdateAggregateReturnsNotFoundForMissingGame(t *testing.T) 
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/missing-aggregate/aggregate", strings.NewReader(`{"title":"Missing Aggregate"}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/missing-aggregate/aggregate", strings.NewReader(`{"game":{"title":"Missing Aggregate"},"assets":{}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "missing-aggregate"}}
 	context.Set("is_admin", true)
@@ -701,7 +841,7 @@ func TestGamesHandlerUpdateAggregateReturnsBadRequestWhenPrimaryROMRootMissing(t
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-missing-root/aggregate", strings.NewReader(`{"title":"Aggregate Missing Root","files":[{"file_path":"/tmp/demo.rom"}]}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-missing-root/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Missing Root"},"assets":{"files":[{"file_path":"/tmp/demo.rom"}]}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-missing-root"}}
 	context.Set("is_admin", true)
@@ -713,46 +853,6 @@ func TestGamesHandlerUpdateAggregateReturnsBadRequestWhenPrimaryROMRootMissing(t
 	}
 	if !strings.Contains(recorder.Body.String(), `"error":"PRIMARY_ROM_ROOT is not configured"`) {
 		t.Fatalf("body = %s, want missing PRIMARY_ROM_ROOT error", recorder.Body.String())
-	}
-}
-
-func TestGamesHandlerUpdateAggregateReturnsBadRequestForUnknownPreviewVideo(t *testing.T) {
-	t.Setenv("GIN_MODE", gin.TestMode)
-
-	db := openGamesHandlerTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	gameID := insertGamesHandlerTestGame(t, db, "aggregate-missing-preview", "Aggregate Missing Preview", "public", "")
-	if _, err := db.Exec(`
-		INSERT INTO game_assets (game_id, asset_uid, asset_type, path, sort_order)
-		VALUES (?, 'video-a', 'video', '/assets/aggregate-missing-preview/video-a.mp4', 0)
-	`, gameID); err != nil {
-		t.Fatalf("insert game asset: %v", err)
-	}
-
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
-
-	recorder := httptest.NewRecorder()
-	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-missing-preview/aggregate", strings.NewReader(`{"title":"Aggregate Missing Preview","preview_video_asset_uid":"missing-video"}`))
-	context.Request.Header.Set("Content-Type", "application/json")
-	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-missing-preview"}}
-	context.Set("is_admin", true)
-
-	handler.UpdateAggregate(context)
-
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
-	}
-	if !strings.Contains(recorder.Body.String(), `"error":"title is required"`) {
-		t.Fatalf("body = %s, want current validation mapping", recorder.Body.String())
 	}
 }
 
@@ -781,7 +881,7 @@ func TestGamesHandlerUpdateAggregateReturnsNotFoundForMissingScreenshotReorderUI
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-missing-shot/aggregate", strings.NewReader(`{"title":"Aggregate Missing Shot","screenshot_order_asset_uids":["missing-shot"]}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-missing-shot/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Missing Shot"},"assets":{"screenshot_order_asset_uids":["missing-shot"]}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-missing-shot"}}
 	context.Set("is_admin", true)
@@ -821,7 +921,7 @@ func TestGamesHandlerUpdateAggregateReturnsNotFoundForMissingVideoReorderUID(t *
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-missing-video/aggregate", strings.NewReader(`{"title":"Aggregate Missing Video","video_order_asset_uids":["missing-video"]}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-missing-video/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Missing Video"},"assets":{"video_order_asset_uids":["missing-video"]}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-missing-video"}}
 	context.Set("is_admin", true)
@@ -861,7 +961,7 @@ func TestGamesHandlerUpdateAggregateReturnsForbiddenForFileOutsidePrimaryROMRoot
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-outside-root/aggregate", strings.NewReader(fmt.Sprintf(`{"title":"Aggregate Outside Root","files":[{"file_path":%q}]}`, outsidePath)))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-outside-root/aggregate", strings.NewReader(fmt.Sprintf(`{"game":{"title":"Aggregate Outside Root"},"assets":{"files":[{"file_path":%q}]}}`, outsidePath)))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-outside-root"}}
 	context.Set("is_admin", true)
@@ -908,4 +1008,34 @@ func insertGamesHandlerTestGame(t *testing.T, db *sqlx.DB, publicID string, titl
 	}
 
 	return id
+}
+
+func insertGamesHandlerMetadataItem(t *testing.T, db *sqlx.DB, table string, name string, slug string) int64 {
+	t.Helper()
+
+	result, err := db.Exec(fmt.Sprintf(`
+		INSERT INTO %s (name, slug)
+		VALUES (?, ?)
+	`, table), name, slug)
+	if err != nil {
+		t.Fatalf("insert %s item: %v", table, err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		t.Fatalf("LastInsertId returned error: %v", err)
+	}
+
+	return id
+}
+
+func linkGamesHandlerGameRelation(t *testing.T, db *sqlx.DB, table string, column string, gameID int64, relationID int64) {
+	t.Helper()
+
+	if _, err := db.Exec(fmt.Sprintf(`
+		INSERT INTO %s (game_id, %s, sort_order)
+		VALUES (?, ?, 0)
+	`, table, column), gameID, relationID); err != nil {
+		t.Fatalf("link %s relation: %v", table, err)
+	}
 }

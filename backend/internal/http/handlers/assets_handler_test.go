@@ -22,7 +22,7 @@ import (
 	"github.com/hao/game/internal/services"
 )
 
-func TestAssetsHandlerUploadVideoPersistsAssetAndSetsPrimaryVideo(t *testing.T) {
+func TestAssetsHandlerUploadVideoPersistsAsset(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 
 	db := openGamesHandlerTestDB(t)
@@ -95,11 +95,6 @@ func TestAssetsHandlerUploadVideoPersistsAssetAndSetsPrimaryVideo(t *testing.T) 
 		t.Fatalf("path = %q, want upload-game mp4 path", response.Data.Path)
 	}
 
-	game := mustLoadHandlerGame(t, db, gameID)
-	if game.PreviewVideoAssetUID == nil || *game.PreviewVideoAssetUID != response.Data.AssetUID {
-		t.Fatalf("PreviewVideoAssetUID = %v, want %q", game.PreviewVideoAssetUID, response.Data.AssetUID)
-	}
-
 	asset := mustLoadHandlerAssetByUID(t, db, response.Data.AssetUID)
 	if asset.SortOrder != 0 {
 		t.Fatalf("SortOrder = %d, want 0 because negative form value should fallback", asset.SortOrder)
@@ -157,25 +152,6 @@ func TestAssetsHandlerDeleteRejectsInvalidPayload(t *testing.T) {
 	}
 }
 
-func TestAssetsHandlerSetPrimaryVideoRejectsInvalidPayload(t *testing.T) {
-	t.Setenv("GIN_MODE", gin.TestMode)
-
-	recorder := httptest.NewRecorder()
-	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPost, "/api/assets/primary-video", strings.NewReader("{"))
-	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set("is_admin", true)
-
-	NewAssetsHandler(nil).SetPrimaryVideo(context)
-
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
-	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid primary video payload"`) {
-		t.Fatalf("body = %s, want invalid primary video payload error", recorder.Body.String())
-	}
-}
-
 func TestAssetsHandlerDeleteReturnsNotFoundWhenScreenshotMissing(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 
@@ -197,36 +173,6 @@ func TestAssetsHandlerDeleteReturnsNotFoundWhenScreenshotMissing(t *testing.T) {
 	context.Set("is_admin", true)
 
 	handler.Delete(context)
-
-	if recorder.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusNotFound, recorder.Body.String())
-	}
-	if !strings.Contains(recorder.Body.String(), `"error":"resource not found"`) {
-		t.Fatalf("body = %s, want resource not found error", recorder.Body.String())
-	}
-}
-
-func TestAssetsHandlerSetPrimaryVideoReturnsNotFoundWhenVideoMissing(t *testing.T) {
-	t.Setenv("GIN_MODE", gin.TestMode)
-
-	db := openGamesHandlerTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	gameID := insertGamesHandlerTestGame(t, db, "asset-primary-missing", "Asset Primary Missing", domain.GameVisibilityPublic, "")
-	service := services.NewAssetsService(
-		config.Config{AssetsDir: filepath.Join(t.TempDir(), "assets")},
-		repositories.NewGamesRepository(db),
-		repositories.NewAssetsRepository(db),
-	)
-	handler := NewAssetsHandler(service)
-
-	recorder := httptest.NewRecorder()
-	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPost, "/api/assets/primary-video", strings.NewReader(`{"game_id":`+strconv.FormatInt(gameID, 10)+`,"asset_uid":"missing-video"}`))
-	context.Request.Header.Set("Content-Type", "application/json")
-	context.Set("is_admin", true)
-
-	handler.SetPrimaryVideo(context)
 
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusNotFound, recorder.Body.String())

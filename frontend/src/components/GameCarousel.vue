@@ -41,7 +41,7 @@
       <a-button
         v-for="(game, index) in games"
         :key="game.id"
-        class="indicator"
+        class="app-text-action-btn indicator"
         :class="{ active: currentIndex === index }"
         type="text"
         shape="circle"

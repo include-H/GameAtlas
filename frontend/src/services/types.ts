@@ -12,6 +12,13 @@ export interface ApiPageEnvelope<T> {
     limit: number
     total: number
     totalPages: number
+    pending_group_counts?: {
+      missing_assets: number
+      missing_wiki: number
+      missing_files: number
+      missing_metadata: number
+      ignored_total: number
+    } | null
   }
 }
 
@@ -166,7 +173,7 @@ export interface TimelineGameResponse {
   banner_image: string | null
 }
 
-export interface GameWriteRequest {
+export interface GameCoreRequest {
   title: string
   title_alt?: string | null
   visibility?: 'public' | 'private'
@@ -176,12 +183,47 @@ export interface GameWriteRequest {
   cover_image?: string | null
   banner_image?: string | null
   needs_review?: boolean
+}
+
+export interface GameWriteRequest extends GameCoreRequest {
   series_id?: number | null
   developer_ids?: number[]
   publisher_ids?: number[]
   platform_ids?: number[]
-  preview_video_asset_uid?: string | null
   tag_ids?: number[]
+}
+
+export interface GameAggregatePatchRequest extends GameCoreRequest {
+  series_id?: number | null
+  developer_ids?: number[]
+  publisher_ids?: number[]
+  platform_ids?: number[]
+  tag_ids?: number[]
+}
+
+export interface GameAggregateFileRequest {
+  id?: number
+  file_path: string
+  label?: string | null
+  notes?: string | null
+  sort_order: number
+}
+
+export interface GameAggregateDeleteAssetRequest {
+  asset_type: 'cover' | 'banner' | 'screenshot' | 'video'
+  path: string
+  asset_id?: number
+  asset_uid?: string
+}
+
+export interface GameAggregateUpdateRequest {
+  game: GameAggregatePatchRequest
+  assets: {
+    files: GameAggregateFileRequest[]
+    delete_assets: GameAggregateDeleteAssetRequest[]
+    screenshot_order_asset_uids: string[]
+    video_order_asset_uids: string[]
+  }
 }
 
 export interface GameListQuery {
@@ -193,6 +235,10 @@ export interface GameListQuery {
   tag?: number[]
   needs_review?: boolean
   pending?: boolean
+  pending_issue?: string
+  pending_include_ignored?: boolean
+  pending_severe?: boolean
+  pending_recent_days?: number
   favorite?: boolean
 }
 
@@ -231,7 +277,7 @@ export interface GameStats {
 }
 
 export interface GameSort {
-  field: 'title' | 'created_at' | 'updated_at' | 'release_date' | 'downloads' | 'random'
+  field: 'title' | 'created_at' | 'updated_at' | 'release_date' | 'downloads' | 'random' | 'pending_issue_count'
   order: 'asc' | 'desc'
   seed?: number
 }

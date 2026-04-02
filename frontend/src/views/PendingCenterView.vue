@@ -4,7 +4,7 @@
       <div class="page-hero__content">
         <h1 class="pending-center__title page-hero__title text-gradient">待处理工作台</h1>
         <p class="pending-center__subtitle page-hero__subtitle">
-          队列视图：后端按待处理规则分页，每页 {{ PENDING_WORKBENCH_PAGE_SIZE }} 条，直到清空待处理游戏。
+          队列视图：后端原生处理待处理筛选、排序与分页，每页 {{ PENDING_WORKBENCH_PAGE_SIZE }} 条。
         </p>
       </div>
 
@@ -43,7 +43,7 @@
         <a-col :xs="24" :sm="12" :md="8" :lg="8">
           <a-input
             v-model="searchQuery"
-            placeholder="筛选当前页游戏"
+            placeholder="搜索待处理队列"
             allow-clear
           >
             <template #prefix>
@@ -93,7 +93,7 @@
 
     <div class="pending-center__result-meta">
       <span>
-        当前页筛选显示 {{ filteredGames.length }} 条，待处理总量 {{ totalPendingCount }} 条，已忽略 {{ ignoredOverridesCount }} 个问题
+        当前页返回 {{ filteredGames.length }} 条，待处理总量 {{ totalPendingCount }} 条，已忽略 {{ ignoredOverridesCount }} 个问题
       </span>
       <div class="pending-center__result-actions">
         <a-button class="app-text-action-btn" type="text" size="small" @click="resetFilters">重置筛选</a-button>
@@ -233,6 +233,7 @@
                   <span class="detail-checklist__group">{{ getPendingIssueLabel(detail.group) }}</span>
                   <a-button
                     v-if="!detail.ignored"
+                    class="app-text-action-btn"
                     size="mini"
                     type="text"
                     status="warning"
@@ -242,6 +243,7 @@
                   </a-button>
                   <a-button
                     v-else
+                    class="app-text-action-btn"
                     size="mini"
                     type="text"
                     @click="restoreIssue(activeGame, detail.key)"
@@ -284,13 +286,13 @@
                 </template>
                 编辑资料
               </a-button>
-              <a-button type="text" @click="openWiki(activeGame)">
+              <a-button class="app-text-action-btn" type="text" @click="openWiki(activeGame)">
                 <template #icon>
                   <icon-book />
                 </template>
                 编辑 Wiki
               </a-button>
-              <a-button type="text" @click="viewGame(activeGame)">
+              <a-button class="app-text-action-btn" type="text" @click="viewGame(activeGame)">
                 <template #icon>
                   <icon-right />
                 </template>

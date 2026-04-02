@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -333,7 +334,7 @@ func TestSteamServiceFetchScreenshotURLsParsesEscapedPatternAndDedupes(t *testin
 	}
 }
 
-func TestSteamServicePreviewAssetsReturnsDefaultPayloadWhenRequestsFail(t *testing.T) {
+func TestSteamServicePreviewAssetsReturnsUpstreamErrorWhenRequestsFail(t *testing.T) {
 	service := &SteamService{
 		client: &http.Client{Transport: steamRoundTripper(func(req *http.Request) (*http.Response, error) {
 			return steamTextResponse(http.StatusBadGateway, ""), nil
@@ -341,23 +342,37 @@ func TestSteamServicePreviewAssetsReturnsDefaultPayloadWhenRequestsFail(t *testi
 	}
 
 	preview, err := service.PreviewAssets(321, "")
-	if err != nil {
-		t.Fatalf("PreviewAssets returned error: %v", err)
+	if preview != nil {
+		t.Fatalf("preview = %+v, want nil on upstream failure", preview)
 	}
-	if preview.AppID != 321 || preview.Name != "Steam App 321" {
-		t.Fatalf("preview = %+v, want default app identity", preview)
+	if !errors.Is(err, ErrUpstream) {
+		t.Fatalf("error = %v, want ErrUpstream", err)
 	}
-	if preview.Description != "" || preview.ReleaseDate != "" {
-		t.Fatalf("preview description/release = %+v, want empty fallback fields", preview)
+	if !strings.Contains(err.Error(), "schinese appdetails") || !strings.Contains(err.Error(), "english appdetails") {
+		t.Fatalf("error = %q, want both locale failures in message", err.Error())
 	}
-	if len(preview.Developers) != 0 || len(preview.Publishers) != 0 || len(preview.ScreenshotURLs) != 0 {
-		t.Fatalf("preview slices = %+v, want empty slices", preview)
+}
+
+func TestSteamServicePreviewAssetsReturnsNotFoundWhenAppMissingInAllLocales(t *testing.T) {
+	service := &SteamService{
+		client: &http.Client{Transport: steamRoundTripper(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.String() {
+			case "https://store.steampowered.com/api/appdetails?appids=321&l=schinese":
+				return steamJSONResponse(`{"321":{"success":false}}`), nil
+			case "https://store.steampowered.com/api/appdetails?appids=321&l=english":
+				return steamJSONResponse(`{"321":{"success":false}}`), nil
+			default:
+				return steamTextResponse(http.StatusNotFound, ""), nil
+			}
+		})},
 	}
-	if preview.CoverURL == nil || *preview.CoverURL != "https://steamcdn-a.akamaihd.net/steam/apps/321/library_600x900.jpg" {
-		t.Fatalf("CoverURL = %v, want fallback cover candidate", preview.CoverURL)
+
+	preview, err := service.PreviewAssets(321, "")
+	if preview != nil {
+		t.Fatalf("preview = %+v, want nil when app is missing", preview)
 	}
-	if preview.BannerURL == nil || *preview.BannerURL != "https://steamcdn-a.akamaihd.net/steam/apps/321/library_hero.jpg" {
-		t.Fatalf("BannerURL = %v, want fallback banner candidate", preview.BannerURL)
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("error = %v, want ErrNotFound", err)
 	}
 }
 

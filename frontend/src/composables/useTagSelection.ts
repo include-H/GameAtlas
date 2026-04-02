@@ -1,10 +1,16 @@
 import { computed, ref, type Ref } from 'vue'
+import type { EditGameForm } from '@/composables/edit-game-form'
 import tagsService from '@/services/tags.service'
 import type { Tag, TagGroup } from '@/services/types'
 import { normalizeOptionId, resolveCreatableSelections } from '@/utils/creatable-select'
 import { extractWikiTagCandidates, type WikiTagGroupKey } from '@/utils/wiki-tag-parser'
 
 type TagSelectionValue = number | number[] | string | string[] | undefined
+
+export interface TagSectionSelectionChangePayload {
+  groupId: number
+  value: number | number[] | string | string[] | Array<string | number> | null | undefined
+}
 
 export interface WikiTagCandidateSelection {
   key: string
@@ -16,7 +22,7 @@ export interface WikiTagCandidateSelection {
 interface UseTagSelectionOptions {
   tagGroups: Ref<TagGroup[]>
   tagOptions: Ref<Tag[]>
-  formTagIds: Ref<Array<string | number>>
+  form: Ref<Pick<EditGameForm, 'tag_ids'>>
   getWikiContent: () => string
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
 }
@@ -61,7 +67,7 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
   const tagSelectionsByGroup = computed<Record<number, string | number | Array<string | number> | undefined>>(() => {
     const grouped: Record<number, Array<string | number>> = {}
 
-    for (const tagId of options.formTagIds.value) {
+    for (const tagId of options.form.value.tag_ids) {
       if (typeof tagId !== 'number') continue
       const groupId = tagGroupIdByTagId.value.get(tagId)
       if (!groupId) continue
@@ -133,13 +139,13 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
       }
     }
 
-    const preserved = options.formTagIds.value.filter((tagId) => {
+    const preserved = options.form.value.tag_ids.filter((tagId) => {
       const normalizedId = normalizeOptionId(tagId)
       if (normalizedId === null) return false
       return tagGroupIdByTagId.value.get(normalizedId) !== groupId
     })
 
-    options.formTagIds.value = [...preserved, ...nextIds]
+    options.form.value.tag_ids = [...preserved, ...nextIds]
     pendingTagDraftsByGroup.value = {
       ...pendingTagDraftsByGroup.value,
       [groupId]: nextDrafts,
@@ -150,10 +156,35 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
     handleFormTagChange(groupId, value)
   }
 
+  const handleTagSectionSelectionChange = (payload: TagSectionSelectionChangePayload) => {
+    const { groupId, value } = payload
+    if (value === null || value === undefined) {
+      handleTagSelectionChange(groupId, undefined)
+      return
+    }
+
+    if (typeof value === 'string' || typeof value === 'number') {
+      handleTagSelectionChange(groupId, value)
+      return
+    }
+
+    if (value.every((item) => typeof item === 'string')) {
+      handleTagSelectionChange(groupId, value as string[])
+      return
+    }
+
+    if (value.every((item) => typeof item === 'number')) {
+      handleTagSelectionChange(groupId, value as number[])
+      return
+    }
+
+    handleTagSelectionChange(groupId, value.map((item) => String(item)))
+  }
+
   const resolveTagSelections = async () => {
     const idsByGroup = new Map<number, number[]>()
 
-    for (const tagId of options.formTagIds.value) {
+    for (const tagId of options.form.value.tag_ids) {
       const normalizedId = normalizeOptionId(tagId)
       if (normalizedId === null) continue
       const groupId = tagGroupIdByTagId.value.get(normalizedId)
@@ -251,15 +282,15 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
   const applySelectedWikiTags = async () => {
     const selected = wikiTagCandidates.value.filter((item) => item.groupKey !== 'ignore')
     if (selected.length === 0) {
-      options.addAlert('还没有选择要应用的字段', 'warning')
-      return
-    }
+        options.addAlert('还没有选择要应用的字段', 'warning')
+        return
+      }
 
     isApplyingWikiTags.value = true
 
     try {
       const mergedIds = new Set<number>(
-        options.formTagIds.value
+        options.form.value.tag_ids
           .map((item) => normalizeOptionId(item))
           .filter((item): item is number => item !== null),
       )
@@ -304,7 +335,7 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
         }
       }
 
-      options.formTagIds.value = Array.from(mergedIds)
+      options.form.value.tag_ids = Array.from(mergedIds)
       pendingTagDraftsByGroup.value = {}
       wikiTagPickerVisible.value = false
 
@@ -336,6 +367,7 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
     tagSelectionsByGroup,
     pendingTagOptionsByGroup,
     handleTagSelectionChange,
+    handleTagSectionSelectionChange,
     handleParseWikiTags,
     handleWikiTagCandidateGroupChange,
     applySelectedWikiTags,

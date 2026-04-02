@@ -1,4 +1,5 @@
 import { ref, type Ref } from 'vue'
+import type { EditGameForm } from '@/composables/edit-game-form'
 import { getHttpErrorMessage } from '@/utils/http-error'
 
 export interface FilePathItem {
@@ -7,8 +8,14 @@ export interface FilePathItem {
   label: string
 }
 
+export interface FilePathItemUpdatePayload {
+  index: number
+  field: 'path' | 'label'
+  value: string
+}
+
 interface UseGameFilePathsOptions {
-  filePaths: Ref<FilePathItem[]>
+  form: Ref<Pick<EditGameForm, 'file_paths'>>
   getDefaultDirectory: () => Promise<string>
   onResolveInitialPathError?: (message: string) => void
 }
@@ -19,18 +26,18 @@ export const useGameFilePaths = (options: UseGameFilePathsOptions) => {
   const currentFileIndex = ref(-1)
 
   const addFilePath = () => {
-    options.filePaths.value.push({ path: '', label: '' })
+    options.form.value.file_paths.push({ path: '', label: '' })
   }
 
   const removeFilePath = (index: number) => {
-    options.filePaths.value.splice(index, 1)
+    options.form.value.file_paths.splice(index, 1)
   }
 
   const openFileBrowser = async (index: number) => {
     currentFileIndex.value = index
     try {
       const defaultPath = await options.getDefaultDirectory()
-      const existingPath = (options.filePaths.value[index]?.path || '').trim()
+      const existingPath = (options.form.value.file_paths[index]?.path || '').trim()
       if (!existingPath) {
         initialPath.value = defaultPath
       } else if (!existingPath.includes('/') && !existingPath.includes('\\')) {
@@ -46,8 +53,14 @@ export const useGameFilePaths = (options: UseGameFilePathsOptions) => {
 
   const handleFileSelect = (path: string) => {
     if (currentFileIndex.value >= 0) {
-      options.filePaths.value[currentFileIndex.value].path = path
+      options.form.value.file_paths[currentFileIndex.value].path = path
     }
+  }
+
+  const handleFilePathItemUpdate = (payload: FilePathItemUpdatePayload) => {
+    const target = options.form.value.file_paths[payload.index]
+    if (!target) return
+    target[payload.field] = payload.value
   }
 
   const resetFileBrowserState = () => {
@@ -64,6 +77,7 @@ export const useGameFilePaths = (options: UseGameFilePathsOptions) => {
     removeFilePath,
     openFileBrowser,
     handleFileSelect,
+    handleFilePathItemUpdate,
     resetFileBrowserState,
   }
 }

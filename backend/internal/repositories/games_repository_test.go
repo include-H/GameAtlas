@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"testing"
+	"time"
 
 	"github.com/hao/game/internal/domain"
 	"github.com/jmoiron/sqlx"
@@ -34,7 +35,7 @@ func TestGamesRepositoryUpdateAggregatePreservesOmittedRelationsAndSeries(t *tes
 
 	if _, err := repo.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			Title: "Repo Aggregate Preserve Updated",
+			GameCoreInput: domain.GameCoreInput{Title: "Repo Aggregate Preserve Updated"},
 		},
 	}); err != nil {
 		t.Fatalf("UpdateAggregate returned error: %v", err)
@@ -98,9 +99,9 @@ func TestGamesRepositoryUpdateAggregateClearsPresentRelationsAndSeries(t *testin
 
 	if _, err := repo.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			Title:        "Repo Aggregate Clear Updated",
-			SeriesID:     domain.OptionalInt64Patch{Present: true, Value: nil},
-			DeveloperIDs: domain.Int64SlicePatch{Present: true, Values: []int64{}},
+			GameCoreInput: domain.GameCoreInput{Title: "Repo Aggregate Clear Updated"},
+			SeriesID:      domain.OptionalInt64Patch{Present: true, Value: nil},
+			DeveloperIDs:  domain.Int64SlicePatch{Present: true, Values: []int64{}},
 		},
 	}); err != nil {
 		t.Fatalf("UpdateAggregate returned error: %v", err)
@@ -247,6 +248,210 @@ func TestGamesRepositoryListAppliesGroupedTagAndPlatformFilters(t *testing.T) {
 	}
 	if len(games) != 1 || games[0].ID != matchingID {
 		t.Fatalf("games = %+v, want only matching public game", games)
+	}
+}
+
+func TestGamesRepositoryListPendingOnlyFiltersResolvedAndIgnoredIssues(t *testing.T) {
+	db := openRepositoryTagsTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	repo := NewGamesRepository(db)
+
+	visiblePendingID := insertRepositoryGame(t, db, "pending-visible", "Pending Visible", "public")
+	resolvedID := insertRepositoryGame(t, db, "pending-resolved", "Pending Resolved", "public")
+	ignoredID := insertRepositoryGame(t, db, "pending-ignored", "Pending Ignored", "public")
+	privatePendingID := insertRepositoryGame(t, db, "pending-private", "Pending Private", "private")
+
+	if _, err := db.Exec(`
+		UPDATE games
+		SET cover_image = ?, banner_image = ?, summary = ?, wiki_content = ?
+		WHERE id = ?
+	`, "/assets/cover.png", "/assets/banner.png", "Ready", "# Ready", resolvedID); err != nil {
+		t.Fatalf("seed resolved repository pending game: %v", err)
+	}
+	if _, err := db.Exec(`
+		UPDATE games
+		SET banner_image = ?, summary = ?, wiki_content = ?
+		WHERE id = ?
+	`, "/assets/banner.png", "Ready", "# Ready", ignoredID); err != nil {
+		t.Fatalf("seed ignored repository pending game: %v", err)
+	}
+
+	insertRepositoryAsset(t, db, resolvedID, "resolved-shot", "screenshot", "/assets/resolved/shot.png", 0)
+	insertRepositoryGameFile(t, db, resolvedID, "/roms/resolved.rom")
+	insertRepositoryAsset(t, db, ignoredID, "ignored-shot", "screenshot", "/assets/ignored/shot.png", 0)
+	insertRepositoryGameFile(t, db, ignoredID, "/roms/ignored.rom")
+
+	platformID := insertRepositoryPlatform(t, db, "Pending Platform", "pending-platform")
+	developerID := insertRepositoryDeveloper(t, db, "Pending Developer", "pending-developer")
+	publisherID := insertRepositoryPublisher(t, db, "Pending Publisher", "pending-publisher")
+	linkRepositoryGamePlatform(t, db, resolvedID, platformID, 0)
+	linkRepositoryGameDeveloper(t, db, resolvedID, developerID, 0)
+	linkRepositoryGamePublisher(t, db, resolvedID, publisherID, 0)
+	linkRepositoryGamePlatform(t, db, ignoredID, platformID, 0)
+	linkRepositoryGameDeveloper(t, db, ignoredID, developerID, 0)
+	linkRepositoryGamePublisher(t, db, ignoredID, publisherID, 0)
+
+	if _, err := db.Exec(`
+		INSERT INTO game_review_issue_overrides (game_id, issue_key, status)
+		VALUES (?, 'missing-cover', 'ignored')
+	`, ignoredID); err != nil {
+		t.Fatalf("insert ignored pending override: %v", err)
+	}
+
+	games, total, err := repo.List(domain.GamesListParams{
+		Page:        1,
+		Limit:       10,
+		PendingOnly: true,
+		Sort:        "updated_at",
+		Order:       "desc",
+	})
+	if err != nil {
+		t.Fatalf("List pending-only returned error: %v", err)
+	}
+
+	if total != 1 {
+		t.Fatalf("total = %d, want 1", total)
+	}
+	if len(games) != 1 || games[0].ID != visiblePendingID {
+		t.Fatalf("games = %+v, want only visible pending public game", games)
+	}
+
+	includeAllGames, includeAllTotal, err := repo.List(domain.GamesListParams{
+		Page:        1,
+		Limit:       10,
+		PendingOnly: true,
+		IncludeAll:  true,
+		Sort:        "updated_at",
+		Order:       "desc",
+	})
+	if err != nil {
+		t.Fatalf("List pending-only includeAll returned error: %v", err)
+	}
+
+	if includeAllTotal != 2 {
+		t.Fatalf("includeAll total = %d, want 2", includeAllTotal)
+	}
+	if len(includeAllGames) != 2 {
+		t.Fatalf("len(includeAllGames) = %d, want 2", len(includeAllGames))
+	}
+
+	gotIDs := []int64{includeAllGames[0].ID, includeAllGames[1].ID}
+	if !(containsRepositoryGameID(gotIDs, visiblePendingID) && containsRepositoryGameID(gotIDs, privatePendingID)) {
+		t.Fatalf("includeAll games = %+v, want visible and private pending games", includeAllGames)
+	}
+
+	ignoredGames, ignoredTotal, err := repo.List(domain.GamesListParams{
+		Page:                  1,
+		Limit:                 10,
+		PendingOnly:           true,
+		PendingIncludeIgnored: true,
+		Sort:                  "updated_at",
+		Order:                 "desc",
+	})
+	if err != nil {
+		t.Fatalf("List pending-only includeIgnored returned error: %v", err)
+	}
+	if ignoredTotal != 2 {
+		t.Fatalf("includeIgnored total = %d, want 2", ignoredTotal)
+	}
+	if len(ignoredGames) != 2 {
+		t.Fatalf("len(ignoredGames) = %d, want 2", len(ignoredGames))
+	}
+	if !containsRepositoryGameID([]int64{ignoredGames[0].ID, ignoredGames[1].ID}, ignoredID) {
+		t.Fatalf("ignoredGames = %+v, want ignored-only game included", ignoredGames)
+	}
+}
+
+func TestGamesRepositoryListPendingOnlySupportsNativeSortAndFilters(t *testing.T) {
+	db := openRepositoryTagsTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	repo := NewGamesRepository(db)
+
+	severeID := insertRepositoryGame(t, db, "pending-severe", "Pending Severe", "public")
+	recentID := insertRepositoryGame(t, db, "pending-recent", "Pending Recent", "public")
+	olderID := insertRepositoryGame(t, db, "pending-older", "Pending Older", "public")
+
+	now := time.Now().UTC()
+	updateRepositoryGameStats(t, db, severeID, 50, false, now.Format("2006-01-02 15:04:05"))
+	updateRepositoryGameStats(t, db, recentID, 10, false, now.AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
+	updateRepositoryGameStats(t, db, olderID, 5, false, now.AddDate(0, 0, -60).Format("2006-01-02 15:04:05"))
+
+	if _, err := db.Exec(`
+		UPDATE games
+		SET banner_image = ?, summary = ?
+		WHERE id = ?
+	`, "/assets/recent-banner.png", "Ready", recentID); err != nil {
+		t.Fatalf("seed recent pending game: %v", err)
+	}
+
+	games, total, err := repo.List(domain.GamesListParams{
+		Page:              1,
+		Limit:             10,
+		PendingOnly:       true,
+		PendingSevereOnly: true,
+		PendingRecentDays: 30,
+		PendingIssue:      "missing-assets",
+		Sort:              "pending_issue_count",
+		Order:             "desc",
+	})
+	if err != nil {
+		t.Fatalf("List pending-only native filters returned error: %v", err)
+	}
+
+	if total != 2 {
+		t.Fatalf("total = %d, want 2", total)
+	}
+	if len(games) != 2 {
+		t.Fatalf("len(games) = %d, want 2", len(games))
+	}
+	if games[0].ID != severeID || games[1].ID != recentID {
+		t.Fatalf("games = %+v, want severe game ordered before recent game", games)
+	}
+}
+
+func TestGamesRepositoryCountPendingGroupsUsesQueueFiltersButIgnoresIssueSelector(t *testing.T) {
+	db := openRepositoryTagsTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	repo := NewGamesRepository(db)
+
+	_ = insertRepositoryGame(t, db, "pending-asset", "Pending Asset", "public")
+	wikiID := insertRepositoryGame(t, db, "pending-wiki", "Pending Wiki", "public")
+
+	if _, err := db.Exec(`
+		UPDATE games
+		SET cover_image = ?, banner_image = ?, summary = ?, wiki_content = ?
+		WHERE id = ?
+	`, "/assets/wiki-cover.png", "/assets/wiki-banner.png", "Ready", "# Ready", wikiID); err != nil {
+		t.Fatalf("seed wiki game: %v", err)
+	}
+	insertRepositoryAsset(t, db, wikiID, "wiki-shot", "screenshot", "/assets/wiki/shot.png", 0)
+	insertRepositoryGameFile(t, db, wikiID, "/roms/wiki.rom")
+	platformID := insertRepositoryPlatform(t, db, "Wiki Platform", "wiki-platform")
+	developerID := insertRepositoryDeveloper(t, db, "Wiki Developer", "wiki-developer")
+	publisherID := insertRepositoryPublisher(t, db, "Wiki Publisher", "wiki-publisher")
+	linkRepositoryGamePlatform(t, db, wikiID, platformID, 0)
+	linkRepositoryGameDeveloper(t, db, wikiID, developerID, 0)
+	linkRepositoryGamePublisher(t, db, wikiID, publisherID, 0)
+
+	counts, err := repo.CountPendingGroups(domain.GamesListParams{
+		Page:         1,
+		Limit:        10,
+		PendingOnly:  true,
+		PendingIssue: "missing-assets",
+		Search:       "Pending",
+	})
+	if err != nil {
+		t.Fatalf("CountPendingGroups returned error: %v", err)
+	}
+
+	if counts.MissingAssets != 1 || counts.MissingWiki != 1 || counts.MissingFiles != 1 || counts.MissingMetadata != 1 {
+		t.Fatalf("counts = %+v, want one matching game contributing to all visible pending groups", counts)
+	}
+	if counts.IgnoredTotal != 0 {
+		t.Fatalf("counts.ignored_total = %d, want 0", counts.IgnoredTotal)
 	}
 }
 
@@ -526,4 +731,13 @@ func linkRepositoryGameTag(t *testing.T, db *sqlx.DB, gameID int64, tagID int64,
 	`, gameID, tagID, sortOrder); err != nil {
 		t.Fatalf("link repository game tag: %v", err)
 	}
+}
+
+func containsRepositoryGameID(ids []int64, want int64) bool {
+	for _, id := range ids {
+		if id == want {
+			return true
+		}
+	}
+	return false
 }

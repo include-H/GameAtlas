@@ -1,31 +1,15 @@
 import { type Ref } from 'vue'
+import type {
+  EditGameEditableScreenshot,
+  EditGameEditableVideo,
+  EditGameForm,
+} from '@/composables/edit-game-form'
 import { uploadAsset, type UploadedAssetResult } from '@/services/assets'
 import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
 import { getHttpErrorMessage } from '@/utils/http-error'
 
 type AlertType = 'success' | 'warning' | 'error'
 type AssetType = 'cover' | 'banner' | 'screenshot' | 'video'
-
-interface AssetEditableScreenshot {
-  id?: number
-  asset_uid?: string
-  path: string
-  client_key: string
-}
-
-interface AssetEditableVideo {
-  id?: number
-  asset_uid?: string
-  path: string
-}
-
-interface AssetFormBridge {
-  cover_image: string
-  banner_image: string
-  screenshots: AssetEditableScreenshot[]
-  preview_videos: AssetEditableVideo[]
-  primary_preview_video_uid: string
-}
 
 interface UploadResponseLike {
   success?: boolean
@@ -34,7 +18,7 @@ interface UploadResponseLike {
 }
 
 interface UseEditGameAssetsOptions {
-  form: Ref<AssetFormBridge>
+  form: Ref<Pick<EditGameForm, 'cover_image' | 'banner_image' | 'screenshots' | 'preview_videos'>>
   gameId: Ref<number | undefined>
   showCoverSelector: Ref<boolean>
   showBannerSelector: Ref<boolean>
@@ -44,8 +28,8 @@ interface UseEditGameAssetsOptions {
   videoUploadProgress: Ref<number>
   videoUploadFileName: Ref<string>
   queueAssetDeletion: (type: AssetType, path: string, assetId?: number, assetUid?: string) => void
-  createEditableScreenshot: (asset: UploadedAssetResult, index: number) => AssetEditableScreenshot
-  createEditableVideo: (asset: UploadedAssetResult) => AssetEditableVideo
+  createEditableScreenshot: (asset: UploadedAssetResult, index: number) => EditGameEditableScreenshot
+  createEditableVideo: (asset: UploadedAssetResult) => EditGameEditableVideo
   addAlert: (message: string, type: AlertType) => void
 }
 
@@ -54,11 +38,8 @@ const readUploadError = (response?: UploadResponseLike) => {
 }
 
 export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
-  const appendPreviewVideo = (video: AssetEditableVideo) => {
+  const appendPreviewVideo = (video: EditGameEditableVideo) => {
     options.form.value.preview_videos.push(video)
-    if (!options.form.value.primary_preview_video_uid && video.asset_uid) {
-      options.form.value.primary_preview_video_uid = video.asset_uid
-    }
   }
 
   const handleCoverUploadSuccess = (fileItem: FileItem) => {
@@ -173,9 +154,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     if (!target) return
     options.queueAssetDeletion('video', target.path, target.id, target.asset_uid)
     options.form.value.preview_videos = options.form.value.preview_videos.filter((item) => item.asset_uid !== assetUid)
-    if (options.form.value.primary_preview_video_uid === assetUid) {
-      options.form.value.primary_preview_video_uid = options.form.value.preview_videos[0]?.asset_uid || ''
-    }
   }
 
   const resetVideoUploadState = () => {

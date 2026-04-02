@@ -27,16 +27,18 @@ func NewGamesHandler(service *services.GamesService) *GamesHandler {
 
 func (h *GamesHandler) List(c *gin.Context) {
 	params := domain.GamesListParams{
-		Page:       parseQueryInt(c, "page", 1),
-		Limit:      parseQueryInt(c, "limit", 20),
-		Search:     c.Query("search"),
-		SeriesID:   parseQueryInt64(c, "series", 0),
-		PlatformID: parseQueryInt64(c, "platform", 0),
-		TagIDs:     parseQueryInt64List(c, "tag"),
-		Sort:       c.Query("sort"),
-		Order:      c.Query("order"),
-		SortSeed:   parseQueryInt64(c, "seed", 0),
-		IncludeAll: isAdminRequest(c),
+		Page:              parseQueryInt(c, "page", 1),
+		Limit:             parseQueryInt(c, "limit", 20),
+		Search:            c.Query("search"),
+		SeriesID:          parseQueryInt64(c, "series", 0),
+		PlatformID:        parseQueryInt64(c, "platform", 0),
+		TagIDs:            parseQueryInt64List(c, "tag"),
+		PendingIssue:      strings.TrimSpace(c.Query("pending_issue")),
+		PendingRecentDays: parseQueryInt(c, "pending_recent_days", 0),
+		Sort:              c.Query("sort"),
+		Order:             c.Query("order"),
+		SortSeed:          parseQueryInt64(c, "seed", 0),
+		IncludeAll:        isAdminRequest(c),
 	}
 
 	if raw := c.Query("needs_review"); raw != "" {
@@ -47,6 +49,16 @@ func (h *GamesHandler) List(c *gin.Context) {
 	if raw := c.Query("pending"); raw != "" {
 		if value, err := strconv.ParseBool(raw); err == nil {
 			params.PendingOnly = value
+		}
+	}
+	if raw := c.Query("pending_include_ignored"); raw != "" {
+		if value, err := strconv.ParseBool(raw); err == nil {
+			params.PendingIncludeIgnored = value
+		}
+	}
+	if raw := c.Query("pending_severe"); raw != "" {
+		if value, err := strconv.ParseBool(raw); err == nil {
+			params.PendingSevereOnly = value
 		}
 	}
 
@@ -65,10 +77,11 @@ func (h *GamesHandler) List(c *gin.Context) {
 		"success": true,
 		"data":    data,
 		"pagination": gin.H{
-			"page":       result.Page,
-			"limit":      result.Limit,
-			"total":      result.Total,
-			"totalPages": result.TotalPages,
+			"page":                 result.Page,
+			"limit":                result.Limit,
+			"total":                result.Total,
+			"totalPages":           result.TotalPages,
+			"pending_group_counts": result.PendingGroupCounts,
 		},
 	})
 }
@@ -220,56 +233,55 @@ func (h *GamesHandler) Create(c *gin.Context) {
 	})
 }
 
-func (h *GamesHandler) Update(c *gin.Context) {
-	if !requireAdmin(c) {
-		return
-	}
-	id, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
-	if !ok {
-		return
-	}
-
-	var input domain.GameWriteInput
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "invalid game payload",
-		})
-		return
-	}
-
-	game, err := h.service.Update(id, input)
-	if err != nil {
-		writeServiceError(c, err, "title is required")
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    toGameListItemResponse(*game),
-	})
+// Aggregate updates have two explicit responsibilities only:
+// game patch fields and asset operations.
+type gameAggregateUpdateRequest struct {
+	Game   gameAggregatePatchRequest       `json:"game"`
+	Assets domain.GameAggregateAssetsInput `json:"assets"`
 }
 
-type gameAggregateUpdateRequest struct {
-	Title                    string                        `json:"title"`
-	TitleAlt                 *string                       `json:"title_alt"`
-	Visibility               string                        `json:"visibility"`
-	Summary                  *string                       `json:"summary"`
-	ReleaseDate              *string                       `json:"release_date"`
-	Engine                   *string                       `json:"engine"`
-	CoverImage               *string                       `json:"cover_image"`
-	BannerImage              *string                       `json:"banner_image"`
-	NeedsReview              bool                          `json:"needs_review"`
-	SeriesID                 json.RawMessage               `json:"series_id"`
-	PlatformIDs              json.RawMessage               `json:"platform_ids"`
-	DeveloperIDs             json.RawMessage               `json:"developer_ids"`
-	PublisherIDs             json.RawMessage               `json:"publisher_ids"`
-	TagIDs                   json.RawMessage               `json:"tag_ids"`
-	PreviewVideoAssetUID     *string                       `json:"preview_video_asset_uid"`
-	Files                    []domain.GameFileUpsertInput  `json:"files"`
-	DeleteAssets             []domain.GameAssetDeleteInput `json:"delete_assets"`
-	ScreenshotOrderAssetUIDs []string                      `json:"screenshot_order_asset_uids"`
-	VideoOrderAssetUIDs      []string                      `json:"video_order_asset_uids"`
+type gameAggregatePatchRequest struct {
+	domain.GameCoreInput
+	SeriesID     json.RawMessage `json:"series_id"`
+	PlatformIDs  json.RawMessage `json:"platform_ids"`
+	DeveloperIDs json.RawMessage `json:"developer_ids"`
+	PublisherIDs json.RawMessage `json:"publisher_ids"`
+	TagIDs       json.RawMessage `json:"tag_ids"`
+}
+
+func (request gameAggregateUpdateRequest) toInput() (domain.GameAggregateUpdateInput, error) {
+	seriesIDPatch, err := decodeOptionalInt64Patch(request.Game.SeriesID)
+	if err != nil {
+		return domain.GameAggregateUpdateInput{}, err
+	}
+	platformIDsPatch, err := decodeInt64SlicePatch(request.Game.PlatformIDs)
+	if err != nil {
+		return domain.GameAggregateUpdateInput{}, err
+	}
+	developerIDsPatch, err := decodeInt64SlicePatch(request.Game.DeveloperIDs)
+	if err != nil {
+		return domain.GameAggregateUpdateInput{}, err
+	}
+	publisherIDsPatch, err := decodeInt64SlicePatch(request.Game.PublisherIDs)
+	if err != nil {
+		return domain.GameAggregateUpdateInput{}, err
+	}
+	tagIDsPatch, err := decodeInt64SlicePatch(request.Game.TagIDs)
+	if err != nil {
+		return domain.GameAggregateUpdateInput{}, err
+	}
+
+	return domain.GameAggregateUpdateInput{
+		Game: domain.GameAggregatePatchInput{
+			GameCoreInput: request.Game.GameCoreInput,
+			SeriesID:      seriesIDPatch,
+			PlatformIDs:   platformIDsPatch,
+			DeveloperIDs:  developerIDsPatch,
+			PublisherIDs:  publisherIDsPatch,
+			TagIDs:        tagIDsPatch,
+		},
+		Assets: request.Assets,
+	}, nil
 }
 
 func decodeOptionalInt64Patch(raw json.RawMessage) (domain.OptionalInt64Patch, error) {
@@ -320,39 +332,7 @@ func (h *GamesHandler) UpdateAggregate(c *gin.Context) {
 		return
 	}
 
-	seriesIDPatch, err := decodeOptionalInt64Patch(request.SeriesID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "invalid game payload",
-		})
-		return
-	}
-	platformIDsPatch, err := decodeInt64SlicePatch(request.PlatformIDs)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "invalid game payload",
-		})
-		return
-	}
-	developerIDsPatch, err := decodeInt64SlicePatch(request.DeveloperIDs)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "invalid game payload",
-		})
-		return
-	}
-	publisherIDsPatch, err := decodeInt64SlicePatch(request.PublisherIDs)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "invalid game payload",
-		})
-		return
-	}
-	tagIDsPatch, err := decodeInt64SlicePatch(request.TagIDs)
+	input, err := request.toInput()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -361,29 +341,7 @@ func (h *GamesHandler) UpdateAggregate(c *gin.Context) {
 		return
 	}
 
-	game, deleteWarnings, err := h.service.UpdateAggregate(id, domain.GameAggregateUpdateInput{
-		Game: domain.GameAggregatePatchInput{
-			Title:                request.Title,
-			TitleAlt:             request.TitleAlt,
-			Visibility:           request.Visibility,
-			Summary:              request.Summary,
-			ReleaseDate:          request.ReleaseDate,
-			Engine:               request.Engine,
-			CoverImage:           request.CoverImage,
-			BannerImage:          request.BannerImage,
-			NeedsReview:          request.NeedsReview,
-			SeriesID:             seriesIDPatch,
-			PlatformIDs:          platformIDsPatch,
-			DeveloperIDs:         developerIDsPatch,
-			PublisherIDs:         publisherIDsPatch,
-			TagIDs:               tagIDsPatch,
-			PreviewVideoAssetUID: request.PreviewVideoAssetUID,
-		},
-		Files:                    request.Files,
-		DeleteAssets:             request.DeleteAssets,
-		ScreenshotOrderAssetUIDs: request.ScreenshotOrderAssetUIDs,
-		VideoOrderAssetUIDs:      request.VideoOrderAssetUIDs,
-	})
+	game, deleteWarnings, err := h.service.UpdateAggregate(id, input)
 	if err != nil {
 		writeServiceError(c, err, "title is required")
 		return

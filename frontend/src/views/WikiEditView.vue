@@ -13,6 +13,7 @@
 
       <div class="wiki-edit-actions">
         <a-button
+          class="app-text-action-btn"
           type="text"
           :loading="isHistoryLoading"
           :disabled="historyEntries.length === 0"
@@ -21,6 +22,7 @@
           历史记录
         </a-button>
         <a-button
+          class="app-text-action-btn"
           type="text"
           :disabled="isSaving"
           @click="handleCancel"
@@ -85,7 +87,7 @@
             <a-button
               v-for="entry in historyEntries"
               :key="entry.id"
-              class="wiki-edit-history-item"
+              class="app-text-action-btn wiki-edit-history-item"
               :class="{ 'wiki-edit-history-item--active': selectedHistory?.id === entry.id }"
               type="text"
               @click="openHistoryPreview(entry)"
@@ -103,7 +105,7 @@
               </div>
 
               <div class="wiki-edit-history-preview-actions">
-                <a-button type="text" size="small" @click="previewHistoryContent = !previewHistoryContent">
+                <a-button class="app-text-action-btn" type="text" size="small" @click="previewHistoryContent = !previewHistoryContent">
                   {{ previewHistoryContent ? '查看源码' : '预览渲染' }}
                 </a-button>
                 <a-button type="primary" size="small" @click="restoreHistory">

@@ -1,21 +1,11 @@
 import { ref, watch, type Ref } from 'vue'
+import type { EditGameForm } from '@/composables/edit-game-form'
 import steamService from '@/services/steam.service'
 import { useSteamPicker } from '@/composables/useSteamPicker'
 import type { SteamGameDetails, SteamGameSearchResult } from '@/services/types'
 import { extractWikiMetadata } from '@/utils/wiki-metadata-parser'
 
 type AlertType = 'success' | 'warning' | 'error'
-
-interface SteamImportMetadataFormBridge {
-  summary: string
-  title: string
-  title_alt: string
-  release_date: string | undefined
-  engine: string
-  developer_ids: Array<string | number>
-  publisher_ids: Array<string | number>
-  platform_ids: Array<string | number>
-}
 
 export interface WikiMetadataCandidateSelection {
   key: string
@@ -26,8 +16,7 @@ export interface WikiMetadataCandidateSelection {
 }
 
 interface UseSteamImportMetadataOptions {
-  form: Ref<SteamImportMetadataFormBridge>
-  releaseDate: Ref<Date | null>
+  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'engine' | 'developer_ids' | 'publisher_ids' | 'platform_ids'>>
   getWikiContent: () => string
   addAlert: (message: string, type: AlertType) => void
 }
@@ -78,7 +67,6 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
   const applySteamMetadataToForm = (details: SteamGameDetails) => {
     if (details.releaseDate) {
       options.form.value.release_date = details.releaseDate
-      options.releaseDate.value = new Date(`${details.releaseDate}T00:00:00`)
     }
     if (details.developers && details.developers.length > 0) {
       const merged = new Set<string | number>(options.form.value.developer_ids)
@@ -262,7 +250,6 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
           case 'release_date':
             if (metadata.releaseDate) {
               options.form.value.release_date = metadata.releaseDate
-              options.releaseDate.value = new Date(`${metadata.releaseDate}T00:00:00`)
               appliedLabels.push('发行日期')
             }
             break

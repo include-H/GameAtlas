@@ -1,27 +1,11 @@
 import { ref, type Ref } from 'vue'
-
-interface MediaStateEditableScreenshot {
-  client_key: string
-  sort_order?: number
-}
-
-interface MediaStateEditableVideo {
-  asset_uid?: string
-  path: string
-  sort_order?: number
-}
-
-interface MediaStateFormBridge {
-  screenshots: MediaStateEditableScreenshot[]
-  preview_videos: MediaStateEditableVideo[]
-  primary_preview_video_uid: string
-}
+import type { EditGameForm, EditGameEditableVideo } from '@/composables/edit-game-form'
 
 interface UseEditGameMediaStateOptions {
-  form: Ref<MediaStateFormBridge>
+  form: Ref<Pick<EditGameForm, 'screenshots' | 'preview_videos'>>
 }
 
-const getEditableVideoKey = (video: MediaStateEditableVideo) => {
+const getEditableVideoKey = (video: EditGameEditableVideo) => {
   return video.asset_uid || video.path
 }
 
@@ -81,11 +65,6 @@ export const useEditGameMediaState = (options: UseEditGameMediaStateOptions) => 
     dragOverScreenshotKey.value = null
   }
 
-  const setPrimaryPreviewVideo = (assetUid?: string) => {
-    if (!assetUid) return
-    options.form.value.primary_preview_video_uid = assetUid
-  }
-
   return {
     draggedScreenshotKey,
     dragOverScreenshotKey,
@@ -94,6 +73,5 @@ export const useEditGameMediaState = (options: UseEditGameMediaStateOptions) => 
     handleScreenshotDragEnter,
     handleScreenshotDrop,
     handleScreenshotDragEnd,
-    setPrimaryPreviewVideo,
   }
 }

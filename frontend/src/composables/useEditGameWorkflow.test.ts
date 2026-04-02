@@ -1,7 +1,8 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { EditGameForm } from '@/composables/edit-game-form'
 import type { GameDetail } from '@/services/types'
-import { useEditGameWorkflow, type EditGameFormBridge } from './useEditGameWorkflow'
+import { useEditGameWorkflow } from './useEditGameWorkflow'
 
 const {
   updateGameAggregateMock,
@@ -70,7 +71,7 @@ const buildOptions = () => {
         id: 1,
         public_id: 'game-1',
       } as GameDetail),
-      form: ref<EditGameFormBridge>({
+      form: ref<EditGameForm>({
         title: 'Game One',
         title_alt: '',
         visibility: 'public' as const,
@@ -85,7 +86,6 @@ const buildOptions = () => {
         cover_image: '',
         banner_image: '',
         preview_videos: [],
-        primary_preview_video_uid: '',
         screenshots: [],
         file_paths: [],
       }),

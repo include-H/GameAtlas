@@ -265,11 +265,6 @@
   border-color: rgba(var(--primary-6), 0.45);
 }
 
-.media-empty-action--inner {
-  border: none;
-  border-radius: 0;
-}
-
 .media-empty-icon {
   font-size: 30px;
 }

@@ -25,6 +25,7 @@
               <div class="field-label-action">
                 <span>游戏名称</span>
                 <a-button
+                  class="app-text-action-btn"
                   type="text"
                   size="mini"
                   html-type="button"
@@ -106,7 +107,6 @@
               :max-year="2100"
               placeholder="选择发行日期"
               class="w-full"
-              @change="handleDateChange"
             />
           </a-form-item>
         </a-col>
@@ -188,6 +188,7 @@
           <div class="summary-label">
             <span>简介</span>
             <a-button
+              class="app-text-action-btn"
               type="text"
               size="mini"
               html-type="button"
@@ -238,7 +239,7 @@
 
 		      <a-form-item>
 	        <a-space style="justify-content: flex-end; width: 100%">
-          <a-button type="text" html-type="button" @click="handleCancel">取消</a-button>
+          <a-button class="app-text-action-btn" type="text" html-type="button" @click="handleCancel">取消</a-button>
           <a-button type="primary" html-type="submit" :loading="isSubmitting">
             保存
           </a-button>
@@ -353,12 +354,10 @@
       :video-upload-progress="videoUploadProgress"
       :video-upload-file-name="videoUploadFileName"
       :preview-videos="form.preview_videos"
-      :primary-preview-video-uid="form.primary_preview_video_uid"
       :banner-image="form.banner_image"
       :cover-image="form.cover_image"
       @update:visible="showVideoSelector = $event"
       @video-file-change="handleVideoFileChange"
-      @set-primary-video="setPrimaryPreviewVideo"
       @reorder-video="reorderEditableVideos($event.key, $event.direction)"
       @remove-video="removePreviewVideo"
     />
@@ -448,7 +447,6 @@ const {
   handleCoverSearchClear,
   handleCoverUploadError,
   handleCoverUploadSuccess,
-  handleDateChange,
   handleDeveloperSearch,
   handleFilePathItemUpdate,
   handleFileSelect,
@@ -523,7 +521,6 @@ const {
   selectedSteamScreenshotGame,
   selectedSteamScreenshots,
   selectedSteamSummaryGame,
-  setPrimaryPreviewVideo,
   showBannerSelector,
   showCoverSelector,
   showFileBrowser,

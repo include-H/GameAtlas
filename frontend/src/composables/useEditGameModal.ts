@@ -1,11 +1,19 @@
 import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
+import {
+  createEmptyEditGameForm,
+  formatEditGameReleaseDate,
+  parseEditGameReleaseDate,
+  type EditGameEditableScreenshot,
+  type EditGameEditableVideo,
+  type EditGameForm,
+} from '@/composables/edit-game-form'
 import { uploadAsset, type UploadedAssetResult } from '@/services/assets'
 import { directoryService } from '@/services/directory.service'
 import { proxySteamAssetUrl } from '@/services/steam.service'
 import { seriesService } from '@/services/series.service'
 import { resolveAssetCandidates } from '@/utils/asset-url'
 import { getAssetFileExtension } from '@/utils/asset-file-extension'
-import { useGameFilePaths, type FilePathItem } from '@/composables/useGameFilePaths'
+import { useGameFilePaths } from '@/composables/useGameFilePaths'
 import { useTagSelection } from '@/composables/useTagSelection'
 import { useSteamImport } from '@/composables/useSteamImport'
 import { useEditGameWorkflow } from '@/composables/useEditGameWorkflow'
@@ -27,43 +35,7 @@ import type {
   TagGroup,
   VideoAssetItem,
 } from '@/services/types'
-import type { GameTagSelectionValue } from '@/components/edit-game/GameTagSection.vue'
 import { useUiStore } from '@/stores/ui'
-
-interface EditableScreenshot {
-  id?: number
-  asset_uid?: string
-  path: string
-  sort_order?: number
-  client_key: string
-}
-
-interface EditableVideo {
-  id?: number
-  asset_uid?: string
-  path: string
-  sort_order?: number
-}
-
-interface GameForm {
-  title: string
-  title_alt: string
-  visibility: 'public' | 'private'
-  developer_ids: Array<string | number>
-  publisher_ids: Array<string | number>
-  release_date: string | undefined
-  engine: string
-  platform_ids: (string | number)[]
-  series_id: string | number | null
-  tag_ids: Array<string | number>
-  summary: string
-  cover_image: string
-  banner_image: string
-  preview_videos: EditableVideo[]
-  primary_preview_video_uid: string
-  screenshots: EditableScreenshot[]
-  file_paths: FilePathItem[]
-}
 
 interface UseEditGameModalOptions {
   props: {
@@ -100,36 +72,15 @@ export const useEditGameModal = ({
   const isUploadingVideo = ref(false)
   const videoUploadProgress = ref(0)
   const videoUploadFileName = ref('')
-  const releaseDate = ref<Date | null>(null)
 
   const rules = {
     title: [{ required: true, message: '请输入游戏名称' }],
   }
 
-  const form = ref<GameForm>({
-    title: '',
-    title_alt: '',
-    visibility: 'public',
-    developer_ids: [],
-    publisher_ids: [],
-    release_date: undefined,
-    engine: '',
-    platform_ids: [],
-    series_id: null,
-    tag_ids: [],
-    summary: '',
-    cover_image: '',
-    banner_image: '',
-    preview_videos: [],
-    primary_preview_video_uid: '',
-    screenshots: [],
-    file_paths: [{ path: '', label: '' }],
-  })
+  const form = ref<EditGameForm>(createEmptyEditGameForm())
 
   const primaryPreviewVideo = computed(() => {
-    if (form.value.preview_videos.length === 0) return null
-    const selected = form.value.preview_videos.find((item) => item.asset_uid === form.value.primary_preview_video_uid)
-    return selected || form.value.preview_videos[0]
+    return form.value.preview_videos[0] || null
   })
 
   const previewVideoSources = computed(() => resolveAssetCandidates(primaryPreviewVideo.value?.path || ''))
@@ -151,6 +102,18 @@ export const useEditGameModal = ({
   const filteredPublisherOptions = computed(() => {
     return sortCreatableOptionsByName(publisherOptions.value)
   })
+
+  const currentGame = computed(() => props.game)
+  const currentGameId = computed(() => props.game?.id)
+  const releaseDate = computed<Date | null>({
+    get: () => parseEditGameReleaseDate(form.value.release_date),
+    set: (value) => {
+      form.value.release_date = formatEditGameReleaseDate(value)
+    },
+  })
+  const addAlert = (message: string, type: 'success' | 'warning' | 'error') => {
+    uiStore.addAlert(message, type)
+  }
 
   const syncViewportWidth = () => {
     viewportWidth.value = window.innerWidth
@@ -223,7 +186,7 @@ export const useEditGameModal = ({
     tagOptionsByGroup,
     tagSelectionsByGroup,
     pendingTagOptionsByGroup,
-    handleTagSelectionChange,
+    handleTagSectionSelectionChange,
     handleParseWikiTags,
     handleWikiTagCandidateGroupChange,
     applySelectedWikiTags,
@@ -232,16 +195,9 @@ export const useEditGameModal = ({
   } = useTagSelection({
     tagGroups,
     tagOptions,
-    formTagIds: computed({
-      get: () => form.value.tag_ids,
-      set: (value) => {
-        form.value.tag_ids = value
-      },
-    }),
+    form,
     getWikiContent: () => props.game?.wiki_content || '',
-    addAlert: (message, type) => {
-      uiStore.addAlert(message, type)
-    },
+    addAlert,
   })
 
   const uploadAction = computed(() => {
@@ -277,7 +233,7 @@ export const useEditGameModal = ({
   const uploadHeaders = computed(() => ({}))
 
   const createScreenshotKey = (
-    asset: Pick<EditableScreenshot, 'id' | 'asset_uid' | 'path'>,
+    asset: Pick<EditGameEditableScreenshot, 'id' | 'asset_uid' | 'path'>,
     index = 0,
   ) => {
     if (asset.asset_uid) return `uid:${asset.asset_uid}`
@@ -288,7 +244,7 @@ export const useEditGameModal = ({
   const createEditableScreenshot = (
     asset: ScreenshotItem | UploadedAssetResult | string,
     index: number,
-  ): EditableScreenshot => {
+  ): EditGameEditableScreenshot => {
     if (typeof asset === 'string') {
       return {
         path: asset,
@@ -313,7 +269,7 @@ export const useEditGameModal = ({
     }
   }
 
-  const createEditableVideo = (asset: VideoAssetItem | UploadedAssetResult | string): EditableVideo => {
+  const createEditableVideo = (asset: VideoAssetItem | UploadedAssetResult | string): EditGameEditableVideo => {
     if (typeof asset === 'string') {
       return { path: asset }
     }
@@ -333,14 +289,8 @@ export const useEditGameModal = ({
     handleScreenshotDragEnter,
     handleScreenshotDrop,
     handleScreenshotDragEnd,
-    setPrimaryPreviewVideo,
   } = useEditGameMediaState({
-    form: computed({
-      get: () => form.value,
-      set: (value) => {
-        form.value = value
-      },
-    }),
+    form,
   })
 
   const {
@@ -350,9 +300,10 @@ export const useEditGameModal = ({
     removeFilePath,
     openFileBrowser,
     handleFileSelect,
+    handleFilePathItemUpdate,
     resetFileBrowserState,
   } = useGameFilePaths({
-    filePaths: computed(() => form.value.file_paths),
+    form,
     getDefaultDirectory: () => directoryService.getDefaultDirectory(),
     onResolveInitialPathError: (message) => {
       console.error(message)
@@ -365,13 +316,7 @@ export const useEditGameModal = ({
   })
 
   const { hydrateFormFromGame, initializeOptions } = useEditGameFormBootstrap({
-    form: computed({
-      get: () => form.value,
-      set: (value) => {
-        form.value = value
-      },
-    }),
-    releaseDate,
+    form,
     seriesOptions,
     platformOptions,
     tagGroups,
@@ -383,68 +328,13 @@ export const useEditGameModal = ({
     createEditableVideo,
   })
 
-  const handleDateChange = (value: Date | number | string | null) => {
-    if (value) {
-      const dateObj = value instanceof Date ? value : new Date(value)
-      const year = dateObj.getFullYear()
-      const month = String(dateObj.getMonth() + 1).padStart(2, '0')
-      const day = String(dateObj.getDate()).padStart(2, '0')
-      form.value.release_date = `${year}-${month}-${day}`
-      return
-    }
-    form.value.release_date = undefined
-  }
-
-  const handleTagSectionSelectionChange = (payload: {
-    groupId: number
-    value: GameTagSelectionValue
-  }) => {
-    if (payload.value === null || payload.value === undefined) {
-      handleTagSelectionChange(payload.groupId, undefined)
-      return
-    }
-
-    if (typeof payload.value === 'string' || typeof payload.value === 'number') {
-      handleTagSelectionChange(payload.groupId, payload.value)
-      return
-    }
-
-    const arrayValue = payload.value
-    if (arrayValue.every((item) => typeof item === 'string')) {
-      handleTagSelectionChange(payload.groupId, arrayValue as string[])
-      return
-    }
-
-    if (arrayValue.every((item) => typeof item === 'number')) {
-      handleTagSelectionChange(payload.groupId, arrayValue as number[])
-      return
-    }
-
-    handleTagSelectionChange(payload.groupId, arrayValue.map((item) => String(item)))
-  }
-
-  const handleFilePathItemUpdate = (payload: {
-    index: number
-    field: 'path' | 'label'
-    value: string
-  }) => {
-    const target = form.value.file_paths[payload.index]
-    if (!target) return
-    target[payload.field] = payload.value
-  }
-
   const {
     queueAssetDeletion,
     resetPendingDeleteAssets,
     handleSubmit,
   } = useEditGameWorkflow({
-    game: computed(() => props.game),
-    form: computed({
-      get: () => form.value,
-      set: (value) => {
-        form.value = value
-      },
-    }),
+    game: currentGame,
+    form,
     isSubmitting,
     seriesOptions,
     developerOptions,
@@ -459,9 +349,7 @@ export const useEditGameModal = ({
       }
     },
     resolveTagSelections,
-    addAlert: (message, type) => {
-      uiStore.addAlert(message, type)
-    },
+    addAlert,
     emitSuccess: () => {
       emit('success')
     },
@@ -567,21 +455,13 @@ export const useEditGameModal = ({
     downloadSelectedSteamScreenshots,
     resetSteamImportState,
   } = useSteamImport({
-    form: computed({
-      get: () => form.value,
-      set: (value) => {
-        form.value = value
-      },
-    }),
-    releaseDate,
-    gameId: computed(() => props.game?.id),
+    form,
+    gameId: currentGameId,
     getWikiContent: () => props.game?.wiki_content || '',
     uploadAssetFromUrl,
     queueAssetDeletion,
     createEditableScreenshot,
-    addAlert: (message, type) => {
-      uiStore.addAlert(message, type)
-    },
+    addAlert,
   })
 
   const handleCoverError = (event: Event) => {
@@ -604,13 +484,8 @@ export const useEditGameModal = ({
     removePreviewVideo,
     resetVideoUploadState,
   } = useEditGameAssets({
-    form: computed({
-      get: () => form.value,
-      set: (value) => {
-        form.value = value
-      },
-    }),
-    gameId: computed(() => props.game?.id),
+    form,
+    gameId: currentGameId,
     showCoverSelector,
     showBannerSelector,
     showScreenshotSelector,
@@ -619,11 +494,9 @@ export const useEditGameModal = ({
     videoUploadProgress,
     videoUploadFileName,
     queueAssetDeletion,
-    createEditableScreenshot: (asset, index) => createEditableScreenshot(asset, index),
-    createEditableVideo: (asset) => createEditableVideo(asset),
-    addAlert: (message, type) => {
-      uiStore.addAlert(message, type)
-    },
+    createEditableScreenshot,
+    createEditableVideo,
+    addAlert,
   })
 
   const resetTransientState = () => {
@@ -684,7 +557,6 @@ export const useEditGameModal = ({
     handleCoverSearchClear,
     handleCoverUploadError,
     handleCoverUploadSuccess,
-    handleDateChange,
     handleDeveloperSearch,
     handleFilePathItemUpdate,
     handleFileSelect,
@@ -760,7 +632,6 @@ export const useEditGameModal = ({
     selectedSteamScreenshots,
     selectedSteamSummaryGame,
     seriesOptions,
-    setPrimaryPreviewVideo,
     showBannerSelector,
     showCoverSelector,
     showFileBrowser,

@@ -18,7 +18,7 @@
         <!-- Scroll Buttons -->
         <div v-if="showScrollButtons && items.length > 0" class="card-row__controls">
           <a-button
-            class="app-secondary-compact"
+            class="app-text-action-btn app-secondary-compact"
             size="small"
             type="text"
             @click="scrollLeft"
@@ -28,7 +28,7 @@
             </template>
           </a-button>
           <a-button
-            class="app-secondary-compact"
+            class="app-text-action-btn app-secondary-compact"
             size="small"
             type="text"
             @click="scrollRight"
@@ -41,6 +41,7 @@
 
         <a-button
           v-if="showViewAll"
+          class="app-text-action-btn"
           type="text"
           size="small"
           @click="router.push(viewAllRoute)"

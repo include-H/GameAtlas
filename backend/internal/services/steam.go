@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -16,6 +17,8 @@ import (
 	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/domain"
 )
+
+var ErrUpstream = errors.New("upstream request failed")
 
 type SteamService struct {
 	client *http.Client
@@ -137,11 +140,24 @@ func (s *SteamService) Search(query string, proxyOverride string) ([]domain.Stea
 
 func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain.SteamAssetsPreview, error) {
 	appKey := fmt.Sprintf("%d", appID)
-	primaryPayload, _ := s.fetchAppDetails(appID, "schinese", proxyOverride)
-	fallbackPayload, _ := s.fetchAppDetails(appID, "english", proxyOverride)
+	primaryPayload, primaryErr := s.fetchAppDetails(appID, "schinese", proxyOverride)
+	fallbackPayload, fallbackErr := s.fetchAppDetails(appID, "english", proxyOverride)
 
 	primaryDetails, primaryOK := primaryPayload[appKey]
 	fallbackDetails, fallbackOK := fallbackPayload[appKey]
+	primaryUsable := primaryOK && primaryDetails.Success && primaryDetails.Data != nil
+	fallbackUsable := fallbackOK && fallbackDetails.Success && fallbackDetails.Data != nil
+	if !primaryUsable && !fallbackUsable {
+		if primaryErr != nil || fallbackErr != nil {
+			return nil, wrapSteamUpstreamError(
+				"steam preview appdetails failed",
+				namedError{name: "schinese appdetails", err: primaryErr},
+				namedError{name: "english appdetails", err: fallbackErr},
+			)
+		}
+		return nil, ErrNotFound
+	}
+
 	name := fmt.Sprintf("Steam App %d", appID)
 	description := ""
 	releaseDate := ""
@@ -149,7 +165,7 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 	publishers := []string{}
 	screenshotURLs := []string{}
 	description = s.fetchDescriptionFromStorePage(appID, proxyOverride)
-	if primaryOK && primaryDetails.Success && primaryDetails.Data != nil {
+	if primaryUsable {
 		if primaryDetails.Data.Name != "" {
 			name = primaryDetails.Data.Name
 		}
@@ -170,7 +186,7 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 			}
 		}
 	}
-	if fallbackOK && fallbackDetails.Success && fallbackDetails.Data != nil {
+	if fallbackUsable {
 		if name == fmt.Sprintf("Steam App %d", appID) && fallbackDetails.Data.Name != "" {
 			name = fallbackDetails.Data.Name
 		}
@@ -355,6 +371,25 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+type namedError struct {
+	name string
+	err  error
+}
+
+func wrapSteamUpstreamError(message string, errs ...namedError) error {
+	details := make([]string, 0, len(errs))
+	for _, item := range errs {
+		if item.err == nil {
+			continue
+		}
+		details = append(details, fmt.Sprintf("%s: %v", item.name, item.err))
+	}
+	if len(details) == 0 {
+		return fmt.Errorf("%w: %s", ErrUpstream, message)
+	}
+	return fmt.Errorf("%w: %s (%s)", ErrUpstream, message, strings.Join(details, "; "))
 }
 
 func (s *SteamService) fetchAppDetails(appID int64, language string, proxyOverride string) (steamAppDetailsResponse, error) {

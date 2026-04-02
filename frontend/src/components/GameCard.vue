@@ -58,7 +58,7 @@
           <a-button
             type="text"
             size="small"
-            :class="{ 'is-favorite': game.isFavorite }"
+            :class="['app-text-action-btn', { 'is-favorite': game.isFavorite }]"
             @click.stop="handleToggleFavorite"
           >
             <template #icon>
@@ -68,6 +68,7 @@
           </a-button>
           <a-dropdown v-if="isAdmin">
             <a-button
+              class="app-text-action-btn"
               type="text"
               size="small"
               @click.stop

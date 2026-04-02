@@ -1,4 +1,5 @@
 import { ref, type Ref } from 'vue'
+import type { EditGameForm } from '@/composables/edit-game-form'
 import gamesService from '@/services/games.service'
 import { seriesService } from '@/services/series.service'
 import platformService from '@/services/platforms.service'
@@ -7,7 +8,7 @@ import { getHttpErrorMessage } from '@/utils/http-error'
 import type {
   Developer,
   GameDetail,
-  GameWriteRequest,
+  GameAggregatePatchRequest,
   Platform,
   Publisher,
   Series,
@@ -22,50 +23,9 @@ interface PendingDeleteAsset {
   assetUid?: string
 }
 
-interface WorkflowFilePathItem {
-  id?: number
-  path: string
-  label: string
-}
-
-interface WorkflowEditableScreenshot {
-  id?: number
-  asset_uid?: string
-  path: string
-  sort_order?: number
-  client_key: string
-}
-
-interface WorkflowEditableVideo {
-  id?: number
-  asset_uid?: string
-  path: string
-  sort_order?: number
-}
-
-export interface EditGameFormBridge {
-  title: string
-  title_alt: string
-  visibility: 'public' | 'private'
-  developer_ids: Array<string | number>
-  publisher_ids: Array<string | number>
-  release_date: string | undefined
-  engine: string
-  platform_ids: Array<string | number>
-  series_id: string | number | null
-  tag_ids: Array<string | number>
-  summary: string
-  cover_image: string
-  banner_image: string
-  preview_videos: WorkflowEditableVideo[]
-  primary_preview_video_uid: string
-  screenshots: WorkflowEditableScreenshot[]
-  file_paths: WorkflowFilePathItem[]
-}
-
 export interface UseEditGameWorkflowOptions {
   game: Ref<GameDetail | null>
-  form: Ref<EditGameFormBridge>
+  form: Ref<EditGameForm>
   isSubmitting: Ref<boolean>
   seriesOptions: Ref<Series[]>
   developerOptions: Ref<Developer[]>
@@ -190,13 +150,13 @@ const resolvePlatforms = async (
 }
 
 const createUpdatePayload = (params: {
-  form: EditGameFormBridge
+  form: EditGameForm
   platformIds: number[]
   seriesId: number | null | undefined
   developerIds: number[] | undefined
   publisherIds: number[] | undefined
   tagIds: number[]
-}): Partial<GameWriteRequest> => {
+}): GameAggregatePatchRequest => {
   return {
     title: params.form.title,
     title_alt: params.form.title_alt,
@@ -211,7 +171,6 @@ const createUpdatePayload = (params: {
     summary: params.form.summary,
     cover_image: params.form.cover_image,
     banner_image: params.form.banner_image,
-    preview_video_asset_uid: params.form.primary_preview_video_uid || null,
   }
 }
 
@@ -312,23 +271,25 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
           publisherIds,
           tagIds,
         }),
-        files: options.form.value.file_paths
-          .filter((item) => item.path.trim())
-          .map((item, index) => ({
-            id: item.id,
-            file_path: item.path.trim(),
-            label: item.label.trim() || null,
-            notes: null,
-            sort_order: index,
+        assets: {
+          files: options.form.value.file_paths
+            .filter((item) => item.path.trim())
+            .map((item, index) => ({
+              id: item.id,
+              file_path: item.path.trim(),
+              label: item.label.trim() || null,
+              notes: null,
+              sort_order: index,
+            })),
+          delete_assets: pendingDeleteAssets.value.map((item) => ({
+            asset_type: item.type,
+            path: item.path,
+            asset_id: item.assetId,
+            asset_uid: item.assetUid,
           })),
-        delete_assets: pendingDeleteAssets.value.map((item) => ({
-          asset_type: item.type,
-          path: item.path,
-          asset_id: item.assetId,
-          asset_uid: item.assetUid,
-        })),
-        screenshot_order_asset_uids: orderedScreenshotUids,
-        video_order_asset_uids: orderedVideoUids,
+          screenshot_order_asset_uids: orderedScreenshotUids,
+          video_order_asset_uids: orderedVideoUids,
+        },
       })
       pendingDeleteAssets.value = []
       if (aggregateResult.warnings.length > 0) {

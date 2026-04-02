@@ -19,13 +19,14 @@
             class="file-label-input"
             @update:model-value="handleLabelUpdate(index, $event)"
           />
-          <a-button type="text" html-type="button" @click="emit('browse', index)">
+          <a-button class="app-text-action-btn" type="text" html-type="button" @click="emit('browse', index)">
             <template #icon>
               <icon-folder />
             </template>
             浏览
           </a-button>
           <a-button
+            class="app-text-action-btn"
             type="text"
             status="danger"
             html-type="button"
@@ -37,6 +38,7 @@
       </div>
 
       <a-button
+        class="app-text-action-btn"
         type="text"
         long
         html-type="button"

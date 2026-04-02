@@ -11,7 +11,7 @@ import (
 	"github.com/hao/game/internal/repositories"
 )
 
-func TestGamesServiceGetDetailUsesConfiguredPreviewVideoAndGroupsTags(t *testing.T) {
+func TestGamesServiceGetDetailUsesFirstSortedVideoAndGroupsTags(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()
 
@@ -19,8 +19,6 @@ func TestGamesServiceGetDetailUsesConfiguredPreviewVideoAndGroupsTags(t *testing
 	insertServicesGameAsset(t, db, gameID, "video-a", "video", "/assets/detail-game/video-a.mp4", 0)
 	insertServicesGameAsset(t, db, gameID, "video-b", "video", "/assets/detail-game/video-b.mp4", 1)
 	insertServicesGameAsset(t, db, gameID, "screen-a", "screenshot", "/assets/detail-game/screen-a.png", 0)
-	previewUID := "video-b"
-	updateServicesGamePreviewVideo(t, db, gameID, &previewUID)
 	groupID := insertServicesTagGroup(t, db, "detail-custom", "Detail Custom")
 	actionID := insertServicesTag(t, db, groupID, "Action", "action")
 	puzzleID := insertServicesTag(t, db, groupID, "Puzzle", "puzzle")
@@ -34,8 +32,8 @@ func TestGamesServiceGetDetailUsesConfiguredPreviewVideoAndGroupsTags(t *testing
 		t.Fatalf("GetDetail returned error: %v", err)
 	}
 
-	if detail.PreviewVideo == nil || detail.PreviewVideo.AssetUID != "video-b" {
-		t.Fatalf("PreviewVideo = %#v, want video-b", detail.PreviewVideo)
+	if detail.PreviewVideo == nil || detail.PreviewVideo.AssetUID != "video-a" {
+		t.Fatalf("PreviewVideo = %#v, want first sorted video-a", detail.PreviewVideo)
 	}
 	if len(detail.PreviewVideos) != 2 {
 		t.Fatalf("len(PreviewVideos) = %d, want 2", len(detail.PreviewVideos))
@@ -52,20 +50,74 @@ func TestGamesServiceGetDetailUsesConfiguredPreviewVideoAndGroupsTags(t *testing
 	if detail.TagGroups[0].ID != groupID || len(detail.TagGroups[0].Tags) != 2 {
 		t.Fatalf("TagGroups[0] = %#v, want grouped tags", detail.TagGroups[0])
 	}
+	if !detail.TagGroups[0].AllowMultiple {
+		t.Fatalf("TagGroups[0].AllowMultiple = %v, want true", detail.TagGroups[0].AllowMultiple)
+	}
+	if !detail.TagGroups[0].IsFilterable {
+		t.Fatalf("TagGroups[0].IsFilterable = %v, want true", detail.TagGroups[0].IsFilterable)
+	}
 	if detail.Platforms == nil || len(detail.Platforms) != 0 {
 		t.Fatalf("Platforms = %#v, want empty non-nil slice", detail.Platforms)
 	}
 }
 
-func TestGamesServiceGetDetailFallsBackToFirstVideoAndRejectsPrivateGame(t *testing.T) {
+func TestGamesServiceGetDetailPreservesTagGroupCapabilities(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	gameID := insertServicesTestGame(t, db, "detail-tag-capabilities", "Detail Tag Capabilities", domain.GameVisibilityPublic)
+	singleSelectGroupID := insertServicesTagGroupWithOptions(t, db, "mode", "Mode", false, true)
+	internalGroupID := insertServicesTagGroupWithOptions(t, db, "internal", "Internal", true, false)
+	storyID := insertServicesTag(t, db, singleSelectGroupID, "Story", "story")
+	curatedID := insertServicesTag(t, db, internalGroupID, "Curated", "curated")
+	linkServicesGameTag(t, db, gameID, storyID, 0)
+	linkServicesGameTag(t, db, gameID, curatedID, 1)
+
+	service := newServicesGamesService(db)
+	detail, err := service.GetDetail(gameID, true)
+	if err != nil {
+		t.Fatalf("GetDetail returned error: %v", err)
+	}
+
+	if len(detail.TagGroups) != 2 {
+		t.Fatalf("len(TagGroups) = %d, want 2", len(detail.TagGroups))
+	}
+
+	groupByID := make(map[int64]domain.GameTagGroup, len(detail.TagGroups))
+	for _, group := range detail.TagGroups {
+		groupByID[group.ID] = group
+	}
+
+	singleSelectGroup, ok := groupByID[singleSelectGroupID]
+	if !ok {
+		t.Fatalf("single-select group %d missing from %#v", singleSelectGroupID, detail.TagGroups)
+	}
+	if singleSelectGroup.AllowMultiple {
+		t.Fatalf("singleSelectGroup.AllowMultiple = %v, want false", singleSelectGroup.AllowMultiple)
+	}
+	if !singleSelectGroup.IsFilterable {
+		t.Fatalf("singleSelectGroup.IsFilterable = %v, want true", singleSelectGroup.IsFilterable)
+	}
+
+	internalGroup, ok := groupByID[internalGroupID]
+	if !ok {
+		t.Fatalf("internal group %d missing from %#v", internalGroupID, detail.TagGroups)
+	}
+	if !internalGroup.AllowMultiple {
+		t.Fatalf("internalGroup.AllowMultiple = %v, want true", internalGroup.AllowMultiple)
+	}
+	if internalGroup.IsFilterable {
+		t.Fatalf("internalGroup.IsFilterable = %v, want false", internalGroup.IsFilterable)
+	}
+}
+
+func TestGamesServiceGetDetailUsesFirstVideoAndRejectsPrivateGame(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	publicGameID := insertServicesTestGame(t, db, "fallback-game", "Fallback Game", domain.GameVisibilityPublic)
 	insertServicesGameAsset(t, db, publicGameID, "video-a", "video", "/assets/fallback-game/video-a.mp4", 0)
 	insertServicesGameAsset(t, db, publicGameID, "video-b", "video", "/assets/fallback-game/video-b.mp4", 1)
-	missingPreviewUID := "missing-video"
-	updateServicesGamePreviewVideo(t, db, publicGameID, &missingPreviewUID)
 	privateGameID := insertServicesTestGame(t, db, "private-detail", "Private Detail", domain.GameVisibilityPrivate)
 
 	service := newServicesGamesService(db)
@@ -75,7 +127,7 @@ func TestGamesServiceGetDetailFallsBackToFirstVideoAndRejectsPrivateGame(t *test
 		t.Fatalf("GetDetail returned error: %v", err)
 	}
 	if detail.PreviewVideo == nil || detail.PreviewVideo.AssetUID != "video-a" {
-		t.Fatalf("PreviewVideo = %#v, want fallback to first video", detail.PreviewVideo)
+		t.Fatalf("PreviewVideo = %#v, want first sorted video", detail.PreviewVideo)
 	}
 
 	_, err = service.GetDetail(privateGameID, false)
@@ -123,42 +175,112 @@ func TestNormalizeTimelineParamsNormalizesDatesAndValidatesCursorRange(t *testin
 	}
 }
 
-func TestGamesServiceUpdateRejectsUnknownPreviewVideoAssetUID(t *testing.T) {
+func TestValidateAndTrimGameInputNormalizesSharedCoreFields(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()
 
-	gameID := insertServicesTestGame(t, db, "update-preview", "Update Preview", domain.GameVisibilityPublic)
-	insertServicesGameAsset(t, db, gameID, "video-a", "video", "/assets/update-preview/video-a.mp4", 0)
 	service := newServicesGamesService(db)
+	titleAlt := " Alt "
+	summary := "   "
+	engine := " Unreal Engine 5 "
 
-	targetUID := "missing-video"
-	_, err := service.Update(gameID, domain.GameWriteInput{
-		Title:                "Update Preview",
-		PreviewVideoAssetUID: &targetUID,
+	trimmed, err := service.validateAndTrimGameInput(domain.GameWriteInput{
+		GameCoreInput: domain.GameCoreInput{
+			Title:      "  Shared Core Game  ",
+			TitleAlt:   &titleAlt,
+			Visibility: "  ",
+			Summary:    &summary,
+			Engine:     &engine,
+		},
+		PlatformIDs:  []int64{3, 3, 1},
+		DeveloperIDs: []int64{4, 4},
+		PublisherIDs: []int64{7, 2, 7},
 	})
-	if !errors.Is(err, ErrValidation) {
-		t.Fatalf("Update error = %v, want ErrValidation", err)
+	if err != nil {
+		t.Fatalf("validateAndTrimGameInput returned error: %v", err)
+	}
+
+	if trimmed.Title != "Shared Core Game" {
+		t.Fatalf("Title = %q, want trimmed title", trimmed.Title)
+	}
+	if trimmed.TitleAlt == nil || *trimmed.TitleAlt != "Alt" {
+		t.Fatalf("TitleAlt = %v, want Alt", trimmed.TitleAlt)
+	}
+	if trimmed.Visibility != domain.GameVisibilityPublic {
+		t.Fatalf("Visibility = %q, want public default", trimmed.Visibility)
+	}
+	if trimmed.Summary != nil {
+		t.Fatalf("Summary = %v, want nil after blank trim", trimmed.Summary)
+	}
+	if trimmed.Engine == nil || *trimmed.Engine != "Unreal Engine 5" {
+		t.Fatalf("Engine = %v, want trimmed engine", trimmed.Engine)
+	}
+	if len(trimmed.PlatformIDs) != 2 || trimmed.PlatformIDs[0] != 3 || trimmed.PlatformIDs[1] != 1 {
+		t.Fatalf("PlatformIDs = %#v, want deduped [3 1]", trimmed.PlatformIDs)
+	}
+	if len(trimmed.DeveloperIDs) != 1 || trimmed.DeveloperIDs[0] != 4 {
+		t.Fatalf("DeveloperIDs = %#v, want deduped [4]", trimmed.DeveloperIDs)
+	}
+	if len(trimmed.PublisherIDs) != 2 || trimmed.PublisherIDs[0] != 7 || trimmed.PublisherIDs[1] != 2 {
+		t.Fatalf("PublisherIDs = %#v, want deduped [7 2]", trimmed.PublisherIDs)
+	}
+	if len(trimmed.TagIDs) != 0 {
+		t.Fatalf("TagIDs = %#v, want empty slice", trimmed.TagIDs)
 	}
 }
 
-func TestGamesServiceUpdateAcceptsTrimmedExistingPreviewVideoAssetUID(t *testing.T) {
+func TestValidateAndTrimGameAggregatePatchInputNormalizesSharedCoreFields(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()
 
-	gameID := insertServicesTestGame(t, db, "update-trimmed-preview", "Update Trimmed Preview", domain.GameVisibilityPublic)
-	insertServicesGameAsset(t, db, gameID, "video-a", "video", "/assets/update-trimmed-preview/video-a.mp4", 0)
 	service := newServicesGamesService(db)
+	titleAlt := " Alt Patch "
+	summary := "   "
+	engine := " RE Engine "
 
-	targetUID := " video-a "
-	game, err := service.Update(gameID, domain.GameWriteInput{
-		Title:                "Update Trimmed Preview",
-		PreviewVideoAssetUID: &targetUID,
+	trimmed, err := service.validateAndTrimGameAggregatePatchInput(domain.GameAggregatePatchInput{
+		GameCoreInput: domain.GameCoreInput{
+			Title:      "  Aggregate Shared Core  ",
+			TitleAlt:   &titleAlt,
+			Visibility: " ",
+			Summary:    &summary,
+			Engine:     &engine,
+		},
+		PlatformIDs:  domain.Int64SlicePatch{Present: true, Values: []int64{8, 8, 5}},
+		DeveloperIDs: domain.Int64SlicePatch{Present: true, Values: []int64{6, 6}},
+		PublisherIDs: domain.Int64SlicePatch{Present: true, Values: []int64{9, 4, 9}},
+		TagIDs:       domain.Int64SlicePatch{Present: true, Values: nil},
 	})
 	if err != nil {
-		t.Fatalf("Update returned error: %v", err)
+		t.Fatalf("validateAndTrimGameAggregatePatchInput returned error: %v", err)
 	}
-	if game.PreviewVideoAssetUID == nil || *game.PreviewVideoAssetUID != "video-a" {
-		t.Fatalf("PreviewVideoAssetUID = %v, want video-a", game.PreviewVideoAssetUID)
+
+	if trimmed.Title != "Aggregate Shared Core" {
+		t.Fatalf("Title = %q, want trimmed title", trimmed.Title)
+	}
+	if trimmed.TitleAlt == nil || *trimmed.TitleAlt != "Alt Patch" {
+		t.Fatalf("TitleAlt = %v, want Alt Patch", trimmed.TitleAlt)
+	}
+	if trimmed.Visibility != domain.GameVisibilityPublic {
+		t.Fatalf("Visibility = %q, want public default", trimmed.Visibility)
+	}
+	if trimmed.Summary != nil {
+		t.Fatalf("Summary = %v, want nil after blank trim", trimmed.Summary)
+	}
+	if trimmed.Engine == nil || *trimmed.Engine != "RE Engine" {
+		t.Fatalf("Engine = %v, want trimmed engine", trimmed.Engine)
+	}
+	if !trimmed.PlatformIDs.Present || len(trimmed.PlatformIDs.Values) != 2 || trimmed.PlatformIDs.Values[0] != 8 || trimmed.PlatformIDs.Values[1] != 5 {
+		t.Fatalf("PlatformIDs = %#v, want deduped [8 5]", trimmed.PlatformIDs)
+	}
+	if !trimmed.DeveloperIDs.Present || len(trimmed.DeveloperIDs.Values) != 1 || trimmed.DeveloperIDs.Values[0] != 6 {
+		t.Fatalf("DeveloperIDs = %#v, want deduped [6]", trimmed.DeveloperIDs)
+	}
+	if !trimmed.PublisherIDs.Present || len(trimmed.PublisherIDs.Values) != 2 || trimmed.PublisherIDs.Values[0] != 9 || trimmed.PublisherIDs.Values[1] != 4 {
+		t.Fatalf("PublisherIDs = %#v, want deduped [9 4]", trimmed.PublisherIDs)
+	}
+	if !trimmed.TagIDs.Present || len(trimmed.TagIDs.Values) != 0 {
+		t.Fatalf("TagIDs = %#v, want empty present slice", trimmed.TagIDs)
 	}
 }
 
@@ -171,30 +293,12 @@ func TestGamesServiceUpdateAggregateRejectsUnsupportedDeleteAssetType(t *testing
 
 	_, _, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			Title: "Aggregate Invalid Asset",
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Invalid Asset"},
 		},
-		DeleteAssets: []domain.GameAssetDeleteInput{
-			{AssetType: "manual", Path: "/assets/manual.pdf"},
-		},
-	})
-	if !errors.Is(err, ErrValidation) {
-		t.Fatalf("UpdateAggregate error = %v, want ErrValidation", err)
-	}
-}
-
-func TestGamesServiceUpdateAggregateRejectsUnknownPreviewVideoAssetUID(t *testing.T) {
-	db := openServicesTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	gameID := insertServicesTestGame(t, db, "aggregate-preview", "Aggregate Preview", domain.GameVisibilityPublic)
-	insertServicesGameAsset(t, db, gameID, "video-a", "video", "/assets/aggregate-preview/video-a.mp4", 0)
-	service := newServicesGamesService(db)
-
-	targetUID := "missing-video"
-	_, _, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
-		Game: domain.GameAggregatePatchInput{
-			Title:                "Aggregate Preview",
-			PreviewVideoAssetUID: &targetUID,
+		Assets: domain.GameAggregateAssetsInput{
+			DeleteAssets: []domain.GameAssetDeleteInput{
+				{AssetType: "manual", Path: "/assets/manual.pdf"},
+			},
 		},
 	})
 	if !errors.Is(err, ErrValidation) {
@@ -211,10 +315,12 @@ func TestGamesServiceUpdateAggregateReturnsMissingConfigForFileValidation(t *tes
 
 	_, _, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			Title: "Aggregate Files",
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Files"},
 		},
-		Files: []domain.GameFileUpsertInput{
-			{FilePath: "/tmp/demo.rom"},
+		Assets: domain.GameAggregateAssetsInput{
+			Files: []domain.GameFileUpsertInput{
+				{FilePath: "/tmp/demo.rom"},
+			},
 		},
 	})
 	if !errors.Is(err, ErrMissingConfig) {
@@ -237,10 +343,12 @@ func TestGamesServiceUpdateAggregateReturnsDeleteWarningsWhenAssetRemovalFails(t
 
 	game, warnings, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			Title: "Aggregate Warning",
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Warning"},
 		},
-		DeleteAssets: []domain.GameAssetDeleteInput{
-			{AssetType: "cover", Path: "/assets/../bad-cover.png"},
+		Assets: domain.GameAggregateAssetsInput{
+			DeleteAssets: []domain.GameAssetDeleteInput{
+				{AssetType: "cover", Path: "/assets/../bad-cover.png"},
+			},
 		},
 	})
 	if err != nil {
@@ -282,17 +390,19 @@ func TestGamesServiceUpdateAggregateNormalizesAndReplacesFiles(t *testing.T) {
 	notes := "  Fresh Notes  "
 	game, warnings, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			Title: "Aggregate Files Success",
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Files Success"},
 		},
-		Files: []domain.GameFileUpsertInput{
-			{
-				ID:       &existingFileID,
-				FilePath: firstPath,
-				Label:    &label,
-				Notes:    &notes,
-			},
-			{
-				FilePath: secondPath,
+		Assets: domain.GameAggregateAssetsInput{
+			Files: []domain.GameFileUpsertInput{
+				{
+					ID:       &existingFileID,
+					FilePath: firstPath,
+					Label:    &label,
+					Notes:    &notes,
+				},
+				{
+					FilePath: secondPath,
+				},
 			},
 		},
 	})
@@ -352,10 +462,12 @@ func TestGamesServiceUpdateAggregateReturnsForbiddenPathForFileOutsideRoot(t *te
 
 	_, _, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			Title: "Aggregate Outside Root",
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Outside Root"},
 		},
-		Files: []domain.GameFileUpsertInput{
-			{FilePath: outsidePath},
+		Assets: domain.GameAggregateAssetsInput{
+			Files: []domain.GameFileUpsertInput{
+				{FilePath: outsidePath},
+			},
 		},
 	})
 	if !errors.Is(err, ErrForbiddenPath) {
@@ -385,9 +497,11 @@ func TestGamesServiceUpdateAggregateDeletesOmittedExistingFiles(t *testing.T) {
 
 	_, warnings, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			Title: "Aggregate Delete Files",
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Delete Files"},
 		},
-		Files: []domain.GameFileUpsertInput{},
+		Assets: domain.GameAggregateAssetsInput{
+			Files: []domain.GameFileUpsertInput{},
+		},
 	})
 	if err != nil {
 		t.Fatalf("UpdateAggregate returned error: %v", err)
@@ -427,12 +541,14 @@ func TestGamesServiceUpdateAggregateReturnsNotFoundForMissingExistingFileID(t *t
 	missingID := int64(9999)
 	_, _, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			Title: "Aggregate Missing File ID",
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Missing File ID"},
 		},
-		Files: []domain.GameFileUpsertInput{
-			{
-				ID:       &missingID,
-				FilePath: filePath,
+		Assets: domain.GameAggregateAssetsInput{
+			Files: []domain.GameFileUpsertInput{
+				{
+					ID:       &missingID,
+					FilePath: filePath,
+				},
 			},
 		},
 	})
@@ -451,9 +567,11 @@ func TestGamesServiceUpdateAggregateReturnsNotFoundForMissingScreenshotReorderUI
 
 	_, _, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			Title: "Aggregate Missing Shot",
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Missing Shot"},
 		},
-		ScreenshotOrderAssetUIDs: []string{"missing-shot"},
+		Assets: domain.GameAggregateAssetsInput{
+			ScreenshotOrderAssetUIDs: []string{"missing-shot"},
+		},
 	})
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("UpdateAggregate error = %v, want ErrNotFound", err)
@@ -470,9 +588,11 @@ func TestGamesServiceUpdateAggregateReturnsNotFoundForMissingVideoReorderUID(t *
 
 	_, _, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			Title: "Aggregate Missing Video",
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Missing Video"},
 		},
-		VideoOrderAssetUIDs: []string{"missing-video"},
+		Assets: domain.GameAggregateAssetsInput{
+			VideoOrderAssetUIDs: []string{"missing-video"},
+		},
 	})
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("UpdateAggregate error = %v, want ErrNotFound", err)
@@ -541,7 +661,7 @@ func TestGamesServiceUpdateAggregatePreservesOmittedRelationsAndSeries(t *testin
 
 	_, warnings, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			Title: "Aggregate Preserve Relations Updated",
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Preserve Relations Updated"},
 		},
 	})
 	if err != nil {
@@ -626,9 +746,9 @@ func TestGamesServiceUpdateAggregateClearsRelationsAndSeriesWhenPresent(t *testi
 
 	_, warnings, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			Title:        "Aggregate Clear Relations Updated",
-			SeriesID:     domain.OptionalInt64Patch{Present: true, Value: nil},
-			DeveloperIDs: domain.Int64SlicePatch{Present: true, Values: []int64{}},
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Clear Relations Updated"},
+			SeriesID:      domain.OptionalInt64Patch{Present: true, Value: nil},
+			DeveloperIDs:  domain.Int64SlicePatch{Present: true, Values: []int64{}},
 		},
 	})
 	if err != nil {
@@ -662,15 +782,15 @@ func TestGamesServiceUpdateAggregateReordersVideos(t *testing.T) {
 	gameID := insertServicesTestGame(t, db, "aggregate-reorder-video", "Aggregate Reorder Video", domain.GameVisibilityPublic)
 	insertServicesGameAsset(t, db, gameID, "video-a", "video", "/assets/aggregate-reorder-video/video-a.mp4", 5)
 	insertServicesGameAsset(t, db, gameID, "video-b", "video", "/assets/aggregate-reorder-video/video-b.mp4", 6)
-	previewUID := "video-a"
 	service := newServicesGamesService(db)
 
 	game, warnings, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			Title:                "Aggregate Reorder Video",
-			PreviewVideoAssetUID: &previewUID,
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Reorder Video"},
 		},
-		VideoOrderAssetUIDs: []string{" video-b ", " video-a "},
+		Assets: domain.GameAggregateAssetsInput{
+			VideoOrderAssetUIDs: []string{" video-b ", " video-a "},
+		},
 	})
 	if err != nil {
 		t.Fatalf("UpdateAggregate returned error: %v", err)
@@ -678,8 +798,8 @@ func TestGamesServiceUpdateAggregateReordersVideos(t *testing.T) {
 	if len(warnings) != 0 {
 		t.Fatalf("warnings = %#v, want none", warnings)
 	}
-	if game == nil || game.PreviewVideoAssetUID == nil || *game.PreviewVideoAssetUID != "video-a" {
-		t.Fatalf("PreviewVideoAssetUID = %v, want video-a", game.PreviewVideoAssetUID)
+	if game == nil {
+		t.Fatalf("game = %#v, want updated game", game)
 	}
 
 	videos, err := repositories.NewGamesRepository(db).ListVideos(gameID)
@@ -697,7 +817,7 @@ func TestGamesServiceUpdateAggregateReordersVideos(t *testing.T) {
 	}
 }
 
-func TestGamesServiceUpdateAggregateDeletesPrimaryVideoAndFallsBack(t *testing.T) {
+func TestGamesServiceUpdateAggregateDeletesFirstVideoAndKeepsNextVideo(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()
 
@@ -707,7 +827,6 @@ func TestGamesServiceUpdateAggregateDeletesPrimaryVideoAndFallsBack(t *testing.T
 	insertServicesGameAsset(t, db, gameID, "video-b", "video", "/assets/aggregate-delete-primary-video/video-b.mp4", 1)
 	writeServicesAssetFile(t, assetsDir, "aggregate-delete-primary-video", "video-a.mp4", []byte("a"))
 	writeServicesAssetFile(t, assetsDir, "aggregate-delete-primary-video", "video-b.mp4", []byte("b"))
-	previewUID := "video-a"
 	service := NewGamesService(
 		config.Config{AssetsDir: assetsDir},
 		repositories.NewGamesRepository(db),
@@ -718,11 +837,12 @@ func TestGamesServiceUpdateAggregateDeletesPrimaryVideoAndFallsBack(t *testing.T
 
 	game, warnings, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			Title:                "Aggregate Delete Primary Video",
-			PreviewVideoAssetUID: &previewUID,
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Delete Primary Video"},
 		},
-		DeleteAssets: []domain.GameAssetDeleteInput{
-			{AssetType: "video", AssetUID: "video-a"},
+		Assets: domain.GameAggregateAssetsInput{
+			DeleteAssets: []domain.GameAssetDeleteInput{
+				{AssetType: "video", AssetUID: "video-a"},
+			},
 		},
 	})
 	if err != nil {
@@ -731,8 +851,8 @@ func TestGamesServiceUpdateAggregateDeletesPrimaryVideoAndFallsBack(t *testing.T
 	if len(warnings) != 0 {
 		t.Fatalf("warnings = %#v, want none", warnings)
 	}
-	if game == nil || game.PreviewVideoAssetUID == nil || *game.PreviewVideoAssetUID != "video-b" {
-		t.Fatalf("PreviewVideoAssetUID = %v, want video-b", game.PreviewVideoAssetUID)
+	if game == nil {
+		t.Fatalf("game = %#v, want updated game", game)
 	}
 
 	videos, err := repositories.NewGamesRepository(db).ListVideos(gameID)
@@ -743,7 +863,7 @@ func TestGamesServiceUpdateAggregateDeletesPrimaryVideoAndFallsBack(t *testing.T
 		t.Fatalf("videos = %+v, want only fallback video-b", videos)
 	}
 	if _, err := os.Stat(filepath.Join(assetsDir, "aggregate-delete-primary-video", "video-a.mp4")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("expected deleted primary video file, got err=%v", err)
+		t.Fatalf("expected deleted first video file, got err=%v", err)
 	}
 	if _, err := os.Stat(filepath.Join(assetsDir, "aggregate-delete-primary-video", "video-b.mp4")); err != nil {
 		t.Fatalf("expected fallback video file to remain, got err=%v", err)

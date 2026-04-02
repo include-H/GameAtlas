@@ -1,11 +1,16 @@
 import { type Ref } from 'vue'
+import {
+  createEmptyEditGameForm,
+  type EditGameEditableScreenshot,
+  type EditGameEditableVideo,
+  type EditGameForm,
+} from '@/composables/edit-game-form'
 import { seriesService } from '@/services/series.service'
 import platformService from '@/services/platforms.service'
 import tagsService from '@/services/tags.service'
 import type {
   Developer,
   GameDetail,
-  GameFileEntry,
   Platform,
   Publisher,
   ScreenshotItem,
@@ -13,52 +18,11 @@ import type {
   Tag,
   TagGroup,
   VideoAssetItem,
+  GameFileEntry,
 } from '@/services/types'
 
-interface BootstrapFilePathItem {
-  id?: number
-  path: string
-  label: string
-}
-
-interface BootstrapEditableScreenshot {
-  id?: number
-  asset_uid?: string
-  path: string
-  sort_order?: number
-  client_key: string
-}
-
-interface BootstrapEditableVideo {
-  id?: number
-  asset_uid?: string
-  path: string
-  sort_order?: number
-}
-
-interface BootstrapGameForm {
-  title: string
-  title_alt: string
-  visibility: 'public' | 'private'
-  developer_ids: Array<string | number>
-  publisher_ids: Array<string | number>
-  release_date: string | undefined
-  engine: string
-  platform_ids: Array<string | number>
-  series_id: string | number | null
-  tag_ids: Array<string | number>
-  summary: string
-  cover_image: string
-  banner_image: string
-  preview_videos: BootstrapEditableVideo[]
-  primary_preview_video_uid: string
-  screenshots: BootstrapEditableScreenshot[]
-  file_paths: BootstrapFilePathItem[]
-}
-
 interface UseEditGameFormBootstrapOptions {
-  form: Ref<BootstrapGameForm>
-  releaseDate: Ref<Date | null>
+  form: Ref<EditGameForm>
   seriesOptions: Ref<Series[]>
   platformOptions: Ref<Platform[]>
   tagGroups: Ref<TagGroup[]>
@@ -66,43 +30,22 @@ interface UseEditGameFormBootstrapOptions {
   developerOptions: Ref<Developer[]>
   publisherOptions: Ref<Publisher[]>
   resetTagSelectionState: () => void
-  createEditableScreenshot: (asset: ScreenshotItem | string, index: number) => BootstrapEditableScreenshot
-  createEditableVideo: (asset: VideoAssetItem | string) => BootstrapEditableVideo
+  createEditableScreenshot: (asset: ScreenshotItem | string, index: number) => EditGameEditableScreenshot
+  createEditableVideo: (asset: VideoAssetItem | string) => EditGameEditableVideo
 }
 
 const hasResolvedFilePath = (item: GameFileEntry) => {
   return typeof item.file_path === 'string' && item.file_path.trim().length > 0
 }
 
-const createEmptyForm = (): BootstrapGameForm => ({
-  title: '',
-  title_alt: '',
-  visibility: 'public',
-  developer_ids: [],
-  publisher_ids: [],
-  release_date: undefined,
-  engine: '',
-  platform_ids: [],
-  series_id: null,
-  tag_ids: [],
-  summary: '',
-  cover_image: '',
-  banner_image: '',
-  preview_videos: [],
-  primary_preview_video_uid: '',
-  screenshots: [],
-  file_paths: [{ path: '', label: '' }],
-})
-
 export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOptions) => {
   const hydrateFormFromGame = (game: GameDetail | null) => {
     if (!game) {
-      options.form.value = createEmptyForm()
-      options.releaseDate.value = null
+      options.form.value = createEmptyEditGameForm()
       return
     }
 
-    let filePaths: BootstrapFilePathItem[] = [{ path: '', label: '' }]
+    let filePaths = createEmptyEditGameForm().file_paths
     if (game.files.length > 0) {
       filePaths = game.files
         .filter(hasResolvedFilePath)
@@ -127,28 +70,12 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
       preview_videos: game.preview_videos.map((asset) =>
         options.createEditableVideo(asset),
       ),
-      primary_preview_video_uid: game.preview_videos?.[0]?.asset_uid || '',
       screenshots: game.screenshots.map((asset, index) =>
         options.createEditableScreenshot(asset, index),
       ),
       file_paths: filePaths,
     }
     options.resetTagSelectionState()
-
-    if (game.release_date) {
-      const parts = game.release_date.split('-')
-      if (parts.length === 3) {
-        options.releaseDate.value = new Date(
-          Number.parseInt(parts[0], 10),
-          Number.parseInt(parts[1], 10) - 1,
-          Number.parseInt(parts[2], 10),
-        )
-      } else {
-        options.releaseDate.value = new Date(game.release_date)
-      }
-    } else {
-      options.releaseDate.value = null
-    }
   }
 
   const initializeOptions = async (currentGame?: GameDetail | null) => {
@@ -218,7 +145,7 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
   }
 
   return {
-    createEmptyForm,
+    createEmptyForm: createEmptyEditGameForm,
     hydrateFormFromGame,
     initializeOptions,
   }

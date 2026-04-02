@@ -20,10 +20,10 @@
       <div class="header-right">
         <a-space :size="20">
           <span v-if="isAdmin" class="welcome-text">欢迎您，{{ adminDisplayName }}</span>
-          <a-button type="text" @click="handleAuthAction">
+          <a-button class="app-text-action-btn" type="text" @click="handleAuthAction">
             {{ isAdmin ? '退出' : '登录' }}
           </a-button>
-          <a-button type="text" shape="circle" @click="scrollToTop">
+          <a-button class="app-text-action-btn" type="text" shape="circle" @click="scrollToTop">
             <template #icon>
               <icon-up />
             </template>
@@ -34,7 +34,7 @@
 
     <a-button
       v-if="isCompactNavigation"
-      :class="['mobile-menu-btn', { 'mobile-menu-btn--active': showMobileMenu }]"
+      :class="['app-text-action-btn', 'mobile-menu-btn', { 'mobile-menu-btn--active': showMobileMenu }]"
       type="text"
       shape="circle"
       @click="showMobileMenu = !showMobileMenu"

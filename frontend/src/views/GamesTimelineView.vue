@@ -61,7 +61,7 @@
           <span>正在加载更多月份...</span>
         </template>
         <template v-else>
-          <a-button type="text" size="small" @click="handleManualLoadMore">
+          <a-button class="app-text-action-btn" type="text" size="small" @click="handleManualLoadMore">
             加载更多
           </a-button>
         </template>

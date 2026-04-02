@@ -74,6 +74,11 @@ func writeServiceError(c *gin.Context, err error, validationMessage string) {
 			"success": false,
 			"error":   validationMessage,
 		})
+	case errors.Is(err, services.ErrUpstream):
+		c.JSON(http.StatusBadGateway, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
 	case errors.Is(err, services.ErrMissingConfig):
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,

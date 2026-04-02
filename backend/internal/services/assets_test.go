@@ -19,8 +19,6 @@ func TestAssetsServiceDeletePrimaryVideoFallsBackToNextVideo(t *testing.T) {
 	gameID := insertServicesTestGame(t, db, "asset-game", "Asset Game", domain.GameVisibilityPublic)
 	insertServicesGameAsset(t, db, gameID, "video-a", "video", "/assets/asset-game/video-a.mp4", 0)
 	insertServicesGameAsset(t, db, gameID, "video-b", "video", "/assets/asset-game/video-b.mp4", 1)
-	previewUID := "video-a"
-	updateServicesGamePreviewVideo(t, db, gameID, &previewUID)
 	writeServicesAssetFile(t, assetsDir, "asset-game", "video-a.mp4", []byte("a"))
 	writeServicesAssetFile(t, assetsDir, "asset-game", "video-b.mp4", []byte("b"))
 
@@ -32,11 +30,6 @@ func TestAssetsServiceDeletePrimaryVideoFallsBackToNextVideo(t *testing.T) {
 		Path:      "/assets/asset-game/video-a.mp4",
 	}); err != nil {
 		t.Fatalf("Delete returned error: %v", err)
-	}
-
-	game := mustLoadServicesGame(t, db, gameID)
-	if game.PreviewVideoAssetUID == nil || *game.PreviewVideoAssetUID != "video-b" {
-		t.Fatalf("PreviewVideoAssetUID = %v, want video-b", game.PreviewVideoAssetUID)
 	}
 
 	if _, err := repositories.NewAssetsRepository(db).GetAssetByUID(gameID, "video-a", "video"); !errors.Is(err, sql.ErrNoRows) {
@@ -57,8 +50,6 @@ func TestAssetsServiceDeleteLastPrimaryVideoClearsPreviewUID(t *testing.T) {
 	assetsDir := filepath.Join(t.TempDir(), "assets")
 	gameID := insertServicesTestGame(t, db, "solo-video", "Solo Video", domain.GameVisibilityPublic)
 	insertServicesGameAsset(t, db, gameID, "video-only", "video", "/assets/solo-video/video-only.mp4", 0)
-	previewUID := "video-only"
-	updateServicesGamePreviewVideo(t, db, gameID, &previewUID)
 	writeServicesAssetFile(t, assetsDir, "solo-video", "video-only.mp4", []byte("only"))
 
 	service := newServicesAssetsService(db, assetsDir)
@@ -71,32 +62,6 @@ func TestAssetsServiceDeleteLastPrimaryVideoClearsPreviewUID(t *testing.T) {
 		t.Fatalf("Delete returned error: %v", err)
 	}
 
-	game := mustLoadServicesGame(t, db, gameID)
-	if game.PreviewVideoAssetUID != nil {
-		t.Fatalf("PreviewVideoAssetUID = %v, want nil", game.PreviewVideoAssetUID)
-	}
-}
-
-func TestAssetsServiceSetPrimaryVideoUpdatesSelection(t *testing.T) {
-	db := openServicesTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	gameID := insertServicesTestGame(t, db, "set-primary", "Set Primary", domain.GameVisibilityPublic)
-	insertServicesGameAsset(t, db, gameID, "video-a", "video", "/assets/set-primary/video-a.mp4", 0)
-	insertServicesGameAsset(t, db, gameID, "video-b", "video", "/assets/set-primary/video-b.mp4", 1)
-
-	service := newServicesAssetsService(db, t.TempDir())
-	if err := service.SetPrimaryVideo(domain.PrimaryVideoUpdateInput{
-		GameID:   gameID,
-		AssetUID: " video-b ",
-	}); err != nil {
-		t.Fatalf("SetPrimaryVideo returned error: %v", err)
-	}
-
-	game := mustLoadServicesGame(t, db, gameID)
-	if game.PreviewVideoAssetUID == nil || *game.PreviewVideoAssetUID != "video-b" {
-		t.Fatalf("PreviewVideoAssetUID = %v, want video-b", game.PreviewVideoAssetUID)
-	}
 }
 
 func TestAssetsServiceReorderScreenshotsRejectsEmptySelection(t *testing.T) {

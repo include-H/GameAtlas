@@ -14,7 +14,7 @@
         class="hidden-file-input"
         @change="emit('video-file-change', $event)"
       />
-      <a-button type="text" long html-type="button" :loading="isUploadingVideo" @click="openVideoFilePicker">
+      <a-button class="app-text-action-btn" type="text" long html-type="button" :loading="isUploadingVideo" @click="openVideoFilePicker">
         <template #icon>
           <icon-upload />
         </template>
@@ -37,12 +37,9 @@
             v-for="(video, index) in previewVideos"
             :key="video.asset_uid || video.path"
             class="video-library-item"
-            :class="{ 'is-primary': primaryPreviewVideoUid === video.asset_uid }"
+            :class="{ 'is-primary': index === 0 }"
           >
-            <div
-              class="video-library-item__preview"
-              @click="emit('set-primary-video', video.asset_uid)"
-            >
+            <div class="video-library-item__preview">
               <div class="video-library-item__thumb">
                 <img
                   v-if="bannerImage || coverImage"
@@ -56,13 +53,14 @@
               <div class="video-library-item__info">
                 <div class="video-library-item__meta-row">
                   <span class="video-library-item__title">预告片 {{ index + 1 }}</span>
-                  <a-tag v-if="primaryPreviewVideoUid === video.asset_uid" size="small" color="arcoblue">主预告</a-tag>
+                  <a-tag v-if="index === 0" size="small" color="arcoblue">首个展示</a-tag>
                   <span class="video-library-item__path">{{ video.asset_uid || video.path }}</span>
                 </div>
               </div>
             </div>
             <div class="video-library-item__actions">
               <a-button
+                class="app-text-action-btn"
                 size="mini"
                 type="text"
                 html-type="button"
@@ -72,6 +70,7 @@
                 上移
               </a-button>
               <a-button
+                class="app-text-action-btn"
                 size="mini"
                 type="text"
                 html-type="button"
@@ -80,16 +79,7 @@
               >
                 下移
               </a-button>
-              <a-button
-                v-if="primaryPreviewVideoUid !== video.asset_uid"
-                size="mini"
-                type="text"
-                html-type="button"
-                @click="emit('set-primary-video', video.asset_uid)"
-              >
-                设为主预告
-              </a-button>
-              <a-button size="mini" type="text" status="danger" html-type="button" @click="emit('remove-video', video.asset_uid)">
+              <a-button class="app-text-action-btn" size="mini" type="text" status="danger" html-type="button" @click="emit('remove-video', video.asset_uid)">
                 删除
               </a-button>
             </div>
@@ -102,7 +92,7 @@
         class="video-library-empty"
       />
       <div class="cover-selector-actions">
-        <a-button type="text" html-type="button" @click="emit('update:visible', false)">完成</a-button>
+        <a-button class="app-text-action-btn" type="text" html-type="button" @click="emit('update:visible', false)">完成</a-button>
       </div>
     </div>
   </a-modal>
@@ -125,7 +115,6 @@ defineProps<{
   videoUploadProgress: number
   videoUploadFileName: string
   previewVideos: EditableVideo[]
-  primaryPreviewVideoUid: string
   bannerImage: string
   coverImage: string
 }>()
@@ -133,7 +122,6 @@ defineProps<{
 const emit = defineEmits<{
   'update:visible': [value: boolean]
   'video-file-change': [event: Event]
-  'set-primary-video': [assetUid?: string]
   'reorder-video': [payload: { key: string; direction: -1 | 1 }]
   'remove-video': [assetUid?: string]
 }>()

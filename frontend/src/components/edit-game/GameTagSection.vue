@@ -4,6 +4,7 @@
       <div class="summary-label">
         <span>标签</span>
         <a-button
+          class="app-text-action-btn"
           type="text"
           size="mini"
           html-type="button"

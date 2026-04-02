@@ -39,25 +39,6 @@ func (r *AssetsRepository) AddVideo(gameID int64, assetUID string, path string, 
 	return r.addAsset(gameID, assetUID, "video", path, sortOrder)
 }
 
-func (r *AssetsRepository) UpdateGamePreviewVideoAssetUID(gameID int64, assetUID *string) error {
-	result, err := r.db.Exec(`
-		UPDATE games
-		SET preview_video_asset_uid = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`, assetUID, gameID)
-	if err != nil {
-		return fmt.Errorf("update preview video asset uid: %w", err)
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("read preview video update rows: %w", err)
-	}
-	if rows == 0 {
-		return sql.ErrNoRows
-	}
-	return nil
-}
-
 func (r *AssetsRepository) DeleteAssetByPath(gameID int64, assetType string, path string) (bool, error) {
 	result, err := r.db.Exec(`
 		DELETE FROM game_assets

@@ -233,6 +233,69 @@ describe('games service', () => {
     ])
   })
 
+  it('normalizes preview video to the first sorted asset', async () => {
+    getMock.mockResolvedValue({
+      data: {
+        ...baseGame,
+        preview_video: {
+          id: 12,
+          asset_uid: 'video-primary',
+          path: '/assets/video-primary.mp4',
+          sort_order: 5,
+        },
+        preview_videos: [
+          {
+            id: 11,
+            asset_uid: 'video-first',
+            path: '/assets/video-first.mp4',
+            sort_order: 0,
+          },
+          {
+            id: 12,
+            asset_uid: 'video-primary',
+            path: '/assets/video-primary.mp4',
+            sort_order: 5,
+          },
+        ],
+        screenshots: [],
+        series: null,
+        platforms: [],
+        developers: [],
+        publishers: [],
+        tags: [],
+        tag_groups: [],
+        files: [],
+      },
+    })
+
+    const result = await gamesService.getGame('game-1')
+
+    expect(result.preview_video?.asset_uid).toBe('video-first')
+    expect(result.preview_videos.map((item) => item.asset_uid)).toEqual(['video-first', 'video-primary'])
+  })
+
+  it('keeps preview video empty when there are no videos', async () => {
+    getMock.mockResolvedValue({
+      data: {
+        ...baseGame,
+        preview_video: null,
+        preview_videos: [],
+        screenshots: [],
+        series: null,
+        platforms: [],
+        developers: [],
+        publishers: [],
+        tags: [],
+        tag_groups: [],
+        files: [],
+      },
+    })
+
+    const result = await gamesService.getGame('game-1')
+
+    expect(result.preview_video).toBeNull()
+  })
+
   it('toggles favorites in localStorage', async () => {
     expect(await gamesService.toggleFavorite('game-1')).toEqual({ isFavorite: true })
     expect(window.localStorage.getItem('game-library-favorites')).toBe(JSON.stringify(['game-1']))
@@ -274,35 +337,40 @@ describe('games service', () => {
         title: 'Game One',
         visibility: 'public',
       },
-      files: [],
-      delete_assets: [],
-      screenshot_order_asset_uids: [],
-      video_order_asset_uids: [],
+      assets: {
+        files: [],
+        delete_assets: [],
+        screenshot_order_asset_uids: [],
+        video_order_asset_uids: [],
+      },
     })
 
     expect(putMock).toHaveBeenCalledTimes(1)
     expect(putMock.mock.calls[0]?.[0]).toBe('/games/game-1/aggregate')
     expect(putMock.mock.calls[0]?.[1]).toEqual({
-      title: 'Game One',
-      title_alt: null,
-      visibility: 'public',
-      summary: null,
-      release_date: null,
-      engine: null,
-      cover_image: null,
-      banner_image: null,
-      needs_review: false,
-      preview_video_asset_uid: null,
-      files: [],
-      delete_assets: [],
-      screenshot_order_asset_uids: [],
-      video_order_asset_uids: [],
+      game: {
+        title: 'Game One',
+        title_alt: null,
+        visibility: 'public',
+        summary: null,
+        release_date: null,
+        engine: null,
+        cover_image: null,
+        banner_image: null,
+        needs_review: false,
+      },
+      assets: {
+        files: [],
+        delete_assets: [],
+        screenshot_order_asset_uids: [],
+        video_order_asset_uids: [],
+      },
     })
-    expect(putMock.mock.calls[0]?.[1]).not.toHaveProperty('series_id')
-    expect(putMock.mock.calls[0]?.[1]).not.toHaveProperty('platform_ids')
-    expect(putMock.mock.calls[0]?.[1]).not.toHaveProperty('developer_ids')
-    expect(putMock.mock.calls[0]?.[1]).not.toHaveProperty('publisher_ids')
-    expect(putMock.mock.calls[0]?.[1]).not.toHaveProperty('tag_ids')
+    expect(putMock.mock.calls[0]?.[1]?.game).not.toHaveProperty('series_id')
+    expect(putMock.mock.calls[0]?.[1]?.game).not.toHaveProperty('platform_ids')
+    expect(putMock.mock.calls[0]?.[1]?.game).not.toHaveProperty('developer_ids')
+    expect(putMock.mock.calls[0]?.[1]?.game).not.toHaveProperty('publisher_ids')
+    expect(putMock.mock.calls[0]?.[1]?.game).not.toHaveProperty('tag_ids')
   })
 
   it('preserves explicit aggregate clear semantics for relation fields', async () => {
@@ -318,16 +386,20 @@ describe('games service', () => {
         series_id: null,
         developer_ids: [],
       },
-      files: [],
-      delete_assets: [],
-      screenshot_order_asset_uids: [],
-      video_order_asset_uids: [],
+      assets: {
+        files: [],
+        delete_assets: [],
+        screenshot_order_asset_uids: [],
+        video_order_asset_uids: [],
+      },
     })
 
     expect(putMock.mock.calls[0]?.[1]).toMatchObject({
-      title: 'Game One',
-      series_id: null,
-      developer_ids: [],
+      game: {
+        title: 'Game One',
+        series_id: null,
+        developer_ids: [],
+      },
     })
   })
 })

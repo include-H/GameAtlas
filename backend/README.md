@@ -218,7 +218,6 @@ bash check.sh
 - `GET /api/games/stats`
 - `GET /api/games/:id`
 - `POST /api/games`
-- `PUT /api/games/:id`
 - `DELETE /api/games/:id`
 
 ### 游戏文件

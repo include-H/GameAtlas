@@ -4,7 +4,7 @@
       <a-form-item label="封面图">
         <div class="media-section media-section--cover">
           <div class="media-frame media-frame--cover">
-            <div v-if="coverImage" class="media-preview">
+            <template v-if="coverImage">
               <a-image
                 :src="coverImage"
                 :alt="title"
@@ -38,7 +38,7 @@
                   </a-button>
                 </div>
               </div>
-            </div>
+            </template>
             <div
               v-else
               class="media-empty-action"
@@ -57,100 +57,96 @@
 
     <a-col :xs="24" :sm="8">
       <a-form-item label="横幅图">
-        <div class="media-section">
-          <div class="media-frame media-frame--banner">
-            <div v-if="bannerImage" class="media-preview">
-              <a-image
-                :src="bannerImage"
-                :alt="title"
-                width="100%"
-                height="100%"
-                fit="cover"
-                hide-footer
-              />
-              <div class="media-overlay">
-                <div class="media-overlay-actions">
-                  <a-button
-                    class="app-text-action-btn media-action-button"
-                    type="text"
-                    shape="circle"
-                    size="small"
-                    html-type="button"
-                    @click.stop="emit('open-banner-selector')"
-                  >
-                    <icon-settings />
-                  </a-button>
-                  <a-button
-                    class="app-text-action-btn media-action-button media-action-button--danger"
-                    type="text"
-                    status="danger"
-                    shape="circle"
-                    size="small"
-                    html-type="button"
-                    @click.stop="emit('remove-banner')"
-                  >
-                    <icon-delete />
-                  </a-button>
-                </div>
+        <div class="media-frame media-frame--banner">
+          <template v-if="bannerImage">
+            <a-image
+              :src="bannerImage"
+              :alt="title"
+              width="100%"
+              height="100%"
+              fit="cover"
+              hide-footer
+            />
+            <div class="media-overlay">
+              <div class="media-overlay-actions">
+                <a-button
+                  class="app-text-action-btn media-action-button"
+                  type="text"
+                  shape="circle"
+                  size="small"
+                  html-type="button"
+                  @click.stop="emit('open-banner-selector')"
+                >
+                  <icon-settings />
+                </a-button>
+                <a-button
+                  class="app-text-action-btn media-action-button media-action-button--danger"
+                  type="text"
+                  status="danger"
+                  shape="circle"
+                  size="small"
+                  html-type="button"
+                  @click.stop="emit('remove-banner')"
+                >
+                  <icon-delete />
+                </a-button>
               </div>
             </div>
-            <div
-              v-else
-              class="media-empty-action"
-              role="button"
-              tabindex="0"
-              @click="emit('open-banner-selector')"
-            >
-              <icon-image class="media-empty-icon" />
-              <span class="media-empty-title">未设置横幅</span>
-              <span class="media-empty-subtitle">点击选择图片</span>
-            </div>
+          </template>
+          <div
+            v-else
+            class="media-empty-action"
+            role="button"
+            tabindex="0"
+            @click="emit('open-banner-selector')"
+          >
+            <icon-image class="media-empty-icon" />
+            <span class="media-empty-title">未设置横幅</span>
+            <span class="media-empty-subtitle">点击选择图片</span>
           </div>
         </div>
       </a-form-item>
 
       <a-form-item label="预告片" class="media-subitem">
-        <div class="media-section">
-          <div class="media-frame media-frame--video">
-            <div v-if="primaryPreviewVideo" class="media-preview">
-              <video
-                class="media-video"
-                controls
-                playsinline
-                preload="metadata"
-              >
-                <source
-                  v-for="src in previewVideoSources"
-                  :key="src"
-                  :src="src"
-                />
-              </video>
-              <div class="media-overlay media-overlay--top-right">
-                <div class="media-overlay-actions">
-                  <a-button
-                    class="app-text-action-btn media-action-button"
-                    type="text"
-                    shape="circle"
-                    size="small"
-                    html-type="button"
-                    @click.stop="emit('open-video-selector')"
-                  >
-                    <icon-settings />
-                  </a-button>
-                </div>
+        <div class="media-frame media-frame--video">
+          <template v-if="primaryPreviewVideo">
+            <video
+              class="media-video"
+              controls
+              playsinline
+              preload="metadata"
+            >
+              <source
+                v-for="src in previewVideoSources"
+                :key="src"
+                :src="src"
+              />
+            </video>
+            <div class="media-overlay media-overlay--top-right">
+              <div class="media-overlay-actions">
+                <a-button
+                  class="app-text-action-btn media-action-button"
+                  type="text"
+                  shape="circle"
+                  size="small"
+                  html-type="button"
+                  @click.stop="emit('open-video-selector')"
+                >
+                  <icon-settings />
+                </a-button>
               </div>
             </div>
-            <div
-              v-else
-              class="media-empty-action"
-              role="button"
-              tabindex="0"
-              @click="emit('open-video-selector')"
-            >
-              <icon-upload class="media-empty-icon" />
-              <span class="media-empty-title">未设置预告片</span>
-              <span class="media-empty-subtitle">点击上传本地视频</span>
-            </div>
+          </template>
+          <div
+            v-else
+            class="media-empty-action"
+            role="button"
+            tabindex="0"
+            @click="emit('open-video-selector')"
+          >
+            <icon-upload class="media-empty-icon" />
+            <span class="media-empty-title">未设置预告片</span>
+            <span class="media-empty-subtitle">点击上传本地视频</span>
           </div>
         </div>
       </a-form-item>
@@ -159,66 +155,67 @@
     <a-col :xs="24" :sm="8">
       <a-form-item label="截图">
         <div class="media-section media-section--screenshots">
-          <div class="media-frame media-frame--cover screenshots-frame">
-            <div v-if="screenshots.length === 0" class="media-empty-action">
-              <div
-                class="media-empty-action media-empty-action--inner"
-                role="button"
-                tabindex="0"
-                @click="emit('open-screenshot-selector')"
-              >
-                <icon-image class="media-empty-icon" />
-                <span class="media-empty-title">未设置截图</span>
-                <span class="media-empty-subtitle">点击添加截图</span>
-              </div>
+          <div
+            v-if="screenshots.length === 0"
+            class="media-frame media-frame--cover"
+          >
+            <div
+              class="media-empty-action"
+              role="button"
+              tabindex="0"
+              @click="emit('open-screenshot-selector')"
+            >
+              <icon-image class="media-empty-icon" />
+              <span class="media-empty-title">未设置截图</span>
+              <span class="media-empty-subtitle">点击添加截图</span>
             </div>
-            <a-image-preview-group v-else infinite>
-              <div class="screenshots-grid-wrapper">
-                <div class="screenshots-grid">
-                  <div
-                    v-for="screenshot in screenshots"
-                    :key="screenshot.asset_uid || screenshot.client_key"
-                    class="screenshot-thumb"
-                    :class="{
-                      'is-dragging': draggedScreenshotKey === screenshot.client_key,
-                      'is-drop-target': dragOverScreenshotKey === screenshot.client_key,
-                    }"
-                    draggable="true"
-                    @dragstart="emit('screenshot-drag-start', screenshot.client_key)"
-                    @dragenter.prevent="emit('screenshot-drag-enter', screenshot.client_key)"
-                    @dragover.prevent
-                    @drop.prevent="emit('screenshot-drop', screenshot.client_key)"
-                    @dragend="emit('screenshot-drag-end')"
-                  >
-                    <a-image
-                      :src="screenshot.path"
-                      width="100%"
-                      height="100%"
-                      fit="cover"
-                      hide-footer
-                    />
-                    <div class="screenshot-overlay">
-                      <a-button
-                        class="app-text-action-btn media-action-button media-action-button--danger"
-                        type="text"
-                        status="danger"
-                        shape="circle"
-                        size="small"
-                        html-type="button"
-                        @click.stop="emit('remove-screenshot', screenshot.client_key)"
-                      >
-                        <icon-delete />
-                      </a-button>
-                    </div>
+          </div>
+          <div v-else class="media-frame media-frame--cover screenshots-frame">
+            <a-image-preview-group infinite>
+              <div class="screenshots-grid">
+                <div
+                  v-for="screenshot in screenshots"
+                  :key="screenshot.asset_uid || screenshot.client_key"
+                  class="screenshot-thumb"
+                  :class="{
+                    'is-dragging': draggedScreenshotKey === screenshot.client_key,
+                    'is-drop-target': dragOverScreenshotKey === screenshot.client_key,
+                  }"
+                  draggable="true"
+                  @dragstart="emit('screenshot-drag-start', screenshot.client_key)"
+                  @dragenter.prevent="emit('screenshot-drag-enter', screenshot.client_key)"
+                  @dragover.prevent
+                  @drop.prevent="emit('screenshot-drop', screenshot.client_key)"
+                  @dragend="emit('screenshot-drag-end')"
+                >
+                  <a-image
+                    :src="screenshot.path"
+                    width="100%"
+                    height="100%"
+                    fit="cover"
+                    hide-footer
+                  />
+                  <div class="screenshot-overlay">
+                    <a-button
+                      class="app-text-action-btn media-action-button media-action-button--danger"
+                      type="text"
+                      status="danger"
+                      shape="circle"
+                      size="small"
+                      html-type="button"
+                      @click.stop="emit('remove-screenshot', screenshot.client_key)"
+                    >
+                      <icon-delete />
+                    </a-button>
                   </div>
-                  <div
-                    class="screenshot-add-tile"
-                    role="button"
-                    tabindex="0"
-                    @click="emit('open-screenshot-selector')"
-                  >
-                    <span class="screenshot-add-tile__label">添加截图</span>
-                  </div>
+                </div>
+                <div
+                  class="screenshot-add-tile"
+                  role="button"
+                  tabindex="0"
+                  @click="emit('open-screenshot-selector')"
+                >
+                  <span class="screenshot-add-tile__label">添加截图</span>
                 </div>
               </div>
             </a-image-preview-group>
@@ -283,7 +280,8 @@ const emit = defineEmits<{
 }
 
 .media-section--screenshots {
-  max-width: 100%;
+  max-width: 88%;
+  margin: 0 auto;
 }
 
 .media-subitem {
@@ -291,6 +289,7 @@ const emit = defineEmits<{
 }
 
 .media-frame {
+  position: relative;
   width: 100%;
   overflow: hidden;
   border-radius: 8px;
@@ -301,12 +300,6 @@ const emit = defineEmits<{
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.media-preview {
-  position: relative;
-  width: 100%;
-  height: 100%;
 }
 
 .media-empty-action {
@@ -331,11 +324,6 @@ const emit = defineEmits<{
   color: rgb(var(--primary-6));
   background: rgba(var(--primary-6), 0.06);
   border-color: rgba(var(--primary-6), 0.45);
-}
-
-.media-empty-action--inner {
-  border: none;
-  border-radius: 0;
 }
 
 .media-empty-icon {
@@ -395,7 +383,7 @@ const emit = defineEmits<{
   transform: scale(1.06);
 }
 
-.media-preview:hover .media-overlay,
+.media-frame:hover .media-overlay,
 .screenshot-thumb:hover .screenshot-overlay {
   opacity: 1;
 }
@@ -428,12 +416,9 @@ const emit = defineEmits<{
 .screenshots-frame {
   align-items: stretch;
   justify-content: stretch;
-}
-
-.screenshots-grid-wrapper {
-  width: 100%;
-  height: 100%;
   padding: 10px;
+  box-sizing: border-box;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -513,7 +498,7 @@ const emit = defineEmits<{
     margin-top: 12px;
   }
 
-  .screenshots-grid-wrapper {
+  .screenshots-frame {
     max-height: 280px;
   }
 }

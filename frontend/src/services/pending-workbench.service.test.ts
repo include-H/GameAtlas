@@ -36,6 +36,13 @@ describe('pending workbench service', () => {
         totalPages: 2,
         page: 1,
         limit: PENDING_WORKBENCH_PAGE_SIZE,
+        pending_group_counts: {
+          missing_assets: 6,
+          missing_wiki: 4,
+          missing_files: 3,
+          missing_metadata: 5,
+          ignored_total: 9,
+        },
       },
     })
     listMock.mockResolvedValue([{ game_public_id: 'game-1', ignored_details: [] }])
@@ -47,10 +54,15 @@ describe('pending workbench service', () => {
         page: 1,
         limit: PENDING_WORKBENCH_PAGE_SIZE,
         pending: true,
+        search: undefined,
+        pending_issue: undefined,
+        pending_include_ignored: undefined,
+        pending_severe: undefined,
+        pending_recent_days: undefined,
       },
       sort: {
-        field: 'updated_at',
-        order: 'asc',
+        field: 'pending_issue_count',
+        order: 'desc',
       },
     })
     expect(listMock).toHaveBeenCalledWith(['game-1', 'game-2'])
@@ -60,10 +72,57 @@ describe('pending workbench service', () => {
         { public_id: 'game-2', title: 'B' },
       ],
       overrides: [{ game_public_id: 'game-1', ignored_details: [] }],
+      issueCounts: {
+        'missing-assets': 6,
+        'missing-wiki': 4,
+        'missing-files': 3,
+        'missing-metadata': 5,
+      },
+      ignoredTotal: 9,
       total: 11,
       totalPages: 2,
       page: 1,
       limit: PENDING_WORKBENCH_PAGE_SIZE,
+    })
+  })
+
+  it('maps native pending filters and sort to the games query', async () => {
+    getGamesMock.mockResolvedValue({
+      data: [],
+      pagination: {
+        total: 0,
+        totalPages: 0,
+        page: 1,
+        limit: PENDING_WORKBENCH_PAGE_SIZE,
+        pending_group_counts: null,
+      },
+    })
+    listMock.mockResolvedValue([])
+
+    await pendingWorkbenchService.getSnapshot(1, PENDING_WORKBENCH_PAGE_SIZE, {
+      search: 'halo',
+      issue: 'missing-assets',
+      onlySevere: true,
+      onlyRecent: true,
+      showIgnored: true,
+      sortBy: 'downloads-desc',
+    })
+
+    expect(getGamesMock).toHaveBeenCalledWith({
+      query: {
+        page: 1,
+        limit: PENDING_WORKBENCH_PAGE_SIZE,
+        pending: true,
+        search: 'halo',
+        pending_issue: 'missing-assets',
+        pending_include_ignored: true,
+        pending_severe: true,
+        pending_recent_days: 7,
+      },
+      sort: {
+        field: 'downloads',
+        order: 'desc',
+      },
     })
   })
 })

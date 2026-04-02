@@ -3,22 +3,22 @@
     <div class="wiki-editor__toolbar">
       <div class="wiki-editor__toolbar-groups">
         <a-button-group class="wiki-editor__toolbar-group">
-          <a-button type="text" @click="insertMarkdown('**', '**')">
+          <a-button class="app-text-action-btn" type="text" @click="insertMarkdown('**', '**')">
             <template #icon>
               <icon-bold />
             </template>
           </a-button>
-          <a-button type="text" @click="insertMarkdown('*', '*')">
+          <a-button class="app-text-action-btn" type="text" @click="insertMarkdown('*', '*')">
             <template #icon>
               <icon-italic />
             </template>
           </a-button>
-          <a-button type="text" @click="insertMarkdown('`', '`')">
+          <a-button class="app-text-action-btn" type="text" @click="insertMarkdown('`', '`')">
             <template #icon>
               <icon-code />
             </template>
           </a-button>
-          <a-button type="text" @click="insertMarkdown('~~', '~~')">
+          <a-button class="app-text-action-btn" type="text" @click="insertMarkdown('~~', '~~')">
             <template #icon>
               <icon-highlight />
             </template>
@@ -26,18 +26,18 @@
         </a-button-group>
 
         <a-button-group class="wiki-editor__toolbar-group">
-          <a-button type="text" @click="insertLine('# ')">
+          <a-button class="app-text-action-btn" type="text" @click="insertLine('# ')">
             <template #icon>
               <icon-h1 />
             </template>
           </a-button>
-          <a-button type="text" @click="insertLine('## ')">
+          <a-button class="app-text-action-btn" type="text" @click="insertLine('## ')">
             <span class="toolbar-h2">H2</span>
           </a-button>
-          <a-button type="text" @click="insertLine('### ')">
+          <a-button class="app-text-action-btn" type="text" @click="insertLine('### ')">
             <span class="toolbar-h3">H3</span>
           </a-button>
-          <a-button type="text" @click="insertDivider">
+          <a-button class="app-text-action-btn" type="text" @click="insertDivider">
             <template #icon>
               <icon-minus />
             </template>
@@ -45,22 +45,22 @@
         </a-button-group>
 
         <a-button-group class="wiki-editor__toolbar-group">
-          <a-button type="text" @click="insertLink">
+          <a-button class="app-text-action-btn" type="text" @click="insertLink">
             <template #icon>
               <icon-link />
             </template>
           </a-button>
-          <a-button type="text" @click="insertImage">
+          <a-button class="app-text-action-btn" type="text" @click="insertImage">
             <template #icon>
               <icon-image />
             </template>
           </a-button>
-          <a-button type="text" @click="insertCodeBlock">
+          <a-button class="app-text-action-btn" type="text" @click="insertCodeBlock">
             <template #icon>
               <icon-code-block />
             </template>
           </a-button>
-          <a-button type="text" @click="insertTable">
+          <a-button class="app-text-action-btn" type="text" @click="insertTable">
             <template #icon>
               <icon-list />
             </template>
@@ -68,22 +68,22 @@
         </a-button-group>
 
         <a-button-group class="wiki-editor__toolbar-group">
-          <a-button type="text" @click="insertLine('- ')">
+          <a-button class="app-text-action-btn" type="text" @click="insertLine('- ')">
             <template #icon>
               <icon-unordered-list />
             </template>
           </a-button>
-          <a-button type="text" @click="insertLine('1. ')">
+          <a-button class="app-text-action-btn" type="text" @click="insertLine('1. ')">
             <template #icon>
               <icon-ordered-list />
             </template>
           </a-button>
-          <a-button type="text" @click="insertLine('- [ ] ')">
+          <a-button class="app-text-action-btn" type="text" @click="insertLine('- [ ] ')">
             <template #icon>
               <icon-check-square />
             </template>
           </a-button>
-          <a-button type="text" @click="insertLine('> ')">
+          <a-button class="app-text-action-btn" type="text" @click="insertLine('> ')">
             <template #icon>
               <icon-quote />
             </template>

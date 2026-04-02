@@ -5,7 +5,9 @@ import type {
   ApiPageEnvelope,
   Developer,
   GameDetail,
+  GameCoreRequest,
   GameDetailDto,
+  GameAggregateUpdateRequest,
   GameFileEntry,
   GameListItem,
   GameListItemDto,
@@ -56,29 +58,6 @@ interface TimelineGamesApiResponse {
   pagination: TimelinePaginationApi
 }
 
-interface AggregateFileInput {
-  id?: number
-  file_path: string
-  label?: string | null
-  notes?: string | null
-  sort_order: number
-}
-
-interface AggregateDeleteAssetInput {
-  asset_type: 'cover' | 'banner' | 'screenshot' | 'video'
-  path: string
-  asset_id?: number
-  asset_uid?: string
-}
-
-interface AggregateUpdateInput {
-  game: Partial<GameWriteRequest>
-  files: AggregateFileInput[]
-  delete_assets: AggregateDeleteAssetInput[]
-  screenshot_order_asset_uids: string[]
-  video_order_asset_uids: string[]
-}
-
 interface AggregateUpdateApiResponse {
   game: GameListItemDto
   warnings?: {
@@ -106,9 +85,12 @@ function sortByOrder<T extends { sort_order: number }>(items: T[]): T[] {
 
 function normalizeGameDetail(item: GameDetailDto): GameDetail {
   const favoriteIds = new Set(readFavorites())
+  const previewVideos = sortByOrder(item.preview_videos || [])
   return annotateFavorite({
     ...item,
-    preview_videos: sortByOrder(item.preview_videos || []),
+    // Preview video is derived from the first sorted video only.
+    preview_video: previewVideos[0] || null,
+    preview_videos: previewVideos,
     screenshots: sortByOrder(item.screenshots || []),
     files: sortByOrder(item.files || []),
     series: item.series || null,
@@ -147,6 +129,20 @@ function getLatestGameFileTimestamp(files: GameFileReleaseSource[]): number {
   }, Number.NEGATIVE_INFINITY)
 }
 
+function serializeGameCoreRequest(data: GameCoreRequest): GameCoreRequest {
+  return {
+    title: data.title || '',
+    title_alt: data.title_alt ?? null,
+    visibility: data.visibility ?? 'public',
+    summary: data.summary ?? null,
+    release_date: data.release_date ?? null,
+    engine: data.engine ?? null,
+    cover_image: data.cover_image ?? null,
+    banner_image: data.banner_image ?? null,
+    needs_review: data.needs_review ?? false,
+  }
+}
+
 async function listMetadata<T extends Series | Platform | Developer | Publisher>(resource: string): Promise<T[]> {
   const response = await get<ApiEnvelope<MetadataApiItem[]>>(`/${resource}`)
   return response.data.map((item) => item as T)
@@ -165,6 +161,12 @@ const gamesService = {
     if (params?.query?.platform) queryParams.append('platform', params.query.platform)
     if (typeof params?.query?.needs_review === 'boolean') queryParams.append('needs_review', String(params.query.needs_review))
     if (typeof params?.query?.pending === 'boolean') queryParams.append('pending', String(params.query.pending))
+    if (params?.query?.pending_issue) queryParams.append('pending_issue', params.query.pending_issue)
+    if (typeof params?.query?.pending_include_ignored === 'boolean') queryParams.append('pending_include_ignored', String(params.query.pending_include_ignored))
+    if (typeof params?.query?.pending_severe === 'boolean') queryParams.append('pending_severe', String(params.query.pending_severe))
+    if (typeof params?.query?.pending_recent_days === 'number' && params.query.pending_recent_days > 0) {
+      queryParams.append('pending_recent_days', String(params.query.pending_recent_days))
+    }
     if (params?.query?.tag?.length) {
       params.query.tag.forEach((tagId) => {
         queryParams.append('tag', String(tagId))
@@ -260,15 +262,17 @@ const gamesService = {
     file_path?: string
   }): Promise<GameListItem> {
     const payload: GameWriteRequest = {
-      title: data.title,
-      title_alt: null,
-      visibility: data.visibility ?? 'public',
-      summary: null,
-      release_date: null,
-      engine: null,
-      cover_image: null,
-      banner_image: null,
-      needs_review: false,
+      ...serializeGameCoreRequest({
+        title: data.title,
+        title_alt: null,
+        visibility: data.visibility ?? 'public',
+        summary: null,
+        release_date: null,
+        engine: null,
+        cover_image: null,
+        banner_image: null,
+        needs_review: false,
+      }),
       series_id: null,
       platform_ids: [],
       developer_ids: [],
@@ -279,70 +283,43 @@ const gamesService = {
     return annotateFavorite(response.data)
   },
 
-  async updateGame(id: string, data: Partial<GameWriteRequest>): Promise<GameListItem> {
-    const payload: GameWriteRequest = {
-      title: data.title || '',
-      title_alt: data.title_alt ?? null,
-      visibility: data.visibility ?? 'public',
-      summary: data.summary ?? null,
-      release_date: data.release_date ?? null,
-      engine: data.engine ?? null,
-      cover_image: data.cover_image ?? null,
-      banner_image: data.banner_image ?? null,
-      needs_review: data.needs_review ?? false,
-      preview_video_asset_uid: data.preview_video_asset_uid ?? null,
-      series_id: data.series_id ?? null,
-      platform_ids: data.platform_ids || [],
-      developer_ids: data.developer_ids || [],
-      publisher_ids: data.publisher_ids || [],
-      tag_ids: data.tag_ids || [],
-    }
-    const response = await put<ApiEnvelope<GameListItemDto>>(`/games/${id}`, payload)
-    return annotateFavorite(response.data)
-  },
-
-  async updateGameAggregate(id: string, data: AggregateUpdateInput): Promise<{ game: GameListItem; warnings: string[] }> {
+  async updateGameAggregate(id: string, data: GameAggregateUpdateRequest): Promise<{ game: GameListItem; warnings: string[] }> {
     const payload: Record<string, unknown> = {
-      title: data.game.title || '',
-      title_alt: data.game.title_alt ?? null,
-      visibility: data.game.visibility ?? 'public',
-      summary: data.game.summary ?? null,
-      release_date: data.game.release_date ?? null,
-      engine: data.game.engine ?? null,
-      cover_image: data.game.cover_image ?? null,
-      banner_image: data.game.banner_image ?? null,
-      needs_review: data.game.needs_review ?? false,
-      preview_video_asset_uid: data.game.preview_video_asset_uid ?? null,
-      files: data.files.map((item) => ({
-        id: item.id,
-        file_path: item.file_path,
-        label: item.label ?? null,
-        notes: item.notes ?? null,
-        sort_order: item.sort_order,
-      })),
-      delete_assets: data.delete_assets.map((item) => ({
-        asset_type: item.asset_type,
-        path: item.path,
-        asset_id: item.asset_id,
-        asset_uid: item.asset_uid,
-      })),
-      screenshot_order_asset_uids: data.screenshot_order_asset_uids,
-      video_order_asset_uids: data.video_order_asset_uids,
+      game: {
+        ...serializeGameCoreRequest(data.game),
+      },
+      assets: {
+        files: data.assets.files.map((item) => ({
+          id: item.id,
+          file_path: item.file_path,
+          label: item.label ?? null,
+          notes: item.notes ?? null,
+          sort_order: item.sort_order,
+        })),
+        delete_assets: data.assets.delete_assets.map((item) => ({
+          asset_type: item.asset_type,
+          path: item.path,
+          asset_id: item.asset_id,
+          asset_uid: item.asset_uid,
+        })),
+        screenshot_order_asset_uids: data.assets.screenshot_order_asset_uids,
+        video_order_asset_uids: data.assets.video_order_asset_uids,
+      },
     }
     if (Object.prototype.hasOwnProperty.call(data.game, 'series_id')) {
-      payload.series_id = data.game.series_id ?? null
+      ;(payload.game as Record<string, unknown>).series_id = data.game.series_id ?? null
     }
     if (Object.prototype.hasOwnProperty.call(data.game, 'platform_ids')) {
-      payload.platform_ids = data.game.platform_ids ?? []
+      ;(payload.game as Record<string, unknown>).platform_ids = data.game.platform_ids ?? []
     }
     if (Object.prototype.hasOwnProperty.call(data.game, 'developer_ids')) {
-      payload.developer_ids = data.game.developer_ids ?? []
+      ;(payload.game as Record<string, unknown>).developer_ids = data.game.developer_ids ?? []
     }
     if (Object.prototype.hasOwnProperty.call(data.game, 'publisher_ids')) {
-      payload.publisher_ids = data.game.publisher_ids ?? []
+      ;(payload.game as Record<string, unknown>).publisher_ids = data.game.publisher_ids ?? []
     }
     if (Object.prototype.hasOwnProperty.call(data.game, 'tag_ids')) {
-      payload.tag_ids = data.game.tag_ids ?? []
+      ;(payload.game as Record<string, unknown>).tag_ids = data.game.tag_ids ?? []
     }
 
     const response = await put<ApiEnvelope<AggregateUpdateApiResponse>>(`/games/${id}/aggregate`, payload)

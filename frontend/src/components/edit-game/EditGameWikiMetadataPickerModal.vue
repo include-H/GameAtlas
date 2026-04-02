@@ -29,7 +29,7 @@
       </div>
 
       <div class="cover-selector-actions">
-        <a-button type="text" html-type="button" @click="emit('update:visible', false)">取消</a-button>
+        <a-button class="app-text-action-btn" type="text" html-type="button" @click="emit('update:visible', false)">取消</a-button>
         <a-button
           type="primary"
           html-type="button"

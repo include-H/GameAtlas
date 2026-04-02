@@ -90,6 +90,7 @@ func TestWriteServiceError(t *testing.T) {
 		{name: "forbidden path", err: services.ErrForbiddenPath, status: http.StatusForbidden, msg: "file path is outside PRIMARY_ROM_ROOT"},
 		{name: "missing file", err: services.ErrMissingFile, status: http.StatusBadRequest, msg: "registered file is unavailable"},
 		{name: "validation", err: services.ErrValidation, status: http.StatusBadRequest, msg: "bad payload"},
+		{name: "upstream", err: services.ErrUpstream, status: http.StatusBadGateway, msg: services.ErrUpstream.Error()},
 		{name: "missing config", err: services.ErrMissingConfig, status: http.StatusBadRequest, msg: services.ErrMissingConfig.Error()},
 		{name: "internal", err: errors.New("boom"), status: http.StatusInternalServerError, msg: "internal server error"},
 	}

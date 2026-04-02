@@ -9,8 +9,10 @@
     "preview": "vite preview --host",
     "test": "vitest",
     "test:run": "vitest run",
-    "lint": "eslint \"src/**/*.{ts,vue}\"",
-    "lint:unused": "eslint \"src/**/*.{ts,vue}\" --max-warnings=0",
+    "lint": "npm run lint:eslint && npm run lint:policy",
+    "lint:eslint": "eslint \"src/**/*.{ts,vue}\"",
+    "lint:policy": "node ./scripts/check-text-action-buttons.mjs",
+    "lint:unused": "npm run lint:eslint -- --max-warnings=0 && npm run lint:policy",
     "knip": "knip"
   },
   "dependencies": {

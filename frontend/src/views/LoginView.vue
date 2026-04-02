@@ -27,7 +27,7 @@
     <section class="login-panel">
       <div class="login-card">
         <a-button
-          class="login-stage__close"
+          class="app-text-action-btn login-stage__close"
           type="text"
           shape="circle"
           aria-label="关闭登录页"
@@ -57,7 +57,7 @@
                 @blur="handlePasswordBlur"
               />
               <a-button
-                class="login-field__toggle"
+                class="app-text-action-btn login-field__toggle"
                 type="text"
                 shape="circle"
                 :aria-label="showPassword ? '隐藏密码' : '显示密码'"
