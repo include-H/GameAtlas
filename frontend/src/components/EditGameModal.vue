@@ -174,7 +174,7 @@
 
       <game-tag-section
         :tag-groups="tagGroups"
-        :tag-selections-by-group="tagSelectionsByGroup"
+        :tag-field-values-by-group="tagFieldValuesByGroup"
         :pending-tag-options-by-group="pendingTagOptionsByGroup"
         :tag-options-by-group="tagOptionsByGroup"
         :wiki-content-exists="!!props.game?.wiki_content"
@@ -541,7 +541,7 @@ const {
   steamSummarySearchResults,
   tagGroups,
   tagOptionsByGroup,
-  tagSelectionsByGroup,
+  tagFieldValuesByGroup,
   toggleSteamScreenshot,
   uploadAction,
   uploadData,

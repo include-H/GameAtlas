@@ -2,6 +2,12 @@ import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useWikiEditDocument } from './useWikiEditDocument'
 
+type WikiEditTestGame = {
+  id: number
+  public_id: string
+  title: string
+}
+
 const {
   getWikiPageMock,
   updateWikiPageMock,
@@ -24,7 +30,7 @@ describe('useWikiEditDocument', () => {
   })
 
   it('loads existing wiki content into editor state', async () => {
-    const currentGame = ref(null)
+    const currentGame = ref<WikiEditTestGame | null>(null)
     const fetchGame = vi.fn().mockImplementation(async (gameId: string) => {
       currentGame.value = {
         id: 1,
@@ -68,7 +74,7 @@ describe('useWikiEditDocument', () => {
   it('saves wiki content and trims empty summaries', async () => {
     const addAlert = vi.fn()
     const onSaveSuccess = vi.fn()
-    const currentGame = ref({
+    const currentGame = ref<WikiEditTestGame | null>({
       id: 1,
       public_id: 'game-1',
       title: 'Game One',

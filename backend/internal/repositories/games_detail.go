@@ -29,6 +29,7 @@ func (r *GamesRepository) GetByID(id int64) (*domain.Game, error) {
 			0 AS developer_count,
 			0 AS publisher_count,
 			0 AS platform_count,
+			CASE WHEN EXISTS (SELECT 1 FROM favorite_games fg WHERE fg.game_id = games.id) THEN 1 ELSE 0 END AS is_favorite,
 			created_at,
 			updated_at
 		FROM games
@@ -63,6 +64,7 @@ func (r *GamesRepository) GetByPublicID(publicID string) (*domain.Game, error) {
 			0 AS developer_count,
 			0 AS publisher_count,
 			0 AS platform_count,
+			CASE WHEN EXISTS (SELECT 1 FROM favorite_games fg WHERE fg.game_id = games.id) THEN 1 ELSE 0 END AS is_favorite,
 			created_at,
 			updated_at
 		FROM games

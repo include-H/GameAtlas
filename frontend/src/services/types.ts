@@ -171,6 +171,7 @@ export interface GameListItemDto {
   developer_count: number
   publisher_count: number
   platform_count: number
+  is_favorite?: boolean
   pending_issues?: PendingIssueEvaluation | null
   downloads: number
   created_at: string
@@ -197,6 +198,7 @@ export interface TimelineGameResponse {
   release_date: string | null
   cover_image: string | null
   banner_image: string | null
+  is_favorite?: boolean
 }
 
 export interface GameCoreRequest {
@@ -231,7 +233,6 @@ export interface GameAggregateFileRequest {
   file_path: string
   label?: string | null
   notes?: string | null
-  sort_order: number
 }
 
 export interface GameAggregateDeleteAssetRequest {
@@ -267,7 +268,7 @@ export interface GameListQuery {
 }
 
 export interface Favoritable {
-  isFavorite?: boolean
+  isFavorite: boolean
 }
 
 export type GameListItemView = GameListItemDto & Favoritable

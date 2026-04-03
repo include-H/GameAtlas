@@ -74,6 +74,17 @@ export const useGamesStore = defineStore('games', () => {
     }
   }
 
+  const getFavoriteState = (gameId: string) => {
+    const sourceGame =
+      games.value.find(game => game.public_id === gameId)
+      || (currentGame.value && currentGame.value.public_id === gameId ? currentGame.value : null)
+      || stats.value?.recent_games.find(game => game.public_id === gameId)
+      || stats.value?.popular_games.find(game => game.public_id === gameId)
+      || null
+
+    return Boolean(sourceGame?.isFavorite)
+  }
+
   // Actions
   const fetchGames = async (
     params: {
@@ -150,7 +161,7 @@ export const useGamesStore = defineStore('games', () => {
 
   const toggleFavorite = async (gameId: string) => {
     try {
-      const result = await gamesService.toggleFavorite(gameId)
+      const result = await gamesService.setFavorite(gameId, !getFavoriteState(gameId))
       applyFavoriteState(gameId, result.isFavorite)
 
       return result.isFavorite

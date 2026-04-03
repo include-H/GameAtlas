@@ -18,17 +18,97 @@ var errInvalidAggregatePatch = errors.New("invalid aggregate patch")
 // Aggregate updates have two explicit responsibilities only:
 // game patch fields and asset operations.
 type gameAggregateUpdateRequest struct {
-	Game   gameAggregatePatchRequest       `json:"game"`
-	Assets domain.GameAggregateAssetsInput `json:"assets"`
+	Game   gameAggregatePatchRequest  `json:"game"`
+	Assets gameAggregateAssetsRequest `json:"assets"`
+}
+
+type gameCreateRequest struct {
+	Title        string  `json:"title"`
+	TitleAlt     *string `json:"title_alt"`
+	Visibility   string  `json:"visibility"`
+	Summary      *string `json:"summary"`
+	ReleaseDate  *string `json:"release_date"`
+	Engine       *string `json:"engine"`
+	CoverImage   *string `json:"cover_image"`
+	BannerImage  *string `json:"banner_image"`
+	SeriesID     *int64  `json:"series_id"`
+	PlatformIDs  []int64 `json:"platform_ids"`
+	DeveloperIDs []int64 `json:"developer_ids"`
+	PublisherIDs []int64 `json:"publisher_ids"`
+	TagIDs       []int64 `json:"tag_ids"`
+}
+
+type gameFileWriteRequest struct {
+	FilePath  string  `json:"file_path"`
+	Label     *string `json:"label"`
+	Notes     *string `json:"notes"`
+	SortOrder int     `json:"sort_order"`
 }
 
 type gameAggregatePatchRequest struct {
-	domain.GameCoreInput
+	Title        string          `json:"title"`
+	TitleAlt     *string         `json:"title_alt"`
+	Visibility   string          `json:"visibility"`
+	Summary      *string         `json:"summary"`
+	ReleaseDate  *string         `json:"release_date"`
+	Engine       *string         `json:"engine"`
+	CoverImage   *string         `json:"cover_image"`
+	BannerImage  *string         `json:"banner_image"`
 	SeriesID     json.RawMessage `json:"series_id"`
 	PlatformIDs  json.RawMessage `json:"platform_ids"`
 	DeveloperIDs json.RawMessage `json:"developer_ids"`
 	PublisherIDs json.RawMessage `json:"publisher_ids"`
 	TagIDs       json.RawMessage `json:"tag_ids"`
+}
+
+type gameAggregateAssetsRequest struct {
+	Files                    []gameAggregateFileRequest        `json:"files"`
+	DeleteAssets             []gameAggregateDeleteAssetRequest `json:"delete_assets"`
+	ScreenshotOrderAssetUIDs []string                          `json:"screenshot_order_asset_uids"`
+	VideoOrderAssetUIDs      []string                          `json:"video_order_asset_uids"`
+}
+
+type gameAggregateFileRequest struct {
+	ID       *int64  `json:"id"`
+	FilePath string  `json:"file_path"`
+	Label    *string `json:"label"`
+	Notes    *string `json:"notes"`
+}
+
+type gameAggregateDeleteAssetRequest struct {
+	AssetType string `json:"asset_type"`
+	Path      string `json:"path"`
+	AssetID   *int64 `json:"asset_id"`
+	AssetUID  string `json:"asset_uid"`
+}
+
+func (request gameCreateRequest) toInput() domain.GameWriteInput {
+	return domain.GameWriteInput{
+		GameCoreInput: domain.GameCoreInput{
+			Title:       request.Title,
+			TitleAlt:    request.TitleAlt,
+			Visibility:  request.Visibility,
+			Summary:     request.Summary,
+			ReleaseDate: request.ReleaseDate,
+			Engine:      request.Engine,
+			CoverImage:  request.CoverImage,
+			BannerImage: request.BannerImage,
+		},
+		SeriesID:     request.SeriesID,
+		PlatformIDs:  request.PlatformIDs,
+		DeveloperIDs: request.DeveloperIDs,
+		PublisherIDs: request.PublisherIDs,
+		TagIDs:       request.TagIDs,
+	}
+}
+
+func (request gameFileWriteRequest) toInput() domain.GameFileWriteInput {
+	return domain.GameFileWriteInput{
+		FilePath:  request.FilePath,
+		Label:     request.Label,
+		Notes:     request.Notes,
+		SortOrder: request.SortOrder,
+	}
 }
 
 func (request gameAggregateUpdateRequest) toInput() (domain.GameAggregateUpdateInput, error) {
@@ -55,15 +135,57 @@ func (request gameAggregateUpdateRequest) toInput() (domain.GameAggregateUpdateI
 
 	return domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
-			GameCoreInput: request.Game.GameCoreInput,
+			GameCoreInput: request.Game.toDomain(),
 			SeriesID:      seriesIDPatch,
 			PlatformIDs:   platformIDsPatch,
 			DeveloperIDs:  developerIDsPatch,
 			PublisherIDs:  publisherIDsPatch,
 			TagIDs:        tagIDsPatch,
 		},
-		Assets: request.Assets,
+		Assets: request.Assets.toDomain(),
 	}, nil
+}
+
+func (request gameAggregatePatchRequest) toDomain() domain.GameCoreInput {
+	return domain.GameCoreInput{
+		Title:       request.Title,
+		TitleAlt:    request.TitleAlt,
+		Visibility:  request.Visibility,
+		Summary:     request.Summary,
+		ReleaseDate: request.ReleaseDate,
+		Engine:      request.Engine,
+		CoverImage:  request.CoverImage,
+		BannerImage: request.BannerImage,
+	}
+}
+
+func (request gameAggregateAssetsRequest) toDomain() domain.GameAggregateAssetsInput {
+	files := make([]domain.GameFileUpsertInput, 0, len(request.Files))
+	for _, item := range request.Files {
+		files = append(files, domain.GameFileUpsertInput{
+			ID:       item.ID,
+			FilePath: item.FilePath,
+			Label:    item.Label,
+			Notes:    item.Notes,
+		})
+	}
+
+	deleteAssets := make([]domain.GameAssetDeleteInput, 0, len(request.DeleteAssets))
+	for _, item := range request.DeleteAssets {
+		deleteAssets = append(deleteAssets, domain.GameAssetDeleteInput{
+			AssetType: item.AssetType,
+			Path:      item.Path,
+			AssetID:   item.AssetID,
+			AssetUID:  item.AssetUID,
+		})
+	}
+
+	return domain.GameAggregateAssetsInput{
+		Files:                    files,
+		DeleteAssets:             deleteAssets,
+		ScreenshotOrderAssetUIDs: request.ScreenshotOrderAssetUIDs,
+		VideoOrderAssetUIDs:      request.VideoOrderAssetUIDs,
+	}
 }
 
 func decodeOptionalInt64Patch(raw json.RawMessage) (domain.OptionalInt64Patch, error) {
@@ -125,6 +247,11 @@ func decodeGamesListParams(c *gin.Context) domain.GamesListParams {
 	if raw := c.Query("pending_severe"); raw != "" {
 		if value, err := strconv.ParseBool(raw); err == nil {
 			params.PendingSevereOnly = value
+		}
+	}
+	if raw := c.Query("favorite"); raw != "" {
+		if value, err := strconv.ParseBool(raw); err == nil {
+			params.FavoriteOnly = value
 		}
 	}
 

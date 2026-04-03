@@ -27,7 +27,7 @@
         </div>
         <a-select
           class="tag-group-select"
-          :model-value="tagSelectionsByGroup[group.id]"
+          :model-value="tagFieldValuesByGroup[group.id]"
           :multiple="group.allow_multiple"
           allow-clear
           allow-search
@@ -81,7 +81,7 @@ interface PendingTagOption {
 
 defineProps<{
   tagGroups: TagGroup[]
-  tagSelectionsByGroup: Record<number, GameTagSelectionValue>
+  tagFieldValuesByGroup: Record<number, GameTagSelectionValue>
   pendingTagOptionsByGroup: Record<number, PendingTagOption[]>
   tagOptionsByGroup: Record<number, Tag[]>
   wikiContentExists: boolean

@@ -65,6 +65,7 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.GameList
 %s
 		FROM page_games pg
 		INNER JOIN games g ON g.id = pg.id
+		LEFT JOIN favorite_games fg ON fg.game_id = g.id
 		LEFT JOIN screenshot_stats ss ON ss.game_id = g.id
 		LEFT JOIN file_stats fs ON fs.game_id = g.id
 		LEFT JOIN developer_stats ds ON ds.game_id = g.id
@@ -186,6 +187,7 @@ func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStat
 %s
 			FROM stat_games sg
 			INNER JOIN games g ON g.id = sg.id
+			LEFT JOIN favorite_games fg ON fg.game_id = g.id
 			LEFT JOIN screenshot_stats ss ON ss.game_id = g.id
 			LEFT JOIN file_stats fs ON fs.game_id = g.id
 			LEFT JOIN developer_stats ds ON ds.game_id = g.id
@@ -214,12 +216,17 @@ func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStat
 	if err != nil {
 		return nil, err
 	}
+	favoriteCount, err := NewFavoriteGamesRepository(r.db).Count()
+	if err != nil {
+		return nil, err
+	}
 
 	return &domain.GameStats{
 		TotalGames:     summary.TotalGames,
 		TotalDownloads: summary.TotalDownloads,
 		RecentGames:    recentGames,
 		PopularGames:   popularGames,
+		FavoriteCount:  favoriteCount,
 		PendingReviews: summary.PendingReviews,
 	}, nil
 }

@@ -18,6 +18,7 @@ type GamesHandler struct {
 	timeline  *services.GameTimelineService
 	detail    *services.GameDetailService
 	aggregate *services.GameAggregateService
+	favorites *services.GameFavoriteService
 }
 
 // NewSplitGamesHandler keeps HTTP routing aligned with the split application services.
@@ -28,12 +29,14 @@ func NewSplitGamesHandler(
 	timeline *services.GameTimelineService,
 	detail *services.GameDetailService,
 	aggregate *services.GameAggregateService,
+	favorites *services.GameFavoriteService,
 ) *GamesHandler {
 	return &GamesHandler{
 		catalog:   catalog,
 		timeline:  timeline,
 		detail:    detail,
 		aggregate: aggregate,
+		favorites: favorites,
 	}
 }
 
@@ -156,6 +159,7 @@ func (h *GamesHandler) Stats(c *gin.Context) {
 			"total_downloads": stats.TotalDownloads,
 			"recent_games":    toGameListItemResponses(stats.RecentGames),
 			"popular_games":   toGameListItemResponses(stats.PopularGames),
+			"favorite_count":  stats.FavoriteCount,
 			"pending_reviews": stats.PendingReviews,
 		},
 	})
@@ -184,8 +188,8 @@ func (h *GamesHandler) Create(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
 	}
-	var input domain.GameWriteInput
-	if err := c.ShouldBindJSON(&input); err != nil {
+	var request gameCreateRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "invalid game payload",
@@ -193,6 +197,7 @@ func (h *GamesHandler) Create(c *gin.Context) {
 		return
 	}
 
+	input := request.toInput()
 	game, err := h.aggregate.Create(input)
 	if err != nil {
 		writeServiceError(c, err, "title is required")
@@ -276,4 +281,44 @@ func (h *GamesHandler) Delete(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": data})
+}
+
+func (h *GamesHandler) Favorite(c *gin.Context) {
+	id, ok := parseGamePublicIDParam(c, "publicId", h.favorites.ResolveGameID)
+	if !ok {
+		return
+	}
+
+	isFavorite, err := h.favorites.Set(id, true)
+	if err != nil {
+		writeServiceError(c, err, "invalid game payload")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"is_favorite": isFavorite,
+		},
+	})
+}
+
+func (h *GamesHandler) Unfavorite(c *gin.Context) {
+	id, ok := parseGamePublicIDParam(c, "publicId", h.favorites.ResolveGameID)
+	if !ok {
+		return
+	}
+
+	isFavorite, err := h.favorites.Set(id, false)
+	if err != nil {
+		writeServiceError(c, err, "invalid game payload")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"is_favorite": isFavorite,
+		},
+	})
 }

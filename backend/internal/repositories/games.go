@@ -77,6 +77,7 @@ func gamesListItemSelectColumns() string {
 			COALESCE(ds.developer_count, 0) AS developer_count,
 			COALESCE(ps.publisher_count, 0) AS publisher_count,
 			COALESCE(pls.platform_count, 0) AS platform_count,
+			CASE WHEN fg.game_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
 			g.created_at,
 			g.updated_at`
 }
@@ -188,6 +189,9 @@ func (r *GamesRepository) buildGamesListWhere(params domain.GamesListParams, exc
 		for key, value := range tagArgs {
 			args[key] = value
 		}
+	}
+	if params.FavoriteOnly {
+		where = append(where, "EXISTS (SELECT 1 FROM favorite_games fg WHERE fg.game_id = g.id)")
 	}
 
 	return where, args, nil

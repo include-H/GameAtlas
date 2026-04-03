@@ -23,6 +23,7 @@ type gameListItemResponse struct {
 	DeveloperCount    int64                          `json:"developer_count"`
 	PublisherCount    int64                          `json:"publisher_count"`
 	PlatformCount     int64                          `json:"platform_count"`
+	IsFavorite        bool                           `json:"is_favorite"`
 	PendingIssues     *domain.PendingIssueEvaluation `json:"pending_issues,omitempty"`
 	CreatedAt         string                         `json:"created_at"`
 	UpdatedAt         string                         `json:"updated_at"`
@@ -89,6 +90,7 @@ type gameDetailResponse struct {
 	Tags          []tagResponse                  `json:"tags"`
 	TagGroups     []gameTagGroupResponse         `json:"tag_groups"`
 	Files         []gameFileResponse             `json:"files"`
+	IsFavorite    bool                           `json:"is_favorite"`
 	PendingIssues *domain.PendingIssueEvaluation `json:"pending_issues,omitempty"`
 	CreatedAt     string                         `json:"created_at"`
 	UpdatedAt     string                         `json:"updated_at"`

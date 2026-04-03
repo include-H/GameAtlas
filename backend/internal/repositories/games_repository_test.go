@@ -184,6 +184,9 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	insertRepositoryAsset(t, db, privateGameID, "screen-private", "screenshot", "/assets/stats-private/only.png", 0)
 	insertRepositoryGameFile(t, db, secondGameID, "/roms/stats-b.rom")
 	insertRepositoryGameFile(t, db, privateGameID, "/roms/stats-private.rom")
+	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, secondGameID); err != nil {
+		t.Fatalf("insert favorite game: %v", err)
+	}
 
 	platformID := insertRepositoryPlatform(t, db, "Stats Platform", "stats-platform")
 	developerID := insertRepositoryDeveloper(t, db, "Stats Developer", "stats-developer")
@@ -209,6 +212,9 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	if stats.PendingReviews != 1 {
 		t.Fatalf("PendingReviews = %d, want 1 native pending public game", stats.PendingReviews)
 	}
+	if stats.FavoriteCount != 1 {
+		t.Fatalf("FavoriteCount = %d, want 1", stats.FavoriteCount)
+	}
 
 	if len(stats.RecentGames) != 2 || stats.RecentGames[0].ID != secondGameID {
 		t.Fatalf("RecentGames = %+v, want second game first", stats.RecentGames)
@@ -224,6 +230,77 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	}
 	if stats.PopularGames[0].FileCount != 1 {
 		t.Fatalf("popular[0].FileCount = %d, want 1", stats.PopularGames[0].FileCount)
+	}
+	if !stats.PopularGames[0].IsFavorite {
+		t.Fatalf("popular[0].IsFavorite = false, want true")
+	}
+}
+
+func TestGamesRepositoryListFiltersFavoritesAndExposesFavoriteState(t *testing.T) {
+	db := openRepositoryTagsTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	repo := NewGamesRepository(db)
+	favoriteID := insertRepositoryGame(t, db, "favorite-a", "Favorite A", "public")
+	otherID := insertRepositoryGame(t, db, "favorite-b", "Favorite B", "public")
+	privateFavoriteID := insertRepositoryGame(t, db, "favorite-private", "Favorite Private", "private")
+
+	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, favoriteID); err != nil {
+		t.Fatalf("insert public favorite: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, privateFavoriteID); err != nil {
+		t.Fatalf("insert private favorite: %v", err)
+	}
+
+	games, total, err := repo.List(domain.GamesListParams{
+		Page:         1,
+		Limit:        10,
+		FavoriteOnly: true,
+		Sort:         "updated_at",
+		Order:        "desc",
+	})
+	if err != nil {
+		t.Fatalf("List favorite-only returned error: %v", err)
+	}
+
+	if total != 1 {
+		t.Fatalf("total = %d, want 1", total)
+	}
+	if len(games) != 1 || games[0].ID != favoriteID {
+		t.Fatalf("games = %+v, want only public favorite game", games)
+	}
+	if !games[0].IsFavorite {
+		t.Fatalf("games[0].IsFavorite = false, want true")
+	}
+
+	allGames, allTotal, err := repo.List(domain.GamesListParams{
+		Page:         1,
+		Limit:        10,
+		IncludeAll:   true,
+		FavoriteOnly: true,
+		Sort:         "updated_at",
+		Order:        "desc",
+	})
+	if err != nil {
+		t.Fatalf("List favorite-only includeAll returned error: %v", err)
+	}
+
+	if allTotal != 2 {
+		t.Fatalf("includeAll total = %d, want 2", allTotal)
+	}
+	if len(allGames) != 2 {
+		t.Fatalf("len(includeAll games) = %d, want 2", len(allGames))
+	}
+	if allGames[0].ID != privateFavoriteID && allGames[1].ID != privateFavoriteID {
+		t.Fatalf("includeAll games = %+v, want private favorite included", allGames)
+	}
+	for _, game := range allGames {
+		if !game.IsFavorite {
+			t.Fatalf("includeAll game %+v has IsFavorite=false, want true", game)
+		}
+		if game.ID == otherID {
+			t.Fatalf("unexpected non-favorite game in results: %+v", game)
+		}
 	}
 }
 

@@ -143,8 +143,14 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
         tagsService.getTagGroups(),
         tagsService.getTags({ active: true }),
       ])
-      options.tagGroups.value = loadedGroups.sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)
-      options.tagOptions.value = loadedTags
+      options.tagGroups.value = loadedGroups
+      const currentGameTags = currentGame?.tags || []
+      options.tagOptions.value = [...loadedTags]
+      for (const tag of currentGameTags) {
+        if (!options.tagOptions.value.find((item) => item.id === tag.id)) {
+          options.tagOptions.value.push(tag)
+        }
+      }
     } catch (error) {
       handleInitializeOptionsError('标签', error)
     }

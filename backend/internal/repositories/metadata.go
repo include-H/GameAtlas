@@ -123,6 +123,7 @@ func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([
 				ORDER BY ga.sort_order ASC, ga.id ASC
 				LIMIT 1
 			) AS primary_screenshot,
+			CASE WHEN EXISTS (SELECT 1 FROM favorite_games fg WHERE fg.game_id = g.id) THEN 1 ELSE 0 END AS is_favorite,
 			g.created_at,
 			g.updated_at
 		FROM games g
@@ -172,6 +173,7 @@ func (r *MetadataRepository) ListSeriesGamesBySeriesIDs(seriesIDs []int64, inclu
 				ORDER BY ga.sort_order ASC, ga.id ASC
 				LIMIT 1
 			) AS primary_screenshot,
+			CASE WHEN EXISTS (SELECT 1 FROM favorite_games fg WHERE fg.game_id = g.id) THEN 1 ELSE 0 END AS is_favorite,
 			g.created_at,
 			g.updated_at
 		FROM games g

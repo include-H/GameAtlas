@@ -1,6 +1,5 @@
 import { get, post } from './api'
 import type { ApiEnvelope, GameListItem, GameListItemDto, Series, SeriesDetail } from './types'
-import { applyFavorite, readFavorites } from './game-list-helpers'
 
 async function listSeriesWithParams(params?: {
   search?: string
@@ -26,10 +25,12 @@ export const seriesService = {
 
   async getSeriesDetail(id: number | string): Promise<SeriesDetail> {
     const response = await get<ApiEnvelope<{ series: Series; games: GameListItemDto[] }>>(`/series/${id}`)
-    const favoriteIds = new Set(readFavorites())
     return {
       series: response.data.series,
-      games: response.data.games.map((item): GameListItem => applyFavorite(item, favoriteIds)),
+      games: response.data.games.map((item): GameListItem => ({
+        ...item,
+        isFavorite: Boolean(item.is_favorite),
+      })),
     }
   },
 

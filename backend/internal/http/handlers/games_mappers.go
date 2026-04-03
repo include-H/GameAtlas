@@ -31,6 +31,7 @@ func toGameListItemResponse(game domain.GameListItem) gameListItemResponse {
 		DeveloperCount:    game.DeveloperCount,
 		PublisherCount:    game.PublisherCount,
 		PlatformCount:     game.PlatformCount,
+		IsFavorite:        game.IsFavorite,
 		PendingIssues:     game.PendingIssues,
 		CreatedAt:         game.CreatedAt,
 		UpdatedAt:         game.UpdatedAt,
@@ -70,6 +71,7 @@ func toGameSummaryResponse(game domain.Game) gameListItemResponse {
 		BannerImage: game.BannerImage,
 		WikiContent: game.WikiContent,
 		Downloads:   game.Downloads,
+		IsFavorite:  game.IsFavorite,
 		CreatedAt:   game.CreatedAt,
 		UpdatedAt:   game.UpdatedAt,
 	}
@@ -92,6 +94,7 @@ func toSeriesGameSummaryResponses(games []domain.SeriesGameSummary) []gameListIt
 			WikiContent:       game.WikiContent,
 			Downloads:         game.Downloads,
 			PrimaryScreenshot: game.PrimaryScreenshot,
+			IsFavorite:        game.IsFavorite,
 			CreatedAt:         game.CreatedAt,
 			UpdatedAt:         game.UpdatedAt,
 		})
@@ -188,6 +191,7 @@ func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDe
 		Tags:          toTagResponses(detail.Tags),
 		TagGroups:     toGameTagGroupResponses(detail.TagGroups),
 		Files:         toGameFileResponses(detail.Files, includePaths),
+		IsFavorite:    detail.Game.IsFavorite,
 		PendingIssues: detail.PendingIssues,
 		CreatedAt:     detail.Game.CreatedAt,
 		UpdatedAt:     detail.Game.UpdatedAt,

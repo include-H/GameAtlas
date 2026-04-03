@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import type { GameDetail, GameListItem, GameStats } from '@/services/types'
 
-const { toggleFavoriteMock } = vi.hoisted(() => ({
-  toggleFavoriteMock: vi.fn(),
+const { setFavoriteMock } = vi.hoisted(() => ({
+  setFavoriteMock: vi.fn(),
 }))
 
 vi.mock('@/services/games.service', () => ({
   default: {
-    toggleFavorite: toggleFavoriteMock,
+    setFavorite: setFavoriteMock,
   },
   mapGameVersions: vi.fn(() => []),
 }))
@@ -18,11 +18,11 @@ import { useGamesStore } from './games'
 describe('games store favorite sync', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    toggleFavoriteMock.mockReset()
+    setFavoriteMock.mockReset()
   })
 
   it('syncs favorite state across store-managed surfaces', async () => {
-    toggleFavoriteMock.mockResolvedValue({ isFavorite: true })
+    setFavoriteMock.mockResolvedValue({ isFavorite: true })
 
     const store = useGamesStore()
 
@@ -52,7 +52,7 @@ describe('games store favorite sync', () => {
     const isFavorite = await store.toggleFavorite('game-1')
 
     expect(isFavorite).toBe(true)
-    expect(toggleFavoriteMock).toHaveBeenCalledWith('game-1')
+    expect(setFavoriteMock).toHaveBeenCalledWith('game-1', true)
     expect(store.games[0]?.isFavorite).toBe(true)
     expect(store.currentGame?.isFavorite).toBe(true)
     expect(store.stats?.recent_games[0]?.isFavorite).toBe(true)

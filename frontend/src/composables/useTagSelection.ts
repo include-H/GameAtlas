@@ -12,7 +12,7 @@ interface TagSectionSelectionChangePayload {
   value: number | number[] | string | string[] | Array<string | number> | null | undefined
 }
 
-interface WikiTagCandidateSelection {
+export interface WikiTagCandidateSelection {
   key: string
   value: string
   sourceLabel: string
@@ -42,15 +42,53 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
   const wikiTagPickerVisible = ref(false)
   const wikiTagCandidates = ref<WikiTagCandidateSelection[]>([])
 
+  const tagGroupById = computed(() => {
+    return new Map(options.tagGroups.value.map((group) => [group.id, group]))
+  })
+
   const tagGroupIdByTagId = computed(() => {
     return new Map(options.tagOptions.value.map((tag) => [tag.id, tag.group_id]))
+  })
+
+  const selectedTagIds = computed(() => {
+    return new Set(
+      options.form.value.tag_ids
+        .map((tagId) => normalizeOptionId(tagId))
+        .filter((tagId): tagId is number => tagId !== null),
+    )
+  })
+
+  const normalizeGroupSelectionValues = <T extends string | number>(groupId: number, values: T[]) => {
+    const group = tagGroupById.value.get(groupId)
+    if (!group?.allow_multiple) {
+      return values.slice(0, 1)
+    }
+    return values
+  }
+
+  const currentTagIdsByGroup = computed(() => {
+    const grouped = new Map<number, number[]>()
+
+    for (const tagId of selectedTagIds.value) {
+      const groupId = tagGroupIdByTagId.value.get(tagId)
+      if (!groupId) continue
+      const current = grouped.get(groupId) || []
+      current.push(tagId)
+      grouped.set(groupId, current)
+    }
+
+    for (const [groupId, values] of grouped.entries()) {
+      grouped.set(groupId, normalizeGroupSelectionValues(groupId, values))
+    }
+
+    return grouped
   })
 
   const tagOptionsByGroup = computed<Record<number, Tag[]>>(() => {
     const grouped: Record<number, Tag[]> = {}
 
     for (const tag of options.tagOptions.value) {
-      if (!tag.is_active) continue
+      if (!tag.is_active && !selectedTagIds.value.has(tag.id)) continue
       if (!grouped[tag.group_id]) {
         grouped[tag.group_id] = []
       }
@@ -64,17 +102,11 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
     return grouped
   })
 
-  const tagSelectionsByGroup = computed<Record<number, string | number | Array<string | number> | undefined>>(() => {
+  const tagFieldValuesByGroup = computed<Record<number, string | number | Array<string | number> | undefined>>(() => {
     const grouped: Record<number, Array<string | number>> = {}
 
-    for (const tagId of options.form.value.tag_ids) {
-      if (typeof tagId !== 'number') continue
-      const groupId = tagGroupIdByTagId.value.get(tagId)
-      if (!groupId) continue
-      if (!grouped[groupId]) {
-        grouped[groupId] = []
-      }
-      grouped[groupId].push(tagId)
+    for (const [groupId, ids] of currentTagIdsByGroup.value.entries()) {
+      grouped[groupId] = [...ids]
     }
 
     for (const [groupId, drafts] of Object.entries(pendingTagDraftsByGroup.value)) {
@@ -88,7 +120,7 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
     const selections: Record<number, string | number | Array<string | number> | undefined> = {}
 
     for (const group of options.tagGroups.value) {
-      const values = grouped[group.id] || []
+      const values = normalizeGroupSelectionValues(group.id, grouped[group.id] || [])
       selections[group.id] = group.allow_multiple ? values : values[0]
     }
 
@@ -111,10 +143,11 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
 
   const handleFormTagChange = (groupId: number, value: TagSelectionValue) => {
     const rawValues = Array.isArray(value) ? value : value === undefined || value === null || value === '' ? [] : [value]
+    const normalizedValues = normalizeGroupSelectionValues(groupId, rawValues)
     const nextIds: number[] = []
     const nextDrafts: string[] = []
 
-    for (const item of rawValues) {
+    for (const item of normalizedValues) {
       const normalizedId = normalizeOptionId(item)
       if (normalizedId !== null) {
         nextIds.push(normalizedId)
@@ -184,21 +217,13 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
   const resolveTagSelections = async () => {
     const idsByGroup = new Map<number, number[]>()
 
-    for (const tagId of options.form.value.tag_ids) {
-      const normalizedId = normalizeOptionId(tagId)
-      if (normalizedId === null) continue
-      const groupId = tagGroupIdByTagId.value.get(normalizedId)
-      if (!groupId) continue
-      const current = idsByGroup.get(groupId) || []
-      current.push(normalizedId)
-      idsByGroup.set(groupId, current)
-    }
-
     for (const group of options.tagGroups.value) {
-      const values: Array<string | number> = [
-        ...(idsByGroup.get(group.id) || []),
-        ...(pendingTagDraftsByGroup.value[group.id] || []),
-      ]
+      const fieldValue = tagFieldValuesByGroup.value[group.id]
+      const values = Array.isArray(fieldValue)
+        ? fieldValue
+        : fieldValue === undefined || fieldValue === null || fieldValue === ''
+          ? []
+          : [fieldValue]
       if (values.length === 0) continue
 
       const result = await resolveCreatableSelections({
@@ -217,7 +242,7 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
       })
 
       options.tagOptions.value = result.options
-      idsByGroup.set(group.id, result.ids)
+      idsByGroup.set(group.id, normalizeGroupSelectionValues(group.id, result.ids))
     }
 
     pendingTagDraftsByGroup.value = {}
@@ -282,17 +307,15 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
   const applySelectedWikiTags = async () => {
     const selected = wikiTagCandidates.value.filter((item) => item.groupKey !== 'ignore')
     if (selected.length === 0) {
-        options.addAlert('还没有选择要应用的字段', 'warning')
-        return
-      }
+      options.addAlert('还没有选择要应用的字段', 'warning')
+      return
+    }
 
     isApplyingWikiTags.value = true
 
     try {
-      const mergedIds = new Set<number>(
-        options.form.value.tag_ids
-          .map((item) => normalizeOptionId(item))
-          .filter((item): item is number => item !== null),
+      const idsByGroup = new Map<number, number[]>(
+        Array.from(currentTagIdsByGroup.value.entries()).map(([groupId, ids]) => [groupId, [...ids]]),
       )
 
       const grouped = new Map<WikiTagGroupKey, string[]>()
@@ -306,6 +329,7 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
       }
 
       const appliedLabels: string[] = []
+      const appliedNamesByGroup = new Map<number, Set<string>>()
 
       for (const [groupKey, names] of grouped.entries()) {
         const group = options.tagGroups.value.find((item) => item.key === groupKey)
@@ -326,17 +350,30 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
         })
 
         options.tagOptions.value = result.options
-        for (const id of result.ids) {
-          mergedIds.add(id)
-        }
+        const existing = idsByGroup.get(group.id) || []
+        const nextIds = group.allow_multiple
+          ? Array.from(new Set([...existing, ...result.ids]))
+          : result.ids.slice(0, 1)
+        idsByGroup.set(group.id, nextIds)
+        appliedNamesByGroup.set(group.id, new Set(names.map((name) => name.toLowerCase())))
 
         if (result.ids.length > 0) {
           appliedLabels.push(`${group.name}：${names.join('、')}`)
         }
       }
 
-      options.form.value.tag_ids = Array.from(mergedIds)
-      pendingTagDraftsByGroup.value = {}
+      options.form.value.tag_ids = Array.from(idsByGroup.values()).flat()
+      pendingTagDraftsByGroup.value = Object.fromEntries(
+        Object.entries(pendingTagDraftsByGroup.value)
+          .map(([groupId, drafts]) => {
+            const appliedNames = appliedNamesByGroup.get(Number(groupId))
+            if (!appliedNames) {
+              return [groupId, drafts]
+            }
+            return [groupId, drafts.filter((draft) => !appliedNames.has(draft.trim().toLowerCase()))]
+          })
+          .filter(([, drafts]) => drafts.length > 0),
+      )
       wikiTagPickerVisible.value = false
 
       if (appliedLabels.length === 0) {
@@ -364,7 +401,7 @@ export const useTagSelection = (options: UseTagSelectionOptions) => {
     wikiTagPickerVisible,
     wikiTagCandidates,
     tagOptionsByGroup,
-    tagSelectionsByGroup,
+    tagFieldValuesByGroup,
     pendingTagOptionsByGroup,
     handleTagSelectionChange,
     handleTagSectionSelectionChange,

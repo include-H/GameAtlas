@@ -22,12 +22,6 @@ import type {
   TimelineGame,
   TimelineGameResponse,
 } from './types'
-import {
-  applyFavorite,
-  getFavoriteCount,
-  readFavorites,
-  writeFavorites,
-} from './game-list-helpers'
 
 interface MetadataApiItem {
   id: number
@@ -42,6 +36,7 @@ interface GameStatsApiResponse {
   total_downloads: number
   recent_games: GameListItemDto[]
   popular_games: GameListItemDto[]
+  favorite_count: number
   pending_reviews: number
 }
 
@@ -82,19 +77,71 @@ type TimelineGamesResult = {
 
 type GameFileReleaseSource = Pick<GameFileEntry, 'source_created_at' | 'created_at'>
 
-function annotateFavorite<T extends { public_id: string }>(item: T, favoriteIds?: Set<string>) {
-  return applyFavorite(item, favoriteIds)
-}
-
 function sortByOrder<T extends { sort_order: number }>(items: T[]): T[] {
   return [...items].sort((a, b) => a.sort_order - b.sort_order)
 }
 
-function normalizeGameDetail(item: GameDetailDto): GameDetail {
-  const favoriteIds = new Set(readFavorites())
-  const previewVideos = sortByOrder(item.preview_videos || [])
-  return annotateFavorite({
+function buildGamesQueryParams(params?: {
+  query?: GameListQuery
+  sort?: GameSort
+}): URLSearchParams {
+  const queryParams = new URLSearchParams()
+  if (params?.query?.page) queryParams.append('page', String(params.query.page))
+  if (params?.query?.limit) queryParams.append('limit', String(params.query.limit))
+  if (params?.query?.search) queryParams.append('search', params.query.search)
+  if (params?.query?.series) queryParams.append('series', String(params.query.series))
+  if (params?.query?.platform) queryParams.append('platform', String(params.query.platform))
+  if (typeof params?.query?.favorite === 'boolean') queryParams.append('favorite', String(params.query.favorite))
+  if (typeof params?.query?.pending === 'boolean') queryParams.append('pending', String(params.query.pending))
+  if (params?.query?.pending_issue) queryParams.append('pending_issue', params.query.pending_issue)
+  if (typeof params?.query?.pending_include_ignored === 'boolean') queryParams.append('pending_include_ignored', String(params.query.pending_include_ignored))
+  if (typeof params?.query?.pending_severe === 'boolean') queryParams.append('pending_severe', String(params.query.pending_severe))
+  if (typeof params?.query?.pending_recent_days === 'number' && params.query.pending_recent_days > 0) {
+    queryParams.append('pending_recent_days', String(params.query.pending_recent_days))
+  }
+  if (params?.query?.tag?.length) {
+    params.query.tag.forEach((tagId) => {
+      queryParams.append('tag', String(tagId))
+    })
+  }
+  if (params?.sort) {
+    queryParams.append('sort', params.sort.field)
+    queryParams.append('order', params.sort.order)
+    if (typeof params.sort.seed === 'number') {
+      queryParams.append('seed', String(params.sort.seed))
+    }
+  }
+  return queryParams
+}
+
+async function fetchGamesPage(params?: {
+  query?: GameListQuery
+  sort?: GameSort
+}): Promise<ApiPageEnvelope<GameListItemDto>> {
+  return get<ApiPageEnvelope<GameListItemDto>>('/games', {
+    params: buildGamesQueryParams(params),
+  })
+}
+
+function normalizeGameListItem(item: GameListItemDto): GameListItem {
+  return {
     ...item,
+    isFavorite: Boolean(item.is_favorite),
+  }
+}
+
+function normalizeTimelineGame(item: TimelineGameResponse): TimelineGame {
+  return {
+    ...item,
+    isFavorite: Boolean(item.is_favorite),
+  }
+}
+
+function normalizeGameDetail(item: GameDetailDto): GameDetail {
+  const previewVideos = sortByOrder(item.preview_videos || [])
+  return {
+    ...item,
+    isFavorite: Boolean(item.is_favorite),
     // Preview video is derived from the first sorted video only.
     preview_video: previewVideos[0] || null,
     preview_videos: previewVideos,
@@ -106,7 +153,7 @@ function normalizeGameDetail(item: GameDetailDto): GameDetail {
     publishers: item.publishers || [],
     tags: item.tags || [],
     tag_groups: item.tag_groups || [],
-  }, favoriteIds)
+  }
 }
 
 function getFileName(filePath?: string | null): string {
@@ -178,39 +225,8 @@ const gamesService = {
     query?: GameListQuery
     sort?: GameSort
   }): Promise<ApiPageEnvelope<GameListItem>> {
-    const queryParams = new URLSearchParams()
-    if (params?.query?.page) queryParams.append('page', String(params.query.page))
-    if (params?.query?.limit) queryParams.append('limit', String(params.query.limit))
-    if (params?.query?.search) queryParams.append('search', params.query.search)
-    if (params?.query?.series) queryParams.append('series', params.query.series)
-    if (params?.query?.platform) queryParams.append('platform', String(params.query.platform))
-    if (typeof params?.query?.pending === 'boolean') queryParams.append('pending', String(params.query.pending))
-    if (params?.query?.pending_issue) queryParams.append('pending_issue', params.query.pending_issue)
-    if (typeof params?.query?.pending_include_ignored === 'boolean') queryParams.append('pending_include_ignored', String(params.query.pending_include_ignored))
-    if (typeof params?.query?.pending_severe === 'boolean') queryParams.append('pending_severe', String(params.query.pending_severe))
-    if (typeof params?.query?.pending_recent_days === 'number' && params.query.pending_recent_days > 0) {
-      queryParams.append('pending_recent_days', String(params.query.pending_recent_days))
-    }
-    if (params?.query?.tag?.length) {
-      params.query.tag.forEach((tagId) => {
-        queryParams.append('tag', String(tagId))
-      })
-    }
-    if (params?.sort) {
-      queryParams.append('sort', params.sort.field)
-      queryParams.append('order', params.sort.order)
-      if (typeof params.sort.seed === 'number') {
-        queryParams.append('seed', String(params.sort.seed))
-      }
-    }
-
-    const response = await get<ApiPageEnvelope<GameListItemDto>>('/games', { params: queryParams })
-    const favoriteIds = new Set(readFavorites())
-    let games = response.data.map((item) => annotateFavorite(item, favoriteIds))
-
-    if (params?.query?.favorite) {
-      games = games.filter((game) => favoriteIds.has(String(game.public_id)))
-    }
+    const response = await fetchGamesPage(params)
+    const games = response.data.map((item) => normalizeGameListItem(item))
 
     return {
       data: games,
@@ -264,10 +280,9 @@ const gamesService = {
     if (params?.from) queryParams.append('from', params.from)
     if (params?.to) queryParams.append('to', params.to)
     const response = await get<TimelineGamesApiResponse>('/games/timeline', { params: queryParams })
-    const favoriteIds = new Set(readFavorites())
 
     return {
-      data: response.data.map((item) => annotateFavorite(item, favoriteIds)),
+      data: response.data.map((item) => normalizeTimelineGame(item)),
       hasMore: Boolean(response.pagination?.hasMore),
       nextCursor: response.pagination?.nextCursor || null,
       from: response.pagination?.from || null,
@@ -302,7 +317,7 @@ const gamesService = {
       tag_ids: [],
     }
     const response = await post<ApiEnvelope<GameListItemDto>>('/games', payload)
-    return annotateFavorite(response.data)
+    return normalizeGameListItem(response.data)
   },
 
   async updateGameAggregate(id: string, data: GameAggregateUpdateRequest): Promise<{ game: GameListItem; warnings: string[] }> {
@@ -316,9 +331,6 @@ const gamesService = {
           file_path: item.file_path,
           label: item.label ?? null,
           notes: item.notes ?? null,
-          // 2026-04-03: keep sort_order in the payload for transport compatibility.
-          // The backend persists file order from array position for the edit workflow only.
-          sort_order: item.sort_order,
         })),
         delete_assets: data.assets.delete_assets.map((item) => ({
           asset_type: item.asset_type,
@@ -349,7 +361,7 @@ const gamesService = {
     const response = await put<ApiEnvelope<AggregateUpdateApiResponse>>(`/games/${id}/aggregate`, payload)
     const warnings = response.data.warnings?.asset_delete_paths || []
     return {
-      game: annotateFavorite(response.data.game),
+      game: normalizeGameListItem(response.data.game),
       warnings,
     }
   },
@@ -385,27 +397,23 @@ const gamesService = {
     }
   },
 
-  async toggleFavorite(gameId: string): Promise<{ isFavorite: boolean }> {
-    const favorites = new Set(readFavorites())
-    if (favorites.has(gameId)) {
-      favorites.delete(gameId)
-    } else {
-      favorites.add(gameId)
+  async setFavorite(gameId: string, isFavorite: boolean): Promise<{ isFavorite: boolean }> {
+    const response = isFavorite
+      ? await put<ApiEnvelope<{ is_favorite: boolean }>>(`/games/${gameId}/favorite`, {})
+      : await del<ApiEnvelope<{ is_favorite: boolean }>>(`/games/${gameId}/favorite`)
+    return {
+      isFavorite: Boolean(response.data.is_favorite),
     }
-    const ids = Array.from(favorites)
-    writeFavorites(ids)
-    return { isFavorite: ids.includes(gameId) }
   },
 
   async getStats(): Promise<GameStats> {
     const response = await get<ApiEnvelope<GameStatsApiResponse>>('/games/stats')
-    const favoriteIds = new Set(readFavorites())
     return {
       total_games: response.data.total_games,
       total_downloads: response.data.total_downloads,
-      recent_games: response.data.recent_games.map((item) => annotateFavorite(item, favoriteIds)),
-      popular_games: response.data.popular_games.map((item) => annotateFavorite(item, favoriteIds)),
-      favorite_count: getFavoriteCount(),
+      recent_games: response.data.recent_games.map((item) => normalizeGameListItem(item)),
+      popular_games: response.data.popular_games.map((item) => normalizeGameListItem(item)),
+      favorite_count: response.data.favorite_count,
       pending_reviews: response.data.pending_reviews,
     }
   },

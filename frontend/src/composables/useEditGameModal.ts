@@ -185,7 +185,7 @@ export const useEditGameModal = ({
     wikiTagPickerVisible,
     wikiTagCandidates,
     tagOptionsByGroup,
-    tagSelectionsByGroup,
+    tagFieldValuesByGroup,
     pendingTagOptionsByGroup,
     handleTagSectionSelectionChange,
     handleParseWikiTags,
@@ -246,19 +246,16 @@ export const useEditGameModal = ({
     if (typeof asset === 'string') {
       return {
         path: asset,
-        sort_order: index,
         client_key: createScreenshotKey({ path: asset }, index),
       }
     }
 
     const screenshotId = 'id' in asset ? asset.id : ('asset_id' in asset ? asset.asset_id : undefined)
-    const screenshotSortOrder = 'sort_order' in asset ? asset.sort_order : index
 
     return {
       id: screenshotId,
       asset_uid: asset.asset_uid,
       path: asset.path,
-      sort_order: screenshotSortOrder ?? index,
       client_key: createScreenshotKey({
         id: screenshotId,
         asset_uid: asset.asset_uid,
@@ -275,7 +272,6 @@ export const useEditGameModal = ({
       id: 'id' in asset ? asset.id : ('asset_id' in asset ? asset.asset_id : undefined),
       asset_uid: asset.asset_uid,
       path: asset.path,
-      sort_order: 'sort_order' in asset ? asset.sort_order : undefined,
     }
   }
 
@@ -651,7 +647,7 @@ export const useEditGameModal = ({
     steamSummarySearchResults,
     tagGroups,
     tagOptionsByGroup,
-    tagSelectionsByGroup,
+    tagFieldValuesByGroup,
     toggleSteamScreenshot,
     uploadAction,
     uploadData,
