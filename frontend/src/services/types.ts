@@ -179,7 +179,6 @@ export interface GameListItemDto {
 }
 
 export interface GameDetailDto extends Omit<GameListItemDto, 'primary_screenshot' | 'screenshot_count' | 'file_count' | 'developer_count' | 'publisher_count' | 'platform_count'> {
-  preview_video: VideoAssetItem | null
   preview_videos: VideoAssetItem[]
   screenshots: ScreenshotItem[]
   series: Series | null
@@ -198,7 +197,6 @@ export interface TimelineGameResponse {
   release_date: string | null
   cover_image: string | null
   banner_image: string | null
-  is_favorite?: boolean
 }
 
 export interface GameCoreRequest {
@@ -275,7 +273,7 @@ export type GameListItemView = GameListItemDto & Favoritable
 export type GameDetailView = GameDetailDto & Favoritable
 export type GameListItem = GameListItemView
 export type GameDetail = GameDetailView
-export type TimelineGame = TimelineGameResponse & Favoritable
+export type TimelineGame = TimelineGameResponse
 
 export interface GameVersion {
   id: string

@@ -19,6 +19,7 @@ export const useAuthStore = defineStore('auth', () => {
       isAdmin.value = !!response.data?.is_admin
       adminDisplayName.value = response.data?.admin_display_name?.trim() || ''
     } catch {
+      // App bootstrap treats a missing/expired session the same as guest mode so the shell can still render.
       isAdmin.value = false
       adminDisplayName.value = ''
     } finally {

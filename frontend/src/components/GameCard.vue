@@ -106,7 +106,7 @@ import {
 } from '@arco-design/web-vue/es/icon'
 
 interface Props {
-  game: GameListItem | TimelineGame
+  game: (GameListItem | TimelineGame) & { isFavorite?: boolean }
   isList?: boolean
   coverOnly?: boolean
 }

@@ -41,7 +41,7 @@ export const directoryService = {
     return get<ApiEnvelope<DirectoryListData>>('/directory/list', { params: path ? { path } : undefined }).then((res) => ({
       currentPath: res.data.current_path,
       parentPath: res.data.parent_path,
-      items: (res.data.items || []).map((item) => ({
+      items: res.data.items.map((item) => ({
         name: item.name,
         path: item.path,
         type: item.is_directory ? 'directory' : 'file',

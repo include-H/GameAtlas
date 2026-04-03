@@ -74,6 +74,7 @@ export const useUiStore = defineStore('ui', () => {
       })
       sharedBackgroundAvailability.value = response.ok ? 'available' : 'missing'
     } catch {
+      // Background artwork is optional; network or file misses should degrade to the built-in backdrop.
       sharedBackgroundAvailability.value = 'missing'
     }
   }

@@ -62,7 +62,7 @@ const steamService = {
         q: query.trim(),
       },
     })
-    return (response.data || []).map(mapSearchResult)
+    return response.data.map(mapSearchResult)
   },
 
   async getGameDetails(appId: string): Promise<SteamGameDetails> {
@@ -72,13 +72,13 @@ const steamService = {
       name: data.name,
       description: data.description || '',
       releaseDate: data.release_date || '',
-      developers: data.developers || [],
-      publishers: data.publishers || [],
+      developers: data.developers,
+      publishers: data.publishers,
       previewVideos: [],
       genres: [],
       tags: [],
       platforms: [],
-      screenshots: (data.screenshot_urls || []).map((url) => proxySteamAssetUrl(url)),
+      screenshots: data.screenshot_urls.map((url) => proxySteamAssetUrl(url)),
       headerImage: proxySteamAssetUrl(data.cover_url),
       libraryHero: proxySteamAssetUrl(data.banner_url) || undefined,
       background: proxySteamAssetUrl(data.banner_url) || undefined,
@@ -93,7 +93,7 @@ const steamService = {
     return {
       coverImage: response.data.cover_url || '',
       bannerImage: response.data.banner_url || '',
-      screenshots: response.data.screenshot_urls || [],
+      screenshots: response.data.screenshot_urls,
     }
   },
 }

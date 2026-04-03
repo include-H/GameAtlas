@@ -154,8 +154,10 @@ export const useGameDetailView = ({
       wiki.value = null
       try {
         wiki.value = await wikiService.getWikiPage(gameId)
-      } catch {
-        // Wiki doesn't exist.
+      } catch (error) {
+        if (getHttpStatus(error) !== 404) {
+          throw error
+        }
       }
     } catch (error) {
       const status = getHttpStatus(error)

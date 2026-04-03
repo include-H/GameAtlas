@@ -36,6 +36,8 @@ export const useWikiEditHistory = ({
     } catch {
       historyEntries.value = []
       selectedHistory.value = null
+      // History requests either return entries or an empty list; failures should stay visible to the editor.
+      addAlert('加载 Wiki 历史失败', 'error')
     } finally {
       isHistoryLoading.value = false
     }

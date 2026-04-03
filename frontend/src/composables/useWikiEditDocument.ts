@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import wikiService, { type WikiDocumentResponse } from '@/services/wiki.service'
-import { getHttpErrorMessage } from '@/utils/http-error'
+import { getHttpErrorMessage, getHttpStatus } from '@/utils/http-error'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
 
@@ -40,12 +40,18 @@ export const useWikiEditDocument = ({
       await gamesStore.fetchGame(gameId)
       resetWikiEditorState()
 
-      const wikiContent = await wikiService.getWikiPage(gameId)
-      if (wikiContent?.content) {
-        wiki.value = wikiContent
-        wikiData.value = {
-          content: wikiContent.content,
-          change_summary: '',
+      try {
+        const wikiContent = await wikiService.getWikiPage(gameId)
+        if (wikiContent.content) {
+          wiki.value = wikiContent
+          wikiData.value = {
+            content: wikiContent.content,
+            change_summary: '',
+          }
+        }
+      } catch (error) {
+        if (getHttpStatus(error) !== 404) {
+          throw error
         }
       }
     } catch {

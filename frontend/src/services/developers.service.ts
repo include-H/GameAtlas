@@ -12,7 +12,7 @@ export const developersService = {
     if (options.query?.trim()) queryParams.append('search', options.query.trim())
     if (options.limit) queryParams.append('limit', String(options.limit))
     const response = await get<ApiEnvelope<Developer[]>>('/developers', { params: queryParams })
-    return response.data || []
+    return response.data
   },
 
   async searchDevelopers(query: string, limit?: number): Promise<Developer[]> {

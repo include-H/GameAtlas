@@ -131,28 +131,24 @@ function normalizeGameListItem(item: GameListItemDto): GameListItem {
 }
 
 function normalizeTimelineGame(item: TimelineGameResponse): TimelineGame {
-  return {
-    ...item,
-    isFavorite: Boolean(item.is_favorite),
-  }
+  return { ...item }
 }
 
 function normalizeGameDetail(item: GameDetailDto): GameDetail {
-  const previewVideos = sortByOrder(item.preview_videos || [])
+  const previewVideos = sortByOrder(item.preview_videos)
   return {
     ...item,
     isFavorite: Boolean(item.is_favorite),
-    // Preview video is derived from the first sorted video only.
-    preview_video: previewVideos[0] || null,
+    // Detail playback follows backend ordering; the first sorted video is the default one.
     preview_videos: previewVideos,
-    screenshots: sortByOrder(item.screenshots || []),
-    files: sortByOrder(item.files || []),
-    series: item.series || null,
-    platforms: item.platforms || [],
-    developers: item.developers || [],
-    publishers: item.publishers || [],
-    tags: item.tags || [],
-    tag_groups: item.tag_groups || [],
+    screenshots: sortByOrder(item.screenshots),
+    files: sortByOrder(item.files),
+    series: item.series,
+    platforms: item.platforms,
+    developers: item.developers,
+    publishers: item.publishers,
+    tags: item.tags,
+    tag_groups: item.tag_groups,
   }
 }
 
@@ -254,7 +250,7 @@ const gamesService = {
       })
 
       allGames.push(...response.data)
-      const totalPages = response.pagination?.totalPages || 1
+      const totalPages = response.pagination.totalPages
       if (page >= totalPages) {
         break
       }
@@ -343,9 +339,11 @@ const gamesService = {
       },
     }
     if (Object.prototype.hasOwnProperty.call(data.game, 'series_id')) {
+      // Aggregate patch semantics distinguish omission from explicit clearing.
       ;(payload.game as Record<string, unknown>).series_id = data.game.series_id ?? null
     }
     if (Object.prototype.hasOwnProperty.call(data.game, 'platform_ids')) {
+      // Relation arrays follow the same rule: omit means "leave as-is", [] means "clear all".
       ;(payload.game as Record<string, unknown>).platform_ids = data.game.platform_ids ?? []
     }
     if (Object.prototype.hasOwnProperty.call(data.game, 'developer_ids')) {

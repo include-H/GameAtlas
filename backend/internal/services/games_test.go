@@ -34,11 +34,11 @@ func TestGamesServiceGetDetailUsesFirstSortedVideoAndGroupsTags(t *testing.T) {
 		t.Fatalf("GetDetail returned error: %v", err)
 	}
 
-	if detail.PreviewVideo == nil || detail.PreviewVideo.AssetUID != "video-a" {
-		t.Fatalf("PreviewVideo = %#v, want first sorted video-a", detail.PreviewVideo)
-	}
 	if len(detail.PreviewVideos) != 2 {
 		t.Fatalf("len(PreviewVideos) = %d, want 2", len(detail.PreviewVideos))
+	}
+	if detail.PreviewVideos[0].AssetUID != "video-a" {
+		t.Fatalf("PreviewVideos[0] = %#v, want first sorted video-a", detail.PreviewVideos[0])
 	}
 	if len(detail.Screenshots) != 1 {
 		t.Fatalf("len(Screenshots) = %d, want 1", len(detail.Screenshots))
@@ -128,8 +128,8 @@ func TestGamesServiceGetDetailUsesFirstVideoAndRejectsPrivateGame(t *testing.T) 
 	if err != nil {
 		t.Fatalf("GetDetail returned error: %v", err)
 	}
-	if detail.PreviewVideo == nil || detail.PreviewVideo.AssetUID != "video-a" {
-		t.Fatalf("PreviewVideo = %#v, want first sorted video", detail.PreviewVideo)
+	if len(detail.PreviewVideos) == 0 || detail.PreviewVideos[0].AssetUID != "video-a" {
+		t.Fatalf("PreviewVideos = %#v, want first sorted video at index 0", detail.PreviewVideos)
 	}
 
 	_, err = service.Get(privateGameID, false)

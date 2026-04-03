@@ -11,7 +11,7 @@ async function listSeriesWithParams(params?: {
   if (params?.limit) queryParams.append('limit', String(params.limit))
   if (params?.sort) queryParams.append('sort', params.sort)
   const response = await get<ApiEnvelope<Series[]>>('/series', { params: queryParams })
-  return response.data || []
+  return response.data
 }
 
 export const seriesService = {

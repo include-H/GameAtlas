@@ -21,16 +21,16 @@ describe('review issues service', () => {
     putMock.mockReset()
   })
 
-  it('lists overrides with joined game ids when provided', async () => {
+  it('lists overrides with joined game public ids when provided', async () => {
     getMock.mockResolvedValue({
       data: [{ game_public_id: 'game-1', issue_key: 'missing-cover' }],
     })
 
-    await expect(reviewIssuesService.list(['game-1', 2])).resolves.toEqual([
+    await expect(reviewIssuesService.list(['game-1', 'game-2'])).resolves.toEqual([
       { game_public_id: 'game-1', issue_key: 'missing-cover' },
     ])
     expect(getMock).toHaveBeenCalledWith('/review-issue-overrides', {
-      params: { game_ids: 'game-1,2' },
+      params: { game_ids: 'game-1,game-2' },
     })
   })
 

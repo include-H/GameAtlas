@@ -81,4 +81,25 @@ describe('useWikiEditHistory', () => {
     expect(history.historyPreviewVisible.value).toBe(false)
     expect(addAlert).toHaveBeenCalledWith('已将历史版本内容恢复到编辑器', 'success')
   })
+
+  it('surfaces history load failures instead of pretending the list is empty', async () => {
+    const addAlert = vi.fn()
+    getWikiHistoryMock.mockRejectedValue(new Error('boom'))
+
+    const history = useWikiEditHistory({
+      wikiData: ref({
+        content: '',
+        change_summary: '',
+      }),
+      addAlert,
+      formatDateTime: (value) => value || '',
+    })
+
+    await history.loadHistory('game-1')
+
+    expect(history.historyEntries.value).toEqual([])
+    expect(history.selectedHistory.value).toBeNull()
+    expect(history.isHistoryLoading.value).toBe(false)
+    expect(addAlert).toHaveBeenCalledWith('加载 Wiki 历史失败', 'error')
+  })
 })

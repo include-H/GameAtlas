@@ -12,7 +12,7 @@ const platformService = {
     if (options.query?.trim()) queryParams.append('search', options.query.trim())
     if (options.limit) queryParams.append('limit', String(options.limit))
     const response = await get<ApiEnvelope<Platform[]>>('/platforms', { params: queryParams })
-    return response.data || []
+    return response.data
   },
 
   async getAllPlatforms(): Promise<Platform[]> {

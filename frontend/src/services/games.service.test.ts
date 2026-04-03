@@ -257,12 +257,6 @@ describe('games service', () => {
     getMock.mockResolvedValue({
       data: {
         ...baseGame,
-        preview_video: {
-          id: 12,
-          asset_uid: 'video-primary',
-          path: '/assets/video-primary.mp4',
-          sort_order: 5,
-        },
         preview_videos: [
           {
             id: 11,
@@ -290,7 +284,6 @@ describe('games service', () => {
 
     const result = await gamesService.getGame('game-1')
 
-    expect(result.preview_video?.asset_uid).toBe('video-first')
     expect(result.preview_videos.map((item) => item.asset_uid)).toEqual(['video-first', 'video-primary'])
   })
 
@@ -298,7 +291,6 @@ describe('games service', () => {
     getMock.mockResolvedValue({
       data: {
         ...baseGame,
-        preview_video: null,
         preview_videos: [],
         screenshots: [],
         series: null,
@@ -313,7 +305,7 @@ describe('games service', () => {
 
     const result = await gamesService.getGame('game-1')
 
-    expect(result.preview_video).toBeNull()
+    expect(result.preview_videos).toEqual([])
   })
 
   it('sets favorite state through backend endpoints', async () => {

@@ -151,15 +151,18 @@ func TestGamesHandlerGetHidesFilePathsForPublicAndIncludesThemForAdmin(t *testin
 
 	var publicResponse struct {
 		Data struct {
-			PreviewVideo map[string]any   `json:"preview_video"`
-			Files        []map[string]any `json:"files"`
+			PreviewVideos []map[string]any `json:"preview_videos"`
+			Files         []map[string]any `json:"files"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(publicRecorder.Body.Bytes(), &publicResponse); err != nil {
 		t.Fatalf("decode public response: %v", err)
 	}
-	if publicResponse.Data.PreviewVideo["path"] != "/assets/detail-paths/video-a.mp4" {
-		t.Fatalf("public preview_video = %#v, want path included", publicResponse.Data.PreviewVideo)
+	if len(publicResponse.Data.PreviewVideos) != 1 {
+		t.Fatalf("len(public preview_videos) = %d, want 1", len(publicResponse.Data.PreviewVideos))
+	}
+	if publicResponse.Data.PreviewVideos[0]["path"] != "/assets/detail-paths/video-a.mp4" {
+		t.Fatalf("public preview_videos[0] = %#v, want first sorted path included", publicResponse.Data.PreviewVideos[0])
 	}
 	if len(publicResponse.Data.Files) != 1 {
 		t.Fatalf("len(public files) = %d, want 1", len(publicResponse.Data.Files))

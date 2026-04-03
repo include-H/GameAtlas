@@ -84,16 +84,10 @@ func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) 
 		return nil, err
 	}
 
-	var previewVideo *domain.GameAsset
-	if len(videos) > 0 {
-		// Keep the first ordered video as the lightweight preview slot the frontend expects.
-		previewVideo = &videos[0]
-	}
-
 	return &GameDetail{
 		Game:          game,
 		PendingIssues: pendingIssues,
-		PreviewVideo:  previewVideo,
+		// Videos are already sorted by the repository; the first item is the detail page's default playback target.
 		PreviewVideos: videos,
 		Screenshots:   screenshots,
 		Series:        primarySeries,

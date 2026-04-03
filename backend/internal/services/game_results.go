@@ -35,7 +35,6 @@ type GamesTimelineResult struct {
 type GameDetail struct {
 	Game          *domain.Game
 	PendingIssues *domain.PendingIssueEvaluation
-	PreviewVideo  *domain.GameAsset
 	PreviewVideos []domain.GameAsset
 	Screenshots   []domain.GameAsset
 	Series        *domain.MetadataItem

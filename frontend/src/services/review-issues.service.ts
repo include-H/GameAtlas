@@ -2,9 +2,9 @@ import { del, get, put } from './api'
 import type { ApiEnvelope, ReviewIssueOverride } from './types'
 
 const reviewIssuesService = {
-  async list(gameIds?: Array<number | string>): Promise<ReviewIssueOverride[]> {
-    const params = gameIds && gameIds.length > 0
-      ? { game_ids: gameIds.map(String).join(',') }
+  async list(gamePublicIds?: string[]): Promise<ReviewIssueOverride[]> {
+    const params = gamePublicIds && gamePublicIds.length > 0
+      ? { game_ids: gamePublicIds.join(',') }
       : undefined
     const response = await get<ApiEnvelope<ReviewIssueOverride[]>>('/review-issue-overrides', { params })
     return response.data

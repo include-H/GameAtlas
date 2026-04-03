@@ -14,13 +14,9 @@ export interface WikiHistoryEntry {
 }
 
 const wikiService = {
-  async getWikiPage(gameId: string): Promise<WikiDocumentResponse | null> {
-    try {
-      const response = await get<ApiEnvelope<WikiDocumentResponse>>(`/games/${gameId}/wiki`)
-      return response.data
-    } catch {
-      return null
-    }
+  async getWikiPage(gameId: string): Promise<WikiDocumentResponse> {
+    const response = await get<ApiEnvelope<WikiDocumentResponse>>(`/games/${gameId}/wiki`)
+    return response.data
   },
 
   async updateWikiPage(gameId: string, data: {

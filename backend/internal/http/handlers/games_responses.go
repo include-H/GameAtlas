@@ -80,7 +80,6 @@ type gameDetailResponse struct {
 	BannerImage   *string                        `json:"banner_image"`
 	WikiContent   *string                        `json:"wiki_content"`
 	Downloads     int64                          `json:"downloads"`
-	PreviewVideo  *gameAssetResponse             `json:"preview_video"`
 	PreviewVideos []gameAssetResponse            `json:"preview_videos"`
 	Screenshots   []gameAssetResponse            `json:"screenshots"`
 	Series        *metadataItemResponse          `json:"series"`

@@ -137,16 +137,6 @@ func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDe
 		})
 	}
 
-	var previewVideo *gameAssetResponse
-	if detail.PreviewVideo != nil {
-		previewVideo = &gameAssetResponse{
-			ID:        detail.PreviewVideo.ID,
-			AssetUID:  detail.PreviewVideo.AssetUID,
-			Path:      detail.PreviewVideo.Path,
-			SortOrder: detail.PreviewVideo.SortOrder,
-		}
-	}
-
 	previewVideos := make([]gameAssetResponse, 0, len(detail.PreviewVideos))
 	for _, asset := range detail.PreviewVideos {
 		previewVideos = append(previewVideos, gameAssetResponse{
@@ -181,7 +171,6 @@ func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDe
 		BannerImage:   detail.Game.BannerImage,
 		WikiContent:   detail.Game.WikiContent,
 		Downloads:     detail.Game.Downloads,
-		PreviewVideo:  previewVideo,
 		PreviewVideos: previewVideos,
 		Screenshots:   screenshots,
 		Series:        series,

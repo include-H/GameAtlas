@@ -113,4 +113,45 @@ describe('useWikiEditDocument', () => {
     expect(document.wikiData.value.change_summary).toBe('')
     expect(document.isSaving.value).toBe(false)
   })
+
+  it('ignores missing wiki documents but surfaces other load failures', async () => {
+    const addAlert = vi.fn()
+    const onLoadGameFailed = vi.fn()
+    const currentGame = ref<WikiEditTestGame | null>(null)
+    const fetchGame = vi.fn().mockImplementation(async (gameId: string) => {
+      currentGame.value = {
+        id: 1,
+        public_id: gameId,
+        title: 'Game One',
+      }
+    })
+
+    const notFoundError = { isAxiosError: true, response: { status: 404 } }
+    getWikiPageMock.mockRejectedValueOnce(notFoundError)
+
+    const document = useWikiEditDocument({
+      gamesStore: {
+        get currentGame() {
+          return currentGame.value
+        },
+        fetchGame,
+      } as never,
+      uiStore: { addAlert } as never,
+      onLoadGameFailed,
+    })
+
+    await document.loadWikiEditorData('game-1')
+
+    expect(addAlert).not.toHaveBeenCalled()
+    expect(onLoadGameFailed).not.toHaveBeenCalled()
+    expect(document.wiki.value).toBeNull()
+
+    const serverError = { isAxiosError: true, response: { status: 500 } }
+    getWikiPageMock.mockRejectedValueOnce(serverError)
+
+    await document.loadWikiEditorData('game-1')
+
+    expect(addAlert).toHaveBeenCalledWith('Failed to load game', 'error')
+    expect(onLoadGameFailed).toHaveBeenCalled()
+  })
 })

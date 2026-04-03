@@ -12,7 +12,7 @@ export const publishersService = {
     if (options.query?.trim()) queryParams.append('search', options.query.trim())
     if (options.limit) queryParams.append('limit', String(options.limit))
     const response = await get<ApiEnvelope<Publisher[]>>('/publishers', { params: queryParams })
-    return response.data || []
+    return response.data
   },
 
   async searchPublishers(query: string, limit?: number): Promise<Publisher[]> {

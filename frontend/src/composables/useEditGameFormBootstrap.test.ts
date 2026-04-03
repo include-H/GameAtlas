@@ -95,12 +95,6 @@ describe('useEditGameFormBootstrap', () => {
       banner_image: null,
       wiki_content: null,
       downloads: 0,
-      preview_video: {
-        id: 2,
-        asset_uid: 'video-primary',
-        path: '/assets/video-primary.mp4',
-        sort_order: 9,
-      },
       preview_videos: [
         {
           id: 3,
@@ -323,7 +317,6 @@ describe('useEditGameFormBootstrap', () => {
       banner_image: null,
       wiki_content: null,
       downloads: 0,
-      preview_video: null,
       preview_videos: [],
       screenshots: [],
       series: null,
