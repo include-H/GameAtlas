@@ -57,7 +57,6 @@ describe('useGamesView helpers', () => {
         search: 'halo',
         platform: '3',
         tag: ['1', '2', 'oops'],
-        needs_review: 'true',
         seed: '99',
       },
       itemsPerPage: 48,
@@ -73,7 +72,6 @@ describe('useGamesView helpers', () => {
         platform: '3',
         tag: [1, 2],
         favorite: true,
-        needs_review: true,
       },
       sort: {
         field: 'random',

@@ -90,15 +90,20 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { IconSearch } from '@arco-design/web-vue/es/icon'
 import { useRouter } from 'vue-router'
 import { seriesService } from '@/services/series.service'
 import type { Series } from '@/services/types'
+import { formatDisplayDate } from '@/utils/date'
+import { useUiStore } from '@/stores/ui'
+import { getAmbientBackgroundUrlsFromSeries } from '@/utils/ambient-background'
 
 defineOptions({
   name: 'SeriesLibraryView',
 })
+
+const AMBIENT_BACKGROUND_OWNER = 'series-library'
 
 interface SeriesCardItem extends Series {
   game_count: number
@@ -108,10 +113,28 @@ interface SeriesCardItem extends Series {
 }
 
 const router = useRouter()
+const uiStore = useUiStore()
 const isLoading = ref(false)
 const searchQuery = ref('')
 const seriesCards = ref<SeriesCardItem[]>([])
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+const syncAmbientBackground = () => {
+  const imageUrls = seriesCards.value
+    .flatMap((item) => getAmbientBackgroundUrlsFromSeries(item))
+    .filter((url, index, list) => list.indexOf(url) === index)
+
+  if (imageUrls.length > 0) {
+    uiStore.setAmbientBackgroundSource({
+      owner: AMBIENT_BACKGROUND_OWNER,
+      key: seriesCards.value.map((item) => item.id).join(','),
+      urls: imageUrls,
+    })
+    return
+  }
+
+  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+}
 
 const loadSeries = async () => {
   isLoading.value = true
@@ -128,6 +151,7 @@ const loadSeries = async () => {
         cover_candidates: (item.cover_candidates || []).filter((value) => value.trim().length > 0).slice(0, 4),
         latest_updated_at: item.latest_updated_at ?? null,
       }))
+    syncAmbientBackground()
   } finally {
     isLoading.value = false
   }
@@ -137,17 +161,14 @@ const openSeries = (id: number) => {
   router.push({ name: 'series-detail', params: { id: String(id) } })
 }
 
-const formatDate = (value: string) => {
-  if (!value) return ''
-  const date = new Date(value)
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
+const formatDate = (value: string) => formatDisplayDate(value)
 
 onMounted(() => {
   loadSeries()
+})
+
+onActivated(() => {
+  syncAmbientBackground()
 })
 
 watch(searchQuery, () => {

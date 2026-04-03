@@ -10,7 +10,6 @@ export default {
   component: () => import('@/views/DashboardView.vue'),
   meta: {
     title: '首页',
-    keepAlive: true,
     icon: IconHome,
   },
 } as RouteRecordRaw

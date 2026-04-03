@@ -1,5 +1,7 @@
 import { API_BASE_URL } from './api'
 
+export type AssetUploadKind = 'cover' | 'banner' | 'screenshot'
+
 function normalizeApiBase(baseUrl: string): string {
   return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
 }
@@ -12,4 +14,13 @@ function normalizeApiPath(path: string): string {
 // so they must be built from the shared API base in one explicit place.
 export function buildApiUrl(path: string): string {
   return `${normalizeApiBase(API_BASE_URL)}${normalizeApiPath(path)}`
+}
+
+export function buildAssetUploadUrl(kind: AssetUploadKind): string {
+  return buildApiUrl(`/assets/${kind}`)
+}
+
+export function buildSteamProxyUrl(rawUrl: string): string {
+  const params = new URLSearchParams({ url: rawUrl })
+  return `${buildApiUrl('/steam/proxy')}?${params.toString()}`
 }

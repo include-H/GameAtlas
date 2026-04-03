@@ -1,5 +1,5 @@
-import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
-import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
+import { computed, onActivated, onMounted, ref, watch } from 'vue'
+import type { Router } from 'vue-router'
 import gamesService from '@/services/games.service'
 import pendingIssuesService from '@/services/pending-issues.service'
 import type {
@@ -10,33 +10,36 @@ import type {
   PendingIssueDetailDefinition,
 } from '@/services/types'
 import { formatDisplayDate } from '@/utils/date'
-import { createDetailRouteQuery } from '@/utils/navigation'
 import { usePendingWorkbench } from '@/composables/usePendingWorkbench'
 import { useUiStore } from '@/stores/ui'
+import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
 
 const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23424242" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/%3E%3C/svg%3E'
+const AMBIENT_BACKGROUND_OWNER = 'pending-center'
 
 interface UsePendingCenterViewOptions {
-  route: RouteLocationNormalizedLoaded
   router: Router
   uiStore: ReturnType<typeof useUiStore>
 }
 
-export const getPendingCenterVisualImage = (game: GameListItem) => {
+const getPendingCenterVisualImage = (game: GameListItem) => {
   return game.banner_image || game.primary_screenshot || game.cover_image || PLACEHOLDER_IMAGE
 }
 
-export const getPendingCenterDisplayImage = (game: GameListItem) => {
+const getPendingCenterAmbientPriorityImage = (game: GameListItem) => {
+  return game.banner_image || game.primary_screenshot || ''
+}
+
+const getPendingCenterDisplayImage = (game: GameListItem) => {
   return game.cover_image || game.banner_image || game.primary_screenshot || PLACEHOLDER_IMAGE
 }
 
-export const formatPendingCenterDate = (value?: string | null) => {
+const formatPendingCenterDate = (value?: string | null) => {
   if (!value) return '未知时间'
   return formatDisplayDate(value) || '未知时间'
 }
 
 export const usePendingCenterView = ({
-  route,
   router,
   uiStore,
 }: UsePendingCenterViewOptions) => {
@@ -116,20 +119,21 @@ export const usePendingCenterView = ({
   }
 
   const syncAmbientBackground = () => {
-    if (!activeGame.value?.public_id) {
-      uiStore.clearAmbientBackgroundOverride()
+    const primaryImageUrl = activeGame.value ? getPendingCenterAmbientPriorityImage(activeGame.value) : ''
+    const fallbackUrls = getAmbientBackgroundUrlsFromGames(filteredGames.value)
+    const imageUrls = primaryImageUrl
+      ? [primaryImageUrl]
+      : fallbackUrls.filter((url, index, list) => Boolean(url) && list.indexOf(url) === index)
+
+    if (imageUrls.length === 0) {
+      uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
       return
     }
 
-    const imageUrl = getPendingCenterVisualImage(activeGame.value)
-    if (!imageUrl || imageUrl === PLACEHOLDER_IMAGE) {
-      uiStore.clearAmbientBackgroundOverride()
-      return
-    }
-
-    uiStore.setAmbientBackgroundOverride({
-      key: activeGame.value.public_id,
-      url: imageUrl,
+    uiStore.setAmbientBackgroundSource({
+      owner: AMBIENT_BACKGROUND_OWNER,
+      key: activeGame.value?.public_id || filteredGames.value.map((game) => game.public_id || game.id).join(','),
+      urls: imageUrls,
     })
   }
 
@@ -175,7 +179,7 @@ export const usePendingCenterView = ({
   }
 
   watch(
-    activeGame,
+    [activeGame, filteredGames],
     () => {
       syncAmbientBackground()
       void updateDetailHero()
@@ -221,7 +225,6 @@ export const usePendingCenterView = ({
     router.push({
       name: 'wiki-edit',
       params: { publicId: game.public_id },
-      query: createDetailRouteQuery(route),
     })
   }
 
@@ -230,7 +233,6 @@ export const usePendingCenterView = ({
     router.push({
       name: 'game-detail',
       params: { publicId: game.public_id },
-      query: createDetailRouteQuery(route),
     })
   }
 
@@ -254,14 +256,6 @@ export const usePendingCenterView = ({
 
   onActivated(() => {
     syncAmbientBackground()
-  })
-
-  onDeactivated(() => {
-    uiStore.clearAmbientBackgroundOverride()
-  })
-
-  onBeforeUnmount(() => {
-    uiStore.clearAmbientBackgroundOverride()
   })
 
   return {

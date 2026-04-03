@@ -111,7 +111,9 @@ func (s *GamesService) List(params domain.GamesListParams) (*GamesListResult, er
 		}
 	}
 
-	s.attachPendingIssues(games)
+	if err := s.attachPendingIssues(games); err != nil {
+		return nil, err
+	}
 
 	totalPages := 0
 	if total > 0 {
@@ -395,16 +397,16 @@ func (s *GamesService) cleanupUnusedMetadata() error {
 	return nil
 }
 
-func (s *GamesService) attachPendingIssues(games []domain.Game) {
+func (s *GamesService) attachPendingIssues(games []domain.Game) error {
 	if len(games) == 0 {
-		return
+		return nil
 	}
 	if s.reviewIssueOverridesRepo == nil {
 		for index := range games {
 			evaluation := domain.EvaluatePendingIssues(games[index], nil)
 			games[index].PendingIssues = &evaluation
 		}
-		return
+		return nil
 	}
 
 	gameIDs := make([]int64, 0, len(games))
@@ -414,7 +416,7 @@ func (s *GamesService) attachPendingIssues(games []domain.Game) {
 
 	overrides, err := s.reviewIssueOverridesRepo.List(gameIDs)
 	if err != nil {
-		return
+		return err
 	}
 
 	ignoredReasonsByGameID := make(map[int64]map[domain.PendingIssueDetailKey]*string, len(games))
@@ -432,6 +434,8 @@ func (s *GamesService) attachPendingIssues(games []domain.Game) {
 		evaluation := domain.EvaluatePendingIssues(games[index], ignoredReasonsByGameID[games[index].ID])
 		games[index].PendingIssues = &evaluation
 	}
+
+	return nil
 }
 
 func (s *GamesService) getPendingIssueEvaluation(game domain.Game) (*domain.PendingIssueEvaluation, error) {

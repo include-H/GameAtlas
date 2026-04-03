@@ -7,7 +7,6 @@ export default {
   component: () => import('@/views/SeriesLibraryView.vue'),
   meta: {
     title: '系列库',
-    keepAlive: true,
     icon: IconApps,
   },
 } as RouteRecordRaw
@@ -18,7 +17,6 @@ export const seriesDetailRoute = {
   component: () => import('@/views/SeriesDetailView.vue'),
   meta: {
     title: '系列详情',
-    keepAlive: true,
     hideInMenu: true,
     activeMenu: 'series-library',
   },

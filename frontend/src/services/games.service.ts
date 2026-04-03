@@ -158,7 +158,6 @@ function serializeGameCoreRequest(data: GameCoreRequest): GameCoreRequest {
     engine: data.engine ?? null,
     cover_image: data.cover_image ?? null,
     banner_image: data.banner_image ?? null,
-    needs_review: data.needs_review ?? false,
   }
 }
 
@@ -178,7 +177,6 @@ const gamesService = {
     if (params?.query?.search) queryParams.append('search', params.query.search)
     if (params?.query?.series) queryParams.append('series', params.query.series)
     if (params?.query?.platform) queryParams.append('platform', params.query.platform)
-    if (typeof params?.query?.needs_review === 'boolean') queryParams.append('needs_review', String(params.query.needs_review))
     if (typeof params?.query?.pending === 'boolean') queryParams.append('pending', String(params.query.pending))
     if (params?.query?.pending_issue) queryParams.append('pending_issue', params.query.pending_issue)
     if (typeof params?.query?.pending_include_ignored === 'boolean') queryParams.append('pending_include_ignored', String(params.query.pending_include_ignored))
@@ -290,7 +288,6 @@ const gamesService = {
         engine: null,
         cover_image: null,
         banner_image: null,
-        needs_review: false,
       }),
       series_id: null,
       platform_ids: [],

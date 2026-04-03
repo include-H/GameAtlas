@@ -157,16 +157,43 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	repo := NewGamesRepository(db)
 	firstGameID := insertRepositoryGame(t, db, "stats-a", "Stats A", "public")
 	secondGameID := insertRepositoryGame(t, db, "stats-b", "Stats B", "public")
-	_ = insertRepositoryGame(t, db, "stats-private", "Stats Private", "private")
+	privateGameID := insertRepositoryGame(t, db, "stats-private", "Stats Private", "private")
 
-	updateRepositoryGameStats(t, db, firstGameID, 10, true, "2024-01-02 00:00:00")
-	updateRepositoryGameStats(t, db, secondGameID, 30, false, "2024-01-03 00:00:00")
-	updateRepositoryPrivateGameStats(t, db, "stats-private", 99, true, "2024-01-04 00:00:00")
+	updateRepositoryGameStats(t, db, firstGameID, 10, "2024-01-02 00:00:00")
+	updateRepositoryGameStats(t, db, secondGameID, 30, "2024-01-03 00:00:00")
+	updateRepositoryPrivateGameStats(t, db, "stats-private", 99, "2024-01-04 00:00:00")
+
+	if _, err := db.Exec(`
+		UPDATE games
+		SET cover_image = ?, banner_image = ?, summary = ?, wiki_content = ?
+		WHERE id = ?
+	`, "/assets/stats-b/cover.png", "/assets/stats-b/banner.png", "Ready", "# Ready", secondGameID); err != nil {
+		t.Fatalf("seed resolved stats game: %v", err)
+	}
+	if _, err := db.Exec(`
+		UPDATE games
+		SET cover_image = ?, banner_image = ?, summary = ?, wiki_content = ?
+		WHERE id = ?
+	`, "/assets/stats-private/cover.png", "/assets/stats-private/banner.png", "Private Ready", "# Private Ready", privateGameID); err != nil {
+		t.Fatalf("seed private stats game: %v", err)
+	}
 
 	insertRepositoryAsset(t, db, secondGameID, "screen-b2", "screenshot", "/assets/stats-b/second.png", 1)
 	insertRepositoryAsset(t, db, secondGameID, "screen-b1", "screenshot", "/assets/stats-b/first.png", 0)
 	insertRepositoryAsset(t, db, firstGameID, "screen-a1", "screenshot", "/assets/stats-a/only.png", 0)
+	insertRepositoryAsset(t, db, privateGameID, "screen-private", "screenshot", "/assets/stats-private/only.png", 0)
 	insertRepositoryGameFile(t, db, secondGameID, "/roms/stats-b.rom")
+	insertRepositoryGameFile(t, db, privateGameID, "/roms/stats-private.rom")
+
+	platformID := insertRepositoryPlatform(t, db, "Stats Platform", "stats-platform")
+	developerID := insertRepositoryDeveloper(t, db, "Stats Developer", "stats-developer")
+	publisherID := insertRepositoryPublisher(t, db, "Stats Publisher", "stats-publisher")
+	linkRepositoryGamePlatform(t, db, secondGameID, platformID, 0)
+	linkRepositoryGameDeveloper(t, db, secondGameID, developerID, 0)
+	linkRepositoryGamePublisher(t, db, secondGameID, publisherID, 0)
+	linkRepositoryGamePlatform(t, db, privateGameID, platformID, 0)
+	linkRepositoryGameDeveloper(t, db, privateGameID, developerID, 0)
+	linkRepositoryGamePublisher(t, db, privateGameID, publisherID, 0)
 
 	stats, err := repo.Stats(domain.GamesListParams{})
 	if err != nil {
@@ -180,7 +207,7 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 		t.Fatalf("TotalDownloads = %d, want 40", stats.TotalDownloads)
 	}
 	if stats.PendingReviews != 1 {
-		t.Fatalf("PendingReviews = %d, want 1", stats.PendingReviews)
+		t.Fatalf("PendingReviews = %d, want 1 native pending public game", stats.PendingReviews)
 	}
 
 	if len(stats.RecentGames) != 2 || stats.RecentGames[0].ID != secondGameID {
@@ -374,9 +401,9 @@ func TestGamesRepositoryListPendingOnlySupportsNativeSortAndFilters(t *testing.T
 	olderID := insertRepositoryGame(t, db, "pending-older", "Pending Older", "public")
 
 	now := time.Now().UTC()
-	updateRepositoryGameStats(t, db, severeID, 50, false, now.Format("2006-01-02 15:04:05"))
-	updateRepositoryGameStats(t, db, recentID, 10, false, now.AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
-	updateRepositoryGameStats(t, db, olderID, 5, false, now.AddDate(0, 0, -60).Format("2006-01-02 15:04:05"))
+	updateRepositoryGameStats(t, db, severeID, 50, now.Format("2006-01-02 15:04:05"))
+	updateRepositoryGameStats(t, db, recentID, 10, now.AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
+	updateRepositoryGameStats(t, db, olderID, 5, now.AddDate(0, 0, -60).Format("2006-01-02 15:04:05"))
 
 	if _, err := db.Exec(`
 		UPDATE games
@@ -570,26 +597,26 @@ func insertRepositoryGameWithReleaseDate(t *testing.T, db *sqlx.DB, publicID str
 	return id
 }
 
-func updateRepositoryGameStats(t *testing.T, db *sqlx.DB, gameID int64, downloads int64, needsReview bool, createdAt string) {
+func updateRepositoryGameStats(t *testing.T, db *sqlx.DB, gameID int64, downloads int64, createdAt string) {
 	t.Helper()
 
 	if _, err := db.Exec(`
 		UPDATE games
-		SET downloads = ?, needs_review = ?, created_at = ?, updated_at = ?
+		SET downloads = ?, created_at = ?, updated_at = ?
 		WHERE id = ?
-	`, downloads, boolToInt(needsReview), createdAt, createdAt, gameID); err != nil {
+	`, downloads, createdAt, createdAt, gameID); err != nil {
 		t.Fatalf("update repository game stats: %v", err)
 	}
 }
 
-func updateRepositoryPrivateGameStats(t *testing.T, db *sqlx.DB, publicID string, downloads int64, needsReview bool, createdAt string) {
+func updateRepositoryPrivateGameStats(t *testing.T, db *sqlx.DB, publicID string, downloads int64, createdAt string) {
 	t.Helper()
 
 	if _, err := db.Exec(`
 		UPDATE games
-		SET downloads = ?, needs_review = ?, created_at = ?, updated_at = ?
+		SET downloads = ?, created_at = ?, updated_at = ?
 		WHERE public_id = ?
-	`, downloads, boolToInt(needsReview), createdAt, createdAt, publicID); err != nil {
+	`, downloads, createdAt, createdAt, publicID); err != nil {
 		t.Fatalf("update repository private game stats: %v", err)
 	}
 }

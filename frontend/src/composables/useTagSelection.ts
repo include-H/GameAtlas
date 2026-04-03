@@ -7,12 +7,12 @@ import { extractWikiTagCandidates, type WikiTagGroupKey } from '@/utils/wiki-tag
 
 type TagSelectionValue = number | number[] | string | string[] | undefined
 
-export interface TagSectionSelectionChangePayload {
+interface TagSectionSelectionChangePayload {
   groupId: number
   value: number | number[] | string | string[] | Array<string | number> | null | undefined
 }
 
-export interface WikiTagCandidateSelection {
+interface WikiTagCandidateSelection {
   key: string
   value: string
   sourceLabel: string

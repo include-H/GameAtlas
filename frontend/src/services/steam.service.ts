@@ -1,4 +1,5 @@
-import { API_BASE_URL, get, post } from './api'
+import { get, post } from './api'
+import { buildApiUrl, buildSteamProxyUrl } from './api-url'
 import type { ApiEnvelope, SteamFetchImagesResponse, SteamGameDetails, SteamGameSearchResult } from './types'
 
 interface SteamSearchApiItem {
@@ -30,14 +31,10 @@ function mapSearchResult(item: SteamSearchApiItem): SteamGameSearchResult {
 }
 
 const STEAM_PROXY_PATH = '/steam/proxy'
-
-function normalizeApiBaseUrl(baseUrl: string): string {
-  return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
-}
+const STEAM_PROXY_URL_PREFIX = `${buildApiUrl(STEAM_PROXY_PATH)}?`
 
 function isSteamProxyUrl(rawUrl: string): boolean {
-  const normalizedBase = normalizeApiBaseUrl(API_BASE_URL)
-  return rawUrl.startsWith(`${normalizedBase}${STEAM_PROXY_PATH}?`)
+  return rawUrl.startsWith(STEAM_PROXY_URL_PREFIX)
 }
 
 export function proxySteamAssetUrl(rawUrl?: string | null): string {
@@ -54,9 +51,7 @@ export function proxySteamAssetUrl(rawUrl?: string | null): string {
     return value
   }
 
-  const normalizedBase = normalizeApiBaseUrl(API_BASE_URL)
-  const params = new URLSearchParams({ url: value })
-  return `${normalizedBase}${STEAM_PROXY_PATH}?${params.toString()}`
+  return buildSteamProxyUrl(value)
 }
 
 const steamService = {

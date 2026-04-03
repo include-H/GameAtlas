@@ -54,11 +54,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import type { GameListItem } from '@/services/types'
 import { resolveAssetUrl } from '@/utils/asset-url'
 import { getDisplayYear } from '@/utils/date'
-import { createDetailRouteQuery } from '@/utils/navigation'
 
 interface Props {
   games: GameListItem[]
@@ -71,7 +70,6 @@ const props = withDefaults(defineProps<Props>(), {
   interval: 5000,
 })
 
-const route = useRoute()
 const router = useRouter()
 const currentIndex = ref(0)
 let autoPlayTimer: number | null = null
@@ -111,7 +109,6 @@ const viewGame = (publicId?: string) => {
   router.push({
     name: 'game-detail',
     params: { publicId },
-    query: createDetailRouteQuery(route),
   })
 }
 

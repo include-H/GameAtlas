@@ -10,6 +10,5 @@ export default {
   meta: {
     title: '未找到页面',
     hideInMenu: true,
-    keepAlive: false,
   },
 } as RouteRecordRaw

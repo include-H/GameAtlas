@@ -38,51 +38,67 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onActivated, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { IconLeft } from '@arco-design/web-vue/es/icon'
 import { useUiStore } from '@/stores/ui'
-import gamesService from '@/services/games.service'
+import { useGamesStore } from '@/stores/games'
 import { seriesService } from '@/services/series.service'
 import GameCard from '@/components/GameCard.vue'
-import { useNamedRouteGuard, watchRouteParamWhenActive } from '@/composables/useNamedRouteGuard'
 import type { GameListItem } from '@/services/types'
-import { createDetailRouteQuery, resolveReturnRoute } from '@/utils/navigation'
+import { navigateBackOrFallback } from '@/utils/navigation'
+import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
 
 defineOptions({
   name: 'SeriesDetailView',
 })
 
+const AMBIENT_BACKGROUND_OWNER = 'series-detail'
+
 const route = useRoute()
 const router = useRouter()
 const uiStore = useUiStore()
-const { runWhenActive } = useNamedRouteGuard(route, 'series-detail')
+const gamesStore = useGamesStore()
 
 const isLoading = ref(false)
 const games = ref<GameListItem[]>([])
 const seriesName = ref('系列')
 
+const syncAmbientBackground = (seriesId: number) => {
+  const imageUrls = getAmbientBackgroundUrlsFromGames(games.value)
+  if (imageUrls.length > 0) {
+    uiStore.setAmbientBackgroundSource({
+      owner: AMBIENT_BACKGROUND_OWNER,
+      key: String(seriesId),
+      urls: imageUrls,
+    })
+    return
+  }
+
+  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+}
+
 const handleGoBack = () => {
-  router.push(resolveReturnRoute(route, { name: 'series-library' }))
+  navigateBackOrFallback(router, { name: 'series-library' })
 }
 
 const loadSeriesDetail = async () => {
-  await runWhenActive(async () => {
-    const id = Number(route.params.id)
-    if (Number.isNaN(id) || id <= 0) {
-      router.replace({ name: 'series-library' })
-      return
-    }
+  const id = Number(route.params.id)
+  if (Number.isNaN(id) || id <= 0) {
+    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+    router.replace({ name: 'series-library' })
+    return
+  }
 
-    isLoading.value = true
-    try {
-      const detail = await seriesService.getSeriesDetail(id)
-      seriesName.value = detail.series.name || `系列 ${id}`
-      games.value = detail.games
-    } finally {
-      isLoading.value = false
-    }
-  })
+  isLoading.value = true
+  try {
+    const detail = await seriesService.getSeriesDetail(id)
+    seriesName.value = detail.series.name || `系列 ${id}`
+    games.value = detail.games
+    syncAmbientBackground(detail.series.id || id)
+  } finally {
+    isLoading.value = false
+  }
 }
 
 const openGame = (publicId: string) => {
@@ -90,30 +106,37 @@ const openGame = (publicId: string) => {
   router.push({
     name: 'game-detail',
     params: { publicId },
-    query: createDetailRouteQuery(route),
   })
 }
 
 const toggleFavorite = async (gameRef: string) => {
   if (!gameRef) return
   try {
-    await gamesService.toggleFavorite(gameRef)
-    games.value = games.value.map((game) =>
-      game.public_id === gameRef ? { ...game, isFavorite: !game.isFavorite } : game,
-    )
+    const isFavorite = await gamesStore.toggleFavorite(gameRef)
+    games.value.forEach((game) => {
+      if (game.public_id === gameRef) {
+        game.isFavorite = isFavorite
+      }
+    })
   } catch {
     uiStore.addAlert('更新收藏失败', 'error')
   }
 }
 
-watchRouteParamWhenActive(
-  route,
-  'series-detail',
-  'id',
+watch(
+  () => route.params.id,
   () => {
     void loadSeriesDetail()
   },
+  { immediate: true },
 )
+
+onActivated(() => {
+  const id = Number(route.params.id)
+  if (!Number.isNaN(id) && id > 0) {
+    syncAmbientBackground(id)
+  }
+})
 </script>
 
 <style scoped>

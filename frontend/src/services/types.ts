@@ -165,7 +165,6 @@ export interface GameListItemDto {
   cover_image: string | null
   banner_image: string | null
   wiki_content: string | null
-  needs_review: boolean
   primary_screenshot: string | null
   screenshot_count: number
   file_count: number
@@ -209,7 +208,6 @@ export interface GameCoreRequest {
   engine?: string | null
   cover_image?: string | null
   banner_image?: string | null
-  needs_review?: boolean
 }
 
 export interface GameWriteRequest extends GameCoreRequest {
@@ -260,7 +258,6 @@ export interface GameListQuery {
   series?: string
   platform?: string
   tag?: number[]
-  needs_review?: boolean
   pending?: boolean
   pending_issue?: string
   pending_include_ignored?: boolean

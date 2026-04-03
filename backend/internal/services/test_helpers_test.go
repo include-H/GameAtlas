@@ -203,7 +203,6 @@ func mustLoadServicesGame(t *testing.T, db *sqlx.DB, gameID int64) domain.Game {
 			cover_image,
 			banner_image,
 			wiki_content,
-			needs_review,
 			downloads,
 			NULL AS primary_screenshot,
 			0 AS screenshot_count,

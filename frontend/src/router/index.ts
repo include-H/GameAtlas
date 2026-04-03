@@ -3,7 +3,6 @@ import { useAuthStore } from '@/stores/auth'
 
 // Import route modules
 import base from './modules/base'
-import register from './modules/register'
 import dashboard from './modules/dashboard'
 import games, { gameDetailRoute, pendingCenterRoute, timelineRoute, wikiEditRoute } from './modules/games'
 import series, { seriesDetailRoute } from './modules/series'
@@ -29,7 +28,6 @@ export const appRoutes: RouteRecordRaw[] = [
  */
 const routes: RouteRecordRaw[] = [
   base,
-  register,
   ...appRoutes,
   notFound,
 ]

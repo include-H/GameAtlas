@@ -3,13 +3,12 @@ import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosError } f
 // Axios requests read the API base from this file only.
 // Non-axios URLs such as download href/action must use buildApiUrl().
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
-const mockMode = import.meta.env.VITE_MOCK_MODE === 'true' || false
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
-  timeout: mockMode ? 1000 : 30000,  // Faster timeout in mock mode
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },

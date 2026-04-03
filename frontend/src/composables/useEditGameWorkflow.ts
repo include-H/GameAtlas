@@ -3,6 +3,8 @@ import type { EditGameForm } from '@/composables/edit-game-form'
 import gamesService from '@/services/games.service'
 import { seriesService } from '@/services/series.service'
 import platformService from '@/services/platforms.service'
+import { developersService } from '@/services/developers.service'
+import { publishersService } from '@/services/publishers.service'
 import { resolveCreatableSelections } from '@/utils/creatable-select'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import type {
@@ -23,7 +25,7 @@ interface PendingDeleteAsset {
   assetUid?: string
 }
 
-export interface UseEditGameWorkflowOptions {
+interface UseEditGameWorkflowOptions {
   game: Ref<GameDetail | null>
   form: Ref<EditGameForm>
   isSubmitting: Ref<boolean>
@@ -89,7 +91,6 @@ const resolveDevelopers = async (
   options: Developer[],
 ) => {
   try {
-    const { developersService } = await import('@/services/developers.service')
     const result = await resolveCreatableSelections({
       values,
       options,
@@ -111,7 +112,6 @@ const resolvePublishers = async (
   options: Publisher[],
 ) => {
   try {
-    const { publishersService } = await import('@/services/publishers.service')
     const result = await resolveCreatableSelections({
       values,
       options,

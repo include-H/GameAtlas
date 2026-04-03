@@ -160,7 +160,6 @@ func (r *GamesRepository) List(params domain.GamesListParams) ([]domain.Game, in
 			g.cover_image,
 			g.banner_image,
 			g.wiki_content,
-			g.needs_review,
 			g.downloads,
 			ss.primary_screenshot,
 			COALESCE(ss.screenshot_count, 0) AS screenshot_count,
@@ -210,14 +209,6 @@ func (r *GamesRepository) buildGamesListWhere(params domain.GamesListParams, exc
 	if params.Search != "" {
 		where = append(where, "(g.title LIKE :search OR COALESCE(g.title_alt, '') LIKE :search OR COALESCE(g.summary, '') LIKE :search)")
 		args["search"] = "%" + params.Search + "%"
-	}
-	if params.NeedsReview != nil {
-		where = append(where, "g.needs_review = :needs_review")
-		if *params.NeedsReview {
-			args["needs_review"] = 1
-		} else {
-			args["needs_review"] = 0
-		}
 	}
 	if params.PendingOnly {
 		where = append(where, "("+pendingAnyIssueCondition(params.PendingIncludeIgnored)+")")
@@ -317,7 +308,6 @@ func (r *GamesRepository) GetByID(id int64) (*domain.Game, error) {
 			cover_image,
 			banner_image,
 			wiki_content,
-			needs_review,
 			downloads,
 			NULL AS primary_screenshot,
 			0 AS screenshot_count,
@@ -352,7 +342,6 @@ func (r *GamesRepository) GetByPublicID(publicID string) (*domain.Game, error) {
 			cover_image,
 			banner_image,
 			wiki_content,
-			needs_review,
 			downloads,
 			NULL AS primary_screenshot,
 			0 AS screenshot_count,
@@ -548,11 +537,11 @@ func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, err
 
 	const query = `
 		INSERT INTO games (
-			public_id, title, title_alt, title_sort_key, visibility, summary, release_date, engine, cover_image, banner_image, needs_review, series_id
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			public_id, title, title_alt, title_sort_key, visibility, summary, release_date, engine, cover_image, banner_image, series_id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING
 			id, public_id, title, title_alt, visibility, summary, release_date, engine, cover_image, banner_image,
-			wiki_content, needs_review, downloads, created_at, updated_at`
+			wiki_content, downloads, created_at, updated_at`
 
 	var game domain.Game
 	if err := tx.Get(
@@ -568,7 +557,6 @@ func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, err
 		input.Engine,
 		input.CoverImage,
 		input.BannerImage,
-		boolToInt(input.NeedsReview),
 		input.SeriesID,
 	); err != nil {
 		return nil, fmt.Errorf("create game: %w", err)
@@ -677,7 +665,6 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 		"engine = ?",
 		"cover_image = ?",
 		"banner_image = ?",
-		"needs_review = ?",
 	}
 	args := []any{
 		input.Title,
@@ -689,7 +676,6 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 		input.Engine,
 		input.CoverImage,
 		input.BannerImage,
-		boolToInt(input.NeedsReview),
 	}
 	if input.SeriesID.Present {
 		setClauses = append(setClauses, "series_id = ?")
@@ -977,10 +963,10 @@ func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStat
 		SELECT
 			COUNT(*) AS total_games,
 			COALESCE(SUM(g.downloads), 0) AS total_downloads,
-			COALESCE(SUM(CASE WHEN g.needs_review = 1 THEN 1 ELSE 0 END), 0) AS pending_reviews
+			COALESCE(SUM(CASE WHEN (%s) THEN 1 ELSE 0 END), 0) AS pending_reviews
 		FROM games g
 		WHERE %s
-	`, baseWhere)
+	`, pendingAnyIssueCondition(false), baseWhere)
 
 	type statsRow struct {
 		TotalGames     int   `db:"total_games"`
@@ -1064,7 +1050,6 @@ func (r *GamesRepository) Stats(params domain.GamesListParams) (*domain.GameStat
 				g.cover_image,
 				g.banner_image,
 				g.wiki_content,
-				g.needs_review,
 				g.downloads,
 				ss.primary_screenshot,
 				COALESCE(ss.screenshot_count, 0) AS screenshot_count,

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hao/game/internal/config"
@@ -133,6 +134,34 @@ func TestGamesServiceGetDetailUsesFirstVideoAndRejectsPrivateGame(t *testing.T) 
 	_, err = service.GetDetail(privateGameID, false)
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("GetDetail private error = %v, want ErrNotFound", err)
+	}
+}
+
+func TestGamesServiceListReturnsOverrideLookupError(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	insertServicesTestGame(t, db, "pending-list-error", "Pending List Error", domain.GameVisibilityPublic)
+
+	if _, err := db.Exec(`DROP TABLE game_review_issue_overrides`); err != nil {
+		t.Fatalf("drop override table: %v", err)
+	}
+
+	service := NewGamesService(
+		config.Config{},
+		repositories.NewGamesRepository(db),
+		repositories.NewGameFilesRepository(db),
+		repositories.NewMetadataRepository(db),
+		repositories.NewTagsRepository(db),
+		repositories.NewReviewIssueOverrideRepository(db),
+	)
+
+	_, err := service.List(domain.GamesListParams{Page: 1, Limit: 20})
+	if err == nil {
+		t.Fatal("List returned nil error, want override lookup failure")
+	}
+	if !strings.Contains(err.Error(), "list review overrides") {
+		t.Fatalf("List error = %v, want review override lookup context", err)
 	}
 }
 

@@ -1,14 +1,14 @@
-import { computed, nextTick, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
+import { computed, nextTick, onActivated, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import wikiService, { type WikiDocumentResponse } from '@/services/wiki.service'
 import downloadService from '@/services/download.service'
 import type { GameVersion } from '@/services/types'
 import { getHttpStatus } from '@/utils/http-error'
 import { formatDisplayDate } from '@/utils/date'
-import { useNamedRouteGuard, watchRouteParamWhenActive } from '@/composables/useNamedRouteGuard'
-import { createDetailRouteQuery, resolveReturnRoute } from '@/utils/navigation'
+import { navigateBackOrFallback } from '@/utils/navigation'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
+import { getAmbientBackgroundUrlsFromGameDetail } from '@/utils/ambient-background'
 
 interface UseGameDetailViewOptions {
   route: RouteLocationNormalizedLoaded
@@ -18,11 +18,13 @@ interface UseGameDetailViewOptions {
   isAdmin: Ref<boolean>
 }
 
-export const formatGameDetailDate = (dateStr: string) => {
+const formatGameDetailDate = (dateStr: string) => {
   return formatDisplayDate(dateStr)
 }
 
-export const formatGameDetailSize = (bytes: number) => {
+const AMBIENT_BACKGROUND_OWNER = 'game-detail'
+
+const formatGameDetailSize = (bytes: number) => {
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
   let size = bytes
   let unitIndex = 0
@@ -35,7 +37,7 @@ export const formatGameDetailSize = (bytes: number) => {
   return `${size.toFixed(1)} ${units[unitIndex]}`
 }
 
-export const shouldSpanGameMetadataRow = (items?: { length: number } | null) => {
+const shouldSpanGameMetadataRow = (items?: { length: number } | null) => {
   return (items?.length || 0) > 2
 }
 
@@ -46,8 +48,6 @@ export const useGameDetailView = ({
   uiStore,
   isAdmin,
 }: UseGameDetailViewOptions) => {
-  const { runWhenActive } = useNamedRouteGuard(route, 'game-detail')
-
   const game = computed(() => gamesStore.currentGame)
   const versions = computed(() => gamesStore.currentVersions)
   const wiki = ref<WikiDocumentResponse | null>(null)
@@ -62,11 +62,19 @@ export const useGameDetailView = ({
   const hasWikiContent = computed(() => Boolean(wiki.value?.content?.trim()))
   const canEdit = computed(() => isAdmin.value)
 
+  const navigateToUrl = (url?: string) => {
+    if (!url || typeof window === 'undefined') {
+      throw new Error('Missing download URL')
+    }
+    window.location.assign(url)
+  }
+
   const handleDownloadVersion = async (version: GameVersion) => {
-    if (!game.value?.public_id) return
+    if (!game.value?.public_id || !version.downloadUrl) return
 
     try {
-      await downloadService.startDownload(game.value.public_id, version.id)
+      await downloadService.recordDownload(game.value.public_id, version.id)
+      navigateToUrl(version.downloadUrl)
       uiStore.addAlert(`已开始下载 ${version.version}`, 'success')
     } catch {
       uiStore.addAlert('下载启动失败', 'error')
@@ -74,10 +82,10 @@ export const useGameDetailView = ({
   }
 
   const handleDownloadLaunchScript = (version: GameVersion) => {
-    if (!game.value?.public_id) return
+    if (!version.launchScriptUrl) return
 
     try {
-      downloadService.downloadLaunchScript(game.value.public_id, version.id)
+      navigateToUrl(version.launchScriptUrl)
       uiStore.addAlert(`已为 ${version.version} 生成启动脚本`, 'success')
     } catch {
       uiStore.addAlert('开始游玩失败', 'error')
@@ -91,7 +99,7 @@ export const useGameDetailView = ({
   }
 
   const handleGoBack = () => {
-    router.push(resolveReturnRoute(route, { name: 'games' }))
+    navigateBackOrFallback(router, { name: 'games' })
   }
 
   const openWikiEditor = () => {
@@ -99,7 +107,6 @@ export const useGameDetailView = ({
     router.push({
       name: 'wiki-edit',
       params: { publicId: game.value.public_id },
-      query: createDetailRouteQuery(route),
     })
   }
 
@@ -126,36 +133,53 @@ export const useGameDetailView = ({
     }
   }
 
-  const loadGameDetail = async (gameId: string) => {
-    await runWhenActive(async () => {
-      try {
-        await gamesStore.fetchGame(gameId)
+  const syncAmbientBackground = () => {
+    const imageUrls = getAmbientBackgroundUrlsFromGameDetail(game.value)
+    if (!game.value?.public_id || imageUrls.length === 0) {
+      uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+      return
+    }
 
-        wiki.value = null
-        try {
-          wiki.value = await wikiService.getWikiPage(gameId)
-        } catch {
-          // Wiki doesn't exist.
-        }
-      } catch (error) {
-        const status = getHttpStatus(error)
-        if (status === 404) {
-          router.replace({ name: 'not-found' })
-          return
-        }
-        uiStore.addAlert('加载游戏详情失败', 'error')
-      }
+    uiStore.setAmbientBackgroundSource({
+      owner: AMBIENT_BACKGROUND_OWNER,
+      key: game.value.public_id,
+      urls: imageUrls,
     })
   }
 
-  watchRouteParamWhenActive(
-    route,
-    'game-detail',
-    'publicId',
+  const loadGameDetail = async (gameId: string) => {
+    try {
+      await gamesStore.fetchGame(gameId)
+
+      wiki.value = null
+      try {
+        wiki.value = await wikiService.getWikiPage(gameId)
+      } catch {
+        // Wiki doesn't exist.
+      }
+    } catch (error) {
+      const status = getHttpStatus(error)
+      if (status === 404) {
+        router.replace({ name: 'not-found' })
+        return
+      }
+      uiStore.addAlert('加载游戏详情失败', 'error')
+    }
+  }
+
+  watch(
+    () => {
+      const rawValue = route.params.publicId
+      return typeof rawValue === 'string' ? rawValue.trim() : Array.isArray(rawValue) ? String(rawValue[0] || '').trim() : ''
+    },
     async (gameId) => {
+      if (!gameId) {
+        return
+      }
       showEditModal.value = false
       await loadGameDetail(gameId)
     },
+    { immediate: true },
   )
 
   const syncTopSectionHeight = () => {
@@ -198,9 +222,15 @@ export const useGameDetailView = ({
     void setupTopSectionObserver()
   })
 
+  onActivated(() => {
+    syncAmbientBackground()
+    void setupTopSectionObserver()
+  })
+
   watch(
     game,
     () => {
+      syncAmbientBackground()
       void setupTopSectionObserver()
     },
     { flush: 'post' },

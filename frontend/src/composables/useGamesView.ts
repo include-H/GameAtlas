@@ -6,8 +6,7 @@ import type {
   RouteLocationNormalizedLoaded,
   Router,
 } from 'vue-router'
-import { Modal, Message } from '@arco-design/web-vue'
-import { createDetailRouteQuery } from '@/utils/navigation'
+import { Modal } from '@arco-design/web-vue'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import gamesService from '@/services/games.service'
 import platformService from '@/services/platforms.service'
@@ -15,6 +14,7 @@ import tagsService from '@/services/tags.service'
 import type { GameListItem, GameListQuery, GameSort, Tag, TagGroup } from '@/services/types'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
+import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
 
 type GamesViewFilter = 'favorites' | 'recent'
 type GamesViewMode = 'grid' | 'list'
@@ -50,6 +50,7 @@ interface BuildGamesListRequestOptions {
 
 const DEFAULT_SORT: GamesSortKey = 'created_desc'
 const DEFAULT_ITEMS_PER_PAGE = 24
+const AMBIENT_BACKGROUND_OWNER = 'games'
 
 const SORT_ALIASES: Record<string, GamesSortKey> = {
   newest: 'created_desc',
@@ -119,7 +120,6 @@ export const buildGamesRouteQuery = (
     || newParams.platform !== undefined
     || newParams.tag !== undefined
     || newParams.filter !== undefined
-    || newParams.needs_review !== undefined
   ) {
     query.page = '1'
   }
@@ -150,7 +150,6 @@ export const buildGamesListRequest = ({
       platform: readSingleQueryValue(routeQuery.platform),
       tag: parseRouteTagIds(routeQuery.tag),
       favorite: filterFavorites || undefined,
-      needs_review: readSingleQueryValue(routeQuery.needs_review) === 'true' ? true : undefined,
     },
     sort: {
       field: sortField,
@@ -260,8 +259,7 @@ export const useGamesView = ({
       searchQuery.value
       || selectedPlatform.value
       || selectedTagIds.value.length > 0
-      || filterFavorites.value
-      || readSingleQueryValue(route.query.needs_review) === 'true',
+      || filterFavorites.value,
     )
   })
 
@@ -269,7 +267,6 @@ export const useGamesView = ({
     const currentFilter = props.filter || readSingleQueryValue(route.query.filter)
     if (currentFilter === 'favorites') return '收藏的游戏'
     if (currentFilter === 'recent') return '最近下载'
-    if (readSingleQueryValue(route.query.needs_review) === 'true') return '待处理的游戏'
     return '所有游戏'
   })
 
@@ -305,11 +302,27 @@ export const useGamesView = ({
         limit: response.pagination.limit,
         totalPages: response.pagination.totalPages,
       }
+
+      syncAmbientBackground(response.data, response.pagination.page)
     } catch {
       uiStore.addAlert('加载游戏失败', 'error')
     } finally {
       isLoading.value = false
     }
+  }
+
+  const syncAmbientBackground = (games: GameListItem[], page = visiblePagination.value.page || 1) => {
+    const imageUrls = getAmbientBackgroundUrlsFromGames(games)
+    if (imageUrls.length > 0) {
+      uiStore.setAmbientBackgroundSource({
+        owner: AMBIENT_BACKGROUND_OWNER,
+        key: `${pageTitle.value}:${page}:${games.length}`,
+        urls: imageUrls,
+      })
+      return
+    }
+
+    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
   }
 
   watch(() => route.query, () => {
@@ -322,7 +335,6 @@ export const useGamesView = ({
     router.push({
       name: 'game-detail',
       params: { publicId },
-      query: createDetailRouteQuery(route),
     })
   }
 
@@ -357,13 +369,14 @@ export const useGamesView = ({
 
   const deleteGame = async (gameRef: string, title: string) => {
     await gamesService.deleteGame(gameRef)
-    Message.success(`游戏 "${title}" 已删除`)
+    uiStore.addAlert(`游戏 "${title}" 已删除`, 'success')
     await loadGames()
   }
 
   const handleDelete = (gameRef: string, title: string) => {
     if (!gameRef || !isAdmin.value) return
 
+    // Destructive actions still require an explicit blocking confirmation; only the result toast is unified via uiStore.
     Modal.confirm({
       title: '确认删除',
       content: `确定要删除游戏 "${title}" 吗？此操作不可撤销。`,
@@ -374,7 +387,7 @@ export const useGamesView = ({
         try {
           await deleteGame(gameRef, title)
         } catch (error) {
-          Message.error(`删除游戏失败：${getHttpErrorMessage(error)}`)
+          uiStore.addAlert(`删除游戏失败：${getHttpErrorMessage(error)}`, 'error')
         }
       },
     })
@@ -441,12 +454,13 @@ export const useGamesView = ({
 
   const loadFilterOptions = async () => {
     try {
-      const platforms = await platformService.getAllPlatforms()
+      const platforms = await platformService.listPlatforms()
       platformOptions.value = platforms
         .map((item) => ({ label: item.name, value: String(item.id) }))
         .sort((a, b) => a.label.localeCompare(b.label, 'zh-Hans-CN'))
     } catch (error) {
       console.error('Failed to load platforms:', error)
+      uiStore.addAlert('加载平台筛选失败', 'error')
     }
 
     try {
@@ -458,6 +472,7 @@ export const useGamesView = ({
       tags.value = loadedTags
     } catch (error) {
       console.error('Failed to load tags:', error)
+      uiStore.addAlert('加载标签筛选失败', 'error')
     }
   }
 
@@ -474,6 +489,7 @@ export const useGamesView = ({
 
   onActivated(async () => {
     await loadFilterOptions()
+    syncAmbientBackground(visibleGames.value)
   })
 
   let searchDebounceTimer: number | undefined

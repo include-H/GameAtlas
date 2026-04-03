@@ -41,11 +41,6 @@ func (h *GamesHandler) List(c *gin.Context) {
 		IncludeAll:        isAdminRequest(c),
 	}
 
-	if raw := c.Query("needs_review"); raw != "" {
-		if value, err := strconv.ParseBool(raw); err == nil {
-			params.NeedsReview = &value
-		}
-	}
 	if raw := c.Query("pending"); raw != "" {
 		if value, err := strconv.ParseBool(raw); err == nil {
 			params.PendingOnly = value
@@ -420,7 +415,6 @@ type gameListItemResponse struct {
 	CoverImage        *string                        `json:"cover_image"`
 	BannerImage       *string                        `json:"banner_image"`
 	WikiContent       *string                        `json:"wiki_content"`
-	NeedsReview       bool                           `json:"needs_review"`
 	Downloads         int64                          `json:"downloads"`
 	PrimaryScreenshot *string                        `json:"primary_screenshot"`
 	ScreenshotCount   int64                          `json:"screenshot_count"`
@@ -483,7 +477,6 @@ type gameDetailResponse struct {
 	CoverImage    *string                        `json:"cover_image"`
 	BannerImage   *string                        `json:"banner_image"`
 	WikiContent   *string                        `json:"wiki_content"`
-	NeedsReview   bool                           `json:"needs_review"`
 	Downloads     int64                          `json:"downloads"`
 	PreviewVideo  *gameAssetResponse             `json:"preview_video"`
 	PreviewVideos []gameAssetResponse            `json:"preview_videos"`
@@ -536,7 +529,6 @@ func toGameListItemResponse(game domain.Game) gameListItemResponse {
 		CoverImage:        game.CoverImage,
 		BannerImage:       game.BannerImage,
 		WikiContent:       game.WikiContent,
-		NeedsReview:       game.NeedsReview,
 		Downloads:         game.Downloads,
 		PrimaryScreenshot: game.PrimaryScreenshot,
 		ScreenshotCount:   game.ScreenshotCount,
@@ -647,7 +639,6 @@ func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDe
 		CoverImage:    detail.Game.CoverImage,
 		BannerImage:   detail.Game.BannerImage,
 		WikiContent:   detail.Game.WikiContent,
-		NeedsReview:   detail.Game.NeedsReview,
 		Downloads:     detail.Game.Downloads,
 		PreviewVideo:  previewVideo,
 		PreviewVideos: previewVideos,

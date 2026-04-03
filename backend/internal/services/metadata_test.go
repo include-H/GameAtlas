@@ -21,14 +21,14 @@ func TestSlugify(t *testing.T) {
 	}
 }
 
-func TestFilterSeriesItems(t *testing.T) {
+func TestFilterMetadataItems(t *testing.T) {
 	items := []domain.MetadataItem{
 		{ID: 1, Name: "Zelda", GameCount: 2},
 		{ID: 2, Name: "Mario", GameCount: 5},
 		{ID: 3, Name: "Metroid", GameCount: 3},
 	}
 
-	got := filterSeriesItems(items, MetadataListOptions{
+	got := filterMetadataItems(items, MetadataListOptions{
 		Search: "m",
 		Sort:   "popular",
 		Limit:  2,
@@ -39,6 +39,26 @@ func TestFilterSeriesItems(t *testing.T) {
 	}
 	if got[0].Name != "Mario" || got[1].Name != "Metroid" {
 		t.Fatalf("filtered order = [%s, %s], want [Mario, Metroid]", got[0].Name, got[1].Name)
+	}
+}
+
+func TestFilterMetadataItemsForSimpleResources(t *testing.T) {
+	items := []domain.MetadataItem{
+		{ID: 1, Name: "Switch"},
+		{ID: 2, Name: "PC-98"},
+		{ID: 3, Name: "PC"},
+	}
+
+	got := filterMetadataItems(items, MetadataListOptions{
+		Search: "pc",
+		Limit:  1,
+	})
+
+	if len(got) != 1 {
+		t.Fatalf("len(filtered) = %d, want 1", len(got))
+	}
+	if got[0].Name != "PC" {
+		t.Fatalf("filtered[0].Name = %q, want PC", got[0].Name)
 	}
 }
 

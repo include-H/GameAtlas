@@ -12,7 +12,6 @@ type Game struct {
 	CoverImage        *string `db:"cover_image"`
 	BannerImage       *string `db:"banner_image"`
 	WikiContent       *string `db:"wiki_content"`
-	NeedsReview       bool    `db:"needs_review"`
 	Downloads         int64   `db:"downloads"`
 	PrimaryScreenshot *string `db:"primary_screenshot"`
 	ScreenshotCount   int64   `db:"screenshot_count"`
@@ -134,7 +133,6 @@ type GamesListParams struct {
 	SeriesID              int64
 	PlatformID            int64
 	TagIDs                []int64
-	NeedsReview           *bool
 	PendingOnly           bool
 	PendingIncludeIgnored bool
 	PendingIssue          string
@@ -183,7 +181,6 @@ type GameCoreInput struct {
 	Engine      *string `json:"engine"`
 	CoverImage  *string `json:"cover_image"`
 	BannerImage *string `json:"banner_image"`
-	NeedsReview bool    `json:"needs_review"`
 }
 
 type GameWriteInput struct {

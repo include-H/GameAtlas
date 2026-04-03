@@ -8,6 +8,8 @@ import {
 import { seriesService } from '@/services/series.service'
 import platformService from '@/services/platforms.service'
 import tagsService from '@/services/tags.service'
+import { developersService } from '@/services/developers.service'
+import { publishersService } from '@/services/publishers.service'
 import type {
   Developer,
   GameDetail,
@@ -29,6 +31,7 @@ interface UseEditGameFormBootstrapOptions {
   tagOptions: Ref<Tag[]>
   developerOptions: Ref<Developer[]>
   publisherOptions: Ref<Publisher[]>
+  addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
   resetTagSelectionState: () => void
   createEditableScreenshot: (asset: ScreenshotItem | string, index: number) => EditGameEditableScreenshot
   createEditableVideo: (asset: VideoAssetItem | string) => EditGameEditableVideo
@@ -39,6 +42,11 @@ const hasResolvedFilePath = (item: GameFileEntry) => {
 }
 
 export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOptions) => {
+  const handleInitializeOptionsError = (context: string, error: unknown) => {
+    console.error(`Failed to load ${context}:`, error)
+    options.addAlert(`加载编辑元数据失败：${context}`, 'error')
+  }
+
   const hydrateFormFromGame = (game: GameDetail | null) => {
     if (!game) {
       options.form.value = createEmptyEditGameForm()
@@ -90,13 +98,12 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
         }
       }
     } catch (error) {
-      console.error('Failed to load series:', error)
+      handleInitializeOptionsError('系列', error)
     }
 
     try {
-      const { developersService } = await import('@/services/developers.service')
-      const popularDevelopers = await developersService.getPopularDevelopers(50)
-      options.developerOptions.value = popularDevelopers
+      const initialDevelopers = await developersService.listDevelopers({ limit: 50 })
+      options.developerOptions.value = initialDevelopers
       if (currentGame?.developers.length) {
         for (const developer of currentGame.developers) {
           const existing = options.developerOptions.value.find((item) => item.id === developer.id)
@@ -106,13 +113,12 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
         }
       }
     } catch (error) {
-      console.error('Failed to load developers:', error)
+      handleInitializeOptionsError('开发商', error)
     }
 
     try {
-      const { publishersService } = await import('@/services/publishers.service')
-      const popularPublishers = await publishersService.getPopularPublishers(50)
-      options.publisherOptions.value = popularPublishers
+      const initialPublishers = await publishersService.listPublishers({ limit: 50 })
+      options.publisherOptions.value = initialPublishers
       if (currentGame?.publishers.length) {
         for (const publisher of currentGame.publishers) {
           const existing = options.publisherOptions.value.find((item) => item.id === publisher.id)
@@ -122,14 +128,14 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
         }
       }
     } catch (error) {
-      console.error('Failed to load publishers:', error)
+      handleInitializeOptionsError('发行商', error)
     }
 
     try {
-      const allPlatforms = await platformService.getAllPlatforms()
+      const allPlatforms = await platformService.listPlatforms()
       options.platformOptions.value = allPlatforms
     } catch (error) {
-      console.error('Failed to load platforms:', error)
+      handleInitializeOptionsError('平台', error)
     }
 
     try {
@@ -140,7 +146,7 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
       options.tagGroups.value = loadedGroups.sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)
       options.tagOptions.value = loadedTags
     } catch (error) {
-      console.error('Failed to load tags:', error)
+      handleInitializeOptionsError('标签', error)
     }
   }
 

@@ -8,6 +8,7 @@
       v-for="(style, index) in layerStyles"
       :key="index"
       class="shared-ambient-bg__layer"
+      :class="{ 'is-active': activeLayerIndex === index }"
       :style="{
         ...style,
         opacity: isEnabled ? (activeLayerIndex === index ? 0.58 : 0) : 0,
@@ -22,16 +23,11 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
-import { getRouteParamString, useNamedRouteGuard } from '@/composables/useNamedRouteGuard'
-import gamesService from '@/services/games.service'
 import { useUiStore } from '@/stores/ui'
-import { resolveAssetUrl } from '@/utils/asset-url'
 
 const route = useRoute()
 const uiStore = useUiStore()
-const { ambientBackgroundOverride, sharedBackgroundAvailability } = storeToRefs(uiStore)
-const gameDetailRouteGuard = useNamedRouteGuard(route, 'game-detail')
-const wikiEditRouteGuard = useNamedRouteGuard(route, 'wiki-edit')
+const { ambientBackgroundSource, sharedBackgroundAvailability } = storeToRefs(uiStore)
 
 const SUPPORTED_ROUTE_NAMES = new Set([
   'login',
@@ -47,23 +43,17 @@ const SUPPORTED_ROUTE_NAMES = new Set([
 
 const DEFAULT_BACKGROUND =
   'radial-gradient(circle at 18% 18%, rgba(122, 162, 199, 0.16), transparent 34%), radial-gradient(circle at 82% 12%, rgba(70, 98, 128, 0.18), transparent 28%), linear-gradient(180deg, rgba(10, 14, 21, 0.98), rgba(16, 22, 31, 0.92))'
+const APPLY_DELAY_MS = 30
 
 const layerUrls = ref<string[]>(['', ''])
 const activeLayerIndex = ref(0)
 const hasAppliedBackground = ref(false)
 const applyRequestId = ref(0)
 
-const LIST_CANDIDATE_LIMIT = 24
 const CUSTOM_BACKGROUND_PATH = '/data/bg.jpg'
 
 const isEnabled = computed(() => SUPPORTED_ROUTE_NAMES.has(String(route.name || '')))
-const pendingCenterOverrideUrl = computed(() => {
-  if (route.name !== 'pending-center') {
-    return ''
-  }
-
-  return resolveAssetUrl(ambientBackgroundOverride.value?.url || '')
-})
+const currentBackgroundUrls = computed(() => ambientBackgroundSource.value?.urls || [])
 
 const buildLayerStyle = (url: string) => {
   if (url) {
@@ -105,55 +95,22 @@ const preloadImage = (url: string) => {
   })
 }
 
+const wait = (ms: number) => new Promise((resolve) => {
+  window.setTimeout(resolve, ms)
+})
+
 const canUseCustomBackground = computed(() => sharedBackgroundAvailability.value === 'available')
 
-const pickRandomFromUrls = async (urls: Array<string | null | undefined>) => {
-  for (const url of shuffleArray(urls)) {
-    const resolvedUrl = resolveAssetUrl(url)
-    if (!resolvedUrl) continue
+const pickRandomBackground = async (urls: string[], currentUrl: string) => {
+  const uniqueUrls = urls.filter((url, index) => url && urls.indexOf(url) === index)
+  const preferredUrls = uniqueUrls.length > 1
+    ? uniqueUrls.filter((url) => url !== currentUrl)
+    : uniqueUrls
+  const candidateUrls = preferredUrls.length > 0 ? preferredUrls : uniqueUrls
 
-    if (await preloadImage(resolvedUrl)) {
-      return resolvedUrl
-    }
-  }
-
-  return ''
-}
-
-const pickGameScopedBackground = async (gameId: string) => {
-  try {
-    const detail = await gamesService.getGame(gameId)
-    const screenshotUrl = await pickRandomFromUrls(detail.screenshots.map((item) => item.path))
-    if (screenshotUrl) {
-      return screenshotUrl
-    }
-
-    return pickRandomFromUrls([detail.banner_image, detail.cover_image])
-  } catch {
-    return ''
-  }
-}
-
-const pickBackgroundFromGames = async () => {
-  const response = await gamesService.getGames({
-    query: {
-      page: 1,
-      limit: LIST_CANDIDATE_LIMIT,
-    },
-    sort: {
-      field: 'updated_at',
-      order: 'desc',
-    },
-  })
-
-  for (const game of shuffleArray(response.data)) {
-    if (!game.public_id) {
-      continue
-    }
-
-    const backgroundUrl = await pickGameScopedBackground(game.public_id)
-    if (backgroundUrl) {
-      return backgroundUrl
+  for (const url of shuffleArray(candidateUrls)) {
+    if (await preloadImage(url)) {
+      return url
     }
   }
 
@@ -161,31 +118,15 @@ const pickBackgroundFromGames = async () => {
 }
 
 const loadBackground = async () => {
-  if (pendingCenterOverrideUrl.value) {
-    return pendingCenterOverrideUrl.value
-  }
-
-  const detailBackground = await gameDetailRouteGuard.runWhenActive(async () => {
-    const gameId = getRouteParamString(route, 'publicId')
-    return gameId ? pickGameScopedBackground(gameId) : ''
-  })
-  if (typeof detailBackground === 'string') {
-    return detailBackground
-  }
-
-  const wikiBackground = await wikiEditRouteGuard.runWhenActive(async () => {
-    const gameId = getRouteParamString(route, 'publicId')
-    return gameId ? pickGameScopedBackground(gameId) : ''
-  })
-  if (typeof wikiBackground === 'string') {
-    return wikiBackground
+  if (currentBackgroundUrls.value.length > 0) {
+    return pickRandomBackground(currentBackgroundUrls.value, layerUrls.value[activeLayerIndex.value] || '')
   }
 
   if (canUseCustomBackground.value) {
     return CUSTOM_BACKGROUND_PATH
   }
 
-  return pickBackgroundFromGames()
+  return ''
 }
 
 const applyBackground = async () => {
@@ -224,6 +165,13 @@ const applyBackground = async () => {
   const nextLayerIndex = activeLayerIndex.value === 0 ? 1 : 0
   layerUrls.value[nextLayerIndex] = nextUrl
 
+  await nextTick()
+  await wait(APPLY_DELAY_MS)
+
+  if (requestId !== applyRequestId.value) {
+    return
+  }
+
   requestAnimationFrame(() => {
     if (requestId !== applyRequestId.value) {
       return
@@ -234,10 +182,10 @@ const applyBackground = async () => {
 
 watch(
   [
-    () => route.fullPath,
     isEnabled,
-    () => pendingCenterOverrideUrl.value,
-    () => ambientBackgroundOverride.value?.key || '',
+    () => ambientBackgroundSource.value?.owner || '',
+    () => ambientBackgroundSource.value?.key || '',
+    () => (ambientBackgroundSource.value?.urls || []).join('|'),
     () => sharedBackgroundAvailability.value,
   ],
   async () => {

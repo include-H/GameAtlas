@@ -1,23 +1,27 @@
 import { get, post } from './api'
 import type { ApiEnvelope, Publisher } from './types'
 
-async function listPublishers(): Promise<Publisher[]> {
-  const response = await get<ApiEnvelope<Publisher[]>>('/publishers')
-  return response.data
+interface ListPublishersOptions {
+  query?: string
+  limit?: number
 }
 
 export const publishersService = {
+  async listPublishers(options: ListPublishersOptions = {}): Promise<Publisher[]> {
+    const queryParams = new URLSearchParams()
+    if (options.query?.trim()) queryParams.append('search', options.query.trim())
+    if (options.limit) queryParams.append('limit', String(options.limit))
+    const response = await get<ApiEnvelope<Publisher[]>>('/publishers', { params: queryParams })
+    return response.data || []
+  },
+
   async getPopularPublishers(limit?: number): Promise<(Publisher & { game_count: number })[]> {
-    const all = await listPublishers()
-    return all.slice(0, limit || all.length).map((item) => ({ ...item, game_count: 0 }))
+    const items = await this.listPublishers({ limit })
+    return items.map((item) => ({ ...item, game_count: 0 }))
   },
 
   async searchPublishers(query: string, limit?: number): Promise<Publisher[]> {
-    const all = await listPublishers()
-    const keyword = query.trim().toLowerCase()
-    return all
-      .filter((item) => item.name.toLowerCase().includes(keyword))
-      .slice(0, limit || all.length)
+    return this.listPublishers({ query, limit })
   },
 
   async createPublisher(data: {

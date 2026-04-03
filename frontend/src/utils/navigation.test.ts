@@ -1,51 +1,58 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { createDetailRouteQuery, resolveReturnRoute } from './navigation'
+import { hasHistoryBack, navigateBackOrFallback } from './navigation'
 
 describe('navigation helpers', () => {
-  it('creates a return query from route path name and string query values', () => {
-    const result = createDetailRouteQuery({
-      path: '/games',
-      name: 'games',
-      query: {
-        page: '2',
-        keyword: ['halo', 'ignored'],
-        empty: '',
-        invalid: 123,
-      },
-    } as never)
-
-    expect(result).toEqual({
-      returnPath: '/games',
-      returnName: 'games',
-      returnQuery_page: '2',
-      returnQuery_keyword: 'halo',
-    })
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
-  it('resolves a named return route when returnName exists', () => {
-    const result = resolveReturnRoute(
+  it('detects when browser history can go back', () => {
+    expect(hasHistoryBack(2)).toBe(true)
+    expect(hasHistoryBack(1)).toBe(false)
+  })
+
+  it('uses browser back when there is navigation history', () => {
+    const back = vi.fn()
+    const push = vi.fn()
+
+    vi.stubGlobal('window', {
+      history: {
+        length: 2,
+      },
+    })
+
+    navigateBackOrFallback(
       {
-        query: {
-          returnPath: '/games',
-          returnName: 'games',
-          returnQuery_page: '3',
-        },
+        back,
+        push,
       } as never,
-      { name: 'dashboard' },
+      { name: 'games' },
     )
 
-    expect(result).toEqual({
-      name: 'games',
-      query: {
-        page: '3',
-      },
-    })
+    expect(back).toHaveBeenCalledTimes(1)
+    expect(push).not.toHaveBeenCalled()
   })
 
-  it('falls back when no return route is present', () => {
-    const fallback = { name: 'dashboard' }
+  it('falls back when there is no navigation history', () => {
+    const back = vi.fn()
+    const push = vi.fn()
 
-    expect(resolveReturnRoute({ query: {} } as never, fallback)).toBe(fallback)
+    vi.stubGlobal('window', {
+      history: {
+        length: 1,
+      },
+    })
+
+    navigateBackOrFallback(
+      {
+        back,
+        push,
+      } as never,
+      { name: 'games' },
+    )
+
+    expect(back).not.toHaveBeenCalled()
+    expect(push).toHaveBeenCalledWith({ name: 'games' })
   })
 })

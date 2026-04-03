@@ -126,11 +126,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
-import gamesService from '@/services/games.service'
-import { createDetailRouteQuery } from '@/utils/navigation'
 import {
   IconTrophy
 } from '@arco-design/web-vue/es/icon'
@@ -139,12 +137,14 @@ import CardRow from '@/components/CardRow.vue'
 import GameCard from '@/components/GameCard.vue'
 import GameCarousel from '@/components/GameCarousel.vue'
 import type { GameListItem } from '@/services/types'
+import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
 
 defineOptions({
   name: 'DashboardView',
 })
 
-const route = useRoute()
+const AMBIENT_BACKGROUND_OWNER = 'dashboard'
+
 const router = useRouter()
 const gamesStore = useGamesStore()
 const uiStore = useUiStore()
@@ -157,6 +157,7 @@ const totalGames = computed(() => gamesStore.stats?.total_games || 0)
 const recentAdditions = computed(() => gamesStore.stats?.recent_games || [])
 const mostPlayed = computed(() => gamesStore.stats?.popular_games || [])
 const favoriteCount = computed(() => gamesStore.stats?.favorite_count || 0)
+const pendingReviews = computed(() => gamesStore.stats?.pending_reviews || 0)
 
 const isEmpty = computed(() => {
   return recentAdditions.value.length === 0
@@ -177,17 +178,27 @@ const carouselGames = computed(() => {
     .sort(() => Math.random() - 0.5)
 })
 
-const pendingReviewGameCount = ref(0)
-const lastLoadedAt = ref(0)
+const syncAmbientBackground = () => {
+  const imageUrls = getAmbientBackgroundUrlsFromGames([...recentAdditions.value, ...mostPlayed.value])
+  if (imageUrls.length > 0) {
+    uiStore.setAmbientBackgroundSource({
+      owner: AMBIENT_BACKGROUND_OWNER,
+      key: String(gamesStore.stats?.total_games || 0),
+      urls: imageUrls,
+    })
+    return
+  }
 
-const pendingReviews = computed(() => pendingReviewGameCount.value)
+  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+}
+
+const lastLoadedAt = ref(0)
 
 const viewGame = (publicId: string) => {
   if (!publicId) return
   router.push({
     name: 'game-detail',
     params: { publicId },
-    query: createDetailRouteQuery(route),
   })
 }
 
@@ -205,19 +216,8 @@ const loadDashboardData = async () => {
   isLoading.value = true
   isDashboardReady.value = false
   try {
-    const stats = await gamesStore.fetchStats()
-    try {
-      const pendingQueueResponse = await gamesService.getGames({
-        query: {
-          page: 1,
-          limit: 1,
-          pending: true,
-        },
-      })
-      pendingReviewGameCount.value = pendingQueueResponse.pagination.total || 0
-    } catch {
-      pendingReviewGameCount.value = stats.pending_reviews || 0
-    }
+    await gamesStore.fetchStats()
+    syncAmbientBackground()
     isDashboardReady.value = true
     lastLoadedAt.value = Date.now()
   } catch {
@@ -235,7 +235,10 @@ onMounted(async () => {
 onActivated(async () => {
   if (Date.now() - lastLoadedAt.value > 30000) {
     await loadDashboardData()
+    return
   }
+
+  syncAmbientBackground()
 })
 </script>
 

@@ -8,7 +8,7 @@ export interface FilePathItem {
   label: string
 }
 
-export interface FilePathItemUpdatePayload {
+interface FilePathItemUpdatePayload {
   index: number
   field: 'path' | 'label'
   value: string

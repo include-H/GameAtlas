@@ -315,7 +315,7 @@
 </template>
 
 <script setup lang="ts">
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import EditGameModal from '@/components/EditGameModal.vue'
 import { PENDING_WORKBENCH_PAGE_SIZE } from '@/composables/usePendingWorkbench'
@@ -326,7 +326,6 @@ defineOptions({
   name: 'PendingCenterView',
 })
 
-const route = useRoute()
 const router = useRouter()
 const uiStore = useUiStore()
 
@@ -372,7 +371,6 @@ const {
   totalPendingCount,
   viewGame,
 } = usePendingCenterView({
-  route,
   router,
   uiStore,
 })

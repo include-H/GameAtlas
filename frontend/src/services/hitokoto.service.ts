@@ -1,6 +1,6 @@
 import { get } from './api'
 
-export interface HitokotoSentence {
+interface HitokotoSentence {
   id: number
   uuid: string
   hitokoto: string

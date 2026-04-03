@@ -3,9 +3,10 @@ import { ref } from 'vue'
 import { safeLocalStorageGetItem, safeLocalStorageSetItem } from '@/utils/safe-local-storage'
 
 type ViewMode = 'grid' | 'list'
-type AmbientBackgroundOverride = {
+type AmbientBackgroundSource = {
+  owner: string
   key: string
-  url: string
+  urls: string[]
 } | null
 
 type SharedBackgroundAvailability = 'unknown' | 'available' | 'missing'
@@ -18,7 +19,7 @@ export const useUiStore = defineStore('ui', () => {
 
   // UI state
   const sidebarCollapsed = ref(false)
-  const ambientBackgroundOverride = ref<AmbientBackgroundOverride>(null)
+  const ambientBackgroundSource = ref<AmbientBackgroundSource>(null)
   const sharedBackgroundAvailability = ref<SharedBackgroundAvailability>('unknown')
 
   // Alerts
@@ -53,12 +54,16 @@ export const useUiStore = defineStore('ui', () => {
     safeLocalStorageSetItem('sidebarCollapsed', String(value))
   }
 
-  const setAmbientBackgroundOverride = (value: AmbientBackgroundOverride) => {
-    ambientBackgroundOverride.value = value
+  const setAmbientBackgroundSource = (value: AmbientBackgroundSource) => {
+    ambientBackgroundSource.value = value
   }
 
-  const clearAmbientBackgroundOverride = () => {
-    ambientBackgroundOverride.value = null
+  const clearAmbientBackgroundSource = (owner: string) => {
+    if (ambientBackgroundSource.value?.owner !== owner) {
+      return
+    }
+
+    ambientBackgroundSource.value = null
   }
 
   const initializeSharedBackgroundAvailability = async () => {
@@ -115,15 +120,15 @@ export const useUiStore = defineStore('ui', () => {
     // State
     gamesViewMode,
     sidebarCollapsed,
-    ambientBackgroundOverride,
+    ambientBackgroundSource,
     sharedBackgroundAvailability,
     alerts,
     // Actions
     setGamesViewMode,
     initializeViewMode,
     toggleSidebar,
-    setAmbientBackgroundOverride,
-    clearAmbientBackgroundOverride,
+    setAmbientBackgroundSource,
+    clearAmbientBackgroundSource,
     initializeSharedBackgroundAvailability,
     addAlert,
     removeAlert,

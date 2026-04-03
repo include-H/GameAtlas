@@ -51,9 +51,9 @@ func (s *MetadataService) List(resource MetadataResource, includeAll bool, optio
 				filtered = append(filtered, items[index])
 			}
 		}
-		filtered = filterSeriesItems(filtered, options)
 		items = filtered
 	}
+	items = filterMetadataItems(items, options)
 	if items == nil {
 		return []domain.MetadataItem{}, nil
 	}
@@ -153,7 +153,7 @@ func slugify(value string) string {
 	return result
 }
 
-func filterSeriesItems(items []domain.MetadataItem, options MetadataListOptions) []domain.MetadataItem {
+func filterMetadataItems(items []domain.MetadataItem, options MetadataListOptions) []domain.MetadataItem {
 	search := strings.ToLower(strings.TrimSpace(options.Search))
 	if search != "" {
 		filtered := make([]domain.MetadataItem, 0, len(items))

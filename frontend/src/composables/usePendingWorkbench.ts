@@ -1,12 +1,20 @@
 import { computed, ref, watch } from 'vue'
-import pendingWorkbenchService, {
-  PENDING_WORKBENCH_PAGE_SIZE,
-  type PendingWorkbenchSortBy,
-} from '@/services/pending-workbench.service'
+import gamesService from '@/services/games.service'
 import reviewIssuesService from '@/services/review-issues.service'
-import type { GameListItem, PendingIssueDetailState, PendingIssueEvaluation } from '@/services/types'
+import type {
+  GameListItem,
+  GameSort,
+  PendingIssueDetailState,
+  PendingIssueEvaluation,
+} from '@/services/types'
 
-export { PENDING_WORKBENCH_PAGE_SIZE }
+export const PENDING_WORKBENCH_PAGE_SIZE = 10
+
+export type PendingWorkbenchSortBy =
+  | 'issue-count'
+  | 'created-desc'
+  | 'updated-asc'
+  | 'downloads-desc'
 
 interface UsePendingWorkbenchOptions {
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
@@ -97,20 +105,29 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   const loadWorkbenchGames = async (page = currentPage.value) => {
     isLoading.value = true
     try {
-      const snapshot = await pendingWorkbenchService.getSnapshot(
-        page,
-        PENDING_WORKBENCH_PAGE_SIZE,
-        buildWorkbenchQuery(),
-      )
-      queueGames.value = snapshot.queueGames
-      backendIgnoredOverridesCount.value = snapshot.ignoredTotal
-      backendIssueCounts.value = snapshot.issueCounts
-      currentPage.value = snapshot.page
-      totalPages.value = snapshot.totalPages
-      totalPendingCount.value = snapshot.total
+      const query = buildWorkbenchQuery()
+      const response = await gamesService.getGames({
+        query: {
+          page,
+          limit: PENDING_WORKBENCH_PAGE_SIZE,
+          pending: true,
+          search: query.search,
+          pending_issue: query.issue,
+          pending_include_ignored: query.showIgnored,
+          pending_severe: query.onlySevere,
+          pending_recent_days: query.onlyRecent ? 7 : undefined,
+        },
+        sort: resolvePendingWorkbenchSort(query.sortBy),
+      })
+      queueGames.value = response.data
+      backendIgnoredOverridesCount.value = response.pagination.pending_issue_counts?.ignored_total || 0
+      backendIssueCounts.value = response.pagination.pending_issue_counts?.groups || {}
+      currentPage.value = response.pagination.page
+      totalPages.value = response.pagination.totalPages
+      totalPendingCount.value = response.pagination.total
 
-      if (snapshot.page > snapshot.totalPages && snapshot.totalPages > 0) {
-        await loadWorkbenchGames(snapshot.totalPages)
+      if (response.pagination.page > response.pagination.totalPages && response.pagination.totalPages > 0) {
+        await loadWorkbenchGames(response.pagination.totalPages)
       }
     } catch {
       options.addAlert('加载待处理工作台失败', 'error')
@@ -187,4 +204,18 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     changePage,
     resetFilters,
   }
+}
+
+function resolvePendingWorkbenchSort(sortBy: PendingWorkbenchSortBy | undefined): GameSort {
+  if (sortBy === 'created-desc') {
+    return { field: 'created_at', order: 'desc' }
+  }
+  if (sortBy === 'downloads-desc') {
+    return { field: 'downloads', order: 'desc' }
+  }
+  if (sortBy === 'updated-asc') {
+    return { field: 'updated_at', order: 'asc' }
+  }
+
+  return { field: 'pending_issue_count', order: 'desc' }
 }

@@ -18,27 +18,29 @@ describe('platform service', () => {
     postMock.mockReset()
   })
 
-  it('loads all platforms from the api envelope', async () => {
+  it('lists all platforms from the api envelope', async () => {
     getMock.mockResolvedValue({
       data: [{ id: 1, name: 'PC' }],
     })
 
-    await expect(platformService.getAllPlatforms()).resolves.toEqual([{ id: 1, name: 'PC' }])
-    expect(getMock).toHaveBeenCalledWith('/platforms')
+    await expect(platformService.listPlatforms()).resolves.toEqual([{ id: 1, name: 'PC' }])
+    expect(getMock).toHaveBeenCalledWith('/platforms', {
+      params: expect.any(URLSearchParams),
+    })
   })
 
-  it('searches platforms case-insensitively and respects the limit', async () => {
+  it('passes search and limit to the api', async () => {
     getMock.mockResolvedValue({
-      data: [
-        { id: 1, name: 'PC' },
-        { id: 2, name: 'PC-98' },
-        { id: 3, name: 'Switch' },
-      ],
+      data: [{ id: 1, name: 'PC' }],
     })
 
-    await expect(platformService.searchPlatforms('pc', 1)).resolves.toEqual([
-      { id: 1, name: 'PC' },
-    ])
+    await expect(platformService.listPlatforms({ query: ' pc ', limit: 1 })).resolves.toEqual([{ id: 1, name: 'PC' }])
+
+    expect(getMock).toHaveBeenCalledWith('/platforms', {
+      params: expect.any(URLSearchParams),
+    })
+    const [, config] = getMock.mock.calls[0]
+    expect((config.params as URLSearchParams).toString()).toBe('search=pc&limit=1')
   })
 
   it('creates a platform via post', async () => {

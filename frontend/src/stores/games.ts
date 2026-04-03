@@ -37,7 +37,7 @@ export const useGamesStore = defineStore('games', () => {
       || stats.value?.popular_games.find(game => game.public_id === gameId)
       || null
 
-    games.value.forEach(game => {
+    games.value.forEach((game) => {
       if (game.public_id === gameId) {
         updateGame(game)
       }

@@ -30,6 +30,7 @@ func TestRunMigrationsOnFreshDatabaseAppliesAllEmbeddedFiles(t *testing.T) {
 	assertTableExists(t, db, "game_assets")
 	assertTableExists(t, db, "tag_groups")
 	assertColumnExists(t, db, "games", "series_id")
+	assertColumnMissing(t, db, "games", "needs_review")
 	assertIndexExists(t, db, "idx_games_release_date_id")
 	assertIndexExists(t, db, "idx_games_public_id")
 	assertIndexExists(t, db, "idx_game_assets_game_type_sort_id")
@@ -181,4 +182,28 @@ func assertColumnExists(t *testing.T, db *sqlx.DB, table string, column string) 
 	}
 
 	t.Fatalf("column %q does not exist on table %q", column, table)
+}
+
+func assertColumnMissing(t *testing.T, db *sqlx.DB, table string, column string) {
+	t.Helper()
+
+	type tableInfoRow struct {
+		CID          int     `db:"cid"`
+		Name         string  `db:"name"`
+		Type         string  `db:"type"`
+		NotNull      int     `db:"notnull"`
+		DefaultValue *string `db:"dflt_value"`
+		PrimaryKey   int     `db:"pk"`
+	}
+
+	var rows []tableInfoRow
+	if err := db.Select(&rows, "PRAGMA table_info("+table+")"); err != nil {
+		t.Fatalf("check columns for table %q returned error: %v", table, err)
+	}
+
+	for _, row := range rows {
+		if row.Name == column {
+			t.Fatalf("column %q unexpectedly exists on table %q", column, table)
+		}
+	}
 }

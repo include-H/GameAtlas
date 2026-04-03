@@ -32,7 +32,6 @@ const baseGame = {
   cover_image: null,
   banner_image: null,
   wiki_content: null,
-  needs_review: false,
   primary_screenshot: null,
   screenshot_count: 0,
   file_count: 0,
@@ -81,7 +80,6 @@ describe('games service', () => {
         search: 'halo',
         series: 'fps',
         platform: 'pc',
-        needs_review: true,
         pending: false,
         tag: [3, 7],
       },
@@ -104,7 +102,6 @@ describe('games service', () => {
     expect(params.get('search')).toBe('halo')
     expect(params.get('series')).toBe('fps')
     expect(params.get('platform')).toBe('pc')
-    expect(params.get('needs_review')).toBe('true')
     expect(params.get('pending')).toBe('false')
     expect(params.getAll('tag')).toEqual(['3', '7'])
     expect(params.get('sort')).toBe('updated_at')
@@ -343,7 +340,6 @@ describe('games service', () => {
         engine: null,
         cover_image: null,
         banner_image: null,
-        needs_review: false,
       },
       assets: {
         files: [],

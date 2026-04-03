@@ -65,7 +65,7 @@
 import type { Tag, TagGroup } from '@/services/types'
 import type { SelectOptionValue } from '@arco-design/web-vue/es/select/interface'
 
-export type GameTagSelectionValue =
+type GameTagSelectionValue =
   | string
   | number
   | string[]

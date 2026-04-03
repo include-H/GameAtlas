@@ -450,6 +450,52 @@ func TestGamesHandlerListPendingUsesNativePendingQueryOptions(t *testing.T) {
 	}
 }
 
+func TestGamesHandlerListReturnsInternalServerErrorWhenPendingOverridesLookupFails(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	insertGamesHandlerTestGame(t, db, "pending-overrides-error", "Pending Overrides Error", "public", "")
+	if _, err := db.Exec(`DROP TABLE game_review_issue_overrides`); err != nil {
+		t.Fatalf("drop override table: %v", err)
+	}
+
+	service := services.NewGamesService(
+		config.Config{},
+		repositories.NewGamesRepository(db),
+		repositories.NewGameFilesRepository(db),
+		repositories.NewMetadataRepository(db),
+		repositories.NewTagsRepository(db),
+		repositories.NewReviewIssueOverrideRepository(db),
+	)
+	handler := NewGamesHandler(service)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/games?limit=10", nil)
+
+	handler.List(context)
+
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusInternalServerError, recorder.Body.String())
+	}
+
+	var response struct {
+		Success bool   `json:"success"`
+		Error   string `json:"error"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Success {
+		t.Fatalf("expected success=false")
+	}
+	if response.Error != "internal server error" {
+		t.Fatalf("error = %q, want internal server error", response.Error)
+	}
+}
+
 func TestGamesHandlerCreateReturnsBadRequestWhenTitleMissing(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 

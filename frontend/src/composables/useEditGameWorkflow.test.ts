@@ -128,6 +128,7 @@ describe('useEditGameWorkflow', () => {
   })
 
   it('aborts submit when series resolution fails', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { options, addAlert, emitSuccess, closeModal } = buildOptions()
     options.form.value.series_id = 'Broken Series'
     createSeriesMock.mockRejectedValue(new Error('boom'))
@@ -140,9 +141,11 @@ describe('useEditGameWorkflow', () => {
     expect(emitSuccess).not.toHaveBeenCalled()
     expect(closeModal).not.toHaveBeenCalled()
     expect(options.isSubmitting.value).toBe(false)
+    consoleErrorSpy.mockRestore()
   })
 
   it('aborts submit when tag resolution fails', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { options, addAlert, emitSuccess, closeModal } = buildOptions()
     options.resolveTagSelections = vi.fn().mockRejectedValue(new Error('tag boom'))
 
@@ -154,5 +157,6 @@ describe('useEditGameWorkflow', () => {
     expect(emitSuccess).not.toHaveBeenCalled()
     expect(closeModal).not.toHaveBeenCalled()
     expect(options.isSubmitting.value).toBe(false)
+    consoleErrorSpy.mockRestore()
   })
 })

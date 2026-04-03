@@ -10,7 +10,6 @@ export default {
   component: () => import('@/views/GamesView.vue'),
   meta: {
     title: '游戏库',
-    keepAlive: true,
     icon: IconTrophy,
   },
 } as RouteRecordRaw
@@ -24,7 +23,6 @@ export const timelineRoute = {
   component: () => import('@/views/GamesTimelineView.vue'),
   meta: {
     title: '发售时间线',
-    keepAlive: true,
     icon: IconCalendarClock,
   },
 } as RouteRecordRaw
@@ -38,7 +36,6 @@ export const gameDetailRoute = {
   component: () => import('@/views/GameDetailView.vue'),
   meta: {
     title: '游戏详情',
-    keepAlive: true,
     hideInMenu: true,
     activeMenu: 'games',
   },
@@ -57,7 +54,6 @@ export const pendingCenterRoute = {
     hideOnCompactNavigation: true,
     title: '待处理工作台',
     requiresAdmin: true,
-    keepAlive: true,
     icon: IconExclamationCircle,
   },
 } as RouteRecordRaw
@@ -72,7 +68,6 @@ export const wikiEditRoute = {
   meta: {
     title: '编辑Wiki',
     requiresAdmin: true,
-    keepAlive: true,
     hideInMenu: true,
     activeMenu: 'games',
   },

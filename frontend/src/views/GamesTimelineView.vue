@@ -74,16 +74,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onActivated, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import GameCard from '@/components/GameCard.vue'
 import gamesService from '@/services/games.service'
 import type { TimelineGame } from '@/services/types'
-import { createDetailRouteQuery } from '@/utils/navigation'
+import { useUiStore } from '@/stores/ui'
+import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
 
 defineOptions({
   name: 'GamesTimelineView',
 })
+
+const AMBIENT_BACKGROUND_OWNER = 'games-timeline'
 
 interface TimelineMonthGroup {
   key: string
@@ -105,8 +108,8 @@ interface TimelineRow {
 const TIMELINE_YEARS = 2
 const TIMELINE_PAGE_SIZE = 60
 
-const route = useRoute()
 const router = useRouter()
+const uiStore = useUiStore()
 
 const isLoading = ref(false)
 const isLoadingMore = ref(false)
@@ -117,6 +120,20 @@ const currentWindowFrom = ref<string | null>(null)
 const currentWindowTo = ref<string | null>(null)
 const scrollRootRef = ref<HTMLElement | null>(null)
 const hasLoadedTimeline = ref(false)
+
+const syncAmbientBackground = (games: TimelineGame[]) => {
+  const imageUrls = getAmbientBackgroundUrlsFromGames(games)
+  if (imageUrls.length > 0) {
+    uiStore.setAmbientBackgroundSource({
+      owner: AMBIENT_BACKGROUND_OWNER,
+      key: `${currentWindowFrom.value || 'timeline'}:${games.length}`,
+      urls: imageUrls,
+    })
+    return
+  }
+
+  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+}
 
 const parseDateParts = (value?: string | null) => {
   const raw = (value || '').trim()
@@ -261,6 +278,7 @@ const loadTimeline = async () => {
     nextCursor.value = response.nextCursor
     currentWindowFrom.value = response.from
     currentWindowTo.value = response.to
+    syncAmbientBackground(response.data)
     hasLoadedTimeline.value = true
   } finally {
     isLoading.value = false
@@ -272,7 +290,6 @@ const openGame = (publicId: string) => {
   router.push({
     name: 'game-detail',
     params: { publicId },
-    query: createDetailRouteQuery(route),
   })
 }
 
@@ -281,6 +298,10 @@ onMounted(() => {
   // each "load more" request spans another two-year backend window, and automatic scroll loading
   // can quickly chain multiple requests together when the page height is still shorter than the viewport.
   loadTimeline()
+})
+
+onActivated(() => {
+  syncAmbientBackground(allGames.value)
 })
 
 onBeforeUnmount(() => {

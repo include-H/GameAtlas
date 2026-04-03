@@ -134,42 +134,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { defineAsyncComponent, onActivated, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useWikiEditDocument } from '@/composables/useWikiEditDocument'
+import { useWikiEditHistory } from '@/composables/useWikiEditHistory'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
-import wikiService, { type WikiDocumentResponse, type WikiHistoryEntry } from '@/services/wiki.service'
-import { useNamedRouteGuard, watchRouteParamWhenActive } from '@/composables/useNamedRouteGuard'
-import { resolveReturnRoute } from '@/utils/navigation'
-import { getHttpErrorMessage } from '@/utils/http-error'
+import { navigateBackOrFallback } from '@/utils/navigation'
+import { formatDisplayDateTime } from '@/utils/date'
+import { getAmbientBackgroundUrlsFromGameDetail } from '@/utils/ambient-background'
 import {
   IconSave
 } from '@arco-design/web-vue/es/icon'
 import WikiEditor from '@/components/WikiEditor.vue'
 
+const AMBIENT_BACKGROUND_OWNER = 'wiki-edit'
+
 const route = useRoute()
 const router = useRouter()
 const gamesStore = useGamesStore()
 const uiStore = useUiStore()
-const { runWhenActive } = useNamedRouteGuard(route, 'wiki-edit')
 
-const game = computed(() => gamesStore.currentGame)
-const wiki = ref<WikiDocumentResponse | null>(null)
-const historyEntries = ref<WikiHistoryEntry[]>([])
-const selectedHistory = ref<WikiHistoryEntry | null>(null)
-const isHistoryLoading = ref(false)
-const previewHistoryContent = ref(true)
-const historyPreviewVisible = ref(false)
 const MarkdownRenderer = defineAsyncComponent(() => import('@/components/MarkdownRenderer.vue'))
-
-const isSaving = ref(false)
-
-const wikiData = ref({
-  content: '',
-  change_summary: '',
-})
-
-const isExisting = computed(() => Boolean(wiki.value?.content))
 
 const getGameDetailRoute = () => {
   if (!game.value?.public_id) {
@@ -183,135 +169,86 @@ const getGameDetailRoute = () => {
 }
 
 const handleCancel = () => {
-  router.push(resolveReturnRoute(route, getGameDetailRoute()))
+  navigateBackOrFallback(router, getGameDetailRoute())
 }
 
-const handleSave = async () => {
-  if (!game.value?.public_id) return
+const formatDateTime = (value?: string) => formatDisplayDateTime(value)
 
-  isSaving.value = true
-
-  try {
-    const wikiDataToSend = {
-      content: wikiData.value.content,
-      change_summary: wikiData.value.change_summary.trim() || undefined,
-    }
-
-    await wikiService.updateWikiPage(game.value.public_id, wikiDataToSend)
-    uiStore.addAlert(isExisting.value ? 'Wiki 已更新' : 'Wiki 已创建', 'success')
-    wikiData.value.change_summary = ''
-    await loadHistory(game.value.public_id)
-
-    router.push(resolveReturnRoute(route, getGameDetailRoute()))
-  } catch (error) {
-    const errorMessage = getHttpErrorMessage(error, '保存 Wiki 失败')
-    uiStore.addAlert(errorMessage, 'error')
-    console.error('Failed to save wiki:', error)
-  } finally {
-    isSaving.value = false
-  }
-}
-
-const loadHistory = async (gameId: string) => {
-  isHistoryLoading.value = true
-  try {
-    historyEntries.value = await wikiService.getWikiHistory(gameId)
-    selectedHistory.value = historyEntries.value[0] || null
-  } catch {
-    historyEntries.value = []
-    selectedHistory.value = null
-  } finally {
-    isHistoryLoading.value = false
-  }
-}
-
-const restoreHistory = () => {
-  if (!selectedHistory.value) return
-  wikiData.value.content = selectedHistory.value.content
-  wikiData.value.change_summary = `恢复历史版本：${selectedHistory.value.change_summary || formatDateTime(selectedHistory.value.created_at)}`
-  historyPreviewVisible.value = false
-  uiStore.addAlert('已将历史版本内容恢复到编辑器', 'success')
-}
-
-const openHistoryDialog = () => {
-  if (historyEntries.value.length === 0) return
-  if (!selectedHistory.value) {
-    selectedHistory.value = historyEntries.value[0] || null
-  }
-  previewHistoryContent.value = true
-  historyPreviewVisible.value = true
-}
-
-const openHistoryPreview = (entry: WikiHistoryEntry) => {
-  selectedHistory.value = entry
-  previewHistoryContent.value = true
-  historyPreviewVisible.value = true
-}
-
-const formatDateTime = (value?: string) => {
-  if (!value) return ''
-  const normalizedValue = value.includes('T') ? value : value.replace(' ', 'T')
-  const utcValue = /(?:Z|[+-]\d{2}:\d{2})$/.test(normalizedValue) ? normalizedValue : `${normalizedValue}Z`
-  const date = new Date(utcValue)
-  if (Number.isNaN(date.getTime())) return value
-
-  const formatter = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-
-  const parts = formatter.formatToParts(date)
-  const getPart = (type: Intl.DateTimeFormatPartTypes) => parts.find(part => part.type === type)?.value || ''
-  return `${getPart('year')}-${getPart('month')}-${getPart('day')} ${getPart('hour')}:${getPart('minute')}`
-}
-
-const loadWikiEditorData = async (gameId: string) => {
-  await runWhenActive(async () => {
-    try {
-      await gamesStore.fetchGame(gameId)
-      wiki.value = null
-      wikiData.value = {
-        content: '',
-        change_summary: '',
-      }
-      historyEntries.value = []
-      selectedHistory.value = null
-
-      // Try to load existing wiki
-      try {
-        const wikiContent = await wikiService.getWikiPage(gameId)
-        if (wikiContent && wikiContent.content) {
-          wiki.value = wikiContent
-          wikiData.value = {
-            content: wikiContent.content,
-            change_summary: '',
-          }
-        }
-      } catch {
-        // Wiki doesn't exist yet
-      }
-
-      await loadHistory(gameId)
-    } catch {
-      uiStore.addAlert('Failed to load game', 'error')
-      router.push({ name: 'games' })
-    }
-  })
-}
-
-watchRouteParamWhenActive(
-  route,
-  'wiki-edit',
-  'publicId',
-  async (gameId) => {
-    await loadWikiEditorData(gameId)
+const {
+  game,
+  wikiData,
+  isSaving,
+  isExisting,
+  loadWikiEditorData,
+  handleSave,
+} = useWikiEditDocument({
+  gamesStore,
+  uiStore,
+  onLoadGameFailed: () => {
+    router.push({ name: 'games' })
   },
+  onSaveSuccess: async () => {
+    if (game.value?.public_id) {
+      await loadHistory(game.value.public_id)
+    }
+    navigateBackOrFallback(router, getGameDetailRoute())
+  },
+})
+
+const {
+  historyEntries,
+  selectedHistory,
+  isHistoryLoading,
+  previewHistoryContent,
+  historyPreviewVisible,
+  resetHistoryState,
+  loadHistory,
+  restoreHistory,
+  openHistoryDialog,
+  openHistoryPreview,
+} = useWikiEditHistory({
+  wikiData,
+  addAlert: (message, type) => uiStore.addAlert(message, type),
+  formatDateTime,
+})
+
+const syncAmbientBackground = () => {
+  const imageUrls = getAmbientBackgroundUrlsFromGameDetail(game.value)
+  if (!game.value?.public_id || imageUrls.length === 0) {
+    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+    return
+  }
+
+  uiStore.setAmbientBackgroundSource({
+    owner: AMBIENT_BACKGROUND_OWNER,
+    key: game.value.public_id,
+    urls: imageUrls,
+  })
+}
+
+watch(
+  () => {
+    const rawValue = route.params.publicId
+    return typeof rawValue === 'string' ? rawValue.trim() : Array.isArray(rawValue) ? String(rawValue[0] || '').trim() : ''
+  },
+  async (gameId) => {
+    if (!gameId) {
+      return
+    }
+    await loadWikiEditorData(gameId)
+    resetHistoryState()
+    await loadHistory(gameId)
+  },
+  { immediate: true },
 )
+
+watch(game, () => {
+  syncAmbientBackground()
+}, { immediate: true })
+
+onActivated(() => {
+  syncAmbientBackground()
+})
 </script>
 
 <style scoped>

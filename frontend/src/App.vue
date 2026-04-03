@@ -98,24 +98,12 @@
 
         <a-layout-content class="content">
           <router-view v-slot="{ Component, route }">
-            <template v-if="route.meta?.keepAlive !== false">
-              <keep-alive>
-                <div
-                  :key="String(route.name || route.path)"
-                  class="route-fade-shell"
-                >
-                  <component :is="Component" />
-                </div>
-              </keep-alive>
-            </template>
-            <template v-else>
-              <div
-                :key="String(route.name || route.path)"
-                class="route-fade-shell"
-              >
-                <component :is="Component" />
-              </div>
-            </template>
+            <div
+              :key="String(route.name || route.path)"
+              class="route-fade-shell"
+            >
+              <component :is="Component" />
+            </div>
           </router-view>
 
           <alert-banner />
@@ -131,10 +119,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
-import { Message } from '@arco-design/web-vue'
 import useMenu from '@/hooks/useMenu'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
@@ -191,10 +178,10 @@ const handleAuthAction = async () => {
 
   try {
     await authStore.logout()
-    showMessage('已退出管理模式', 'success')
+    uiStore.addAlert('已退出管理模式', 'success')
     router.push({ name: 'dashboard' })
   } catch {
-    showMessage('退出失败', 'error')
+    uiStore.addAlert('退出失败', 'error')
   }
 }
 
@@ -225,23 +212,6 @@ const handleMobileOpenKeysChange = (keys: string[]) => {
   mobileOpenKeys.value = keys
 }
 
-const showMessage = (content: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
-  switch (type) {
-    case 'success':
-      Message.success(content)
-      break
-    case 'warning':
-      Message.warning(content)
-      break
-    case 'error':
-      Message.error(content)
-      break
-    default:
-      Message.info(content)
-      break
-  }
-}
-
 const handleResize = () => {
   const compact = window.innerWidth < compactNavigationBreakpoint
   isCompactNavigation.value = compact
@@ -263,8 +233,6 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
 })
-
-provide('showMessage', showMessage)
 </script>
 
 <style scoped>

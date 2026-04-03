@@ -8,9 +8,12 @@ import {
   type EditGameForm,
 } from '@/composables/edit-game-form'
 import { uploadAsset, type UploadedAssetResult } from '@/services/assets'
+import { buildAssetUploadUrl } from '@/services/api-url'
 import { directoryService } from '@/services/directory.service'
 import { proxySteamAssetUrl } from '@/services/steam.service'
 import { seriesService } from '@/services/series.service'
+import { developersService } from '@/services/developers.service'
+import { publishersService } from '@/services/publishers.service'
 import { resolveAssetCandidates } from '@/utils/asset-url'
 import { getAssetFileExtension } from '@/utils/asset-file-extension'
 import { useGameFilePaths } from '@/composables/useGameFilePaths'
@@ -150,12 +153,11 @@ export const useEditGameModal = ({
     if (!query) return
     isSearchingDevelopers.value = true
     try {
-      const { developersService } = await import('@/services/developers.service')
       developerOptions.value = await searchCreatableOptions({
         query,
         selectedValues: form.value.developer_ids,
         currentOptions: developerOptions.value,
-        search: (keyword) => developersService.searchDevelopers(keyword),
+        search: (keyword) => developersService.listDevelopers({ query: keyword }),
       })
     } finally {
       isSearchingDevelopers.value = false
@@ -166,12 +168,11 @@ export const useEditGameModal = ({
     if (!query) return
     isSearchingPublishers.value = true
     try {
-      const { publishersService } = await import('@/services/publishers.service')
       publisherOptions.value = await searchCreatableOptions({
         query,
         selectedValues: form.value.publisher_ids,
         currentOptions: publisherOptions.value,
-        search: (keyword) => publishersService.searchPublishers(keyword),
+        search: (keyword) => publishersService.listPublishers({ query: keyword }),
       })
     } finally {
       isSearchingPublishers.value = false
@@ -201,8 +202,7 @@ export const useEditGameModal = ({
   })
 
   const uploadAction = computed(() => {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
-    return `${baseUrl}/assets/cover`
+    return buildAssetUploadUrl('cover')
   })
 
   const uploadData = computed(() => ({
@@ -211,8 +211,7 @@ export const useEditGameModal = ({
   }))
 
   const bannerUploadAction = computed(() => {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
-    return `${baseUrl}/assets/banner`
+    return buildAssetUploadUrl('banner')
   })
 
   const bannerUploadData = computed(() => ({
@@ -221,8 +220,7 @@ export const useEditGameModal = ({
   }))
 
   const screenshotUploadAction = computed(() => {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
-    return `${baseUrl}/assets/screenshot`
+    return buildAssetUploadUrl('screenshot')
   })
 
   const screenshotUploadData = computed(() => ({
@@ -323,6 +321,7 @@ export const useEditGameModal = ({
     tagOptions,
     developerOptions,
     publisherOptions,
+    addAlert,
     resetTagSelectionState,
     createEditableScreenshot,
     createEditableVideo,

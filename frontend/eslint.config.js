@@ -11,7 +11,6 @@ export default [
       'coverage/**',
       'node_modules/**',
       'public/vendor/**',
-      'src/auto-imports.d.ts',
       'src/components.d.ts',
     ],
   },

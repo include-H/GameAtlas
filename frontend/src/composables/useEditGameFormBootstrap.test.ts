@@ -2,6 +2,11 @@ import { ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { GameDetail } from '@/services/types'
 import { useEditGameFormBootstrap } from './useEditGameFormBootstrap'
+import { seriesService } from '@/services/series.service'
+import platformService from '@/services/platforms.service'
+import tagsService from '@/services/tags.service'
+import { developersService } from '@/services/developers.service'
+import { publishersService } from '@/services/publishers.service'
 
 vi.mock('@/services/series.service', () => ({
   seriesService: {
@@ -19,6 +24,18 @@ vi.mock('@/services/tags.service', () => ({
   default: {
     getTagGroups: vi.fn(),
     getTags: vi.fn(),
+  },
+}))
+
+vi.mock('@/services/developers.service', () => ({
+  developersService: {
+    listDevelopers: vi.fn(),
+  },
+}))
+
+vi.mock('@/services/publishers.service', () => ({
+  publishersService: {
+    listPublishers: vi.fn(),
   },
 }))
 
@@ -51,6 +68,7 @@ describe('useEditGameFormBootstrap', () => {
       tagOptions: ref([]),
       developerOptions: ref([]),
       publisherOptions: ref([]),
+      addAlert: vi.fn(),
       resetTagSelectionState: vi.fn(),
       createEditableScreenshot: (asset, index) => ({
         path: typeof asset === 'string' ? asset : asset.path,
@@ -76,7 +94,6 @@ describe('useEditGameFormBootstrap', () => {
       cover_image: null,
       banner_image: null,
       wiki_content: null,
-      needs_review: false,
       downloads: 0,
       preview_video: {
         id: 2,
@@ -112,5 +129,63 @@ describe('useEditGameFormBootstrap', () => {
     } as GameDetail)
 
     expect(form.value.preview_videos.map((item) => item.asset_uid)).toEqual(['video-first', 'video-primary'])
+  })
+
+  it('shows alerts when edit metadata initialization fails', async () => {
+    const addAlert = vi.fn()
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.mocked(seriesService.getPopularSeries).mockRejectedValueOnce(new Error('series failed'))
+    vi.mocked(developersService.listDevelopers).mockRejectedValueOnce(new Error('developers failed'))
+    vi.mocked(publishersService.listPublishers).mockRejectedValueOnce(new Error('publishers failed'))
+    vi.mocked(platformService.getAllPlatforms).mockRejectedValueOnce(new Error('platform failed'))
+    vi.mocked(tagsService.getTagGroups).mockRejectedValueOnce(new Error('tags failed'))
+
+    const { initializeOptions } = useEditGameFormBootstrap({
+      form: ref({
+        title: '',
+        title_alt: '',
+        visibility: 'public' as const,
+        developer_ids: [],
+        publisher_ids: [],
+        release_date: undefined,
+        engine: '',
+        platform_ids: [],
+        series_id: null,
+        tag_ids: [],
+        summary: '',
+        cover_image: '',
+        banner_image: '',
+        preview_videos: [],
+        screenshots: [],
+        file_paths: [{ path: '', label: '' }],
+      }),
+      seriesOptions: ref([]),
+      platformOptions: ref([]),
+      tagGroups: ref([]),
+      tagOptions: ref([]),
+      developerOptions: ref([]),
+      publisherOptions: ref([]),
+      addAlert,
+      resetTagSelectionState: vi.fn(),
+      createEditableScreenshot: (asset, index) => ({
+        path: typeof asset === 'string' ? asset : asset.path,
+        client_key: `screenshot-${index}`,
+        sort_order: index,
+      }),
+      createEditableVideo: (asset) => ({
+        asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
+        path: typeof asset === 'string' ? asset : asset.path,
+        sort_order: typeof asset === 'string' ? undefined : asset.sort_order,
+      }),
+    })
+
+    await initializeOptions()
+
+    expect(addAlert).toHaveBeenCalledWith('加载编辑元数据失败：系列', 'error')
+    expect(addAlert).toHaveBeenCalledWith('加载编辑元数据失败：开发商', 'error')
+    expect(addAlert).toHaveBeenCalledWith('加载编辑元数据失败：发行商', 'error')
+    expect(addAlert).toHaveBeenCalledWith('加载编辑元数据失败：平台', 'error')
+    expect(addAlert).toHaveBeenCalledWith('加载编辑元数据失败：标签', 'error')
+    consoleErrorSpy.mockRestore()
   })
 })
