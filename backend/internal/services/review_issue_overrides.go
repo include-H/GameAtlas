@@ -8,12 +8,12 @@ import (
 )
 
 type ReviewIssueOverrideService struct {
-	gamesRepo     *repositories.GamesRepository
+	gamesRepo     gameDetailReadRepository
 	overridesRepo *repositories.ReviewIssueOverrideRepository
 }
 
 func NewReviewIssueOverrideService(
-	gamesRepo *repositories.GamesRepository,
+	gamesRepo gameDetailReadRepository,
 	overridesRepo *repositories.ReviewIssueOverrideRepository,
 ) *ReviewIssueOverrideService {
 	return &ReviewIssueOverrideService{

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
@@ -160,11 +161,29 @@ func newServicesAssetsService(db *sqlx.DB, assetsDir string) *AssetsService {
 	)
 }
 
-func newServicesGamesService(db *sqlx.DB) *GamesService {
-	return NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
+func newServicesCatalogService(db *sqlx.DB) *GameCatalogService {
+	gamesRepo := repositories.NewGamesRepository(db)
+	return NewGameCatalogService(
+		repositories.NewGameCatalogRepository(gamesRepo),
+		repositories.NewReviewIssueOverrideRepository(db),
+	)
+}
+
+func newServicesDetailService(db *sqlx.DB) *GameDetailService {
+	gamesRepo := repositories.NewGamesRepository(db)
+	return NewGameDetailService(
+		repositories.NewGameDetailRepository(gamesRepo),
 		repositories.NewGameFilesRepository(db),
+		repositories.NewTagsRepository(db),
+		repositories.NewReviewIssueOverrideRepository(db),
+	)
+}
+
+func newServicesAggregateService(db *sqlx.DB, cfg config.Config) *GameAggregateService {
+	gamesRepo := repositories.NewGamesRepository(db)
+	return NewGameAggregateService(
+		cfg,
+		repositories.NewGameAggregateRepository(gamesRepo),
 		repositories.NewMetadataRepository(db),
 		repositories.NewTagsRepository(db),
 	)
@@ -219,4 +238,43 @@ func mustLoadServicesGame(t *testing.T, db *sqlx.DB, gameID int64) domain.Game {
 	}
 
 	return game
+}
+
+func mustLoadAssetCleanupTask(t *testing.T, db *sqlx.DB, assetPath string) domain.AssetCleanupTask {
+	t.Helper()
+
+	var task domain.AssetCleanupTask
+	if err := db.Get(&task, `
+		SELECT id, asset_path, source, last_error, attempt_count, created_at, updated_at
+		FROM asset_cleanup_tasks
+		WHERE asset_path = ?
+	`, assetPath); err != nil {
+		t.Fatalf("load asset cleanup task: %v", err)
+	}
+
+	return task
+}
+
+func assertAssetCleanupTaskMissing(t *testing.T, db *sqlx.DB, assetPath string) {
+	t.Helper()
+
+	var count int
+	if err := db.Get(&count, `SELECT COUNT(*) FROM asset_cleanup_tasks WHERE asset_path = ?`, assetPath); err != nil {
+		t.Fatalf("count asset cleanup tasks: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("asset cleanup task count for %q = %d, want 0", assetPath, count)
+	}
+}
+
+func assertNoAssetCleanupTasks(t *testing.T, db *sqlx.DB) {
+	t.Helper()
+
+	var count int
+	if err := db.Get(&count, `SELECT COUNT(*) FROM asset_cleanup_tasks`); err != nil && err != sql.ErrNoRows {
+		t.Fatalf("count asset cleanup tasks: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("asset cleanup task total = %d, want 0", count)
+	}
 }

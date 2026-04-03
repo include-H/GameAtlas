@@ -16,17 +16,23 @@ import (
 )
 
 type DownloadsHandler struct {
-	service          *services.GameFilesService
-	authService      *services.AuthService
+	service       *services.GameFilesService
+	windowsLaunch *services.WindowsLaunchService
+	authService   *services.AuthService
+	// Download stats only need lightweight single-process dedupe for this app's
+	// main use case: preventing accidental double-counts from repeated clicks by
+	// the same person. This is intentionally in-memory and approximate, not a
+	// cross-restart or multi-instance guarantee.
 	downloadDedupeMu sync.Mutex
 	downloadDedupe   map[string]time.Time
 }
 
 const downloadRecordWindow = 10 * time.Minute
 
-func NewDownloadsHandler(service *services.GameFilesService, authService *services.AuthService) *DownloadsHandler {
+func NewDownloadsHandler(service *services.GameFilesService, windowsLaunch *services.WindowsLaunchService, authService *services.AuthService) *DownloadsHandler {
 	return &DownloadsHandler{
 		service:        service,
+		windowsLaunch:  windowsLaunch,
 		authService:    authService,
 		downloadDedupe: make(map[string]time.Time),
 	}
@@ -116,6 +122,9 @@ func (h *DownloadsHandler) shouldRecordDownload(gameID, fileID int64, sourceKey 
 	h.downloadDedupeMu.Lock()
 	defer h.downloadDedupeMu.Unlock()
 
+	// Best-effort cleanup for the in-memory dedupe window. We do not persist this
+	// state because the goal is only to absorb local click bursts, not to enforce
+	// stable rate limiting semantics across process restarts or deployments.
 	for key, expiresAt := range h.downloadDedupe {
 		if !expiresAt.After(now) {
 			delete(h.downloadDedupe, key)
@@ -132,6 +141,15 @@ func (h *DownloadsHandler) shouldRecordDownload(gameID, fileID int64, sourceKey 
 }
 
 func (h *DownloadsHandler) LaunchScript(c *gin.Context) {
+	if h.windowsLaunch == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "launch script service is unavailable"})
+		return
+	}
+
+	// This endpoint intentionally follows the same visibility boundary as normal downloads instead of
+	// requiring admin. The current product assumption is single-user / trusted deployment, and the
+	// configured SMB account is expected to have read-only access only. If that deployment model changes,
+	// revisit this endpoint first and move it behind stricter authorization.
 	gameID, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
 	if !ok {
 		return
@@ -141,7 +159,7 @@ func (h *DownloadsHandler) LaunchScript(c *gin.Context) {
 		return
 	}
 
-	script, filename, err := h.service.BuildLaunchScript(gameID, fileID, isAdminRequest(c))
+	script, filename, err := h.windowsLaunch.BuildLaunchScript(gameID, fileID, isAdminRequest(c))
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrNotFound):

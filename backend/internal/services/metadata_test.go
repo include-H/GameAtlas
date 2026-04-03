@@ -8,10 +8,10 @@ import (
 
 func TestSlugify(t *testing.T) {
 	cases := map[string]string{
-		"  Mega Man X  ":    "mega-man-x",
-		"动作 Game 2":         "动作-game-2",
-		"Already__Slugged":  "already-slugged",
-		"***":               "",
+		"  Mega Man X  ":   "mega-man-x",
+		"动作 Game 2":        "动作-game-2",
+		"Already__Slugged": "already-slugged",
+		"***":              "",
 	}
 
 	for input, want := range cases {
@@ -68,7 +68,7 @@ func TestApplySeriesItemGamesPicksDistinctCoverCandidates(t *testing.T) {
 	banner := "/assets/banner-b.jpg"
 	screenshot := "/assets/screenshot-c.jpg"
 
-	games := []domain.Game{
+	games := []domain.SeriesGameSummary{
 		{UpdatedAt: "2026-03-25T00:00:00Z", CoverImage: &cover},
 		{UpdatedAt: "2026-03-24T00:00:00Z", CoverImage: &cover},
 		{UpdatedAt: "2026-03-23T00:00:00Z", BannerImage: &banner},
@@ -102,13 +102,13 @@ func TestPickSeriesCoverSourceFallsBackInOrder(t *testing.T) {
 	banner := " banner "
 	screenshot := " screenshot "
 
-	if got := pickSeriesCoverSource(domain.Game{CoverImage: &cover, BannerImage: &banner, PrimaryScreenshot: &screenshot}); got != "cover" {
+	if got := pickSeriesCoverSource(domain.SeriesGameSummary{CoverImage: &cover, BannerImage: &banner, PrimaryScreenshot: &screenshot}); got != "cover" {
 		t.Fatalf("pickSeriesCoverSource() = %q, want cover", got)
 	}
-	if got := pickSeriesCoverSource(domain.Game{BannerImage: &banner, PrimaryScreenshot: &screenshot}); got != "banner" {
+	if got := pickSeriesCoverSource(domain.SeriesGameSummary{BannerImage: &banner, PrimaryScreenshot: &screenshot}); got != "banner" {
 		t.Fatalf("pickSeriesCoverSource() = %q, want banner", got)
 	}
-	if got := pickSeriesCoverSource(domain.Game{PrimaryScreenshot: &screenshot}); got != "screenshot" {
+	if got := pickSeriesCoverSource(domain.SeriesGameSummary{PrimaryScreenshot: &screenshot}); got != "screenshot" {
 		t.Fatalf("pickSeriesCoverSource() = %q, want screenshot", got)
 	}
 }

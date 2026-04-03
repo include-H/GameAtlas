@@ -8,7 +8,7 @@ import (
 )
 
 type WikiService struct {
-	gamesRepo        *repositories.GamesRepository
+	gamesRepo        gameDetailReadRepository
 	wikiRepo         *repositories.WikiRepository
 	wikiHistoryLimit int
 }
@@ -21,7 +21,7 @@ type WikiDocument struct {
 	HistoryCount int     `json:"history_count,omitempty"`
 }
 
-func NewWikiService(gamesRepo *repositories.GamesRepository, wikiRepo *repositories.WikiRepository, wikiHistoryLimit int) *WikiService {
+func NewWikiService(gamesRepo gameDetailReadRepository, wikiRepo *repositories.WikiRepository, wikiHistoryLimit int) *WikiService {
 	return &WikiService{
 		gamesRepo:        gamesRepo,
 		wikiRepo:         wikiRepo,

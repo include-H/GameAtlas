@@ -131,7 +131,6 @@ func TestGetEnvAsDurationRejectsInvalidConfiguredValue(t *testing.T) {
 
 func TestLoadAggregatesConfigurationErrors(t *testing.T) {
 	t.Setenv("ADMIN_PASSWORD", "secret")
-	t.Setenv("SESSION_SECRET", "not-default")
 	t.Setenv("PORT", "abc")
 	t.Setenv("AUTH_COOLDOWN", "10min")
 
@@ -144,5 +143,54 @@ func TestLoadAggregatesConfigurationErrors(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `AUTH_COOLDOWN="10min"`) {
 		t.Fatalf("Load error = %v, want AUTH_COOLDOWN parse failure", err)
+	}
+}
+
+func TestChooseRuntimeBaseDirPrefersDotEnvDirectory(t *testing.T) {
+	cwd := filepath.Join(string(filepath.Separator), "workspace", "backend")
+	executableDir := filepath.Join(string(filepath.Separator), "release")
+	exists := func(path string) bool {
+		return path == filepath.Join(executableDir, ".env")
+	}
+
+	baseDir, dotEnvPath := chooseRuntimeBaseDir(cwd, executableDir, exists)
+	if baseDir != executableDir {
+		t.Fatalf("baseDir = %q, want %q", baseDir, executableDir)
+	}
+	if dotEnvPath != filepath.Join(executableDir, ".env") {
+		t.Fatalf("dotEnvPath = %q, want executable .env path", dotEnvPath)
+	}
+}
+
+func TestChooseRuntimeBaseDirFallsBackToGoModuleDirectory(t *testing.T) {
+	cwd := filepath.Join(string(filepath.Separator), "workspace", "backend")
+	executableDir := filepath.Join(string(filepath.Separator), "tmp", "go-build")
+	exists := func(path string) bool {
+		return path == filepath.Join(cwd, "go.mod")
+	}
+
+	baseDir, dotEnvPath := chooseRuntimeBaseDir(cwd, executableDir, exists)
+	if baseDir != cwd {
+		t.Fatalf("baseDir = %q, want %q", baseDir, cwd)
+	}
+	if dotEnvPath != "" {
+		t.Fatalf("dotEnvPath = %q, want empty string", dotEnvPath)
+	}
+}
+
+func TestResolveRuntimePathResolvesRelativePathAgainstBaseDir(t *testing.T) {
+	baseDir := filepath.Join(string(filepath.Separator), "workspace", "backend")
+	got := resolveRuntimePath(baseDir, "data/app.db")
+	want := filepath.Join(baseDir, "data", "app.db")
+	if got != want {
+		t.Fatalf("resolveRuntimePath() = %q, want %q", got, want)
+	}
+}
+
+func TestResolveRuntimePathLeavesAbsolutePathUntouched(t *testing.T) {
+	absolute := filepath.Join(string(filepath.Separator), "var", "lib", "game", "app.db")
+	got := resolveRuntimePath(filepath.Join(string(filepath.Separator), "workspace", "backend"), absolute)
+	if got != absolute {
+		t.Fatalf("resolveRuntimePath() = %q, want %q", got, absolute)
 	}
 }

@@ -29,43 +29,46 @@ type Config struct {
 	WikiHistoryLimit  int
 	AdminDisplayName  string
 	AdminPassword     string
-	SessionSecret     string
 	AuthMaxFails      int
 	AuthCooldown      time.Duration
 	AuthFailWindow    time.Duration
 	AuthStateTTL      time.Duration
 	AuthTrackBy       string
-	LogLevel          string
 	ReadHeaderTimeout time.Duration
 	ShutdownTimeout   time.Duration
 }
 
 func Load() (Config, error) {
-	if err := loadDotEnv(".env"); err != nil {
+	runtimeBaseDir, dotEnvPath, err := detectRuntimeBaseDir()
+	if err != nil {
 		return Config{}, err
 	}
 
+	if dotEnvPath != "" {
+		if err := loadDotEnv(dotEnvPath); err != nil {
+			return Config{}, err
+		}
+	}
+
 	proxy := getEnv("PROXY", "")
-	primaryROMRoot := filepath.Clean(getEnv("PRIMARY_ROM_ROOT", "ROM"))
+	primaryROMRoot := resolveRuntimePath(runtimeBaseDir, getEnv("PRIMARY_ROM_ROOT", "ROM"))
 
 	cfg := Config{
-		AppEnv:            getEnv("APP_ENV", "development"),
-		Host:              getEnv("HOST", "0.0.0.0"),
-		DBPath:            filepath.Clean(getEnv("DB_PATH", "data/db.db")),
-		StaticDir:         filepath.Clean(getEnv("STATIC_DIR", "../frontend/dist")),
-		AssetsDir:         filepath.Clean(getEnv("ASSETS_DIR", "data/gamelist")),
-		PrimaryROMRoot:    primaryROMRoot,
-		Proxy:             proxy,
-		SMBShareRoot:      getEnv("SMB_SHARE_ROOT", ""),
-		SMBPathMappings:   getEnv("SMB_PATH_MAPPINGS", ""),
-		SMBUsername:       getEnv("SMB_USERNAME", ""),
-		SMBPassword:       getEnv("SMB_PASSWORD", ""),
-		VHDDiffRoot:       getEnv("VHD_DIFF_ROOT", `C:`),
-		AdminDisplayName:  getEnv("ADMIN_DISPLAY_NAME", "Admin"),
-		AdminPassword:     getEnv("ADMIN_PASSWORD", ""),
-		SessionSecret:     getEnv("SESSION_SECRET", "change-me"),
-		AuthTrackBy:       getEnv("AUTH_TRACK_BY", "ip"),
-		LogLevel:          getEnv("LOG_LEVEL", "info"),
+		AppEnv:           getEnv("APP_ENV", "development"),
+		Host:             getEnv("HOST", "0.0.0.0"),
+		DBPath:           resolveRuntimePath(runtimeBaseDir, getEnv("DB_PATH", "data/db.db")),
+		StaticDir:        resolveRuntimePath(runtimeBaseDir, getEnv("STATIC_DIR", "../frontend/dist")),
+		AssetsDir:        resolveRuntimePath(runtimeBaseDir, getEnv("ASSETS_DIR", "data/gamelist")),
+		PrimaryROMRoot:   primaryROMRoot,
+		Proxy:            proxy,
+		SMBShareRoot:     getEnv("SMB_SHARE_ROOT", ""),
+		SMBPathMappings:  getEnv("SMB_PATH_MAPPINGS", ""),
+		SMBUsername:      getEnv("SMB_USERNAME", ""),
+		SMBPassword:      getEnv("SMB_PASSWORD", ""),
+		VHDDiffRoot:      getEnv("VHD_DIFF_ROOT", `C:`),
+		AdminDisplayName: getEnv("ADMIN_DISPLAY_NAME", "Admin"),
+		AdminPassword:    getEnv("ADMIN_PASSWORD", ""),
+		AuthTrackBy:      getEnv("AUTH_TRACK_BY", "ip"),
 	}
 
 	var errs []error
@@ -86,12 +89,86 @@ func Load() (Config, error) {
 	return cfg, nil
 }
 
+func detectRuntimeBaseDir() (string, string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", "", fmt.Errorf("determine current working directory: %w", err)
+	}
+
+	executablePath, err := os.Executable()
+	executableDir := ""
+	if err == nil {
+		executableDir = filepath.Dir(executablePath)
+	}
+
+	baseDir, dotEnvPath := chooseRuntimeBaseDir(cwd, executableDir, pathExists)
+	if baseDir == "" {
+		baseDir = cwd
+	}
+
+	return baseDir, dotEnvPath, nil
+}
+
+func chooseRuntimeBaseDir(cwd, executableDir string, exists func(string) bool) (string, string) {
+	cwd = cleanOptionalPath(cwd)
+	executableDir = cleanOptionalPath(executableDir)
+
+	if cwd != "" {
+		candidate := filepath.Join(cwd, ".env")
+		if exists(candidate) {
+			return cwd, candidate
+		}
+	}
+
+	if executableDir != "" {
+		candidate := filepath.Join(executableDir, ".env")
+		if exists(candidate) {
+			return executableDir, candidate
+		}
+	}
+
+	if cwd != "" && exists(filepath.Join(cwd, "go.mod")) {
+		return cwd, ""
+	}
+
+	if executableDir != "" {
+		return executableDir, ""
+	}
+
+	return cwd, ""
+}
+
+func cleanOptionalPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	return filepath.Clean(path)
+}
+
+func resolveRuntimePath(baseDir, value string) string {
+	cleaned := filepath.Clean(strings.TrimSpace(value))
+	if filepath.IsAbs(cleaned) {
+		return cleaned
+	}
+	if baseDir == "" {
+		return cleaned
+	}
+	return filepath.Join(baseDir, cleaned)
+}
+
+func pathExists(path string) bool {
+	if strings.TrimSpace(path) == "" {
+		return false
+	}
+
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 func (c Config) Validate() error {
 	if strings.TrimSpace(c.AdminPassword) == "" {
 		return fmt.Errorf("ADMIN_PASSWORD must be configured")
-	}
-	if strings.TrimSpace(c.SessionSecret) == "" || strings.TrimSpace(c.SessionSecret) == "change-me" {
-		return fmt.Errorf("SESSION_SECRET must be configured with a non-default value")
 	}
 	if _, err := parseProxyURL(c.Proxy); err != nil {
 		return err

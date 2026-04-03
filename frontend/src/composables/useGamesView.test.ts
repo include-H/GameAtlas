@@ -5,6 +5,7 @@ import {
   buildGamesRouteQuery,
   normalizeGamesSortValue,
   parsePositiveQueryNumber,
+  parsePositiveRouteNumber,
   parseRouteTagIds,
   readSingleQueryValue,
 } from './useGamesView'
@@ -19,6 +20,8 @@ describe('useGamesView helpers', () => {
   it('parses positive query numbers and tag ids safely', () => {
     expect(parsePositiveQueryNumber('24', 12)).toBe(24)
     expect(parsePositiveQueryNumber('0', 12)).toBe(12)
+    expect(parsePositiveRouteNumber('3')).toBe(3)
+    expect(parsePositiveRouteNumber('pc')).toBeUndefined()
     expect(parseRouteTagIds(['1', 'x', '2', '-3'])).toEqual([1, 2])
   })
 
@@ -69,7 +72,7 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 48,
         search: 'halo',
-        platform: '3',
+        platform: 3,
         tag: [1, 2],
         favorite: true,
       },

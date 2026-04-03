@@ -1,6 +1,7 @@
 package services
 
 import (
+	"database/sql"
 	"errors"
 	"os"
 	"path/filepath"
@@ -27,8 +28,8 @@ func TestGamesServiceGetDetailUsesFirstSortedVideoAndGroupsTags(t *testing.T) {
 	linkServicesGameTag(t, db, gameID, puzzleID, 1)
 	insertServicesGameFile(t, db, gameID, "/roms/detail-game.rom", 0)
 
-	service := newServicesGamesService(db)
-	detail, err := service.GetDetail(gameID, true)
+	service := newServicesDetailService(db)
+	detail, err := service.Get(gameID, true)
 	if err != nil {
 		t.Fatalf("GetDetail returned error: %v", err)
 	}
@@ -74,8 +75,8 @@ func TestGamesServiceGetDetailPreservesTagGroupCapabilities(t *testing.T) {
 	linkServicesGameTag(t, db, gameID, storyID, 0)
 	linkServicesGameTag(t, db, gameID, curatedID, 1)
 
-	service := newServicesGamesService(db)
-	detail, err := service.GetDetail(gameID, true)
+	service := newServicesDetailService(db)
+	detail, err := service.Get(gameID, true)
 	if err != nil {
 		t.Fatalf("GetDetail returned error: %v", err)
 	}
@@ -121,9 +122,9 @@ func TestGamesServiceGetDetailUsesFirstVideoAndRejectsPrivateGame(t *testing.T) 
 	insertServicesGameAsset(t, db, publicGameID, "video-b", "video", "/assets/fallback-game/video-b.mp4", 1)
 	privateGameID := insertServicesTestGame(t, db, "private-detail", "Private Detail", domain.GameVisibilityPrivate)
 
-	service := newServicesGamesService(db)
+	service := newServicesDetailService(db)
 
-	detail, err := service.GetDetail(publicGameID, true)
+	detail, err := service.Get(publicGameID, true)
 	if err != nil {
 		t.Fatalf("GetDetail returned error: %v", err)
 	}
@@ -131,7 +132,7 @@ func TestGamesServiceGetDetailUsesFirstVideoAndRejectsPrivateGame(t *testing.T) 
 		t.Fatalf("PreviewVideo = %#v, want first sorted video", detail.PreviewVideo)
 	}
 
-	_, err = service.GetDetail(privateGameID, false)
+	_, err = service.Get(privateGameID, false)
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("GetDetail private error = %v, want ErrNotFound", err)
 	}
@@ -147,14 +148,7 @@ func TestGamesServiceListReturnsOverrideLookupError(t *testing.T) {
 		t.Fatalf("drop override table: %v", err)
 	}
 
-	service := NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-		repositories.NewReviewIssueOverrideRepository(db),
-	)
+	service := newServicesCatalogService(db)
 
 	_, err := service.List(domain.GamesListParams{Page: 1, Limit: 20})
 	if err == nil {
@@ -163,6 +157,109 @@ func TestGamesServiceListReturnsOverrideLookupError(t *testing.T) {
 	if !strings.Contains(err.Error(), "list review overrides") {
 		t.Fatalf("List error = %v, want review override lookup context", err)
 	}
+}
+
+func TestGamesServiceDeleteRemovesTrackedAssetFiles(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	assetsDir := filepath.Join(t.TempDir(), "assets")
+	gameID := insertServicesTestGame(t, db, "delete-game-assets", "Delete Game Assets", domain.GameVisibilityPublic)
+	if _, err := db.Exec(`
+		UPDATE games
+		SET cover_image = ?, banner_image = ?
+		WHERE id = ?
+	`, "/assets/delete-game-assets/cover.png", "/assets/delete-game-assets/banner.png", gameID); err != nil {
+		t.Fatalf("set game images: %v", err)
+	}
+	insertServicesGameAsset(t, db, gameID, "shot-a", "screenshot", "/assets/delete-game-assets/shot-a.png", 0)
+	insertServicesGameAsset(t, db, gameID, "video-a", "video", "/assets/delete-game-assets/video-a.mp4", 1)
+	writeServicesAssetFile(t, assetsDir, "delete-game-assets", "cover.png", []byte("cover"))
+	writeServicesAssetFile(t, assetsDir, "delete-game-assets", "banner.png", []byte("banner"))
+	writeServicesAssetFile(t, assetsDir, "delete-game-assets", "shot-a.png", []byte("shot"))
+	writeServicesAssetFile(t, assetsDir, "delete-game-assets", "video-a.mp4", []byte("video"))
+
+	service := newServicesAggregateService(db, config.Config{AssetsDir: assetsDir})
+
+	result, err := service.Delete(gameID)
+	if err != nil {
+		t.Fatalf("Delete returned error: %v", err)
+	}
+	if result == nil || len(result.Warnings) != 0 {
+		t.Fatalf("result = %#v, want no warnings", result)
+	}
+	if _, err := repositories.NewGamesRepository(db).GetByID(gameID); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("expected deleted game row, got err=%v", err)
+	}
+	for _, name := range []string{"cover.png", "banner.png", "shot-a.png", "video-a.mp4"} {
+		if _, err := os.Stat(filepath.Join(assetsDir, "delete-game-assets", name)); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("expected %s to be deleted, got err=%v", name, err)
+		}
+	}
+	assertNoAssetCleanupTasks(t, db)
+}
+
+func TestGamesServiceDeleteQueuesCleanupTaskWhenFileRemovalFails(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	gameID := insertServicesTestGame(t, db, "delete-game-warning", "Delete Game Warning", domain.GameVisibilityPublic)
+	if _, err := db.Exec(`
+		UPDATE games
+		SET cover_image = ?
+		WHERE id = ?
+	`, "/assets/../bad-delete-cover.png", gameID); err != nil {
+		t.Fatalf("set game cover image: %v", err)
+	}
+
+	service := newServicesAggregateService(db, config.Config{AssetsDir: filepath.Join(t.TempDir(), "assets")})
+
+	result, err := service.Delete(gameID)
+	if err != nil {
+		t.Fatalf("Delete returned error: %v", err)
+	}
+	if result == nil || len(result.Warnings) != 1 || result.Warnings[0] != "/assets/../bad-delete-cover.png" {
+		t.Fatalf("result = %#v, want bad cover warning", result)
+	}
+	if _, err := repositories.NewGamesRepository(db).GetByID(gameID); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("expected deleted game row, got err=%v", err)
+	}
+
+	task := mustLoadAssetCleanupTask(t, db, "/assets/../bad-delete-cover.png")
+	if task.Source != "games.delete" {
+		t.Fatalf("task.Source = %q, want games.delete", task.Source)
+	}
+	if task.AttemptCount != 1 {
+		t.Fatalf("task.AttemptCount = %d, want 1", task.AttemptCount)
+	}
+}
+
+func TestGamesServiceProcessPendingAssetCleanupDeletesRecoveredFile(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	assetsDir := filepath.Join(t.TempDir(), "assets")
+	path := "/assets/retry-game/retry-cover.png"
+	writeServicesAssetFile(t, assetsDir, "retry-game", "retry-cover.png", []byte("cover"))
+
+	tasksRepo := repositories.NewAssetCleanupTasksRepository(db)
+	if err := tasksRepo.Enqueue(path, "games.delete", "temporary failure"); err != nil {
+		t.Fatalf("enqueue cleanup task: %v", err)
+	}
+
+	service := newServicesAggregateService(db, config.Config{AssetsDir: assetsDir})
+
+	processed, err := service.ProcessPendingAssetCleanup(100)
+	if err != nil {
+		t.Fatalf("ProcessPendingAssetCleanup returned error: %v", err)
+	}
+	if processed != 1 {
+		t.Fatalf("processed = %d, want 1", processed)
+	}
+	if _, err := os.Stat(filepath.Join(assetsDir, "retry-game", "retry-cover.png")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected retry asset file to be deleted, got err=%v", err)
+	}
+	assertAssetCleanupTaskMissing(t, db, path)
 }
 
 func TestNormalizeTimelineParamsNormalizesDatesAndValidatesCursorRange(t *testing.T) {
@@ -208,12 +305,12 @@ func TestValidateAndTrimGameInputNormalizesSharedCoreFields(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()
 
-	service := newServicesGamesService(db)
+	tagsRepo := repositories.NewTagsRepository(db)
 	titleAlt := " Alt "
 	summary := "   "
 	engine := " Unreal Engine 5 "
 
-	trimmed, err := service.validateAndTrimGameInput(domain.GameWriteInput{
+	trimmed, err := validateAndTrimGameInput(domain.GameWriteInput{
 		GameCoreInput: domain.GameCoreInput{
 			Title:      "  Shared Core Game  ",
 			TitleAlt:   &titleAlt,
@@ -224,7 +321,7 @@ func TestValidateAndTrimGameInputNormalizesSharedCoreFields(t *testing.T) {
 		PlatformIDs:  []int64{3, 3, 1},
 		DeveloperIDs: []int64{4, 4},
 		PublisherIDs: []int64{7, 2, 7},
-	})
+	}, tagsRepo)
 	if err != nil {
 		t.Fatalf("validateAndTrimGameInput returned error: %v", err)
 	}
@@ -262,12 +359,12 @@ func TestValidateAndTrimGameAggregatePatchInputNormalizesSharedCoreFields(t *tes
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()
 
-	service := newServicesGamesService(db)
+	tagsRepo := repositories.NewTagsRepository(db)
 	titleAlt := " Alt Patch "
 	summary := "   "
 	engine := " RE Engine "
 
-	trimmed, err := service.validateAndTrimGameAggregatePatchInput(domain.GameAggregatePatchInput{
+	trimmed, err := validateAndTrimGameAggregatePatchInput(domain.GameAggregatePatchInput{
 		GameCoreInput: domain.GameCoreInput{
 			Title:      "  Aggregate Shared Core  ",
 			TitleAlt:   &titleAlt,
@@ -279,7 +376,7 @@ func TestValidateAndTrimGameAggregatePatchInputNormalizesSharedCoreFields(t *tes
 		DeveloperIDs: domain.Int64SlicePatch{Present: true, Values: []int64{6, 6}},
 		PublisherIDs: domain.Int64SlicePatch{Present: true, Values: []int64{9, 4, 9}},
 		TagIDs:       domain.Int64SlicePatch{Present: true, Values: nil},
-	})
+	}, tagsRepo)
 	if err != nil {
 		t.Fatalf("validateAndTrimGameAggregatePatchInput returned error: %v", err)
 	}
@@ -318,9 +415,9 @@ func TestGamesServiceUpdateAggregateRejectsUnsupportedDeleteAssetType(t *testing
 	defer func() { _ = db.Close() }()
 
 	gameID := insertServicesTestGame(t, db, "aggregate-invalid-asset", "Aggregate Invalid Asset", domain.GameVisibilityPublic)
-	service := newServicesGamesService(db)
+	service := newServicesAggregateService(db, config.Config{})
 
-	_, _, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Invalid Asset"},
 		},
@@ -340,9 +437,9 @@ func TestGamesServiceUpdateAggregateReturnsMissingConfigForFileValidation(t *tes
 	defer func() { _ = db.Close() }()
 
 	gameID := insertServicesTestGame(t, db, "aggregate-files", "Aggregate Files", domain.GameVisibilityPublic)
-	service := newServicesGamesService(db)
+	service := newServicesAggregateService(db, config.Config{})
 
-	_, _, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Files"},
 		},
@@ -362,15 +459,9 @@ func TestGamesServiceUpdateAggregateReturnsDeleteWarningsWhenAssetRemovalFails(t
 	defer func() { _ = db.Close() }()
 
 	gameID := insertServicesTestGame(t, db, "aggregate-warning", "Aggregate Warning", domain.GameVisibilityPublic)
-	service := NewGamesService(
-		config.Config{AssetsDir: t.TempDir()},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
+	service := newServicesAggregateService(db, config.Config{AssetsDir: t.TempDir()})
 
-	game, warnings, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+	game, warnings, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Warning"},
 		},
@@ -388,6 +479,10 @@ func TestGamesServiceUpdateAggregateReturnsDeleteWarningsWhenAssetRemovalFails(t
 	}
 	if len(warnings) != 1 || warnings[0] != "/assets/../bad-cover.png" {
 		t.Fatalf("warnings = %#v, want delete warning path", warnings)
+	}
+	task := mustLoadAssetCleanupTask(t, db, "/assets/../bad-cover.png")
+	if task.Source != "games.update_aggregate" {
+		t.Fatalf("task.Source = %q, want games.update_aggregate", task.Source)
 	}
 }
 
@@ -407,17 +502,11 @@ func TestGamesServiceUpdateAggregateNormalizesAndReplacesFiles(t *testing.T) {
 
 	gameID := insertServicesTestGame(t, db, "aggregate-files-success", "Aggregate Files Success", domain.GameVisibilityPublic)
 	existingFileID := insertServicesGameFile(t, db, gameID, firstPath, 9)
-	service := NewGamesService(
-		config.Config{PrimaryROMRoot: root},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
+	service := newServicesAggregateService(db, config.Config{PrimaryROMRoot: root})
 
 	label := "  Updated Label  "
 	notes := "  Fresh Notes  "
-	game, warnings, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+	game, warnings, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Files Success"},
 		},
@@ -481,15 +570,9 @@ func TestGamesServiceUpdateAggregateReturnsForbiddenPathForFileOutsideRoot(t *te
 	}
 
 	gameID := insertServicesTestGame(t, db, "aggregate-outside-root", "Aggregate Outside Root", domain.GameVisibilityPublic)
-	service := NewGamesService(
-		config.Config{PrimaryROMRoot: root},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
+	service := newServicesAggregateService(db, config.Config{PrimaryROMRoot: root})
 
-	_, _, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Outside Root"},
 		},
@@ -516,15 +599,9 @@ func TestGamesServiceUpdateAggregateDeletesOmittedExistingFiles(t *testing.T) {
 
 	gameID := insertServicesTestGame(t, db, "aggregate-delete-files", "Aggregate Delete Files", domain.GameVisibilityPublic)
 	insertServicesGameFile(t, db, gameID, existingPath, 0)
-	service := NewGamesService(
-		config.Config{PrimaryROMRoot: root},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
+	service := newServicesAggregateService(db, config.Config{PrimaryROMRoot: root})
 
-	_, warnings, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+	_, warnings, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Delete Files"},
 		},
@@ -559,16 +636,10 @@ func TestGamesServiceUpdateAggregateReturnsNotFoundForMissingExistingFileID(t *t
 	}
 
 	gameID := insertServicesTestGame(t, db, "aggregate-missing-file-id", "Aggregate Missing File ID", domain.GameVisibilityPublic)
-	service := NewGamesService(
-		config.Config{PrimaryROMRoot: root},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
+	service := newServicesAggregateService(db, config.Config{PrimaryROMRoot: root})
 
 	missingID := int64(9999)
-	_, _, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Missing File ID"},
 		},
@@ -592,9 +663,9 @@ func TestGamesServiceUpdateAggregateReturnsNotFoundForMissingScreenshotReorderUI
 
 	gameID := insertServicesTestGame(t, db, "aggregate-missing-shot", "Aggregate Missing Shot", domain.GameVisibilityPublic)
 	insertServicesGameAsset(t, db, gameID, "shot-a", "screenshot", "/assets/aggregate-missing-shot/shot-a.png", 0)
-	service := newServicesGamesService(db)
+	service := newServicesAggregateService(db, config.Config{})
 
-	_, _, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Missing Shot"},
 		},
@@ -613,9 +684,9 @@ func TestGamesServiceUpdateAggregateReturnsNotFoundForMissingVideoReorderUID(t *
 
 	gameID := insertServicesTestGame(t, db, "aggregate-missing-video", "Aggregate Missing Video", domain.GameVisibilityPublic)
 	insertServicesGameAsset(t, db, gameID, "video-a", "video", "/assets/aggregate-missing-video/video-a.mp4", 0)
-	service := newServicesGamesService(db)
+	service := newServicesAggregateService(db, config.Config{})
 
-	_, _, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Missing Video"},
 		},
@@ -686,9 +757,9 @@ func TestGamesServiceUpdateAggregatePreservesOmittedRelationsAndSeries(t *testin
 	tagID := insertServicesTag(t, db, tagGroupID, "RPG", "rpg")
 	linkServicesGameTag(t, db, gameID, tagID, 0)
 
-	service := newServicesGamesService(db)
+	service := newServicesAggregateService(db, config.Config{})
 
-	_, warnings, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+	_, warnings, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Preserve Relations Updated"},
 		},
@@ -771,9 +842,9 @@ func TestGamesServiceUpdateAggregateClearsRelationsAndSeriesWhenPresent(t *testi
 		t.Fatalf("link game developer: %v", err)
 	}
 
-	service := newServicesGamesService(db)
+	service := newServicesAggregateService(db, config.Config{})
 
-	_, warnings, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+	_, warnings, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Clear Relations Updated"},
 			SeriesID:      domain.OptionalInt64Patch{Present: true, Value: nil},
@@ -811,9 +882,9 @@ func TestGamesServiceUpdateAggregateReordersVideos(t *testing.T) {
 	gameID := insertServicesTestGame(t, db, "aggregate-reorder-video", "Aggregate Reorder Video", domain.GameVisibilityPublic)
 	insertServicesGameAsset(t, db, gameID, "video-a", "video", "/assets/aggregate-reorder-video/video-a.mp4", 5)
 	insertServicesGameAsset(t, db, gameID, "video-b", "video", "/assets/aggregate-reorder-video/video-b.mp4", 6)
-	service := newServicesGamesService(db)
+	service := newServicesAggregateService(db, config.Config{})
 
-	game, warnings, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+	game, warnings, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Reorder Video"},
 		},
@@ -856,15 +927,9 @@ func TestGamesServiceUpdateAggregateDeletesFirstVideoAndKeepsNextVideo(t *testin
 	insertServicesGameAsset(t, db, gameID, "video-b", "video", "/assets/aggregate-delete-primary-video/video-b.mp4", 1)
 	writeServicesAssetFile(t, assetsDir, "aggregate-delete-primary-video", "video-a.mp4", []byte("a"))
 	writeServicesAssetFile(t, assetsDir, "aggregate-delete-primary-video", "video-b.mp4", []byte("b"))
-	service := NewGamesService(
-		config.Config{AssetsDir: assetsDir},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
+	service := newServicesAggregateService(db, config.Config{AssetsDir: assetsDir})
 
-	game, warnings, err := service.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+	game, warnings, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregatePatchInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Delete Primary Video"},
 		},

@@ -28,12 +28,14 @@ func TestRunMigrationsOnFreshDatabaseAppliesAllEmbeddedFiles(t *testing.T) {
 
 	assertTableExists(t, db, "games")
 	assertTableExists(t, db, "game_assets")
+	assertTableExists(t, db, "asset_cleanup_tasks")
 	assertTableExists(t, db, "tag_groups")
 	assertColumnExists(t, db, "games", "series_id")
 	assertColumnMissing(t, db, "games", "needs_review")
 	assertIndexExists(t, db, "idx_games_release_date_id")
 	assertIndexExists(t, db, "idx_games_public_id")
 	assertIndexExists(t, db, "idx_game_assets_game_type_sort_id")
+	assertIndexExists(t, db, "idx_asset_cleanup_tasks_updated_at")
 	assertIndexExists(t, db, "idx_games_series_id")
 
 	var groupCount int

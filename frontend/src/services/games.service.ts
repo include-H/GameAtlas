@@ -65,6 +65,13 @@ interface AggregateUpdateApiResponse {
   }
 }
 
+interface DeleteGameApiResponse {
+  deleted: boolean
+  warnings?: {
+    asset_delete_paths?: string[]
+  }
+}
+
 type TimelineGamesResult = {
   data: TimelineGame[]
   hasMore: boolean
@@ -176,7 +183,7 @@ const gamesService = {
     if (params?.query?.limit) queryParams.append('limit', String(params.query.limit))
     if (params?.query?.search) queryParams.append('search', params.query.search)
     if (params?.query?.series) queryParams.append('series', params.query.series)
-    if (params?.query?.platform) queryParams.append('platform', params.query.platform)
+    if (params?.query?.platform) queryParams.append('platform', String(params.query.platform))
     if (typeof params?.query?.pending === 'boolean') queryParams.append('pending', String(params.query.pending))
     if (params?.query?.pending_issue) queryParams.append('pending_issue', params.query.pending_issue)
     if (typeof params?.query?.pending_include_ignored === 'boolean') queryParams.append('pending_include_ignored', String(params.query.pending_include_ignored))
@@ -276,7 +283,6 @@ const gamesService = {
   async createGame(data: {
     title: string
     visibility?: 'public' | 'private'
-    file_path?: string
   }): Promise<GameListItem> {
     const payload: GameWriteRequest = {
       ...serializeGameCoreRequest({
@@ -310,6 +316,8 @@ const gamesService = {
           file_path: item.file_path,
           label: item.label ?? null,
           notes: item.notes ?? null,
+          // 2026-04-03: keep sort_order in the payload for transport compatibility.
+          // The backend persists file order from array position for the edit workflow only.
           sort_order: item.sort_order,
         })),
         delete_assets: data.assets.delete_assets.map((item) => ({
@@ -370,8 +378,11 @@ const gamesService = {
     await del<ApiEnvelope<void>>(`/games/${gameId}/files/${fileId}`)
   },
 
-  async deleteGame(id: string): Promise<void> {
-    await del<ApiEnvelope<void>>(`/games/${id}`)
+  async deleteGame(id: string): Promise<{ warnings: string[] }> {
+    const response = await del<ApiEnvelope<DeleteGameApiResponse>>(`/games/${id}`)
+    return {
+      warnings: response.data.warnings?.asset_delete_paths || [],
+    }
   },
 
   async toggleFavorite(gameId: string): Promise<{ isFavorite: boolean }> {
@@ -397,13 +408,6 @@ const gamesService = {
       favorite_count: getFavoriteCount(),
       pending_reviews: response.data.pending_reviews,
     }
-  },
-
-  async addGameFromFile(filePath: string): Promise<{ success: GameListItem[]; failed: never[] }> {
-    const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || 'Unknown Game'
-    const title = fileName.replace(/\.[^/.]+$/, '')
-    const game = await this.createGame({ title, file_path: filePath })
-    return { success: [game], failed: [] }
   },
 
   async getAllSeries(): Promise<Series[]> {

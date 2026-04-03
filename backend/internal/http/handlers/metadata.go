@@ -64,7 +64,7 @@ func (h *MetadataHandler) Get(c *gin.Context) {
 		"success": true,
 		"data": gin.H{
 			"series": detail.Series,
-			"games":  toGameListItemResponses(detail.Games),
+			"games":  toSeriesGameSummaryResponses(detail.Games),
 		},
 	})
 }

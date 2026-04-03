@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"mime/multipart"
-	"os"
 	"strings"
 	"time"
 
@@ -15,12 +14,19 @@ import (
 	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/files"
 	"github.com/hao/game/internal/repositories"
+	"github.com/jmoiron/sqlx"
 )
 
+type assetGameRepository interface {
+	GetByID(id int64) (*domain.Game, error)
+	DB() *sqlx.DB
+}
+
 type AssetsService struct {
-	gamesRepo  *repositories.GamesRepository
-	assetsRepo *repositories.AssetsRepository
-	store      *files.AssetStore
+	gamesRepo             assetGameRepository
+	assetsRepo            *repositories.AssetsRepository
+	assetCleanupTasksRepo *repositories.AssetCleanupTasksRepository
+	store                 *files.AssetStore
 }
 
 type UploadResult struct {
@@ -29,11 +35,12 @@ type UploadResult struct {
 	AssetUID string
 }
 
-func NewAssetsService(cfg config.Config, gamesRepo *repositories.GamesRepository, assetsRepo *repositories.AssetsRepository) *AssetsService {
+func NewAssetsService(cfg config.Config, gamesRepo assetGameRepository, assetsRepo *repositories.AssetsRepository) *AssetsService {
 	return &AssetsService{
-		gamesRepo:  gamesRepo,
-		assetsRepo: assetsRepo,
-		store:      files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
+		gamesRepo:             gamesRepo,
+		assetsRepo:            assetsRepo,
+		assetCleanupTasksRepo: repositories.NewAssetCleanupTasksRepository(gamesRepo.DB()),
+		store:                 files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
 	}
 }
 
@@ -58,6 +65,9 @@ func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart
 
 	asset, err := s.persistAssetPath(gameID, assetType, assetUID, path, sortOrder)
 	if err != nil {
+		if cleanupErr := s.cleanupPersistFailedAsset(path, "assets.upload"); cleanupErr != nil {
+			return nil, cleanupErr
+		}
 		return nil, err
 	}
 
@@ -131,7 +141,7 @@ func (s *AssetsService) Delete(input domain.DeleteAssetInput) error {
 		return ErrValidation
 	}
 
-	if err := s.store.DeleteAsset(assetPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if _, err := cleanupAssetPath(s.store, s.assetCleanupTasksRepo, assetPath, "assets.delete"); err != nil {
 		return err
 	}
 	return nil
@@ -149,6 +159,9 @@ func (s *AssetsService) ApplyRemoteAsset(gameID int64, assetType string, remoteU
 	}
 	_, err = s.persistAssetPath(gameID, assetType, assetUID, path, sortOrder)
 	if err != nil {
+		if cleanupErr := s.cleanupPersistFailedAsset(path, "assets.apply_remote"); cleanupErr != nil {
+			return "", cleanupErr
+		}
 		return "", err
 	}
 	return path, nil
@@ -166,9 +179,17 @@ func (s *AssetsService) ApplyRawAsset(gameID int64, assetType string, content []
 	}
 	_, err = s.persistAssetPath(gameID, assetType, assetUID, path, sortOrder)
 	if err != nil {
+		if cleanupErr := s.cleanupPersistFailedAsset(path, "assets.apply_raw"); cleanupErr != nil {
+			return "", cleanupErr
+		}
 		return "", err
 	}
 	return path, nil
+}
+
+func (s *AssetsService) cleanupPersistFailedAsset(path string, source string) error {
+	_, err := cleanupAssetPath(s.store, s.assetCleanupTasksRepo, path, source)
+	return err
 }
 
 func (s *AssetsService) persistAssetPath(gameID int64, assetType string, assetUID string, path string, sortOrder int) (*domain.GameAsset, error) {

@@ -1,6 +1,7 @@
 package files
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -36,13 +37,21 @@ var ErrBlockedRemoteURL = errors.New("blocked remote image url")
 var uuidAssetNamePattern = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$`)
 
 type AssetStore struct {
-	baseDir string
-	client  *http.Client
+	baseDir    string
+	client     *http.Client
+	lookupHost func(ctx context.Context, host string) ([]net.IP, error)
 }
 
 func NewAssetStore(baseDir string, proxyURL string, timeout time.Duration) *AssetStore {
+	store := &AssetStore{
+		baseDir:    baseDir,
+		lookupHost: lookupHostIPs,
+	}
+
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
+		// Re-resolve at dial time so DNS rebinding cannot bypass the initial URL check.
+		DialContext: store.dialContext,
 	}
 
 	if proxyURL != "" {
@@ -51,13 +60,12 @@ func NewAssetStore(baseDir string, proxyURL string, timeout time.Duration) *Asse
 		}
 	}
 
-	return &AssetStore{
-		baseDir: baseDir,
-		client: &http.Client{
-			Timeout:   timeout,
-			Transport: transport,
-		},
+	store.client = &http.Client{
+		Timeout:       timeout,
+		Transport:     transport,
+		CheckRedirect: store.checkRedirect,
 	}
+	return store
 }
 
 func (s *AssetStore) SaveUploadedAsset(
@@ -101,7 +109,7 @@ func (s *AssetStore) DownloadRemoteAsset(
 	assetName string,
 	remoteURL string,
 ) (string, error) {
-	parsed, err := validateRemoteImageURL(remoteURL)
+	parsed, err := validateRemoteImageURL(remoteURL, s.lookupHost)
 	if err != nil {
 		return "", err
 	}
@@ -178,7 +186,7 @@ func assetTarget(gamePublicID string, assetName string, extension string) (strin
 	return dir, assetName + extension
 }
 
-func validateRemoteImageURL(raw string) (*url.URL, error) {
+func validateRemoteImageURL(raw string, lookupHost func(ctx context.Context, host string) ([]net.IP, error)) (*url.URL, error) {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || parsed == nil || parsed.Host == "" {
 		return nil, ErrInvalidRemoteURL
@@ -186,36 +194,94 @@ func validateRemoteImageURL(raw string) (*url.URL, error) {
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return nil, ErrInvalidRemoteURL
 	}
-	host := parsed.Hostname()
-	if isBlockedHost(host) {
-		return nil, ErrBlockedRemoteURL
+	if _, err := resolvePublicIPs(context.Background(), parsed.Hostname(), lookupHost); err != nil {
+		return nil, err
 	}
 	return parsed, nil
 }
 
-func isBlockedHost(host string) bool {
+func lookupHostIPs(ctx context.Context, host string) ([]net.IP, error) {
+	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	ips := make([]net.IP, 0, len(addrs))
+	for _, addr := range addrs {
+		if addr.IP != nil {
+			ips = append(ips, addr.IP)
+		}
+	}
+	return ips, nil
+}
+
+func resolvePublicIPs(ctx context.Context, host string, lookupHost func(ctx context.Context, host string) ([]net.IP, error)) ([]net.IP, error) {
 	lower := strings.ToLower(strings.TrimSpace(host))
+	if lower == "" {
+		return nil, ErrInvalidRemoteURL
+	}
 	if lower == "localhost" || strings.HasSuffix(lower, ".localhost") || strings.HasSuffix(lower, ".local") {
-		return true
+		return nil, ErrBlockedRemoteURL
 	}
 
 	ip := net.ParseIP(lower)
 	if ip != nil {
-		return isPrivateIP(ip)
+		if isPrivateIP(ip) {
+			return nil, ErrBlockedRemoteURL
+		}
+		return []net.IP{ip}, nil
 	}
 
-	addrs, err := net.LookupIP(lower)
-	if err != nil {
-		return false
+	addrs, err := lookupHost(ctx, lower)
+	if err != nil || len(addrs) == 0 {
+		// Treat lookup failures as blocked so this path can serve as a hard boundary.
+		return nil, ErrBlockedRemoteURL
 	}
+	publicAddrs := make([]net.IP, 0, len(addrs))
 	for _, addr := range addrs {
 		if isPrivateIP(addr) {
-			return true
+			return nil, ErrBlockedRemoteURL
 		}
+		publicAddrs = append(publicAddrs, addr)
 	}
-	return false
+	return publicAddrs, nil
+}
+
+func (s *AssetStore) checkRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+	// Re-validate every redirect target so a safe origin cannot bounce us into a blocked one.
+	_, err := validateRemoteImageURL(req.URL.String(), s.lookupHost)
+	return err
+}
+
+func (s *AssetStore) dialContext(ctx context.Context, network string, address string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+
+	addrs, err := resolvePublicIPs(ctx, host, s.lookupHost)
+	if err != nil {
+		return nil, err
+	}
+
+	// Only connect to the public IPs we just validated for this hostname.
+	dialer := &net.Dialer{}
+	var lastErr error
+	for _, addr := range addrs {
+		conn, dialErr := dialer.DialContext(ctx, network, net.JoinHostPort(addr.String(), port))
+		if dialErr == nil {
+			return conn, nil
+		}
+		lastErr = dialErr
+	}
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, ErrBlockedRemoteURL
 }
 
 func isPrivateIP(ip net.IP) bool {
-	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast()
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast()
 }

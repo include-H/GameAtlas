@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -231,7 +232,7 @@ func TestSteamServiceProxyAssetReturnsPayloadForPartialContent(t *testing.T) {
 			if req.Method != http.MethodGet {
 				t.Fatalf("request method = %s, want GET", req.Method)
 			}
-			if req.URL.String() != "https://cdn.example.com/demo.jpg" {
+			if req.URL.String() != "https://cdn.cloudflare.steamstatic.com/demo.jpg" {
 				t.Fatalf("request url = %s, want asset url", req.URL.String())
 			}
 			resp := steamTextResponse(http.StatusPartialContent, "asset-bytes")
@@ -240,7 +241,7 @@ func TestSteamServiceProxyAssetReturnsPayloadForPartialContent(t *testing.T) {
 		})},
 	}
 
-	contentType, payload, err := service.ProxyAsset("https://cdn.example.com/demo.jpg", "")
+	contentType, payload, err := service.ProxyAsset("https://cdn.cloudflare.steamstatic.com/demo.jpg", "")
 	if err != nil {
 		t.Fatalf("ProxyAsset returned error: %v", err)
 	}
@@ -259,7 +260,7 @@ func TestSteamServiceProxyAssetReturnsErrorForUnexpectedStatus(t *testing.T) {
 		})},
 	}
 
-	_, _, err := service.ProxyAsset("https://cdn.example.com/demo.jpg", "")
+	_, _, err := service.ProxyAsset("https://cdn.cloudflare.steamstatic.com/demo.jpg", "")
 	if err == nil {
 		t.Fatalf("ProxyAsset error = nil, want failure")
 	}
@@ -274,6 +275,42 @@ func TestSteamServiceProxyAssetRejectsMissingHost(t *testing.T) {
 	_, _, err := service.ProxyAsset("https:///missing-host.jpg", "")
 	if err != ErrValidation {
 		t.Fatalf("error = %v, want ErrValidation", err)
+	}
+}
+
+func TestSteamServiceProxyAssetRejectsNonSteamHosts(t *testing.T) {
+	service := &SteamService{}
+
+	_, _, err := service.ProxyAsset("https://cdn.example.com/demo.jpg", "")
+	if err != ErrValidation {
+		t.Fatalf("error = %v, want ErrValidation", err)
+	}
+}
+
+func TestSteamServiceProxyLogValueMasksCredentials(t *testing.T) {
+	service := &SteamService{proxy: "http://alice:secret@example.com:8080"}
+
+	got := service.proxyLogValue("")
+	if strings.Contains(got, "secret") {
+		t.Fatalf("proxyLogValue leaked password: %q", got)
+	}
+	if got != "http://alice:REDACTED@example.com:8080" {
+		t.Fatalf("proxyLogValue() = %q, want masked credentials", got)
+	}
+}
+
+func TestSanitizeURLForLogMasksRequestCredentials(t *testing.T) {
+	parsed, err := url.Parse("https://bob:hunter2@cdn.cloudflare.steamstatic.com/demo.jpg")
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	got := sanitizeURLForLog(parsed)
+	if strings.Contains(got, "hunter2") {
+		t.Fatalf("sanitizeURLForLog leaked password: %q", got)
+	}
+	if got != "https://bob:REDACTED@cdn.cloudflare.steamstatic.com/demo.jpg" {
+		t.Fatalf("sanitizeURLForLog() = %q, want masked credentials", got)
 	}
 }
 

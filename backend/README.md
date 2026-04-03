@@ -36,7 +36,7 @@ GameAtlas 当前主线后端，提供游戏库 API、文件与素材管理、Wik
   - 将远程素材下载并保存到本地素材目录
 - Wiki
   - 读取、更新
-  - Markdown 渲染
+  - 保留原始文本内容（写入前会做首尾空白裁剪）
   - 历史记录
   - 自动裁剪历史条目
 - 元数据
@@ -135,6 +135,11 @@ bash check.sh
 - `ASSETS_DIR`
   游戏素材目录，默认 `data/gamelist`
 
+说明：
+
+- 以上路径配置支持绝对路径与相对路径。
+- 相对路径优先以实际加载到的 `.env` 所在目录为基准；若未加载 `.env`，则回退到当前后端运行目录。
+
 ### 文件访问边界
 
 - `PRIMARY_ROM_ROOT`
@@ -146,8 +151,6 @@ bash check.sh
   前端显示用的管理员名称；后端运行时读取并通过接口返回给前端
 - `ADMIN_PASSWORD`
   管理员密码
-- `SESSION_SECRET`
-  cookie 会话签名密钥；发布脚本会自动生成一个随机值
 - `AUTH_MAX_FAILS`
   最大连续失败次数
 - `AUTH_COOLDOWN`
@@ -162,7 +165,6 @@ bash check.sh
 注意：
 
 - `ADMIN_PASSWORD` 不能为空。
-- `SESSION_SECRET` 不能为空，也不能保留默认值 `change-me`。
 - 任一条件不满足时，后端会直接拒绝启动。
 
 ### Wiki
@@ -191,11 +193,12 @@ bash check.sh
 ## 认证与访问控制
 
 - 管理员身份通过 cookie `gameatlas_admin` 判断。
-- `/api/auth/login` 会校验管理员密码，并在成功后写入 HttpOnly cookie。
+- `/api/auth/login` 会校验管理员密码，并在成功后写入 HttpOnly cookie；当请求本身是 HTTPS，或由反向代理通过 `X-Forwarded-Proto: https` 转发时，会同时写入 `Secure`。
 - 登录失败会按 `AUTH_*` 配置记录次数，并在达到阈值后短时锁定。
 - 大多数写操作要求管理员权限。
-- 文件下载和启动脚本下载额外支持“管理员或本地子网访问”。
+- 文件下载和启动脚本下载仅允许管理员访问。
 - 下载统计通过显式接口 `POST /api/games/:id/files/:fileId/downloads` 完成，并在进程内按 `gameId + fileId + sourceKey` 做 10 分钟时间窗去重。
+  这只是单进程内的近似防重复记录机制，主要用于吸收同一用户短时间内的重复点击；它不是跨重启、跨实例或跨部署环境的稳定限流契约。
 - 对于私有游戏，未登录用户无法通过 `/assets/*` 直接访问其素材。
 
 ## API 概览

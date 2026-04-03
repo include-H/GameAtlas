@@ -2,6 +2,7 @@ package services
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
@@ -44,18 +45,19 @@ func (e *LoginDeniedError) Error() string {
 
 type AuthService struct {
 	adminPassword string
-	sessionSecret string
 	// Auth lockout policy is owned by the service, but the persistence details
 	// stay in repository so future auth features do not mix SQL with rules here.
 	attemptsRepo *repositories.AuthAttemptRepository
+	sessionsRepo *repositories.AuthSessionRepository
 	maxFails     int
 	cooldown     time.Duration
 	failWindow   time.Duration
 	stateTTL     time.Duration
+	sessionTTL   time.Duration
 	trackBy      string
 }
 
-func NewAuthService(cfg config.Config, attemptsRepo *repositories.AuthAttemptRepository) *AuthService {
+func NewAuthService(cfg config.Config, attemptsRepo *repositories.AuthAttemptRepository, sessionsRepo *repositories.AuthSessionRepository) *AuthService {
 	maxFails := cfg.AuthMaxFails
 	if maxFails <= 0 {
 		maxFails = 5
@@ -76,20 +78,27 @@ func NewAuthService(cfg config.Config, attemptsRepo *repositories.AuthAttemptRep
 	if trackBy != "ip_ua" {
 		trackBy = "ip"
 	}
+	sessionTTL := 30 * 24 * time.Hour
 
 	return &AuthService{
 		adminPassword: strings.TrimSpace(cfg.AdminPassword),
-		sessionSecret: strings.TrimSpace(cfg.SessionSecret),
 		attemptsRepo:  attemptsRepo,
+		sessionsRepo:  sessionsRepo,
 		maxFails:      maxFails,
 		cooldown:      cooldown,
 		failWindow:    failWindow,
 		stateTTL:      stateTTL,
+		sessionTTL:    sessionTTL,
 		trackBy:       trackBy,
 	}
 }
 
 func (s *AuthService) SourceKey(clientIP, userAgent string) string {
+	// SourceKey is a privacy-preserving, approximate request-source fingerprint
+	// used for auth lockout tracking and download dedupe. It is intentionally
+	// derived from request metadata available at runtime, so callers must not
+	// treat it as a stable device identity across proxy changes, NAT changes,
+	// user-agent changes, restarts, or different deployments.
 	base := strings.TrimSpace(clientIP)
 	if base == "" {
 		base = "unknown-ip"
@@ -98,7 +107,7 @@ func (s *AuthService) SourceKey(clientIP, userAgent string) string {
 		base = base + "|" + strings.TrimSpace(userAgent)
 	}
 
-	secret := s.sessionSecret
+	secret := s.adminPassword
 	if secret == "" {
 		secret = "auth-source-default-secret"
 	}
@@ -168,34 +177,60 @@ func (s *AuthService) Login(password, sourceKey string) (string, error) {
 	if err := s.deleteAttempt(sourceKey); err != nil {
 		return "", fmt.Errorf("clear auth attempts after success: %w", err)
 	}
-	return s.sessionValue(), nil
+
+	session, err := s.createSession(nowUnix)
+	if err != nil {
+		return "", err
+	}
+	return session, nil
 }
 
 func (s *AuthService) IsAdmin(session string) bool {
 	if s.adminPassword == "" {
 		return true
 	}
-	expected := s.sessionValue()
-	if expected == "" || session == "" {
+	session = strings.TrimSpace(session)
+	if session == "" {
 		return false
 	}
-	return subtle.ConstantTimeCompare([]byte(session), []byte(expected)) == 1
+	nowUnix := time.Now().UTC().Unix()
+	_ = s.cleanupExpired(nowUnix)
+
+	item, err := s.loadSession(session)
+	if err != nil || item == nil {
+		return false
+	}
+	if item.ExpiresAtUnix <= nowUnix {
+		_ = s.deleteSession(session)
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(session), []byte(item.Token)) == 1
 }
 
-func (s *AuthService) sessionValue() string {
-	if s.sessionSecret == "" {
-		return ""
+func (s *AuthService) Logout(session string) error {
+	session = strings.TrimSpace(session)
+	if session == "" {
+		return nil
 	}
-	mac := hmac.New(sha256.New, []byte(s.sessionSecret))
-	_, _ = mac.Write([]byte("admin-session"))
-	return hex.EncodeToString(mac.Sum(nil))
+	return s.deleteSession(session)
+}
+
+func (s *AuthService) SessionMaxAgeSeconds() int {
+	return int(s.sessionTTL.Seconds())
 }
 
 func (s *AuthService) cleanupExpired(nowUnix int64) error {
-	if s.attemptsRepo == nil {
-		return nil
+	if s.attemptsRepo != nil {
+		if err := s.attemptsRepo.CleanupExpired(nowUnix); err != nil {
+			return err
+		}
 	}
-	return s.attemptsRepo.CleanupExpired(nowUnix)
+	if s.sessionsRepo != nil {
+		if err := s.sessionsRepo.CleanupExpired(nowUnix); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *AuthService) loadAttempt(sourceKey string) (*repositories.AuthAttemptState, error) {
@@ -254,6 +289,45 @@ func (s *AuthService) deleteAttempt(sourceKey string) error {
 		return nil
 	}
 	return s.attemptsRepo.Delete(sourceKey)
+}
+
+func (s *AuthService) loadSession(token string) (*repositories.AuthSessionState, error) {
+	if s.sessionsRepo == nil {
+		return nil, nil
+	}
+	return s.sessionsRepo.Get(token)
+}
+
+func (s *AuthService) deleteSession(token string) error {
+	if s.sessionsRepo == nil {
+		return nil
+	}
+	return s.sessionsRepo.Delete(token)
+}
+
+func (s *AuthService) createSession(nowUnix int64) (string, error) {
+	token, err := newAuthSessionToken()
+	if err != nil {
+		return "", fmt.Errorf("create auth session token: %w", err)
+	}
+	if s.sessionsRepo == nil {
+		return "", fmt.Errorf("create auth session: missing repository")
+	}
+	if err := s.sessionsRepo.Create(repositories.AuthSessionState{
+		Token:         token,
+		ExpiresAtUnix: nowUnix + int64(s.sessionTTL.Seconds()),
+	}); err != nil {
+		return "", fmt.Errorf("create auth session: %w", err)
+	}
+	return token, nil
+}
+
+func newAuthSessionToken() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
 }
 
 func (s *AuthService) stateTTLLimit() time.Duration {

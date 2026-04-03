@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -70,7 +69,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie(services.AuthCookieName, session, int((30 * 24 * time.Hour).Seconds()), "/", "", false, true)
+	c.SetCookie(services.AuthCookieName, session, h.service.SessionMaxAgeSeconds(), "/", "", requestUsesHTTPS(c.Request), true)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
@@ -80,8 +79,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
+	session, _ := c.Cookie(services.AuthCookieName)
+	if h.service != nil {
+		_ = h.service.Logout(session)
+	}
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie(services.AuthCookieName, "", -1, "/", "", false, true)
+	c.SetCookie(services.AuthCookieName, "", -1, "/", "", requestUsesHTTPS(c.Request), true)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    gin.H{"logged_out": true},
@@ -129,4 +132,16 @@ func requireAdmin(c *gin.Context) bool {
 		"error":   "admin login required",
 	})
 	return false
+}
+
+func requestUsesHTTPS(req *http.Request) bool {
+	if req == nil {
+		return false
+	}
+	if req.TLS != nil {
+		return true
+	}
+
+	forwardedProto := strings.TrimSpace(strings.Split(req.Header.Get("X-Forwarded-Proto"), ",")[0])
+	return strings.EqualFold(forwardedProto, "https")
 }

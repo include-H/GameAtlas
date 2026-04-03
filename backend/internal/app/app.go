@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/jmoiron/sqlx"
@@ -11,6 +12,7 @@ import (
 	"github.com/hao/game/internal/db"
 	"github.com/hao/game/internal/http/routes"
 	"github.com/hao/game/internal/repositories"
+	"github.com/hao/game/internal/services"
 )
 
 type App struct {
@@ -35,9 +37,16 @@ func New(cfg config.Config) (*App, error) {
 	}
 
 	gamesRepo := repositories.NewGamesRepository(sqliteDB)
-	if err := gamesRepo.RebuildTitleSortKeys(); err != nil {
-		_ = sqliteDB.Close()
-		return nil, fmt.Errorf("rebuild title sort keys: %w", err)
+	gameAggregateService := services.NewGameAggregateService(
+		cfg,
+		repositories.NewGameAggregateRepository(gamesRepo),
+		repositories.NewMetadataRepository(sqliteDB),
+		repositories.NewTagsRepository(sqliteDB),
+	)
+	if processed, err := gameAggregateService.ProcessPendingAssetCleanup(100); err != nil {
+		log.Printf("asset cleanup retry failed after %d task(s): %v", processed, err)
+	} else if processed > 0 {
+		log.Printf("asset cleanup retry processed %d task(s)", processed)
 	}
 
 	router := routes.New(cfg, sqliteDB)

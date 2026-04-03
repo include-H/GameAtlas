@@ -25,7 +25,7 @@ func TestWikiServiceGetRejectsPrivateGameForPublicRequest(t *testing.T) {
 	}
 }
 
-func TestWikiServiceUpdateRendersMarkdownAndPrunesHistory(t *testing.T) {
+func TestWikiServiceUpdateTrimsContentAndPrunesHistory(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()
 

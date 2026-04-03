@@ -98,6 +98,13 @@ export const parseRouteTagIds = (
     .filter((item) => Number.isInteger(item) && item > 0)
 }
 
+export const parsePositiveRouteNumber = (
+  value: LocationQueryValue | LocationQueryValue[] | undefined,
+): number | undefined => {
+  const parsed = Number(readSingleQueryValue(value))
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
+}
+
 export const normalizeGamesSortValue = (value: string | undefined): GamesSortKey => {
   return SORT_ALIASES[value || ''] || DEFAULT_SORT
 }
@@ -147,7 +154,7 @@ export const buildGamesListRequest = ({
       page,
       limit: itemsPerPage,
       search: readSingleQueryValue(routeQuery.search),
-      platform: readSingleQueryValue(routeQuery.platform),
+      platform: parsePositiveRouteNumber(routeQuery.platform),
       tag: parseRouteTagIds(routeQuery.tag),
       favorite: filterFavorites || undefined,
     },
@@ -368,8 +375,14 @@ export const useGamesView = ({
   }
 
   const deleteGame = async (gameRef: string, title: string) => {
-    await gamesService.deleteGame(gameRef)
+    const result = await gamesService.deleteGame(gameRef)
     uiStore.addAlert(`游戏 "${title}" 已删除`, 'success')
+    if (result.warnings.length > 0) {
+      uiStore.addAlert(
+        `游戏 "${title}" 已删除，但仍有 ${result.warnings.length} 个残留素材等待清理，系统会在下次后端启动时自动重试删除`,
+        'warning'
+      )
+    }
     await loadGames()
   }
 

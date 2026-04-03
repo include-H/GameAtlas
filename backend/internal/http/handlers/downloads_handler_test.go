@@ -42,7 +42,7 @@ func TestDownloadsHandlerDownloadServesRegisteredFile(t *testing.T) {
 		repositories.NewGamesRepository(db),
 		repositories.NewGameFilesRepository(db),
 	)
-	handler := NewDownloadsHandler(service, services.NewAuthService(config.Config{}, nil))
+	handler := NewDownloadsHandler(service, nil, services.NewAuthService(config.Config{}, nil, nil))
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -91,7 +91,7 @@ func TestDownloadsHandlerDownloadFormatsChineseContentDisposition(t *testing.T) 
 		repositories.NewGamesRepository(db),
 		repositories.NewGameFilesRepository(db),
 	)
-	handler := NewDownloadsHandler(service, services.NewAuthService(config.Config{}, nil))
+	handler := NewDownloadsHandler(service, nil, services.NewAuthService(config.Config{}, nil, nil))
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -124,7 +124,7 @@ func TestDownloadsHandlerRecordDownloadDedupesWithinWindow(t *testing.T) {
 		repositories.NewGamesRepository(db),
 		repositories.NewGameFilesRepository(db),
 	)
-	handler := NewDownloadsHandler(service, services.NewAuthService(config.Config{SessionSecret: "dedupe-secret"}, nil))
+	handler := NewDownloadsHandler(service, nil, services.NewAuthService(config.Config{AdminPassword: "dedupe-secret"}, nil, nil))
 
 	firstRecorder := httptest.NewRecorder()
 	firstContext, _ := gin.CreateTestContext(firstRecorder)
@@ -199,7 +199,11 @@ func TestDownloadsHandlerLaunchScriptReturnsBadRequestWhenSMBConfigMissing(t *te
 		repositories.NewGamesRepository(db),
 		repositories.NewGameFilesRepository(db),
 	)
-	handler := NewDownloadsHandler(service, services.NewAuthService(config.Config{}, nil))
+	handler := NewDownloadsHandler(
+		service,
+		services.NewWindowsLaunchService(config.Config{}, repositories.NewGamesRepository(db), repositories.NewGameFilesRepository(db)),
+		services.NewAuthService(config.Config{}, nil, nil),
+	)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -247,7 +251,21 @@ func TestDownloadsHandlerLaunchScriptFormatsChineseContentDisposition(t *testing
 		repositories.NewGamesRepository(db),
 		repositories.NewGameFilesRepository(db),
 	)
-	handler := NewDownloadsHandler(service, services.NewAuthService(config.Config{}, nil))
+	handler := NewDownloadsHandler(
+		service,
+		services.NewWindowsLaunchService(
+			config.Config{
+				PrimaryROMRoot: root,
+				SMBShareRoot:   `\\NAS\Games`,
+				SMBUsername:    "demo-user",
+				SMBPassword:    "demo-pass",
+				VHDDiffRoot:    "d:",
+			},
+			repositories.NewGamesRepository(db),
+			repositories.NewGameFilesRepository(db),
+		),
+		services.NewAuthService(config.Config{}, nil, nil),
+	)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -286,16 +304,30 @@ func TestDownloadsHandlerLaunchScriptSetsSafeAttachmentFilename(t *testing.T) {
 	fileID := insertDownloadsHandlerGameFile(t, db, gameID, romPath, 0)
 	service := services.NewGameFilesService(
 		config.Config{
-			PrimaryROMRoot: root,
+			PrimaryROMRoot:  root,
 			SMBPathMappings: root + "=//NAS/Share/Games",
-			SMBUsername:    "demo-user",
-			SMBPassword:    "demo-pass",
-			VHDDiffRoot:    "d:",
+			SMBUsername:     "demo-user",
+			SMBPassword:     "demo-pass",
+			VHDDiffRoot:     "d:",
 		},
 		repositories.NewGamesRepository(db),
 		repositories.NewGameFilesRepository(db),
 	)
-	handler := NewDownloadsHandler(service, services.NewAuthService(config.Config{}, nil))
+	handler := NewDownloadsHandler(
+		service,
+		services.NewWindowsLaunchService(
+			config.Config{
+				PrimaryROMRoot:  root,
+				SMBPathMappings: root + "=//NAS/Share/Games",
+				SMBUsername:     "demo-user",
+				SMBPassword:     "demo-pass",
+				VHDDiffRoot:     "d:",
+			},
+			repositories.NewGamesRepository(db),
+			repositories.NewGameFilesRepository(db),
+		),
+		services.NewAuthService(config.Config{}, nil, nil),
+	)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)

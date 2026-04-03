@@ -255,8 +255,8 @@ export interface GameListQuery {
   page?: number
   limit?: number
   search?: string
-  series?: string
-  platform?: string
+  series?: number
+  platform?: number
   tag?: number[]
   pending?: boolean
   pending_issue?: string

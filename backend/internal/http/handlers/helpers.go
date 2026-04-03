@@ -95,3 +95,27 @@ func writeServiceError(c *gin.Context, err error, validationMessage string) {
 func int64ToString(value int64) string {
 	return strconv.FormatInt(value, 10)
 }
+
+func parseQueryInt(c *gin.Context, key string, fallback int) int {
+	raw := c.Query(key)
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return fallback
+	}
+	return value
+}
+
+func parseQueryInt64(c *gin.Context, key string, fallback int64) int64 {
+	raw := c.Query(key)
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return fallback
+	}
+	return value
+}

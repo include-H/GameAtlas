@@ -93,7 +93,7 @@ func (r *MetadataRepository) CreateSimple(table string, input domain.MetadataWri
 	return &item, nil
 }
 
-func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([]domain.Game, error) {
+func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([]domain.SeriesGameSummary, error) {
 	where := "WHERE g.series_id = ?"
 	args := []any{seriesID}
 	if !includeAll {
@@ -101,7 +101,7 @@ func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([
 		args = append(args, domain.GameVisibilityPublic)
 	}
 
-	var games []domain.Game
+	var games []domain.SeriesGameSummary
 	query := fmt.Sprintf(`
 		SELECT
 			g.id,
@@ -123,11 +123,6 @@ func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([
 				ORDER BY ga.sort_order ASC, ga.id ASC
 				LIMIT 1
 			) AS primary_screenshot,
-			0 AS screenshot_count,
-			0 AS file_count,
-			0 AS developer_count,
-			0 AS publisher_count,
-			0 AS platform_count,
 			g.created_at,
 			g.updated_at
 		FROM games g
@@ -142,10 +137,10 @@ func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([
 	return games, nil
 }
 
-func (r *MetadataRepository) ListSeriesGamesBySeriesIDs(seriesIDs []int64, includeAll bool) (map[int64][]domain.Game, error) {
+func (r *MetadataRepository) ListSeriesGamesBySeriesIDs(seriesIDs []int64, includeAll bool) (map[int64][]domain.SeriesGameSummary, error) {
 	normalized := uniquePositiveIDs(seriesIDs)
 	if len(normalized) == 0 {
-		return map[int64][]domain.Game{}, nil
+		return map[int64][]domain.SeriesGameSummary{}, nil
 	}
 
 	where := "WHERE g.series_id IN (?)"
@@ -177,11 +172,6 @@ func (r *MetadataRepository) ListSeriesGamesBySeriesIDs(seriesIDs []int64, inclu
 				ORDER BY ga.sort_order ASC, ga.id ASC
 				LIMIT 1
 			) AS primary_screenshot,
-			0 AS screenshot_count,
-			0 AS file_count,
-			0 AS developer_count,
-			0 AS publisher_count,
-			0 AS platform_count,
 			g.created_at,
 			g.updated_at
 		FROM games g
@@ -195,7 +185,7 @@ func (r *MetadataRepository) ListSeriesGamesBySeriesIDs(seriesIDs []int64, inclu
 
 	type seriesGameRow struct {
 		SeriesID int64 `db:"series_id"`
-		domain.Game
+		domain.SeriesGameSummary
 	}
 
 	var rows []seriesGameRow
@@ -203,12 +193,12 @@ func (r *MetadataRepository) ListSeriesGamesBySeriesIDs(seriesIDs []int64, inclu
 		return nil, fmt.Errorf("list series games by ids: %w", err)
 	}
 
-	gamesBySeriesID := make(map[int64][]domain.Game, len(normalized))
+	gamesBySeriesID := make(map[int64][]domain.SeriesGameSummary, len(normalized))
 	for _, seriesID := range normalized {
-		gamesBySeriesID[seriesID] = []domain.Game{}
+		gamesBySeriesID[seriesID] = []domain.SeriesGameSummary{}
 	}
 	for _, row := range rows {
-		gamesBySeriesID[row.SeriesID] = append(gamesBySeriesID[row.SeriesID], row.Game)
+		gamesBySeriesID[row.SeriesID] = append(gamesBySeriesID[row.SeriesID], row.SeriesGameSummary)
 	}
 
 	return gamesBySeriesID, nil

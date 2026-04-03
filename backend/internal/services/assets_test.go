@@ -130,6 +130,44 @@ func TestAssetsServiceDeleteCoverClearsImageAndRemovesFile(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(assetsDir, "cover-game", "cover.png")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expected cover file to be deleted, got err=%v", err)
 	}
+	assertAssetCleanupTaskMissing(t, db, coverPath)
+}
+
+func TestAssetsServiceDeleteQueuesCleanupTaskWhenFileRemovalFails(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	gameID := insertServicesTestGame(t, db, "cover-cleanup-task", "Cover Cleanup Task", domain.GameVisibilityPublic)
+	coverPath := "/assets/../bad-cover.png"
+	if _, err := db.Exec(`
+		UPDATE games
+		SET cover_image = ?
+		WHERE id = ?
+	`, coverPath, gameID); err != nil {
+		t.Fatalf("set test cover image: %v", err)
+	}
+
+	service := newServicesAssetsService(db, filepath.Join(t.TempDir(), "assets"))
+	if err := service.Delete(domain.DeleteAssetInput{
+		GameID:    gameID,
+		AssetType: "cover",
+		Path:      coverPath,
+	}); err != nil {
+		t.Fatalf("Delete returned error: %v", err)
+	}
+
+	game := mustLoadServicesGame(t, db, gameID)
+	if game.CoverImage != nil {
+		t.Fatalf("CoverImage = %v, want nil", game.CoverImage)
+	}
+
+	task := mustLoadAssetCleanupTask(t, db, coverPath)
+	if task.Source != "assets.delete" {
+		t.Fatalf("task.Source = %q, want assets.delete", task.Source)
+	}
+	if task.AttemptCount != 1 {
+		t.Fatalf("task.AttemptCount = %d, want 1", task.AttemptCount)
+	}
 }
 
 func TestAssetsServiceApplyRemoteAssetRejectsBlockedOrInvalidURLs(t *testing.T) {
@@ -160,6 +198,37 @@ func TestAssetsServiceApplyRawAssetRejectsInvalidContentType(t *testing.T) {
 	_, err := service.ApplyRawAsset(gameID, "cover", []byte("not-an-image"), "text/plain", 0)
 	if !errors.Is(err, ErrValidation) {
 		t.Fatalf("ApplyRawAsset error = %v, want ErrValidation", err)
+	}
+}
+
+func TestAssetsServiceApplyRawAssetCleansUpSavedFileWhenPersistFails(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	assetsDir := filepath.Join(t.TempDir(), "assets")
+	gameID := insertServicesTestGame(t, db, "persist-fail", "Persist Fail", domain.GameVisibilityPublic)
+	service := newServicesAssetsService(db, assetsDir)
+
+	_, err := service.ApplyRawAsset(gameID, "unexpected", []byte("png"), "image/png", 0)
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("ApplyRawAsset error = %v, want ErrValidation", err)
+	}
+
+	entries, readErr := os.ReadDir(filepath.Join(assetsDir, "persist-fail"))
+	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
+		t.Fatalf("ReadDir returned error: %v", readErr)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected no saved files after persist failure, got %d", len(entries))
+	}
+
+	tasksRepo := repositories.NewAssetCleanupTasksRepository(db)
+	tasks, listErr := tasksRepo.ListPending(10)
+	if listErr != nil {
+		t.Fatalf("ListPending returned error: %v", listErr)
+	}
+	if len(tasks) != 0 {
+		t.Fatalf("expected no cleanup task when rollback succeeds, got %d", len(tasks))
 	}
 }
 

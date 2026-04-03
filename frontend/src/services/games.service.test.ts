@@ -78,8 +78,8 @@ describe('games service', () => {
         page: 2,
         limit: 20,
         search: 'halo',
-        series: 'fps',
-        platform: 'pc',
+        series: 12,
+        platform: 3,
         pending: false,
         tag: [3, 7],
       },
@@ -100,8 +100,8 @@ describe('games service', () => {
     expect(params.get('page')).toBe('2')
     expect(params.get('limit')).toBe('20')
     expect(params.get('search')).toBe('halo')
-    expect(params.get('series')).toBe('fps')
-    expect(params.get('platform')).toBe('pc')
+    expect(params.get('series')).toBe('12')
+    expect(params.get('platform')).toBe('3')
     expect(params.get('pending')).toBe('false')
     expect(params.getAll('tag')).toEqual(['3', '7'])
     expect(params.get('sort')).toBe('updated_at')
@@ -136,6 +136,24 @@ describe('games service', () => {
 
     expect(result.data).toHaveLength(1)
     expect(result.data[0]?.public_id).toBe('game-2')
+  })
+
+  it('returns delete warnings when game removal leaves cleanup tasks', async () => {
+    delMock.mockResolvedValue({
+      data: {
+        deleted: true,
+        warnings: {
+          asset_delete_paths: ['/assets/bad-cover.png'],
+        },
+      },
+    })
+
+    const result = await gamesService.deleteGame('game-1')
+
+    expect(delMock).toHaveBeenCalledWith('/games/game-1')
+    expect(result).toEqual({
+      warnings: ['/assets/bad-cover.png'],
+    })
   })
 
   it('loads all pages through getAllGames', async () => {

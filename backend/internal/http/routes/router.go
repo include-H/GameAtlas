@@ -28,31 +28,44 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 
 	healthHandler := handlers.NewHealthHandler(db)
 	authAttemptsRepo := repositories.NewAuthAttemptRepository(db)
-	authService := services.NewAuthService(cfg, authAttemptsRepo)
+	authSessionsRepo := repositories.NewAuthSessionRepository(db)
+	authService := services.NewAuthService(cfg, authAttemptsRepo, authSessionsRepo)
 	authHandler := handlers.NewAuthHandler(authService, cfg)
 	gamesRepo := repositories.NewGamesRepository(db)
+	gameDetailRepo := repositories.NewGameDetailRepository(gamesRepo)
 	gameFilesRepo := repositories.NewGameFilesRepository(db)
 	assetsRepo := repositories.NewAssetsRepository(db)
 	metadataRepo := repositories.NewMetadataRepository(db)
 	tagsRepo := repositories.NewTagsRepository(db)
 	reviewIssueOverridesRepo := repositories.NewReviewIssueOverrideRepository(db)
 	wikiRepo := repositories.NewWikiRepository(db)
-	gamesService := services.NewGamesService(cfg, gamesRepo, gameFilesRepo, metadataRepo, tagsRepo, reviewIssueOverridesRepo)
-	gameFilesService := services.NewGameFilesService(cfg, gamesRepo, gameFilesRepo)
-	assetsService := services.NewAssetsService(cfg, gamesRepo, assetsRepo)
+	gameCatalogRepo := repositories.NewGameCatalogRepository(gamesRepo)
+	gameTimelineRepo := repositories.NewGameTimelineRepository(gamesRepo)
+	gameAggregateRepo := repositories.NewGameAggregateRepository(gamesRepo)
+	gameCatalogService := services.NewGameCatalogService(gameCatalogRepo, reviewIssueOverridesRepo)
+	gameTimelineService := services.NewGameTimelineService(gameTimelineRepo)
+	gameDetailService := services.NewGameDetailService(gameDetailRepo, gameFilesRepo, tagsRepo, reviewIssueOverridesRepo)
+	gameAggregateService := services.NewGameAggregateService(cfg, gameAggregateRepo, metadataRepo, tagsRepo)
+	gameFilesService := services.NewGameFilesService(cfg, gameDetailRepo, gameFilesRepo)
+	windowsLaunchService := services.NewWindowsLaunchService(cfg, gameDetailRepo, gameFilesRepo)
+	assetsService := services.NewAssetsService(cfg, gameDetailRepo, assetsRepo)
 	directoryService := services.NewDirectoryService(cfg)
-	metadataService := services.NewMetadataService(cfg, metadataRepo)
+	metadataService := services.NewMetadataService(metadataRepo)
 	pendingIssuesService := services.NewPendingIssuesService()
 	tagsService := services.NewTagsService(tagsRepo)
-	reviewIssueOverrideService := services.NewReviewIssueOverrideService(gamesRepo, reviewIssueOverridesRepo)
+	reviewIssueOverrideService := services.NewReviewIssueOverrideService(gameDetailRepo, reviewIssueOverridesRepo)
 	steamService := services.NewSteamService(cfg, assetsService)
-	wikiService := services.NewWikiService(gamesRepo, wikiRepo, cfg.WikiHistoryLimit)
+	wikiService := services.NewWikiService(gameDetailRepo, wikiRepo, cfg.WikiHistoryLimit)
 	hitokotoService := services.NewHitokotoService()
 	assetsHandler := handlers.NewAssetsHandler(assetsService)
 	directoryHandler := handlers.NewDirectoryHandler(directoryService)
-	gamesHandler := handlers.NewGamesHandler(gamesService)
+	gamesHandler := handlers.NewSplitGamesHandler(gameCatalogService, gameTimelineService, gameDetailService, gameAggregateService)
 	gameFilesHandler := handlers.NewGameFilesHandler(gameFilesService)
-	downloadsHandler := handlers.NewDownloadsHandler(gameFilesService, authService)
+	downloadsHandler := handlers.NewDownloadsHandler(gameFilesService, windowsLaunchService, authService)
+	// These endpoints are exposed as first-class resources for admin UX, but
+	// they still point at metadata that is auto-pruned once unreferenced by any
+	// game. The lightweight MetadataResource mapping keeps the transport layer
+	// small while the actual lifecycle rule remains in aggregate-side cleanup.
 	seriesHandler := handlers.NewMetadataHandler(metadataService, services.MetadataResource{Table: "series", ResourceName: "series"})
 	platformsHandler := handlers.NewMetadataHandler(metadataService, services.MetadataResource{Table: "platforms", ResourceName: "platforms"})
 	developersHandler := handlers.NewMetadataHandler(metadataService, services.MetadataResource{Table: "developers", ResourceName: "developers"})
@@ -124,14 +137,18 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.POST("/steam/:appId/apply-assets", steamHandler.Apply)
 	api.GET("/steam/proxy", steamHandler.Proxy)
 
-	registerAssetRoutes(router, cfg.AssetsDir, gamesRepo)
+	registerAssetRoutes(router, cfg.AssetsDir, gameDetailRepo)
 	registerCustomDataRoutes(router, filepath.Dir(cfg.AssetsDir))
 	registerStaticRoutes(router, cfg.StaticDir)
 
 	return router
 }
 
-func registerAssetRoutes(router *gin.Engine, assetsDir string, gamesRepo *repositories.GamesRepository) {
+type assetRouteGameRepository interface {
+	GetByPublicID(publicID string) (*domain.Game, error)
+}
+
+func registerAssetRoutes(router *gin.Engine, assetsDir string, gamesRepo assetRouteGameRepository) {
 	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
 		return
 	}

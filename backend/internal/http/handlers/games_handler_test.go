@@ -17,7 +17,6 @@ import (
 	"github.com/hao/game/internal/config"
 	dbpkg "github.com/hao/game/internal/db"
 	"github.com/hao/game/internal/repositories"
-	"github.com/hao/game/internal/services"
 )
 
 func TestGamesHandlerListTimelineRejectsInvalidCursor(t *testing.T) {
@@ -27,7 +26,7 @@ func TestGamesHandlerListTimelineRejectsInvalidCursor(t *testing.T) {
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodGet, "/api/games/timeline?cursor=bad", nil)
 
-	handler := NewGamesHandler(nil)
+	handler := NewSplitGamesHandler(nil, nil, nil, nil)
 	handler.ListTimeline(context)
 
 	if recorder.Code != http.StatusBadRequest {
@@ -56,14 +55,7 @@ func TestGamesHandlerListTimelineUsesLatestPublicReleaseDateAndFormatsCursor(t *
 	secondID := insertGamesHandlerTestGame(t, db, "public-mid", "Public Mid", "public", "2023-05-01")
 	_ = insertGamesHandlerTestGame(t, db, "public-old", "Public Old", "public", "2022-03-01")
 
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -145,14 +137,7 @@ func TestGamesHandlerGetHidesFilePathsForPublicAndIncludesThemForAdmin(t *testin
 		t.Fatalf("insert game file: %v", err)
 	}
 
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	publicRecorder := httptest.NewRecorder()
 	publicContext, _ := gin.CreateTestContext(publicRecorder)
@@ -275,14 +260,7 @@ func TestGamesHandlerListPendingUsesNativePendingFilter(t *testing.T) {
 		t.Fatalf("insert ignored override: %v", err)
 	}
 
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -391,14 +369,7 @@ func TestGamesHandlerListPendingUsesNativePendingQueryOptions(t *testing.T) {
 		}
 	}
 
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -461,15 +432,7 @@ func TestGamesHandlerListReturnsInternalServerErrorWhenPendingOverridesLookupFai
 		t.Fatalf("drop override table: %v", err)
 	}
 
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-		repositories.NewReviewIssueOverrideRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -502,14 +465,7 @@ func TestGamesHandlerCreateReturnsBadRequestWhenTitleMissing(t *testing.T) {
 	db := openGamesHandlerTestDB(t)
 	defer func() { _ = db.Close() }()
 
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -533,14 +489,7 @@ func TestGamesHandlerCreateRejectsInvalidJSON(t *testing.T) {
 	db := openGamesHandlerTestDB(t)
 	defer func() { _ = db.Close() }()
 
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -565,14 +514,7 @@ func TestGamesHandlerUpdateAggregateIncludesAssetDeleteWarnings(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	gameID := insertGamesHandlerTestGame(t, db, "aggregate-warning", "Aggregate Warning", "public", "")
-	service := services.NewGamesService(
-		config.Config{AssetsDir: t.TempDir()},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{AssetsDir: t.TempDir()}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -628,14 +570,7 @@ func TestGamesHandlerUpdateAggregatePreservesOmittedRelations(t *testing.T) {
 		t.Fatalf("link game developer: %v", err)
 	}
 
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -666,14 +601,7 @@ func TestGamesHandlerUpdateAggregateRejectsNullRelationPatch(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	insertGamesHandlerTestGame(t, db, "aggregate-null-relations", "Aggregate Null Relations", "public", "")
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -698,14 +626,7 @@ func TestGamesHandlerDeleteReturnsNotFoundForMissingGame(t *testing.T) {
 	db := openGamesHandlerTestDB(t)
 	defer func() { _ = db.Close() }()
 
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -730,14 +651,7 @@ func TestGamesHandlerDeleteRemovesExistingGame(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	gameID := insertGamesHandlerTestGame(t, db, "delete-existing", "Delete Existing", "public", "")
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -754,7 +668,10 @@ func TestGamesHandlerDeleteRemovesExistingGame(t *testing.T) {
 	var response struct {
 		Success bool `json:"success"`
 		Data    struct {
-			Deleted bool `json:"deleted"`
+			Deleted  bool `json:"deleted"`
+			Warnings *struct {
+				AssetDeletePaths []string `json:"asset_delete_paths"`
+			} `json:"warnings"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
@@ -763,8 +680,56 @@ func TestGamesHandlerDeleteRemovesExistingGame(t *testing.T) {
 	if !response.Success || !response.Data.Deleted {
 		t.Fatalf("response = %s, want deleted=true", recorder.Body.String())
 	}
+	if response.Data.Warnings != nil {
+		t.Fatalf("response warnings = %#v, want nil", response.Data.Warnings)
+	}
 	if _, err := repositories.NewGamesRepository(db).GetByID(gameID); err == nil {
 		t.Fatalf("expected deleted game to be gone from repository")
+	}
+}
+
+func TestGamesHandlerDeleteReturnsAssetDeleteWarnings(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	gameID := insertGamesHandlerTestGame(t, db, "delete-warning", "Delete Warning", "public", "")
+	if _, err := db.Exec(`UPDATE games SET cover_image = ? WHERE id = ?`, "/assets/../bad-cover.png", gameID); err != nil {
+		t.Fatalf("set cover image: %v", err)
+	}
+
+	handler := newSplitGamesHandlerForTest(config.Config{AssetsDir: filepath.Join(t.TempDir(), "assets")}, db)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodDelete, "/api/games/delete-warning", nil)
+	context.Params = gin.Params{{Key: "publicId", Value: "delete-warning"}}
+	context.Set("is_admin", true)
+
+	handler.Delete(context)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Deleted  bool `json:"deleted"`
+			Warnings struct {
+				AssetDeletePaths []string `json:"asset_delete_paths"`
+			} `json:"warnings"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !response.Success || !response.Data.Deleted {
+		t.Fatalf("response = %s, want deleted=true", recorder.Body.String())
+	}
+	if len(response.Data.Warnings.AssetDeletePaths) != 1 || response.Data.Warnings.AssetDeletePaths[0] != "/assets/../bad-cover.png" {
+		t.Fatalf("warnings = %#v, want bad cover path", response.Data.Warnings.AssetDeletePaths)
 	}
 }
 
@@ -775,14 +740,7 @@ func TestGamesHandlerUpdateAggregateReturnsBadRequestForInvalidDeleteAssetType(t
 	defer func() { _ = db.Close() }()
 
 	insertGamesHandlerTestGame(t, db, "aggregate-invalid-type", "Aggregate Invalid Type", "public", "")
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -808,14 +766,7 @@ func TestGamesHandlerUpdateAggregateRejectsInvalidJSONAfterResolvingGame(t *test
 	defer func() { _ = db.Close() }()
 
 	insertGamesHandlerTestGame(t, db, "aggregate-invalid-json", "Aggregate Invalid JSON", "public", "")
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -840,14 +791,7 @@ func TestGamesHandlerUpdateAggregateReturnsNotFoundForMissingGame(t *testing.T) 
 	db := openGamesHandlerTestDB(t)
 	defer func() { _ = db.Close() }()
 
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -873,14 +817,7 @@ func TestGamesHandlerUpdateAggregateReturnsBadRequestWhenPrimaryROMRootMissing(t
 	defer func() { _ = db.Close() }()
 
 	insertGamesHandlerTestGame(t, db, "aggregate-missing-root", "Aggregate Missing Root", "public", "")
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -913,14 +850,7 @@ func TestGamesHandlerUpdateAggregateReturnsNotFoundForMissingScreenshotReorderUI
 		t.Fatalf("insert screenshot asset: %v", err)
 	}
 
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -953,14 +883,7 @@ func TestGamesHandlerUpdateAggregateReturnsNotFoundForMissingVideoReorderUID(t *
 		t.Fatalf("insert video asset: %v", err)
 	}
 
-	service := services.NewGamesService(
-		config.Config{},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -993,14 +916,7 @@ func TestGamesHandlerUpdateAggregateReturnsForbiddenForFileOutsidePrimaryROMRoot
 	}
 
 	insertGamesHandlerTestGame(t, db, "aggregate-outside-root", "Aggregate Outside Root", "public", "")
-	service := services.NewGamesService(
-		config.Config{PrimaryROMRoot: root},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
-	)
-	handler := NewGamesHandler(service)
+	handler := newSplitGamesHandlerForTest(config.Config{PrimaryROMRoot: root}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)

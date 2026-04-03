@@ -7,7 +7,6 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/repositories"
 )
@@ -17,6 +16,11 @@ type MetadataService struct {
 }
 
 type MetadataResource struct {
+	// These resources share the same CRUD shape at the HTTP/service boundary,
+	// but they are still "game-attached metadata" in product semantics rather
+	// than permanently curated master data. They can be pre-created for form
+	// input convenience and are expected to be auto-pruned once no games refer
+	// to them anymore.
 	Table        string
 	ResourceName string
 }
@@ -29,10 +33,10 @@ type MetadataListOptions struct {
 
 type SeriesDetail struct {
 	Series *domain.MetadataItem
-	Games  []domain.Game
+	Games  []domain.SeriesGameSummary
 }
 
-func NewMetadataService(cfg config.Config, repo *repositories.MetadataRepository) *MetadataService {
+func NewMetadataService(repo *repositories.MetadataRepository) *MetadataService {
 	return &MetadataService{
 		repo: repo,
 	}
@@ -216,7 +220,7 @@ func (s *MetadataService) enrichSeriesItems(items []domain.MetadataItem, include
 	}
 }
 
-func applySeriesItemGames(item *domain.MetadataItem, games []domain.Game) {
+func applySeriesItemGames(item *domain.MetadataItem, games []domain.SeriesGameSummary) {
 	item.GameCount = len(games)
 	item.LatestUpdatedAt = nil
 	item.CoverCandidates = nil
@@ -249,7 +253,7 @@ func applySeriesItemGames(item *domain.MetadataItem, games []domain.Game) {
 	}
 }
 
-func pickSeriesCoverSource(game domain.Game) string {
+func pickSeriesCoverSource(game domain.SeriesGameSummary) string {
 	if game.CoverImage != nil && strings.TrimSpace(*game.CoverImage) != "" {
 		return strings.TrimSpace(*game.CoverImage)
 	}

@@ -106,7 +106,7 @@ func TestGameFilesServiceCreateNormalizesPathAndPersistsSize(t *testing.T) {
 	}
 }
 
-func TestGameFilesServiceBuildLaunchScriptUsesMappedSMBPath(t *testing.T) {
+func TestWindowsLaunchServiceBuildLaunchScriptUsesMappedSMBPath(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()
 
@@ -121,7 +121,7 @@ func TestGameFilesServiceBuildLaunchScriptUsesMappedSMBPath(t *testing.T) {
 
 	gameID := insertServicesTestGame(t, db, "launch-script-game", "Launch Script Game", domain.GameVisibilityPublic)
 	fileID := insertServicesGameFile(t, db, gameID, romPath, 0)
-	service := NewGameFilesService(
+	service := NewWindowsLaunchService(
 		config.Config{
 			PrimaryROMRoot:  root,
 			SMBPathMappings: root + "=//NAS/Share/Games",

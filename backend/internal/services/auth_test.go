@@ -13,13 +13,13 @@ import (
 
 func TestAuthServiceSourceKeyDependsOnTrackingMode(t *testing.T) {
 	ipOnly := NewAuthService(config.Config{
-		SessionSecret: "secret",
+		AdminPassword: "secret",
 		AuthTrackBy:   "ip",
-	}, nil)
+	}, nil, nil)
 	ipUA := NewAuthService(config.Config{
-		SessionSecret: "secret",
+		AdminPassword: "secret",
 		AuthTrackBy:   "ip_ua",
-	}, nil)
+	}, nil, nil)
 
 	if ipOnly.SourceKey("127.0.0.1", "ua1") != ipOnly.SourceKey("127.0.0.1", "ua2") {
 		t.Fatalf("expected ip tracking to ignore user agent")
@@ -35,12 +35,11 @@ func TestAuthServiceLoginTracksFailuresAndLocks(t *testing.T) {
 
 	service := NewAuthService(config.Config{
 		AdminPassword:  "secret",
-		SessionSecret:  "session-secret",
 		AuthMaxFails:   3,
 		AuthCooldown:   time.Minute,
 		AuthFailWindow: time.Hour,
 		AuthStateTTL:   time.Hour,
-	}, repositories.NewAuthAttemptRepository(db))
+	}, repositories.NewAuthAttemptRepository(db), repositories.NewAuthSessionRepository(db))
 
 	sourceKey := service.SourceKey("127.0.0.1", "")
 	for attempt := 1; attempt <= 2; attempt++ {
@@ -70,12 +69,11 @@ func TestAuthServiceLoginClearsAttemptsAfterSuccess(t *testing.T) {
 
 	service := NewAuthService(config.Config{
 		AdminPassword:  "secret",
-		SessionSecret:  "session-secret",
 		AuthMaxFails:   3,
 		AuthCooldown:   time.Minute,
 		AuthFailWindow: time.Hour,
 		AuthStateTTL:   time.Hour,
-	}, repositories.NewAuthAttemptRepository(db))
+	}, repositories.NewAuthAttemptRepository(db), repositories.NewAuthSessionRepository(db))
 
 	sourceKey := service.SourceKey("127.0.0.1", "")
 	_, _ = service.Login("wrong", sourceKey)
@@ -95,16 +93,22 @@ func TestAuthServiceLoginClearsAttemptsAfterSuccess(t *testing.T) {
 	if attempt != nil {
 		t.Fatalf("expected attempts to be cleared after successful login")
 	}
+
+	if err := service.Logout(session); err != nil {
+		t.Fatalf("Logout returned error: %v", err)
+	}
+	if service.IsAdmin(session) {
+		t.Fatalf("expected logged out session to be rejected")
+	}
 }
 
 func TestAuthServiceStateTTLLimitUsesLongestWindow(t *testing.T) {
 	service := NewAuthService(config.Config{
 		AdminPassword:  "secret",
-		SessionSecret:  "session-secret",
 		AuthCooldown:   10 * time.Minute,
 		AuthFailWindow: 30 * time.Minute,
 		AuthStateTTL:   5 * time.Minute,
-	}, nil)
+	}, nil, nil)
 
 	if got := service.stateTTLLimit(); got != 40*time.Minute {
 		t.Fatalf("stateTTLLimit() = %s, want 40m0s", got)

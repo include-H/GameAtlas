@@ -24,6 +24,48 @@ type Game struct {
 	UpdatedAt         string `db:"updated_at"`
 }
 
+type GameListItem struct {
+	ID                int64   `db:"id"`
+	PublicID          string  `db:"public_id"`
+	Title             string  `db:"title"`
+	TitleAlt          *string `db:"title_alt"`
+	Visibility        string  `db:"visibility"`
+	Summary           *string `db:"summary"`
+	ReleaseDate       *string `db:"release_date"`
+	Engine            *string `db:"engine"`
+	CoverImage        *string `db:"cover_image"`
+	BannerImage       *string `db:"banner_image"`
+	WikiContent       *string `db:"wiki_content"`
+	Downloads         int64   `db:"downloads"`
+	PrimaryScreenshot *string `db:"primary_screenshot"`
+	ScreenshotCount   int64   `db:"screenshot_count"`
+	FileCount         int64   `db:"file_count"`
+	DeveloperCount    int64   `db:"developer_count"`
+	PublisherCount    int64   `db:"publisher_count"`
+	PlatformCount     int64   `db:"platform_count"`
+	PendingIssues     *PendingIssueEvaluation
+	CreatedAt         string `db:"created_at"`
+	UpdatedAt         string `db:"updated_at"`
+}
+
+type SeriesGameSummary struct {
+	ID                int64   `db:"id"`
+	PublicID          string  `db:"public_id"`
+	Title             string  `db:"title"`
+	TitleAlt          *string `db:"title_alt"`
+	Visibility        string  `db:"visibility"`
+	Summary           *string `db:"summary"`
+	ReleaseDate       *string `db:"release_date"`
+	Engine            *string `db:"engine"`
+	CoverImage        *string `db:"cover_image"`
+	BannerImage       *string `db:"banner_image"`
+	WikiContent       *string `db:"wiki_content"`
+	Downloads         int64   `db:"downloads"`
+	PrimaryScreenshot *string `db:"primary_screenshot"`
+	CreatedAt         string  `db:"created_at"`
+	UpdatedAt         string  `db:"updated_at"`
+}
+
 type GameAsset struct {
 	ID        int64  `db:"id"`
 	GameID    int64  `db:"game_id"`
@@ -271,8 +313,8 @@ type ReviewIssueOverride struct {
 type GameStats struct {
 	TotalGames     int
 	TotalDownloads int64
-	RecentGames    []Game
-	PopularGames   []Game
+	RecentGames    []GameListItem
+	PopularGames   []GameListItem
 	PendingReviews int
 }
 
