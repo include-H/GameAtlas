@@ -25,10 +25,10 @@ describe('useGamesView helpers', () => {
     expect(parseRouteTagIds(['1', 'x', '2', '-3'])).toEqual([1, 2])
   })
 
-  it('normalizes legacy sort aliases', () => {
-    expect(normalizeGamesSortValue('newest')).toBe('created_desc')
-    expect(normalizeGamesSortValue('downloads')).toBe('downloads_desc')
-    expect(normalizeGamesSortValue('random')).toBe('random_desc')
+  it('normalizes only supported sort values', () => {
+    expect(normalizeGamesSortValue('created_desc')).toBe('created_desc')
+    expect(normalizeGamesSortValue('downloads_desc')).toBe('downloads_desc')
+    expect(normalizeGamesSortValue('random_desc')).toBe('random_desc')
     expect(normalizeGamesSortValue('unexpected')).toBe('created_desc')
   })
 
@@ -37,7 +37,6 @@ describe('useGamesView helpers', () => {
       {
         page: '3',
         limit: '48',
-        needs: 'legacy',
         filter: 'favorites',
       },
       {

@@ -248,16 +248,10 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       }
 
       const orderedScreenshotUids = options.form.value.screenshots
-        .map((item, index) => {
-          item.sort_order = index
-          return item.asset_uid
-        })
+        .map((item) => item.asset_uid)
         .filter((assetUid): assetUid is string => Boolean(assetUid))
       const orderedVideoUids = options.form.value.preview_videos
-        .map((item, index) => {
-          item.sort_order = index
-          return item.asset_uid
-        })
+        .map((item) => item.asset_uid)
         .filter((assetUid): assetUid is string => Boolean(assetUid))
       if (!game.public_id) {
         throw new Error('missing game public_id')
@@ -274,12 +268,11 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
         assets: {
           files: options.form.value.file_paths
             .filter((item) => item.path.trim())
-            .map((item, index) => ({
+            .map((item) => ({
               id: item.id,
               file_path: item.path.trim(),
               label: item.label.trim() || null,
               notes: null,
-              sort_order: index,
             })),
           delete_assets: pendingDeleteAssets.value.map((item) => ({
             asset_type: item.type,

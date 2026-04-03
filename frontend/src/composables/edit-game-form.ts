@@ -4,7 +4,6 @@ export interface EditGameEditableScreenshot {
   id?: number
   asset_uid?: string
   path: string
-  sort_order?: number
   client_key: string
 }
 
@@ -12,7 +11,6 @@ export interface EditGameEditableVideo {
   id?: number
   asset_uid?: string
   path: string
-  sort_order?: number
 }
 
 export interface EditGameForm {

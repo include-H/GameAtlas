@@ -48,7 +48,7 @@
             icon="mdi-new-box"
             color="#00b42a"
             :height="104"
-            @click="router.push('/games?sort=newest')"
+            @click="router.push('/games?sort=created_desc')"
           />
 
           <stat-card
@@ -74,7 +74,7 @@
       icon="mdi-new-box"
       :items="recentAdditions"
       :show-view-all="true"
-      view-all-route="/games?sort=newest"
+      view-all-route="/games?sort=created_desc"
     >
       <template #item="{ item }">
         <game-card
@@ -93,7 +93,7 @@
       icon="mdi-download"
       :items="mostPlayed"
       :show-view-all="true"
-      view-all-route="/games?sort=downloads"
+      view-all-route="/games?sort=downloads_desc"
     >
       <template #item="{ item }">
         <game-card

@@ -5,7 +5,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/services"
 )
 
@@ -44,8 +43,8 @@ func (h *WikiHandler) Update(c *gin.Context) {
 		return
 	}
 
-	var input domain.WikiWriteInput
-	if err := c.ShouldBindJSON(&input); err != nil {
+	var request wikiWriteRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "invalid wiki payload",
@@ -53,6 +52,7 @@ func (h *WikiHandler) Update(c *gin.Context) {
 		return
 	}
 
+	input := request.toInput()
 	document, err := h.service.Update(gameID, input)
 	if err != nil {
 		writeServiceError(c, err, "invalid wiki payload")

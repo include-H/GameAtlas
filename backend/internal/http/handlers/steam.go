@@ -2,12 +2,10 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/services"
 )
 
@@ -63,18 +61,13 @@ func (h *SteamHandler) Apply(c *gin.Context) {
 		return
 	}
 
-	var input domain.SteamApplyAssetsInput
-	if err := c.ShouldBindJSON(&input); err != nil {
+	var request steamApplyAssetsRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid steam asset payload"})
 		return
 	}
-	if input.GameID <= 0 {
-		if raw := c.Query("game_id"); raw != "" {
-			if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil {
-				input.GameID = parsed
-			}
-		}
-	}
+
+	input := request.toInput(c.Query("game_id"))
 
 	preview, err := h.service.ApplyAssets(appID, input)
 	if err != nil {

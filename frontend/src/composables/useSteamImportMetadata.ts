@@ -3,7 +3,7 @@ import type { EditGameForm } from '@/composables/edit-game-form'
 import steamService from '@/services/steam.service'
 import { useSteamPicker } from '@/composables/useSteamPicker'
 import type { SteamGameDetails, SteamGameSearchResult } from '@/services/types'
-import { extractWikiMetadata } from '@/utils/wiki-metadata-parser'
+import { extractWikiMetadata, type WikiMetadataExtraction } from '@/utils/wiki-metadata-parser'
 
 type AlertType = 'success' | 'warning' | 'error'
 
@@ -57,6 +57,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
   const isApplyingWikiMetadata = ref(false)
   const wikiMetadataPickerVisible = ref(false)
   const wikiMetadataCandidates = ref<WikiMetadataCandidateSelection[]>([])
+  const wikiMetadataSnapshot = ref<WikiMetadataExtraction | null>(null)
 
   const pickSteamSearchQuery = () => {
     const preferred = options.form.value.title_alt?.trim()
@@ -166,6 +167,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
       return
     }
 
+    wikiMetadataSnapshot.value = metadata
     wikiMetadataCandidates.value = candidates
     wikiMetadataPickerVisible.value = true
   }
@@ -214,7 +216,11 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
     isApplyingWikiMetadata.value = true
 
     try {
-      const metadata = extractWikiMetadata(options.getWikiContent())
+      const metadata = wikiMetadataSnapshot.value
+      if (!metadata) {
+        options.addAlert('当前没有可应用的 Wiki 提取结果', 'warning')
+        return
+      }
       const appliedLabels: string[] = []
 
       for (const item of selected) {
@@ -380,6 +386,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
     steamSummaryDetails.value = null
     wikiMetadataPickerVisible.value = false
     wikiMetadataCandidates.value = []
+    wikiMetadataSnapshot.value = null
   }
 
   return {

@@ -1,4 +1,4 @@
-interface WikiMetadataExtraction {
+export interface WikiMetadataExtraction {
   summary: string
   releaseDate: string
   englishTitleAlt: string

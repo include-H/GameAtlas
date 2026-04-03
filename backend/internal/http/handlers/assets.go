@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/services"
 )
 
@@ -69,12 +68,13 @@ func (h *AssetsHandler) Delete(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
 	}
-	var input domain.DeleteAssetInput
-	if err := c.ShouldBindJSON(&input); err != nil {
+	var request deleteAssetRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid asset payload"})
 		return
 	}
 
+	input := request.toInput()
 	if err := h.service.Delete(input); err != nil {
 		writeServiceError(c, err, "invalid asset payload")
 		return
@@ -90,12 +90,13 @@ func (h *AssetsHandler) ReorderScreenshots(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
 	}
-	var input domain.ScreenshotOrderUpdateInput
-	if err := c.ShouldBindJSON(&input); err != nil {
+	var request assetOrderUpdateRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid screenshot reorder payload"})
 		return
 	}
 
+	input := request.toScreenshotInput()
 	if err := h.service.ReorderScreenshots(input); err != nil {
 		writeServiceError(c, err, "invalid screenshot reorder payload")
 		return
@@ -111,12 +112,13 @@ func (h *AssetsHandler) ReorderVideos(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
 	}
-	var input domain.VideoOrderUpdateInput
-	if err := c.ShouldBindJSON(&input); err != nil {
+	var request assetOrderUpdateRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid video reorder payload"})
 		return
 	}
 
+	input := request.toVideoInput()
 	if err := h.service.ReorderVideos(input); err != nil {
 		writeServiceError(c, err, "invalid video reorder payload")
 		return

@@ -23,10 +23,7 @@ export const useEditGameMediaState = (options: UseEditGameMediaStateOptions) => 
 
     const [moved] = videos.splice(index, 1)
     videos.splice(nextIndex, 0, moved)
-    options.form.value.preview_videos = videos.map((item, order) => ({
-      ...item,
-      sort_order: order,
-    }))
+    options.form.value.preview_videos = videos
   }
 
   const reorderEditableScreenshots = (fromKey: string, toKey: string) => {
@@ -37,10 +34,7 @@ export const useEditGameMediaState = (options: UseEditGameMediaStateOptions) => 
 
     const [moved] = screenshots.splice(fromIndex, 1)
     screenshots.splice(toIndex, 0, moved)
-    options.form.value.screenshots = screenshots.map((item, index) => ({
-      ...item,
-      sort_order: index,
-    }))
+    options.form.value.screenshots = screenshots
   }
 
   const handleScreenshotDragStart = (clientKey: string) => {

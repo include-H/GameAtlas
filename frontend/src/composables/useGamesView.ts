@@ -52,19 +52,16 @@ const DEFAULT_SORT: GamesSortKey = 'created_desc'
 const DEFAULT_ITEMS_PER_PAGE = 24
 const AMBIENT_BACKGROUND_OWNER = 'games'
 
-const SORT_ALIASES: Record<string, GamesSortKey> = {
-  newest: 'created_desc',
-  created_desc: 'created_desc',
-  created_asc: 'created_asc',
-  title_asc: 'title_asc',
-  title_desc: 'title_desc',
-  release_asc: 'release_asc',
-  release_desc: 'release_desc',
-  downloads: 'downloads_desc',
-  downloads_desc: 'downloads_desc',
-  random: 'random_desc',
-  random_desc: 'random_desc',
-}
+const SORT_VALUES = new Set<GamesSortKey>([
+  'created_desc',
+  'created_asc',
+  'title_asc',
+  'title_desc',
+  'release_asc',
+  'release_desc',
+  'downloads_desc',
+  'random_desc',
+])
 
 const SORT_FIELD_MAP: Record<'created' | 'title' | 'release' | 'downloads' | 'random', GameSort['field']> = {
   created: 'created_at',
@@ -106,7 +103,7 @@ export const parsePositiveRouteNumber = (
 }
 
 export const normalizeGamesSortValue = (value: string | undefined): GamesSortKey => {
-  return SORT_ALIASES[value || ''] || DEFAULT_SORT
+  return value && SORT_VALUES.has(value as GamesSortKey) ? value as GamesSortKey : DEFAULT_SORT
 }
 
 export const buildGamesRouteQuery = (
@@ -114,7 +111,6 @@ export const buildGamesRouteQuery = (
   newParams: LocationQueryRaw,
 ): LocationQueryRaw => {
   const query: LocationQueryRaw = { ...currentQuery, ...newParams }
-  delete query.needs
 
   Object.keys(query).forEach((key) => {
     if (query[key] === undefined || query[key] === null || query[key] === '') {

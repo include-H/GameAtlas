@@ -15,11 +15,6 @@ export const publishersService = {
     return response.data || []
   },
 
-  async getPopularPublishers(limit?: number): Promise<(Publisher & { game_count: number })[]> {
-    const items = await this.listPublishers({ limit })
-    return items.map((item) => ({ ...item, game_count: 0 }))
-  },
-
   async searchPublishers(query: string, limit?: number): Promise<Publisher[]> {
     return this.listPublishers({ query, limit })
   },

@@ -15,11 +15,6 @@ export const developersService = {
     return response.data || []
   },
 
-  async getPopularDevelopers(limit?: number): Promise<(Developer & { game_count: number })[]> {
-    const items = await this.listDevelopers({ limit })
-    return items.map((item) => ({ ...item, game_count: 0 }))
-  },
-
   async searchDevelopers(query: string, limit?: number): Promise<Developer[]> {
     return this.listDevelopers({ query, limit })
   },

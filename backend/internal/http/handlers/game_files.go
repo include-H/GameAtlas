@@ -44,8 +44,8 @@ func (h *GameFilesHandler) Create(c *gin.Context) {
 		return
 	}
 
-	var input domain.GameFileWriteInput
-	if err := c.ShouldBindJSON(&input); err != nil {
+	var request gameFileWriteRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "invalid game file payload",
@@ -53,6 +53,7 @@ func (h *GameFilesHandler) Create(c *gin.Context) {
 		return
 	}
 
+	input := request.toInput()
 	file, err := h.service.Create(gameID, input)
 	if err != nil {
 		writeServiceError(c, err, "file_path is required")
@@ -78,8 +79,8 @@ func (h *GameFilesHandler) Update(c *gin.Context) {
 		return
 	}
 
-	var input domain.GameFileWriteInput
-	if err := c.ShouldBindJSON(&input); err != nil {
+	var request gameFileWriteRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "invalid game file payload",
@@ -87,6 +88,7 @@ func (h *GameFilesHandler) Update(c *gin.Context) {
 		return
 	}
 
+	input := request.toInput()
 	file, err := h.service.Update(gameID, fileID, input)
 	if err != nil {
 		writeServiceError(c, err, "file_path is required")

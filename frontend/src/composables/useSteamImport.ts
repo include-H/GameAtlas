@@ -18,7 +18,6 @@ interface UploadedAssetLike {
   asset_id?: number
   asset_uid?: string
   path: string
-  sort_order?: number
 }
 
 interface SteamScreenshotsData {

@@ -36,8 +36,8 @@ func (h *TagsHandler) CreateGroup(c *gin.Context) {
 		return
 	}
 
-	var input domain.TagGroupWriteInput
-	if err := c.ShouldBindJSON(&input); err != nil {
+	var request tagGroupWriteRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "invalid tag group payload",
@@ -45,6 +45,7 @@ func (h *TagsHandler) CreateGroup(c *gin.Context) {
 		return
 	}
 
+	input := request.toInput()
 	item, err := h.service.CreateGroup(input)
 	if err != nil {
 		writeServiceError(c, err, "key and name are required")
@@ -86,8 +87,8 @@ func (h *TagsHandler) CreateTag(c *gin.Context) {
 		return
 	}
 
-	var input domain.TagWriteInput
-	if err := c.ShouldBindJSON(&input); err != nil {
+	var request tagWriteRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "invalid tag payload",
@@ -95,6 +96,7 @@ func (h *TagsHandler) CreateTag(c *gin.Context) {
 		return
 	}
 
+	input := request.toInput()
 	item, err := h.service.CreateTag(input)
 	if err != nil {
 		writeServiceError(c, err, "group_id and name are required")
