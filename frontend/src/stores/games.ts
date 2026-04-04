@@ -137,7 +137,7 @@ export const useGamesStore = defineStore('games', () => {
     error.value = null
 
     try {
-      const game = await gamesService.getGame(id)
+      const game = await gamesService.getGameDetail(id)
       currentGame.value = game
       currentVersions.value = mapGameVersions(game)
       return game

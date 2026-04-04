@@ -11,8 +11,8 @@ import tagsService from '@/services/tags.service'
 import { developersService } from '@/services/developers.service'
 import { publishersService } from '@/services/publishers.service'
 import type {
+  AdminGameDetail,
   Developer,
-  GameDetail,
   Platform,
   Publisher,
   ScreenshotItem,
@@ -20,7 +20,6 @@ import type {
   Tag,
   TagGroup,
   VideoAssetItem,
-  GameFileEntry,
 } from '@/services/types'
 
 interface UseEditGameFormBootstrapOptions {
@@ -37,17 +36,13 @@ interface UseEditGameFormBootstrapOptions {
   createEditableVideo: (asset: VideoAssetItem | string) => EditGameEditableVideo
 }
 
-const hasResolvedFilePath = (item: GameFileEntry) => {
-  return typeof item.file_path === 'string' && item.file_path.trim().length > 0
-}
-
 export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOptions) => {
   const handleInitializeOptionsError = (context: string, error: unknown) => {
     console.error(`Failed to load ${context}:`, error)
     options.addAlert(`加载编辑元数据失败：${context}`, 'error')
   }
 
-  const hydrateFormFromGame = (game: GameDetail | null) => {
+  const hydrateFormFromGame = (game: AdminGameDetail | null) => {
     if (!game) {
       options.form.value = createEmptyEditGameForm()
       return
@@ -56,10 +51,9 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
     let filePaths = createEmptyEditGameForm().file_paths
     if (game.files.length > 0) {
       filePaths = game.files
-        .filter(hasResolvedFilePath)
         .map((item) => ({
           id: item.id,
-          path: item.file_path || '',
+          path: item.file_path,
           label: item.label || '',
           notes: item.notes || null,
         }))
@@ -90,7 +84,7 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
     options.resetTagSelectionState()
   }
 
-  const initializeOptions = async (currentGame?: GameDetail | null) => {
+  const initializeOptions = async (currentGame?: AdminGameDetail | null) => {
     try {
       const popularSeries = await seriesService.getPopularSeries(50)
       options.seriesOptions.value = popularSeries

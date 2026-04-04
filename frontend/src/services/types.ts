@@ -125,11 +125,10 @@ export interface GameTagGroup {
   tags: Tag[]
 }
 
-export interface GameFileEntry {
+export interface PublicGameFileEntry {
   id: number
   game_id: number
   file_name: string
-  file_path?: string
   label?: string | null
   notes?: string | null
   size_bytes?: number | null
@@ -138,6 +137,12 @@ export interface GameFileEntry {
   created_at: string
   updated_at: string
 }
+
+export interface AdminGameFileEntry extends PublicGameFileEntry {
+  file_path: string
+}
+
+export type GameFileEntry = PublicGameFileEntry | AdminGameFileEntry
 
 export interface ScreenshotItem {
   id: number
@@ -171,14 +176,14 @@ export interface GameListItemDto {
   developer_count: number
   publisher_count: number
   platform_count: number
-  is_favorite?: boolean
+  is_favorite: boolean
   pending_issues?: PendingIssueEvaluation | null
   downloads: number
   created_at: string
   updated_at: string
 }
 
-export interface GameDetailDto extends Omit<GameListItemDto, 'primary_screenshot' | 'screenshot_count' | 'file_count' | 'developer_count' | 'publisher_count' | 'platform_count'> {
+export interface GameDetailDtoBase<TFile extends GameFileEntry = GameFileEntry> extends Omit<GameListItemDto, 'primary_screenshot' | 'screenshot_count' | 'file_count' | 'developer_count' | 'publisher_count' | 'platform_count'> {
   preview_videos: VideoAssetItem[]
   screenshots: ScreenshotItem[]
   series: Series | null
@@ -187,8 +192,12 @@ export interface GameDetailDto extends Omit<GameListItemDto, 'primary_screenshot
   publishers: Publisher[]
   tags: Tag[]
   tag_groups: GameTagGroup[]
-  files: GameFileEntry[]
+  files: TFile[]
 }
+
+export type PublicGameDetailDto = GameDetailDtoBase<PublicGameFileEntry>
+export type AdminGameDetailDto = GameDetailDtoBase<AdminGameFileEntry>
+export type GameDetailDto = PublicGameDetailDto | AdminGameDetailDto
 
 export interface TimelineGameResponse {
   id: number
@@ -199,19 +208,24 @@ export interface TimelineGameResponse {
   banner_image: string | null
 }
 
-export interface GameCoreRequest {
+export interface GameCreateRequest {
   title: string
-  title_alt?: string | null
   visibility?: 'public' | 'private'
-  summary?: string | null
-  release_date?: string | null
-  engine?: string | null
-  cover_image?: string | null
-  banner_image?: string | null
+}
+
+export interface GameAggregateCoreRequest {
+  title: string
+  title_alt: string | null
+  visibility: 'public' | 'private'
+  summary: string | null
+  release_date: string | null
+  engine: string | null
+  cover_image: string | null
+  banner_image: string | null
 }
 
 // Aggregate update rewrites the editable game aggregate in one request.
-export interface GameAggregateGameUpdateRequest extends GameCoreRequest {
+export interface GameAggregateGameUpdateRequest extends GameAggregateCoreRequest {
   series_id: number | null
   developer_ids: number[]
   publisher_ids: number[]
@@ -262,11 +276,25 @@ export interface Favoritable {
   isFavorite: boolean
 }
 
-export type GameListItemView = GameListItemDto & Favoritable
-export type GameDetailView = GameDetailDto & Favoritable
+export type GameListItemView = Omit<GameListItemDto, 'is_favorite'> & Favoritable
+export type GameDetailView<TFile extends GameFileEntry = GameFileEntry> = Omit<GameDetailDtoBase<TFile>, 'is_favorite'> & Favoritable
 export type GameListItem = GameListItemView
-export type GameDetail = GameDetailView
+export type PublicGameDetail = GameDetailView<PublicGameFileEntry>
+export type AdminGameDetail = GameDetailView<AdminGameFileEntry>
+export type GameDetail = PublicGameDetail | AdminGameDetail
 export type TimelineGame = TimelineGameResponse
+
+// Keep the public/admin detail contract explicit in the frontend because the backend
+// serves both shapes from the same route depending on auth state. Without this split,
+// edit bootstrap code silently drifts back to optional file_path handling.
+export const hasResolvedGameFilePath = (file: GameFileEntry): file is AdminGameFileEntry => {
+  return 'file_path' in file && typeof file.file_path === 'string' && file.file_path.trim().length > 0
+}
+
+export const isAdminGameDetail = (game: GameDetail | null | undefined): game is AdminGameDetail => {
+  if (!game) return false
+  return game.files.every((file) => hasResolvedGameFilePath(file))
+}
 
 export interface GameVersion {
   id: string

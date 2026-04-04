@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestGameAggregateUpdateRequestToInputKeepsTransportRelationShapeUntouched(t *testing.T) {
+func TestGameAggregateUpdateRequestToInputNormalizesOmittedReplacementSlices(t *testing.T) {
 	raw := []byte(`{
 		"game": {
 			"title": "Aggregate Test",
@@ -29,8 +29,8 @@ func TestGameAggregateUpdateRequestToInputKeepsTransportRelationShapeUntouched(t
 	if input.Game.SeriesID != nil {
 		t.Fatalf("series_id = %v, want nil for explicit clear", input.Game.SeriesID)
 	}
-	if input.Game.PlatformIDs != nil {
-		t.Fatalf("platform_ids = %#v, want nil when field is omitted", input.Game.PlatformIDs)
+	if input.Game.PlatformIDs == nil || len(input.Game.PlatformIDs) != 0 {
+		t.Fatalf("platform_ids = %#v, want empty slice for full replacement decode", input.Game.PlatformIDs)
 	}
 	if got := len(input.Game.DeveloperIDs); got != 0 {
 		t.Fatalf("developer_ids len = %d, want 0 for explicit clear", got)
@@ -119,7 +119,7 @@ func TestGameAggregateUpdateRequestToInputPreservesAssetPayloadWithoutLegacyFile
 	}
 }
 
-func TestGameAggregateUpdateRequestToInputKeepsOmittedAssetOrderSlicesNil(t *testing.T) {
+func TestGameAggregateUpdateRequestToInputNormalizesOmittedAssetOrderSlices(t *testing.T) {
 	raw := []byte(`{
 		"game": {
 			"title": "Aggregate Test"
@@ -134,10 +134,10 @@ func TestGameAggregateUpdateRequestToInputKeepsOmittedAssetOrderSlicesNil(t *tes
 
 	input := request.toInput()
 
-	if input.Assets.ScreenshotOrderAssetUIDs != nil {
-		t.Fatalf("screenshot_order_asset_uids = %#v, want nil when field is omitted", input.Assets.ScreenshotOrderAssetUIDs)
+	if input.Assets.ScreenshotOrderAssetUIDs == nil || len(input.Assets.ScreenshotOrderAssetUIDs) != 0 {
+		t.Fatalf("screenshot_order_asset_uids = %#v, want empty slice when field is omitted", input.Assets.ScreenshotOrderAssetUIDs)
 	}
-	if input.Assets.VideoOrderAssetUIDs != nil {
-		t.Fatalf("video_order_asset_uids = %#v, want nil when field is omitted", input.Assets.VideoOrderAssetUIDs)
+	if input.Assets.VideoOrderAssetUIDs == nil || len(input.Assets.VideoOrderAssetUIDs) != 0 {
+		t.Fatalf("video_order_asset_uids = %#v, want empty slice when field is omitted", input.Assets.VideoOrderAssetUIDs)
 	}
 }

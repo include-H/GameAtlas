@@ -7,16 +7,12 @@ import (
 	"github.com/hao/game/internal/repositories"
 )
 
-// normalizeGameCoreInput keeps game core field cleanup in services, where this
-// project already normalizes request inputs, without introducing another DTO
-// that mirrors domain.GameCoreInput.
+// normalizeGameCoreInput trims aggregate-edit core fields before validation.
+// Aggregate updates are full replacements, so callers must provide visibility explicitly.
 func normalizeGameCoreInput(input domain.GameCoreInput) domain.GameCoreInput {
 	input.Title = strings.TrimSpace(input.Title)
 	input.TitleAlt = trimStringPtr(input.TitleAlt)
 	input.Visibility = strings.TrimSpace(input.Visibility)
-	if input.Visibility == "" {
-		input.Visibility = domain.GameVisibilityPublic
-	}
 	input.Summary = trimStringPtr(input.Summary)
 	input.ReleaseDate = trimStringPtr(input.ReleaseDate)
 	input.Engine = trimStringPtr(input.Engine)
@@ -31,8 +27,7 @@ func validateGameCoreInput(input domain.GameCoreInput) error {
 	if input.Title == "" {
 		return ErrValidation
 	}
-	if input.Visibility != "" &&
-		input.Visibility != domain.GameVisibilityPublic &&
+	if input.Visibility != domain.GameVisibilityPublic &&
 		input.Visibility != domain.GameVisibilityPrivate {
 		return ErrValidation
 	}

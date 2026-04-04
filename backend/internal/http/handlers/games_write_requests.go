@@ -63,10 +63,10 @@ func (request gameAggregateUpdateRequest) toInput() domain.GameAggregateUpdateIn
 		Game: domain.GameAggregateCoreUpdateInput{
 			GameCoreInput: request.Game.toDomain(),
 			SeriesID:      request.Game.SeriesID,
-			PlatformIDs:   request.Game.PlatformIDs,
-			DeveloperIDs:  request.Game.DeveloperIDs,
-			PublisherIDs:  request.Game.PublisherIDs,
-			TagIDs:        request.Game.TagIDs,
+			PlatformIDs:   emptyInt64Slice(request.Game.PlatformIDs),
+			DeveloperIDs:  emptyInt64Slice(request.Game.DeveloperIDs),
+			PublisherIDs:  emptyInt64Slice(request.Game.PublisherIDs),
+			TagIDs:        emptyInt64Slice(request.Game.TagIDs),
 		},
 		Assets: request.Assets.toDomain(),
 	}
@@ -109,7 +109,21 @@ func (request gameAggregateAssetsRequest) toDomain() domain.GameAggregateAssetsI
 	return domain.GameAggregateAssetsInput{
 		Files:                    files,
 		DeleteAssets:             deleteAssets,
-		ScreenshotOrderAssetUIDs: request.ScreenshotOrderAssetUIDs,
-		VideoOrderAssetUIDs:      request.VideoOrderAssetUIDs,
+		ScreenshotOrderAssetUIDs: emptyStringSlice(request.ScreenshotOrderAssetUIDs),
+		VideoOrderAssetUIDs:      emptyStringSlice(request.VideoOrderAssetUIDs),
 	}
+}
+
+func emptyInt64Slice(values []int64) []int64 {
+	if values == nil {
+		return []int64{}
+	}
+	return values
+}
+
+func emptyStringSlice(values []string) []string {
+	if values == nil {
+		return []string{}
+	}
+	return values
 }

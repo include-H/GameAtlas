@@ -8,8 +8,8 @@ import { publishersService } from '@/services/publishers.service'
 import { resolveCreatableSelections } from '@/utils/creatable-select'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import type {
+  AdminGameDetail,
   Developer,
-  GameDetail,
   GameAggregateGameUpdateRequest,
   Platform,
   Publisher,
@@ -26,7 +26,7 @@ interface PendingDeleteAsset {
 }
 
 interface UseEditGameWorkflowOptions {
-  game: Ref<GameDetail | null>
+  game: Ref<AdminGameDetail | null>
   form: Ref<EditGameForm>
   isSubmitting: Ref<boolean>
   seriesOptions: Ref<Series[]>
@@ -174,7 +174,7 @@ const createUpdatePayload = (params: {
     title: params.form.title,
     title_alt: toNullableFormText(params.form.title_alt),
     visibility: params.form.visibility,
-    release_date: params.form.release_date || undefined,
+    release_date: toNullableFormText(params.form.release_date),
     engine: toNullableFormText(params.form.engine),
     platform_ids: params.platformIds,
     series_id: params.seriesId ?? null,

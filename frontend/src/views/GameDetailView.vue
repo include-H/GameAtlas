@@ -31,7 +31,7 @@
               v-if="canEdit"
               class="app-text-action-btn"
               type="text"
-              @click="showEditModal = true"
+              @click="openEditModal"
             >
               <template #icon>
                 <icon-edit />
@@ -250,7 +250,7 @@
   <!-- Edit Game Modal -->
   <edit-game-modal
     v-model:visible="showEditModal"
-    :game="game"
+    :game="editableGame"
     @success="handleEditSuccess"
   />
 
@@ -287,6 +287,7 @@ const {
   canEdit,
   carouselHeight,
   developerNames,
+  editableGame,
   formatDate,
   formatSize,
   game,
@@ -296,6 +297,7 @@ const {
   handleGoBack,
   handleToggleFavorite,
   hasWikiContent,
+  openEditModal,
   openWikiEditor,
   publisherNames,
   shouldSpanMetadataRow,

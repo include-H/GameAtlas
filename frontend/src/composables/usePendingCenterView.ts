@@ -2,13 +2,7 @@ import { computed, onActivated, onMounted, ref, watch } from 'vue'
 import type { Router } from 'vue-router'
 import gamesService from '@/services/games.service'
 import pendingIssuesService from '@/services/pending-issues.service'
-import type {
-  GameDetail,
-  GameListItem,
-  PendingIssueCatalog,
-  PendingIssueDefinition,
-  PendingIssueDetailDefinition,
-} from '@/services/types'
+import type { AdminGameDetail, GameListItem, PendingIssueCatalog, PendingIssueDefinition, PendingIssueDetailDefinition } from '@/services/types'
 import { formatDisplayDate } from '@/utils/date'
 import { usePendingWorkbench } from '@/composables/usePendingWorkbench'
 import { useUiStore } from '@/stores/ui'
@@ -47,7 +41,7 @@ export const usePendingCenterView = ({
     groups: [],
     details: [],
   })
-  const editingGame = ref<GameDetail | null>(null)
+  const editingGame = ref<AdminGameDetail | null>(null)
   const showEditModal = ref(false)
   const detailHeroFit = ref<'cover' | 'contain'>('cover')
   const detailHeroSrc = ref('')
@@ -84,9 +78,9 @@ export const usePendingCenterView = ({
   })
 
   const issueDefinitionFallbacks = computed<PendingIssueDefinition[]>(() => {
-    // 2026-04-04: keep this fallback because pending_issue_counts already carries backend-native issue keys,
-    // so catalog fetch failures should degrade labels only instead of blanking the workbench.
-    // Impact: only issue copy falls back to raw keys; filtering, counts, and queue semantics stay backend-defined.
+    // 2026-04-04: keep this fallback because /pending-issues only provides issue copy,
+    // while pending_issue_counts already carries backend-native queue keys for this screen.
+    // Impact: catalog fetch failures degrade labels only; filtering, counts, and queue semantics stay backend-defined.
     return Object.keys(pendingIssueCounts.value).map((key) => ({
       key,
       label: key,
@@ -216,7 +210,7 @@ export const usePendingCenterView = ({
   const openEdit = async (game: GameListItem) => {
     if (!game.public_id) return
     try {
-      editingGame.value = await gamesService.getGame(game.public_id)
+      editingGame.value = await gamesService.getAdminGameDetail(game.public_id)
       showEditModal.value = true
     } catch {
       uiStore.addAlert('加载游戏详情失败', 'error')

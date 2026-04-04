@@ -28,8 +28,8 @@ import {
   sortCreatableOptionsByName,
 } from '@/utils/creatable-select'
 import type {
+  AdminGameDetail,
   Developer,
-  GameDetail,
   Platform,
   Publisher,
   ScreenshotItem,
@@ -43,7 +43,7 @@ import { useUiStore } from '@/stores/ui'
 interface UseEditGameModalOptions {
   props: {
     visible: boolean
-    game: GameDetail | null
+    game: AdminGameDetail | null
   }
   emit: {
     (event: 'update:visible', value: boolean): void

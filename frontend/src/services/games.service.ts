@@ -2,11 +2,14 @@ import { del, get, post, put } from './api'
 import { buildApiUrl } from './api-url'
 import type {
   ApiEnvelope,
+  AdminGameDetail,
+  AdminGameDetailDto,
   ApiPageEnvelope,
   Developer,
   GameDetail,
   GameDetailDto,
   GameAggregateUpdateRequest,
+  GameCreateRequest,
   GameFileEntry,
   GameListItem,
   GameListItemDto,
@@ -120,7 +123,7 @@ async function fetchGamesPage(params?: {
 function normalizeGameListItem(item: GameListItemDto): GameListItem {
   return {
     ...item,
-    isFavorite: Boolean(item.is_favorite),
+    isFavorite: item.is_favorite,
   }
 }
 
@@ -131,7 +134,7 @@ function normalizeTimelineGame(item: TimelineGameResponse): TimelineGame {
 function normalizeGameDetail(item: GameDetailDto): GameDetail {
   return {
     ...item,
-    isFavorite: Boolean(item.is_favorite),
+    isFavorite: item.is_favorite,
     preview_videos: item.preview_videos,
     screenshots: item.screenshots,
     files: item.files,
@@ -141,6 +144,13 @@ function normalizeGameDetail(item: GameDetailDto): GameDetail {
     publishers: item.publishers,
     tags: item.tags,
     tag_groups: item.tag_groups,
+  }
+}
+
+function normalizeAdminGameDetail(item: AdminGameDetailDto): AdminGameDetail {
+  return {
+    ...normalizeGameDetail(item),
+    files: item.files,
   }
 }
 
@@ -265,15 +275,21 @@ const gamesService = {
     }
   },
 
-  async getGame(id: string): Promise<GameDetail> {
+  // Use the generic detail reader for page/store flows that can legally render either
+  // public or admin payloads from /games/:publicId.
+  async getGameDetail(id: string): Promise<GameDetail> {
     const response = await get<ApiEnvelope<GameDetailDto>>(`/games/${id}`)
     return normalizeGameDetail(response.data)
   },
 
-  async createGame(data: {
-    title: string
-    visibility?: 'public' | 'private'
-  }): Promise<GameListItem> {
+  // Keep an explicit admin detail entry point for edit flows so callers do not need to
+  // repeatedly narrow a mixed public/admin payload before touching file_path.
+  async getAdminGameDetail(id: string): Promise<AdminGameDetail> {
+    const response = await get<ApiEnvelope<AdminGameDetailDto>>(`/games/${id}`)
+    return normalizeAdminGameDetail(response.data)
+  },
+
+  async createGame(data: GameCreateRequest): Promise<GameListItem> {
     const payload = {
       title: data.title,
       visibility: data.visibility ?? 'public',

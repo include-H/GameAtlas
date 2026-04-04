@@ -331,7 +331,7 @@ func TestValidateAndTrimGameAggregateCoreUpdateInputNormalizesSharedCoreFields(t
 		GameCoreInput: domain.GameCoreInput{
 			Title:      "  Aggregate Shared Core  ",
 			TitleAlt:   &titleAlt,
-			Visibility: " ",
+			Visibility: " public ",
 			Summary:    &summary,
 			Engine:     &engine,
 		},
@@ -351,7 +351,7 @@ func TestValidateAndTrimGameAggregateCoreUpdateInputNormalizesSharedCoreFields(t
 		t.Fatalf("TitleAlt = %v, want Alt Patch", trimmed.TitleAlt)
 	}
 	if trimmed.Visibility != domain.GameVisibilityPublic {
-		t.Fatalf("Visibility = %q, want public default", trimmed.Visibility)
+		t.Fatalf("Visibility = %q, want public", trimmed.Visibility)
 	}
 	if trimmed.Summary != nil {
 		t.Fatalf("Summary = %v, want nil after blank trim", trimmed.Summary)
@@ -382,7 +382,7 @@ func TestGamesServiceUpdateAggregateRejectsUnsupportedDeleteAssetType(t *testing
 
 	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Invalid Asset"},
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Invalid Asset", Visibility: domain.GameVisibilityPublic},
 		},
 		Assets: domain.GameAggregateAssetsInput{
 			DeleteAssets: []domain.GameAssetDeleteInput{
@@ -404,7 +404,7 @@ func TestGamesServiceUpdateAggregateReturnsMissingConfigForFileValidation(t *tes
 
 	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Files"},
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Files", Visibility: domain.GameVisibilityPublic},
 		},
 		Assets: domain.GameAggregateAssetsInput{
 			Files: []domain.GameFileUpsertInput{
@@ -426,7 +426,7 @@ func TestGamesServiceUpdateAggregateReturnsDeleteWarningsWhenAssetRemovalFails(t
 
 	game, warnings, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Warning"},
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Warning", Visibility: domain.GameVisibilityPublic},
 		},
 		Assets: domain.GameAggregateAssetsInput{
 			DeleteAssets: []domain.GameAssetDeleteInput{
@@ -471,7 +471,7 @@ func TestGamesServiceUpdateAggregateNormalizesAndReplacesFiles(t *testing.T) {
 	notes := "  Fresh Notes  "
 	game, warnings, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Files Success"},
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Files Success", Visibility: domain.GameVisibilityPublic},
 		},
 		Assets: domain.GameAggregateAssetsInput{
 			Files: []domain.GameFileUpsertInput{
@@ -537,7 +537,7 @@ func TestGamesServiceUpdateAggregateReturnsForbiddenPathForFileOutsideRoot(t *te
 
 	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Outside Root"},
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Outside Root", Visibility: domain.GameVisibilityPublic},
 		},
 		Assets: domain.GameAggregateAssetsInput{
 			Files: []domain.GameFileUpsertInput{
@@ -566,7 +566,7 @@ func TestGamesServiceUpdateAggregateDeletesOmittedExistingFiles(t *testing.T) {
 
 	_, warnings, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Delete Files"},
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Delete Files", Visibility: domain.GameVisibilityPublic},
 		},
 		Assets: domain.GameAggregateAssetsInput{
 			Files: []domain.GameFileUpsertInput{},
@@ -604,7 +604,7 @@ func TestGamesServiceUpdateAggregateReturnsNotFoundForMissingExistingFileID(t *t
 	missingID := int64(9999)
 	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Missing File ID"},
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Missing File ID", Visibility: domain.GameVisibilityPublic},
 		},
 		Assets: domain.GameAggregateAssetsInput{
 			Files: []domain.GameFileUpsertInput{
@@ -630,7 +630,7 @@ func TestGamesServiceUpdateAggregateReturnsNotFoundForMissingScreenshotReorderUI
 
 	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Missing Shot"},
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Missing Shot", Visibility: domain.GameVisibilityPublic},
 		},
 		Assets: domain.GameAggregateAssetsInput{
 			ScreenshotOrderAssetUIDs: []string{"missing-shot"},
@@ -651,7 +651,7 @@ func TestGamesServiceUpdateAggregateReturnsNotFoundForMissingVideoReorderUID(t *
 
 	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Missing Video"},
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Missing Video", Visibility: domain.GameVisibilityPublic},
 		},
 		Assets: domain.GameAggregateAssetsInput{
 			VideoOrderAssetUIDs: []string{"missing-video"},
@@ -729,7 +729,7 @@ func TestGamesServiceUpdateAggregateReplacesRelationsAndSeries(t *testing.T) {
 
 	_, warnings, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Preserve Relations Updated"},
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Preserve Relations Updated", Visibility: domain.GameVisibilityPublic},
 			SeriesID:      nil,
 			PlatformIDs:   []int64{},
 			DeveloperIDs:  []int64{},
@@ -819,7 +819,7 @@ func TestGamesServiceUpdateAggregateClearsRelationsAndSeries(t *testing.T) {
 
 	_, warnings, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Clear Relations Updated"},
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Clear Relations Updated", Visibility: domain.GameVisibilityPublic},
 			SeriesID:      nil,
 			PlatformIDs:   []int64{},
 			DeveloperIDs:  []int64{},
@@ -862,7 +862,7 @@ func TestGamesServiceUpdateAggregateReordersVideos(t *testing.T) {
 
 	game, warnings, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Reorder Video"},
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Reorder Video", Visibility: domain.GameVisibilityPublic},
 		},
 		Assets: domain.GameAggregateAssetsInput{
 			VideoOrderAssetUIDs: []string{" video-b ", " video-a "},
@@ -907,7 +907,7 @@ func TestGamesServiceUpdateAggregateDeletesFirstVideoAndKeepsNextVideo(t *testin
 
 	game, warnings, err := service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Delete Primary Video"},
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Delete Primary Video", Visibility: domain.GameVisibilityPublic},
 		},
 		Assets: domain.GameAggregateAssetsInput{
 			DeleteAssets: []domain.GameAssetDeleteInput{

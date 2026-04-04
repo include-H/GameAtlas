@@ -290,7 +290,7 @@ describe('games service', () => {
     ])
   })
 
-  it('keeps backend preview video order', async () => {
+  it('keeps backend preview video order in generic detail responses', async () => {
     getMock.mockResolvedValue({
       data: {
         ...baseGame,
@@ -319,7 +319,7 @@ describe('games service', () => {
       },
     })
 
-    const result = await gamesService.getGame('game-1')
+    const result = await gamesService.getGameDetail('game-1')
 
     expect(result.preview_videos.map((item) => item.asset_uid)).toEqual(['video-primary', 'video-first'])
   })
@@ -340,9 +340,44 @@ describe('games service', () => {
       },
     })
 
-    const result = await gamesService.getGame('game-1')
+    const result = await gamesService.getGameDetail('game-1')
 
     expect(result.preview_videos).toEqual([])
+  })
+
+  it('loads admin detail with required file paths for edit flows', async () => {
+    getMock.mockResolvedValue({
+      data: {
+        ...baseGame,
+        preview_videos: [],
+        screenshots: [],
+        series: null,
+        platforms: [],
+        developers: [],
+        publishers: [],
+        tags: [],
+        tag_groups: [],
+        files: [
+          {
+            id: 10,
+            game_id: 1,
+            file_name: 'Alpha.vhdx',
+            file_path: '/roms/Alpha.vhdx',
+            label: 'Alpha',
+            notes: null,
+            size_bytes: 123,
+            sort_order: 2,
+            source_created_at: '2026-03-25T00:00:00Z',
+            created_at: '2026-03-24T00:00:00Z',
+            updated_at: '2026-03-25T00:00:00Z',
+          },
+        ],
+      },
+    })
+
+    const result = await gamesService.getAdminGameDetail('game-1')
+
+    expect(result.files[0]?.file_path).toBe('/roms/Alpha.vhdx')
   })
 
   it('sets favorite state through backend endpoints', async () => {
@@ -395,7 +430,13 @@ describe('games service', () => {
     await gamesService.updateGameAggregate('game-1', {
       game: {
         title: 'Game One',
+        title_alt: null,
         visibility: 'public',
+        summary: null,
+        release_date: null,
+        engine: null,
+        cover_image: null,
+        banner_image: null,
         series_id: null,
         platform_ids: [],
         developer_ids: [],
@@ -415,7 +456,13 @@ describe('games service', () => {
     expect(putMock.mock.calls[0]?.[1]).toEqual({
       game: {
         title: 'Game One',
+        title_alt: null,
         visibility: 'public',
+        summary: null,
+        release_date: null,
+        engine: null,
+        cover_image: null,
+        banner_image: null,
         series_id: null,
         platform_ids: [],
         developer_ids: [],

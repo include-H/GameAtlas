@@ -381,7 +381,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useUiStore } from '@/stores/ui'
-import type { GameDetail } from '@/services/types'
+import type { AdminGameDetail } from '@/services/types'
 import FileBrowserModal from '@/components/FileBrowserModal.vue'
 import GameTagSection from '@/components/edit-game/GameTagSection.vue'
 import GameFilePathsSection from '@/components/edit-game/GameFilePathsSection.vue'
@@ -394,7 +394,7 @@ import { useEditGameModal } from '@/composables/useEditGameModal'
 
 interface Props {
   visible: boolean
-  game: GameDetail | null
+  game: AdminGameDetail | null
 }
 
 const props = defineProps<Props>()

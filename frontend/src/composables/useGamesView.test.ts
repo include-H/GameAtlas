@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildGamesSortOptionValue,
   buildGamesListRequest,
   buildGamesRouteQuery,
   hasGamesActiveFilters,
   normalizeGamesFavoriteRouteQuery,
   normalizeGamesSortRouteQuery,
-  parseGamesSortValue,
+  parseGamesSortField,
+  parseGamesSortOrder,
   parsePositiveQueryNumber,
   parseRouteBoolean,
   parsePositiveRouteNumber,
@@ -32,12 +34,16 @@ describe('useGamesView helpers', () => {
     expect(parseRouteTagIds(['1', 'x', '2', '-3'])).toEqual([1, 2])
   })
 
-  it('parses only supported sort values', () => {
-    expect(parseGamesSortValue('updated_desc')).toBe('updated_desc')
-    expect(parseGamesSortValue('created_desc')).toBe('created_desc')
-    expect(parseGamesSortValue('downloads_desc')).toBe('downloads_desc')
-    expect(parseGamesSortValue('random_desc')).toBe('random_desc')
-    expect(parseGamesSortValue('unexpected')).toBeUndefined()
+  it('parses only supported native sort fields and orders', () => {
+    expect(parseGamesSortField('updated_at')).toBe('updated_at')
+    expect(parseGamesSortField('created_at')).toBe('created_at')
+    expect(parseGamesSortField('downloads')).toBe('downloads')
+    expect(parseGamesSortField('random')).toBe('random')
+    expect(parseGamesSortField('unexpected')).toBeUndefined()
+    expect(parseGamesSortOrder('asc')).toBe('asc')
+    expect(parseGamesSortOrder('desc')).toBe('desc')
+    expect(parseGamesSortOrder('sideways')).toBeUndefined()
+    expect(buildGamesSortOptionValue('updated_at', 'desc')).toBe('updated_at:desc')
   })
 
   it('uses backend default sort when route does not declare one', () => {
@@ -67,6 +73,7 @@ describe('useGamesView helpers', () => {
         page: '2',
         search: 'halo',
         sort: 'legacy_default',
+        order: 'desc',
       },
       itemsPerPage: 24,
     })
@@ -88,6 +95,7 @@ describe('useGamesView helpers', () => {
       {
         page: '2',
         sort: 'legacy_default',
+        order: 'desc',
         seed: '123',
         search: 'halo',
       },
@@ -102,14 +110,16 @@ describe('useGamesView helpers', () => {
   it('drops stale seed when sort is no longer random', () => {
     const result = normalizeGamesSortRouteQuery({
       page: '2',
-      sort: 'updated_desc',
+      sort: 'updated_at',
+      order: 'desc',
       seed: '123',
       search: 'halo',
     })
 
     expect(result).toEqual({
       page: '2',
-      sort: 'updated_desc',
+      sort: 'updated_at',
+      order: 'desc',
       search: 'halo',
     })
   })
@@ -143,13 +153,15 @@ describe('useGamesView helpers', () => {
   it('adds route seed when random sort is missing one', () => {
     const result = normalizeGamesSortRouteQuery({
       page: '2',
-      sort: 'random_desc',
+      sort: 'random',
+      order: 'desc',
       search: 'halo',
     })
 
     expect(result).toMatchObject({
       page: '2',
-      sort: 'random_desc',
+      sort: 'random',
+      order: 'desc',
       search: 'halo',
     })
     expect(Number(result?.seed)).toBeGreaterThan(0)
@@ -182,7 +194,8 @@ describe('useGamesView helpers', () => {
         search: 'halo',
         platform: '3',
         tag: ['1', '2', 'oops'],
-        sort: 'random_desc',
+        sort: 'random',
+        order: 'desc',
         seed: '99',
         favorite: 'true',
       },
@@ -210,7 +223,7 @@ describe('useGamesView helpers', () => {
     const result = buildGamesListRequest({
       routeQuery: {
         page: '2',
-        sort: 'random_desc',
+        sort: 'random',
       },
       itemsPerPage: 48,
     })
@@ -229,6 +242,21 @@ describe('useGamesView helpers', () => {
         order: 'desc',
         seed: undefined,
       },
+    })
+  })
+
+  it('drops invalid native order while preserving supported sort', () => {
+    const result = normalizeGamesSortRouteQuery({
+      page: '2',
+      sort: 'title',
+      order: 'sideways',
+      search: 'halo',
+    })
+
+    expect(result).toEqual({
+      page: '2',
+      sort: 'title',
+      search: 'halo',
     })
   })
 

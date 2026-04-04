@@ -29,7 +29,7 @@ export const seriesService = {
       series: response.data.series,
       games: response.data.games.map((item): GameListItem => ({
         ...item,
-        isFavorite: Boolean(item.is_favorite),
+        isFavorite: item.is_favorite,
       })),
     }
   },

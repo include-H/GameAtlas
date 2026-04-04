@@ -2,7 +2,7 @@ import { computed, nextTick, onActivated, onMounted, onUnmounted, ref, watch, ty
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import wikiService, { type WikiDocumentResponse } from '@/services/wiki.service'
 import downloadService from '@/services/download.service'
-import type { GameVersion } from '@/services/types'
+import { isAdminGameDetail, type AdminGameDetail, type GameVersion } from '@/services/types'
 import { getHttpStatus } from '@/utils/http-error'
 import { formatDisplayDate } from '@/utils/date'
 import { navigateBackOrFallback } from '@/utils/navigation'
@@ -61,6 +61,15 @@ export const useGameDetailView = ({
   const publisherNames = computed(() => (game.value?.publishers || []).map((item) => item.name).join(' / '))
   const hasWikiContent = computed(() => Boolean(wiki.value?.content?.trim()))
   const canEdit = computed(() => isAdmin.value)
+  // The detail page can render either public or admin payloads, but the edit modal
+  // must never receive the public shape because missing file_path means broken edit state,
+  // not a valid degraded experience.
+  const editableGame = computed<AdminGameDetail | null>(() => {
+    if (!canEdit.value || !isAdminGameDetail(game.value)) {
+      return null
+    }
+    return game.value
+  })
 
   const navigateToUrl = (url?: string) => {
     if (!url || typeof window === 'undefined') {
@@ -118,6 +127,15 @@ export const useGameDetailView = ({
     } catch {
       uiStore.addAlert('更新收藏失败', 'error')
     }
+  }
+
+  const openEditModal = () => {
+    if (!canEdit.value) return
+    if (!editableGame.value) {
+      uiStore.addAlert('编辑数据缺少管理员文件路径，无法打开编辑器', 'error')
+      return
+    }
+    showEditModal.value = true
   }
 
   const carouselHeight = computed(() => {
@@ -249,6 +267,7 @@ export const useGameDetailView = ({
     canEdit,
     carouselHeight,
     developerNames,
+    editableGame,
     formatDate: formatGameDetailDate,
     formatSize: formatGameDetailSize,
     game,
@@ -258,6 +277,7 @@ export const useGameDetailView = ({
     handleGoBack,
     handleToggleFavorite,
     hasWikiContent,
+    openEditModal,
     openWikiEditor,
     publisherNames,
     shouldSpanMetadataRow: shouldSpanGameMetadataRow,

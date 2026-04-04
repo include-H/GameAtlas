@@ -1,8 +1,7 @@
 import { ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { EditGameForm } from '@/composables/edit-game-form'
-import type { GameDetail } from '@/services/types'
-import type { Tag, TagGroup } from '@/services/types'
+import type { AdminGameDetail, Tag, TagGroup } from '@/services/types'
 import { useEditGameFormBootstrap } from './useEditGameFormBootstrap'
 import { seriesService } from '@/services/series.service'
 import platformService from '@/services/platforms.service'
@@ -121,7 +120,7 @@ describe('useEditGameFormBootstrap', () => {
       created_at: '2026-03-25T00:00:00Z',
       updated_at: '2026-03-25T00:00:00Z',
       isFavorite: false,
-    } as GameDetail)
+    } as AdminGameDetail)
 
     expect(form.value.preview_videos.map((item) => item.asset_uid)).toEqual(['video-first', 'video-primary'])
   })
@@ -218,7 +217,7 @@ describe('useEditGameFormBootstrap', () => {
       created_at: '2026-03-25T00:00:00Z',
       updated_at: '2026-03-25T00:00:00Z',
       isFavorite: false,
-    } as GameDetail)
+    } as AdminGameDetail)
 
     expect(form.value.file_paths.map((item) => item.id)).toEqual([22, 21])
   })
@@ -440,7 +439,7 @@ describe('useEditGameFormBootstrap', () => {
       created_at: '2026-03-25T00:00:00Z',
       updated_at: '2026-03-25T00:00:00Z',
       isFavorite: false,
-    } as GameDetail)
+    } as AdminGameDetail)
 
     expect(tagOptions.value.map((item) => item.id)).toEqual([2, 9])
   })

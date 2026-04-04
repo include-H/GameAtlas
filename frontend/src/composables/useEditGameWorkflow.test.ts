@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EditGameForm } from '@/composables/edit-game-form'
-import type { GameDetail } from '@/services/types'
+import type { AdminGameDetail } from '@/services/types'
 import { useEditGameWorkflow } from './useEditGameWorkflow'
 
 const {
@@ -70,7 +70,29 @@ const buildOptions = () => {
       game: ref({
         id: 1,
         public_id: 'game-1',
-      } as GameDetail),
+        title: 'Game One',
+        title_alt: null,
+        visibility: 'public',
+        summary: null,
+        release_date: null,
+        engine: null,
+        cover_image: null,
+        banner_image: null,
+        wiki_content: null,
+        downloads: 0,
+        preview_videos: [],
+        screenshots: [],
+        series: null,
+        platforms: [],
+        developers: [],
+        publishers: [],
+        tags: [],
+        tag_groups: [],
+        files: [],
+        created_at: '2026-03-25T00:00:00Z',
+        updated_at: '2026-03-25T00:00:00Z',
+        isFavorite: false,
+      } as AdminGameDetail),
       form: ref<EditGameForm>({
         title: 'Game One',
         title_alt: '',

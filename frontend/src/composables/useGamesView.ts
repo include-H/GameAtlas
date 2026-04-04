@@ -17,17 +17,18 @@ import { useUiStore } from '@/stores/ui'
 import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
 
 type GamesViewMode = 'grid' | 'list'
-type GamesSortKey =
-  | 'updated_desc'
-  | 'updated_asc'
-  | 'created_desc'
-  | 'created_asc'
-  | 'title_asc'
-  | 'title_desc'
-  | 'release_desc'
-  | 'release_asc'
-  | 'downloads_desc'
-  | 'random_desc'
+type GamesSortField = Exclude<GameSort['field'], 'pending_issue_count'>
+type GamesSortOptionValue =
+  | 'updated_at:desc'
+  | 'updated_at:asc'
+  | 'created_at:desc'
+  | 'created_at:asc'
+  | 'title:asc'
+  | 'title:desc'
+  | 'release_date:desc'
+  | 'release_date:asc'
+  | 'downloads:desc'
+  | 'random:desc'
 
 interface UseGamesViewOptions {
   route: RouteLocationNormalizedLoaded
@@ -42,34 +43,28 @@ interface BuildGamesListRequestOptions {
   itemsPerPage: number
 }
 
-// 2026-04-04: keep this UI-only default aligned with the backend list default sort.
-// Impact: the select shows "最近更新" when route.query omits sort, but requests still rely on the
-// backend native default instead of forcing a front-end sort parameter.
-const DEFAULT_SORT: GamesSortKey = 'updated_desc'
+// 2026-04-04: keep this UI-only default aligned with the backend list default sort/order.
+// Impact: the select shows "最近更新" when route.query omits both fields, but requests still rely
+// on the backend native default instead of forcing route-owned sort/order values.
+const DEFAULT_SORT = { field: 'updated_at', order: 'desc' } as const satisfies Pick<GameSort, 'field' | 'order'>
 const DEFAULT_ITEMS_PER_PAGE = 24
 const AMBIENT_BACKGROUND_OWNER = 'games'
 
-const SORT_VALUES = new Set<GamesSortKey>([
-  'updated_desc',
-  'updated_asc',
-  'created_desc',
-  'created_asc',
-  'title_asc',
-  'title_desc',
-  'release_asc',
-  'release_desc',
-  'downloads_desc',
-  'random_desc',
+const SORT_VALUES = new Set<GamesSortOptionValue>([
+  'updated_at:desc',
+  'updated_at:asc',
+  'created_at:desc',
+  'created_at:asc',
+  'title:asc',
+  'title:desc',
+  'release_date:asc',
+  'release_date:desc',
+  'downloads:desc',
+  'random:desc',
 ])
 
-const SORT_FIELD_MAP: Record<'updated' | 'created' | 'title' | 'release' | 'downloads' | 'random', GameSort['field']> = {
-  updated: 'updated_at',
-  created: 'created_at',
-  title: 'title',
-  release: 'release_date',
-  downloads: 'downloads',
-  random: 'random',
-}
+const SORT_FIELDS = new Set<GamesSortField>(['updated_at', 'created_at', 'title', 'release_date', 'downloads', 'random'])
+const SORT_ORDERS = new Set<GameSort['order']>(['asc', 'desc'])
 
 export const readSingleQueryValue = (
   value: LocationQueryValue | LocationQueryValue[] | undefined,
@@ -111,8 +106,20 @@ export const parseRouteBoolean = (
   return undefined
 }
 
-export const parseGamesSortValue = (value: string | undefined): GamesSortKey | undefined => {
-  return value && SORT_VALUES.has(value as GamesSortKey) ? value as GamesSortKey : undefined
+export const parseGamesSortField = (value: string | undefined): GamesSortField | undefined => {
+  return value && SORT_FIELDS.has(value as GamesSortField) ? value as GamesSortField : undefined
+}
+
+export const parseGamesSortOrder = (value: string | undefined): GameSort['order'] | undefined => {
+  return value && SORT_ORDERS.has(value as GameSort['order']) ? value as GameSort['order'] : undefined
+}
+
+export const buildGamesSortOptionValue = (
+  field: GamesSortField,
+  order: GameSort['order'],
+): GamesSortOptionValue | undefined => {
+  const value = `${field}:${order}` as GamesSortOptionValue
+  return SORT_VALUES.has(value) ? value : undefined
 }
 
 export const buildGamesRouteQuery = (
@@ -144,7 +151,8 @@ export const buildGamesListRequest = ({
   itemsPerPage,
 }: BuildGamesListRequestOptions): { query: GameListQuery; sort?: GameSort } => {
   const page = parsePositiveQueryNumber(readSingleQueryValue(routeQuery.page), 1)
-  const sortValue = parseGamesSortValue(readSingleQueryValue(routeQuery.sort))
+  const sortField = parseGamesSortField(readSingleQueryValue(routeQuery.sort))
+  const sortOrder = parseGamesSortOrder(readSingleQueryValue(routeQuery.order))
   const favorite = parseRouteBoolean(routeQuery.favorite) === true
     ? true
     : undefined
@@ -160,15 +168,11 @@ export const buildGamesListRequest = ({
     },
   }
 
-  if (sortValue) {
-    const [field, order] = sortValue.split('_') as [
-      keyof typeof SORT_FIELD_MAP,
-      GameSort['order'] | undefined,
-    ]
+  if (sortField) {
     request.sort = {
-      field: SORT_FIELD_MAP[field] || SORT_FIELD_MAP.updated,
-      order: order === 'asc' ? 'asc' : 'desc',
-      seed: field === 'random'
+      field: sortField,
+      order: sortOrder || 'desc',
+      seed: sortField === 'random'
         ? parsePositiveRouteNumber(routeQuery.seed)
         : undefined,
     }
@@ -202,17 +206,27 @@ export const normalizeGamesFavoriteRouteQuery = (routeQuery: LocationQuery): Loc
 
 export const normalizeGamesSortRouteQuery = (routeQuery: LocationQuery): LocationQueryRaw | null => {
   const rawSort = readSingleQueryValue(routeQuery.sort)
-  if (!rawSort) return null
+  const rawOrder = readSingleQueryValue(routeQuery.order)
+  const sortField = parseGamesSortField(rawSort)
+  const sortOrder = parseGamesSortOrder(rawOrder)
 
-  const sortValue = parseGamesSortValue(rawSort)
-  if (!sortValue) {
+  if (!rawSort && !rawOrder) return null
+
+  if (!sortField) {
     return buildGamesRouteQuery(routeQuery, {
       sort: undefined,
+      order: undefined,
       seed: undefined,
     })
   }
 
-  if (sortValue !== 'random_desc') {
+  if (rawOrder !== undefined && !sortOrder) {
+    return buildGamesRouteQuery(routeQuery, {
+      order: undefined,
+    })
+  }
+
+  if (sortField !== 'random') {
     if (readSingleQueryValue(routeQuery.seed) === undefined) {
       return null
     }
@@ -298,16 +312,16 @@ export const useGamesView = ({
   ]
 
   const sortOptions = [
-    { label: '最近更新', value: 'updated_desc' },
-    { label: '最早更新', value: 'updated_asc' },
-    { label: '最新添加', value: 'created_desc' },
-    { label: '最早添加', value: 'created_asc' },
-    { label: '名称 A-Z', value: 'title_asc' },
-    { label: '名称 Z-A', value: 'title_desc' },
-    { label: '年份新到旧', value: 'release_desc' },
-    { label: '年份旧到新', value: 'release_asc' },
-    { label: '下载量最高', value: 'downloads_desc' },
-    { label: '随机', value: 'random_desc' },
+    { label: '最近更新', value: 'updated_at:desc' },
+    { label: '最早更新', value: 'updated_at:asc' },
+    { label: '最新添加', value: 'created_at:desc' },
+    { label: '最早添加', value: 'created_at:asc' },
+    { label: '名称 A-Z', value: 'title:asc' },
+    { label: '名称 Z-A', value: 'title:desc' },
+    { label: '年份新到旧', value: 'release_date:desc' },
+    { label: '年份旧到新', value: 'release_date:asc' },
+    { label: '下载量最高', value: 'downloads:desc' },
+    { label: '随机', value: 'random:desc' },
   ]
 
   const games = computed(() => gamesStore.games)
@@ -331,12 +345,20 @@ export const useGamesView = ({
   })
 
   const sortBy = computed({
-    get: () => parseGamesSortValue(readSingleQueryValue(route.query.sort)) || DEFAULT_SORT,
+    get: () => {
+      const field = parseGamesSortField(readSingleQueryValue(route.query.sort)) || DEFAULT_SORT.field
+      const order = parseGamesSortOrder(readSingleQueryValue(route.query.order)) || DEFAULT_SORT.order
+      return buildGamesSortOptionValue(field, order) || buildGamesSortOptionValue(DEFAULT_SORT.field, DEFAULT_SORT.order)!
+    },
     set: (sort: string) => {
-      const normalizedSort = parseGamesSortValue(sort) || DEFAULT_SORT
+      const [nextFieldRaw, nextOrderRaw] = String(sort).split(':')
+      const nextField = parseGamesSortField(nextFieldRaw) || DEFAULT_SORT.field
+      const nextOrder = parseGamesSortOrder(nextOrderRaw) || DEFAULT_SORT.order
+      const isDefaultSort = nextField === DEFAULT_SORT.field && nextOrder === DEFAULT_SORT.order
       updateRoute({
-        sort: normalizedSort === DEFAULT_SORT ? undefined : normalizedSort,
-        seed: normalizedSort === 'random_desc'
+        sort: isDefaultSort ? undefined : nextField,
+        order: isDefaultSort ? undefined : nextOrder,
+        seed: nextField === 'random'
           ? (readSingleQueryValue(route.query.seed) || String(Date.now()))
           : undefined,
         page: '1',

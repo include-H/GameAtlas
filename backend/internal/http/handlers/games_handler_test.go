@@ -673,7 +673,7 @@ func TestGamesHandlerUpdateAggregateIncludesAssetDeleteWarnings(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-warning/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Warning"},"assets":{"delete_assets":[{"asset_type":"cover","path":"/assets/../bad-cover.png"}]}}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-warning/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Warning","visibility":"public"},"assets":{"delete_assets":[{"asset_type":"cover","path":"/assets/../bad-cover.png"}]}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-warning"}}
 	context.Set("is_admin", true)
@@ -730,7 +730,7 @@ func TestGamesHandlerUpdateAggregateReplacesRelations(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-replace-relations/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Replace Relations Updated","series_id":null,"platform_ids":[],"developer_ids":[],"publisher_ids":[],"tag_ids":[]},"assets":{}}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-replace-relations/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Replace Relations Updated","visibility":"public","series_id":null,"platform_ids":[],"developer_ids":[],"publisher_ids":[],"tag_ids":[]},"assets":{}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-replace-relations"}}
 	context.Set("is_admin", true)
@@ -874,7 +874,7 @@ func TestGamesHandlerUpdateAggregateReturnsBadRequestForInvalidDeleteAssetType(t
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-invalid-type/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Invalid Type"},"assets":{"delete_assets":[{"asset_type":"manual","path":"/assets/manual.pdf"}]}}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-invalid-type/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Invalid Type","visibility":"public"},"assets":{"delete_assets":[{"asset_type":"manual","path":"/assets/manual.pdf"}]}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-invalid-type"}}
 	context.Set("is_admin", true)
@@ -926,7 +926,7 @@ func TestGamesHandlerUpdateAggregateRejectsLegacyUnknownFields(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-unknown-field/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Unknown Field"},"assets":{"files":[{"file_path":"/tmp/demo.rom","sort_order":99}]}}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-unknown-field/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Unknown Field","visibility":"public"},"assets":{"files":[{"file_path":"/tmp/demo.rom","sort_order":99}]}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-unknown-field"}}
 	context.Set("is_admin", true)
@@ -951,7 +951,7 @@ func TestGamesHandlerUpdateAggregateReturnsNotFoundForMissingGame(t *testing.T) 
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/missing-aggregate/aggregate", strings.NewReader(`{"game":{"title":"Missing Aggregate"},"assets":{}}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/missing-aggregate/aggregate", strings.NewReader(`{"game":{"title":"Missing Aggregate","visibility":"public"},"assets":{}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "missing-aggregate"}}
 	context.Set("is_admin", true)
@@ -977,7 +977,7 @@ func TestGamesHandlerUpdateAggregateReturnsBadRequestWhenPrimaryROMRootMissing(t
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-missing-root/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Missing Root"},"assets":{"files":[{"file_path":"/tmp/demo.rom"}]}}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-missing-root/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Missing Root","visibility":"public"},"assets":{"files":[{"file_path":"/tmp/demo.rom"}]}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-missing-root"}}
 	context.Set("is_admin", true)
@@ -1010,7 +1010,7 @@ func TestGamesHandlerUpdateAggregateReturnsNotFoundForMissingScreenshotReorderUI
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-missing-shot/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Missing Shot"},"assets":{"screenshot_order_asset_uids":["missing-shot"]}}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-missing-shot/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Missing Shot","visibility":"public"},"assets":{"screenshot_order_asset_uids":["missing-shot"]}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-missing-shot"}}
 	context.Set("is_admin", true)
@@ -1043,7 +1043,7 @@ func TestGamesHandlerUpdateAggregateReturnsNotFoundForMissingVideoReorderUID(t *
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-missing-video/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Missing Video"},"assets":{"video_order_asset_uids":["missing-video"]}}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-missing-video/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Missing Video","visibility":"public"},"assets":{"video_order_asset_uids":["missing-video"]}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-missing-video"}}
 	context.Set("is_admin", true)
@@ -1076,7 +1076,7 @@ func TestGamesHandlerUpdateAggregateReturnsForbiddenForFileOutsidePrimaryROMRoot
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-outside-root/aggregate", strings.NewReader(fmt.Sprintf(`{"game":{"title":"Aggregate Outside Root"},"assets":{"files":[{"file_path":%q}]}}`, outsidePath)))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-outside-root/aggregate", strings.NewReader(fmt.Sprintf(`{"game":{"title":"Aggregate Outside Root","visibility":"public"},"assets":{"files":[{"file_path":%q}]}}`, outsidePath)))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-outside-root"}}
 	context.Set("is_admin", true)
