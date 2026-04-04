@@ -16,7 +16,7 @@ export interface WikiMetadataCandidateSelection {
 }
 
 interface UseSteamImportMetadataOptions {
-  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'engine'>>
+  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'engine' | 'developer_ids' | 'publisher_ids' | 'platform_ids'>>
   getWikiContent: () => string
   addAlert: (message: string, type: AlertType) => void
 }
@@ -65,11 +65,27 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
     return options.form.value.title?.trim() || ''
   }
 
-const applySteamMetadataToForm = (details: SteamGameDetails) => {
-  if (details.releaseDate) {
-    options.form.value.release_date = details.releaseDate
+  const applySteamMetadataToForm = (details: SteamGameDetails) => {
+    if (details.releaseDate) {
+      options.form.value.release_date = details.releaseDate
+    }
+    if (details.developers && details.developers.length > 0) {
+      // 2026-04-04: Steam import writes names into the form first because the edit submit flow is
+      // responsible for resolving new metadata into persistent ids.
+      const merged = new Set<string | number>(options.form.value.developer_ids)
+      for (const name of details.developers) {
+        if (name.trim()) merged.add(name.trim())
+      }
+      options.form.value.developer_ids = Array.from(merged)
+    }
+    if (details.publishers && details.publishers.length > 0) {
+      const merged = new Set<string | number>(options.form.value.publisher_ids)
+      for (const name of details.publishers) {
+        if (name.trim()) merged.add(name.trim())
+      }
+      options.form.value.publisher_ids = Array.from(merged)
+    }
   }
-}
 
   const prepareWikiMetadataCandidates = () => {
     const metadata = extractWikiMetadata(options.getWikiContent())
@@ -120,6 +136,30 @@ const applySteamMetadataToForm = (details: SteamGameDetails) => {
         key: 'engine',
         label: '游戏引擎',
         value: metadata.engine,
+        selected: true,
+      })
+    }
+    if (metadata.developers.length > 0) {
+      candidates.push({
+        key: 'developers',
+        label: '开发商',
+        value: metadata.developers.join(' / '),
+        selected: true,
+      })
+    }
+    if (metadata.publishers.length > 0) {
+      candidates.push({
+        key: 'publishers',
+        label: '发行商',
+        value: metadata.publishers.join(' / '),
+        selected: true,
+      })
+    }
+    if (metadata.platforms.length > 0) {
+      candidates.push({
+        key: 'platforms',
+        label: '平台',
+        value: metadata.platforms.join(' / '),
         selected: true,
       })
     }
@@ -220,6 +260,36 @@ const applySteamMetadataToForm = (details: SteamGameDetails) => {
               appliedLabels.push('发行日期')
             }
             break
+          case 'developers':
+            if (metadata.developers.length > 0) {
+              const merged = new Set<string | number>(options.form.value.developer_ids)
+              for (const name of metadata.developers) {
+                merged.add(name)
+              }
+              options.form.value.developer_ids = Array.from(merged)
+              appliedLabels.push('开发商')
+            }
+            break
+          case 'publishers':
+            if (metadata.publishers.length > 0) {
+              const merged = new Set<string | number>(options.form.value.publisher_ids)
+              for (const name of metadata.publishers) {
+                merged.add(name)
+              }
+              options.form.value.publisher_ids = Array.from(merged)
+              appliedLabels.push('发行商')
+            }
+            break
+          case 'platforms':
+            if (metadata.platforms.length > 0) {
+              const merged = new Set<string | number>(options.form.value.platform_ids)
+              for (const name of metadata.platforms) {
+                merged.add(name)
+              }
+              options.form.value.platform_ids = Array.from(merged)
+              appliedLabels.push('平台')
+            }
+            break
         }
       }
 
@@ -281,7 +351,7 @@ const applySteamMetadataToForm = (details: SteamGameDetails) => {
 
   const confirmSummaryImport = () => {
     const details = steamSummaryDetails.value
-    const hasImportableMetadata = !!details?.releaseDate
+    const hasImportableMetadata = !!details?.releaseDate || !!details?.developers?.[0] || !!details?.publishers?.[0]
     if (!steamSummaryPreview.value && !hasImportableMetadata) {
       options.addAlert('当前没有可导入的 Steam 信息', 'warning')
       return

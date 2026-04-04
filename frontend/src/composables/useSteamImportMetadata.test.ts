@@ -11,6 +11,9 @@ describe('useSteamImportMetadata', () => {
       title_alt: '',
       release_date: undefined as string | undefined,
       engine: '',
+      developer_ids: [] as Array<string | number>,
+      publisher_ids: [] as Array<string | number>,
+      platform_ids: [] as Array<string | number>,
     })
     const wikiContent = ref(`
 - 简介：First summary
