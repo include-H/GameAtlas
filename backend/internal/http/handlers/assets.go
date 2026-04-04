@@ -24,13 +24,13 @@ func (h *AssetsHandler) Upload(assetType string) gin.HandlerFunc {
 		}
 		gameID, err := strconv.ParseInt(c.PostForm("game_id"), 10, 64)
 		if err != nil || gameID <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "valid game_id is required"})
+			writeJSONError(c, http.StatusBadRequest, "valid game_id is required")
 			return
 		}
 
 		file, err := c.FormFile("file")
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "file is required"})
+			writeJSONError(c, http.StatusBadRequest, "file is required")
 			return
 		}
 
@@ -47,85 +47,16 @@ func (h *AssetsHandler) Upload(assetType string) gin.HandlerFunc {
 			return
 		}
 
-		data := gin.H{
-			"path": result.Path,
+		response := assetUploadResponse{
+			Path: result.Path,
 		}
 		if result.AssetID != nil {
-			data["asset_id"] = *result.AssetID
+			response.AssetID = result.AssetID
 		}
 		if result.AssetUID != "" {
-			data["asset_uid"] = result.AssetUID
+			response.AssetUID = result.AssetUID
 		}
 
-		c.JSON(http.StatusCreated, gin.H{
-			"success": true,
-			"data":    data,
-		})
+		writeJSONSuccess(c, http.StatusCreated, response)
 	}
-}
-
-func (h *AssetsHandler) Delete(c *gin.Context) {
-	if !requireAdmin(c) {
-		return
-	}
-	var request deleteAssetRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid asset payload"})
-		return
-	}
-
-	input := request.toInput()
-	if err := h.service.Delete(input); err != nil {
-		writeServiceError(c, err, "invalid asset payload")
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    gin.H{"deleted": true},
-	})
-}
-
-func (h *AssetsHandler) ReorderScreenshots(c *gin.Context) {
-	if !requireAdmin(c) {
-		return
-	}
-	var request assetOrderUpdateRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid screenshot reorder payload"})
-		return
-	}
-
-	input := request.toScreenshotInput()
-	if err := h.service.ReorderScreenshots(input); err != nil {
-		writeServiceError(c, err, "invalid screenshot reorder payload")
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    gin.H{"updated": true},
-	})
-}
-
-func (h *AssetsHandler) ReorderVideos(c *gin.Context) {
-	if !requireAdmin(c) {
-		return
-	}
-	var request assetOrderUpdateRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid video reorder payload"})
-		return
-	}
-
-	input := request.toVideoInput()
-	if err := h.service.ReorderVideos(input); err != nil {
-		writeServiceError(c, err, "invalid video reorder payload")
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    gin.H{"updated": true},
-	})
 }

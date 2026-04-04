@@ -51,61 +51,6 @@ func TestBuildDiffVHDPathAndNormalizeDriveRoot(t *testing.T) {
 	}
 }
 
-func TestGameFilesServiceCreateNormalizesPathAndPersistsSize(t *testing.T) {
-	db := openServicesTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	root := t.TempDir()
-	romPath := filepath.Join(root, "library", "demo.rom")
-	if err := os.MkdirAll(filepath.Dir(romPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll returned error: %v", err)
-	}
-	content := []byte("demo-rom")
-	if err := os.WriteFile(romPath, content, 0o644); err != nil {
-		t.Fatalf("WriteFile returned error: %v", err)
-	}
-
-	gameID := insertServicesTestGame(t, db, "file-create", "File Create", domain.GameVisibilityPublic)
-	service := NewGameFilesService(
-		config.Config{PrimaryROMRoot: root},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-	)
-
-	label := "  Main Build  "
-	notes := "  Launch me  "
-	file, err := service.Create(gameID, domain.GameFileWriteInput{
-		FilePath:  "  " + romPath + "  ",
-		Label:     &label,
-		Notes:     &notes,
-		SortOrder: 7,
-	})
-	if err != nil {
-		t.Fatalf("Create returned error: %v", err)
-	}
-
-	if file.FilePath != romPath {
-		t.Fatalf("FilePath = %q, want %q", file.FilePath, romPath)
-	}
-	if file.Label == nil || *file.Label != "Main Build" {
-		t.Fatalf("Label = %v, want trimmed Main Build", file.Label)
-	}
-	if file.Notes == nil || *file.Notes != "Launch me" {
-		t.Fatalf("Notes = %v, want trimmed Launch me", file.Notes)
-	}
-	if file.SizeBytes == nil || *file.SizeBytes != int64(len(content)) {
-		t.Fatalf("SizeBytes = %v, want %d", file.SizeBytes, len(content))
-	}
-
-	stored, err := repositories.NewGameFilesRepository(db).GetByID(gameID, file.ID)
-	if err != nil {
-		t.Fatalf("GetByID returned error: %v", err)
-	}
-	if stored.SizeBytes == nil || *stored.SizeBytes != int64(len(content)) {
-		t.Fatalf("stored.SizeBytes = %v, want %d", stored.SizeBytes, len(content))
-	}
-}
-
 func TestWindowsLaunchServiceBuildLaunchScriptUsesMappedSMBPath(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()

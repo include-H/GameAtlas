@@ -17,12 +17,12 @@ export interface EditGameForm {
   title: string
   title_alt: string
   visibility: 'public' | 'private'
-  developer_ids: Array<string | number>
-  publisher_ids: Array<string | number>
+  developer_ids: number[]
+  publisher_ids: number[]
   release_date: string | undefined
   engine: string
-  platform_ids: Array<string | number>
-  series_id: string | number | null
+  platform_ids: number[]
+  series_id: number | null
   tag_ids: Array<string | number>
   summary: string
   cover_image: string

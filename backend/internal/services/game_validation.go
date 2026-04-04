@@ -39,10 +39,25 @@ func validateGameCoreInput(input domain.GameCoreInput) error {
 	return nil
 }
 
-func validateAndTrimGameInput(input domain.GameWriteInput, tagsRepo *repositories.TagsRepository) (domain.GameWriteInput, error) {
+func validateAndTrimGameCreateInput(input domain.GameCreateInput) (domain.GameCreateInput, error) {
+	input.Title = strings.TrimSpace(input.Title)
+	input.Visibility = strings.TrimSpace(input.Visibility)
+	if input.Visibility == "" {
+		input.Visibility = domain.GameVisibilityPublic
+	}
+	if input.Title == "" {
+		return domain.GameCreateInput{}, ErrValidation
+	}
+	if input.Visibility != domain.GameVisibilityPublic && input.Visibility != domain.GameVisibilityPrivate {
+		return domain.GameCreateInput{}, ErrValidation
+	}
+	return input, nil
+}
+
+func validateAndTrimGameAggregateCoreUpdateInput(input domain.GameAggregateCoreUpdateInput, tagsRepo *repositories.TagsRepository) (domain.GameAggregateCoreUpdateInput, error) {
 	input.GameCoreInput = normalizeGameCoreInput(input.GameCoreInput)
 	if err := validateGameCoreInput(input.GameCoreInput); err != nil {
-		return domain.GameWriteInput{}, err
+		return domain.GameAggregateCoreUpdateInput{}, err
 	}
 	input.PlatformIDs = uniqueIDs(input.PlatformIDs)
 	input.DeveloperIDs = uniqueIDs(input.DeveloperIDs)
@@ -54,41 +69,9 @@ func validateAndTrimGameInput(input domain.GameWriteInput, tagsRepo *repositorie
 
 	tagIDs, err := tagsRepo.ValidateTagSelection(input.TagIDs)
 	if err != nil {
-		return domain.GameWriteInput{}, ErrValidation
+		return domain.GameAggregateCoreUpdateInput{}, ErrValidation
 	}
 	input.TagIDs = tagIDs
-
-	return input, nil
-}
-
-func validateAndTrimGameAggregatePatchInput(input domain.GameAggregatePatchInput, tagsRepo *repositories.TagsRepository) (domain.GameAggregatePatchInput, error) {
-	input.GameCoreInput = normalizeGameCoreInput(input.GameCoreInput)
-	if err := validateGameCoreInput(input.GameCoreInput); err != nil {
-		return domain.GameAggregatePatchInput{}, err
-	}
-	if input.PlatformIDs.Present {
-		input.PlatformIDs.Values = uniqueIDs(input.PlatformIDs.Values)
-	}
-	if input.DeveloperIDs.Present {
-		input.DeveloperIDs.Values = uniqueIDs(input.DeveloperIDs.Values)
-	}
-	if input.PublisherIDs.Present {
-		input.PublisherIDs.Values = uniqueIDs(input.PublisherIDs.Values)
-	}
-	if input.TagIDs.Present {
-		input.TagIDs.Values = uniqueIDs(input.TagIDs.Values)
-	}
-	if input.TagIDs.Present && input.TagIDs.Values == nil {
-		input.TagIDs.Values = []int64{}
-	}
-
-	if input.TagIDs.Present {
-		tagIDs, err := tagsRepo.ValidateTagSelection(input.TagIDs.Values)
-		if err != nil {
-			return domain.GameAggregatePatchInput{}, ErrValidation
-		}
-		input.TagIDs.Values = tagIDs
-	}
 
 	return input, nil
 }

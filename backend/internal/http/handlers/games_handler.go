@@ -42,7 +42,10 @@ func NewSplitGamesHandler(
 
 // List stays on the catalog read model boundary; avoid mixing aggregate write concerns here.
 func (h *GamesHandler) List(c *gin.Context) {
-	params := decodeGamesListParams(c)
+	params, ok := decodeGamesListParams(c)
+	if !ok {
+		return
+	}
 
 	result, err := h.catalog.List(params)
 	if err != nil {
@@ -63,7 +66,7 @@ func (h *GamesHandler) List(c *gin.Context) {
 			"limit":                result.Limit,
 			"total":                result.Total,
 			"totalPages":           result.TotalPages,
-			"pending_issue_counts": result.PendingIssueCounts,
+			"pending_issue_counts": toPendingIssueCountSummaryResponse(result.PendingIssueCounts),
 		},
 	})
 }
@@ -189,7 +192,7 @@ func (h *GamesHandler) Create(c *gin.Context) {
 		return
 	}
 	var request gameCreateRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
+	if err := decodeJSONStrict(c, &request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "invalid game payload",
@@ -220,7 +223,7 @@ func (h *GamesHandler) UpdateAggregate(c *gin.Context) {
 	}
 
 	var request gameAggregateUpdateRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
+	if err := decodeJSONStrict(c, &request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "invalid game payload",
@@ -228,16 +231,7 @@ func (h *GamesHandler) UpdateAggregate(c *gin.Context) {
 		return
 	}
 
-	input, err := request.toInput()
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "invalid game payload",
-		})
-		return
-	}
-
-	game, deleteWarnings, err := h.aggregate.Update(id, input)
+	game, deleteWarnings, err := h.aggregate.Update(id, request.toInput())
 	if err != nil {
 		writeServiceError(c, err, "title is required")
 		return

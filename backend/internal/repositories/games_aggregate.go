@@ -11,7 +11,7 @@ import (
 	"github.com/hao/game/internal/domain"
 )
 
-func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, error) {
+func (r *GamesRepository) Create(input domain.GameCreateInput) (*domain.Game, error) {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return nil, fmt.Errorf("begin create game tx: %w", err)
@@ -32,27 +32,17 @@ func (r *GamesRepository) Create(input domain.GameWriteInput) (*domain.Game, err
 		query,
 		newGamePublicID(),
 		input.Title,
-		input.TitleAlt,
-		buildTitleSortKey(input.Title, input.TitleAlt),
+		nil,
+		buildTitleSortKey(input.Title, nil),
 		input.Visibility,
-		input.Summary,
-		input.ReleaseDate,
-		input.Engine,
-		input.CoverImage,
-		input.BannerImage,
-		input.SeriesID,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
 	); err != nil {
 		return nil, fmt.Errorf("create game: %w", err)
-	}
-
-	if err := r.replaceRelationsTx(tx, game.ID, domain.GameAggregatePatchInput{
-		GameCoreInput: domain.GameCoreInput{},
-		PlatformIDs:   domain.Int64SlicePatch{Present: true, Values: input.PlatformIDs},
-		DeveloperIDs:  domain.Int64SlicePatch{Present: true, Values: input.DeveloperIDs},
-		PublisherIDs:  domain.Int64SlicePatch{Present: true, Values: input.PublisherIDs},
-		TagIDs:        domain.Int64SlicePatch{Present: true, Values: input.TagIDs},
-	}); err != nil {
-		return nil, fmt.Errorf("create game relations: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -157,7 +147,7 @@ func (r *GamesRepository) Delete(id int64) ([]string, bool, error) {
 	return uniqueNonEmptyStrings(assetPaths), true, nil
 }
 
-func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.GameAggregatePatchInput) error {
+func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.GameAggregateCoreUpdateInput) error {
 	setClauses := []string{
 		"title = ?",
 		"title_alt = ?",
@@ -180,10 +170,8 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 		input.CoverImage,
 		input.BannerImage,
 	}
-	if input.SeriesID.Present {
-		setClauses = append(setClauses, "series_id = ?")
-		args = append(args, input.SeriesID.Value)
-	}
+	setClauses = append(setClauses, "series_id = ?")
+	args = append(args, input.SeriesID)
 	setClauses = append(setClauses, "updated_at = CURRENT_TIMESTAMP")
 	args = append(args, id)
 
@@ -210,26 +198,18 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 	return nil
 }
 
-func (r *GamesRepository) replaceRelationsTx(tx *sqlx.Tx, gameID int64, input domain.GameAggregatePatchInput) error {
-	if input.PlatformIDs.Present {
-		if err := replaceRelationRows(tx, "game_platforms", "platform_id", gameID, input.PlatformIDs.Values); err != nil {
-			return err
-		}
+func (r *GamesRepository) replaceRelationsTx(tx *sqlx.Tx, gameID int64, input domain.GameAggregateCoreUpdateInput) error {
+	if err := replaceRelationRows(tx, "game_platforms", "platform_id", gameID, input.PlatformIDs); err != nil {
+		return err
 	}
-	if input.DeveloperIDs.Present {
-		if err := replaceRelationRows(tx, "game_developers", "developer_id", gameID, input.DeveloperIDs.Values); err != nil {
-			return err
-		}
+	if err := replaceRelationRows(tx, "game_developers", "developer_id", gameID, input.DeveloperIDs); err != nil {
+		return err
 	}
-	if input.PublisherIDs.Present {
-		if err := replaceRelationRows(tx, "game_publishers", "publisher_id", gameID, input.PublisherIDs.Values); err != nil {
-			return err
-		}
+	if err := replaceRelationRows(tx, "game_publishers", "publisher_id", gameID, input.PublisherIDs); err != nil {
+		return err
 	}
-	if input.TagIDs.Present {
-		if err := replaceRelationRows(tx, "game_tags", "tag_id", gameID, input.TagIDs.Values); err != nil {
-			return err
-		}
+	if err := replaceRelationRows(tx, "game_tags", "tag_id", gameID, input.TagIDs); err != nil {
+		return err
 	}
 	return nil
 }

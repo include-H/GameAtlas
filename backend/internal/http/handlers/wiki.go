@@ -28,9 +28,12 @@ func (h *WikiHandler) Get(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    document,
+	writeJSONSuccess(c, http.StatusOK, wikiDocumentResponse{
+		GameID:       document.GameID,
+		Title:        document.Title,
+		Content:      document.Content,
+		UpdatedAt:    document.UpdatedAt,
+		HistoryCount: document.HistoryCount,
 	})
 }
 
@@ -45,10 +48,7 @@ func (h *WikiHandler) Update(c *gin.Context) {
 
 	var request wikiWriteRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "invalid wiki payload",
-		})
+		writeJSONError(c, http.StatusBadRequest, "invalid wiki payload")
 		return
 	}
 
@@ -59,9 +59,12 @@ func (h *WikiHandler) Update(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    document,
+	writeJSONSuccess(c, http.StatusOK, wikiDocumentResponse{
+		GameID:       document.GameID,
+		Title:        document.Title,
+		Content:      document.Content,
+		UpdatedAt:    document.UpdatedAt,
+		HistoryCount: document.HistoryCount,
 	})
 }
 
@@ -80,19 +83,16 @@ func (h *WikiHandler) History(c *gin.Context) {
 		return
 	}
 
-	response := make([]gin.H, 0, len(items))
+	response := make([]wikiHistoryItemResponse, 0, len(items))
 	for _, item := range items {
-		response = append(response, gin.H{
-			"id":             item.ID,
-			"game_id":        item.GameID,
-			"content":        item.Content,
-			"change_summary": item.ChangeSummary,
-			"created_at":     item.CreatedAt,
+		response = append(response, wikiHistoryItemResponse{
+			ID:            item.ID,
+			GameID:        item.GameID,
+			Content:       item.Content,
+			ChangeSummary: item.ChangeSummary,
+			CreatedAt:     item.CreatedAt,
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    response,
-	})
+	writeJSONSuccess(c, http.StatusOK, response)
 }

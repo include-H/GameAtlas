@@ -183,7 +183,7 @@ func newServicesAggregateService(db *sqlx.DB, cfg config.Config) *GameAggregateS
 	gamesRepo := repositories.NewGamesRepository(db)
 	return NewGameAggregateService(
 		cfg,
-		repositories.NewGameAggregateRepository(gamesRepo),
+		gamesRepo,
 		repositories.NewMetadataRepository(db),
 		repositories.NewTagsRepository(db),
 	)

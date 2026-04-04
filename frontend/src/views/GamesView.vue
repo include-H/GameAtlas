@@ -156,7 +156,7 @@
             <a-tag
               v-if="filterFavorites"
               closable
-              @close="updateRoute({ filter: undefined })"
+              @close="updateRoute({ favorite: undefined })"
             >
               仅收藏
             </a-tag>
@@ -287,12 +287,6 @@ defineOptions({
   name: 'GamesView',
 })
 
-interface Props {
-  filter?: 'favorites' | 'recent'
-}
-
-const props = defineProps<Props>()
-
 const route = useRoute()
 const router = useRouter()
 const gamesStore = useGamesStore()
@@ -336,7 +330,6 @@ const {
   viewGame,
   viewMode,
 } = useGamesView({
-  props,
   route,
   router,
   gamesStore,

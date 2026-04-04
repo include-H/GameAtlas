@@ -32,7 +32,7 @@ func (h *SteamHandler) Search(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": results})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamSearchResultResponses(results)})
 }
 
 func (h *SteamHandler) Preview(c *gin.Context) {
@@ -49,7 +49,7 @@ func (h *SteamHandler) Preview(c *gin.Context) {
 		writeServiceError(c, err, "invalid steam request")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": preview})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamAssetsPreviewResponse(preview)})
 }
 
 func (h *SteamHandler) Apply(c *gin.Context) {
@@ -67,14 +67,14 @@ func (h *SteamHandler) Apply(c *gin.Context) {
 		return
 	}
 
-	input := request.toInput(c.Query("game_id"))
+	input := request.toInput()
 
 	preview, err := h.service.ApplyAssets(appID, input)
 	if err != nil {
 		writeServiceError(c, err, "invalid steam asset payload")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": preview})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamAssetsPreviewResponse(preview)})
 }
 
 func (h *SteamHandler) Proxy(c *gin.Context) {

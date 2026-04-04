@@ -5,7 +5,6 @@ import type {
   ApiPageEnvelope,
   Developer,
   GameDetail,
-  GameCoreRequest,
   GameDetailDto,
   GameAggregateUpdateRequest,
   GameFileEntry,
@@ -15,7 +14,6 @@ import type {
   GameSort,
   GameStats,
   GameVersion,
-  GameWriteRequest,
   Platform,
   Publisher,
   Series,
@@ -77,10 +75,6 @@ type TimelineGamesResult = {
 
 type GameFileReleaseSource = Pick<GameFileEntry, 'source_created_at' | 'created_at'>
 
-function sortByOrder<T extends { sort_order: number }>(items: T[]): T[] {
-  return [...items].sort((a, b) => a.sort_order - b.sort_order)
-}
-
 function buildGamesQueryParams(params?: {
   query?: GameListQuery
   sort?: GameSort
@@ -91,7 +85,7 @@ function buildGamesQueryParams(params?: {
   if (params?.query?.search) queryParams.append('search', params.query.search)
   if (params?.query?.series) queryParams.append('series', String(params.query.series))
   if (params?.query?.platform) queryParams.append('platform', String(params.query.platform))
-  if (typeof params?.query?.favorite === 'boolean') queryParams.append('favorite', String(params.query.favorite))
+  if (params?.query?.favorite === true) queryParams.append('favorite', 'true')
   if (typeof params?.query?.pending === 'boolean') queryParams.append('pending', String(params.query.pending))
   if (params?.query?.pending_issue) queryParams.append('pending_issue', params.query.pending_issue)
   if (typeof params?.query?.pending_include_ignored === 'boolean') queryParams.append('pending_include_ignored', String(params.query.pending_include_ignored))
@@ -135,14 +129,12 @@ function normalizeTimelineGame(item: TimelineGameResponse): TimelineGame {
 }
 
 function normalizeGameDetail(item: GameDetailDto): GameDetail {
-  const previewVideos = sortByOrder(item.preview_videos)
   return {
     ...item,
     isFavorite: Boolean(item.is_favorite),
-    // Detail playback follows backend ordering; the first sorted video is the default one.
-    preview_videos: previewVideos,
-    screenshots: sortByOrder(item.screenshots),
-    files: sortByOrder(item.files),
+    preview_videos: item.preview_videos,
+    screenshots: item.screenshots,
+    files: item.files,
     series: item.series,
     platforms: item.platforms,
     developers: item.developers,
@@ -181,7 +173,7 @@ function getLatestGameFileTimestamp(files: GameFileReleaseSource[]): number {
 
 export function mapGameVersions(game: Pick<GameDetail, 'public_id' | 'files'>): GameVersion[] {
   const gameId = game.public_id
-  const files = [...game.files].sort((a, b) => a.sort_order - b.sort_order)
+  const files = game.files
   const latestTimestamp = getLatestGameFileTimestamp(files)
 
   return files.map((file, index) => ({
@@ -196,19 +188,6 @@ export function mapGameVersions(game: Pick<GameDetail, 'public_id' | 'files'>): 
     launchScriptUrl: buildApiUrl(`/games/${gameId}/files/${file.id}/launch-script`),
     changelog: file.notes || undefined,
   }))
-}
-
-function serializeGameCoreRequest(data: GameCoreRequest): GameCoreRequest {
-  return {
-    title: data.title || '',
-    title_alt: data.title_alt ?? null,
-    visibility: data.visibility ?? 'public',
-    summary: data.summary ?? null,
-    release_date: data.release_date ?? null,
-    engine: data.engine ?? null,
-    cover_image: data.cover_image ?? null,
-    banner_image: data.banner_image ?? null,
-  }
 }
 
 async function listMetadata<T extends Series | Platform | Developer | Publisher>(resource: string): Promise<T[]> {
@@ -295,97 +274,21 @@ const gamesService = {
     title: string
     visibility?: 'public' | 'private'
   }): Promise<GameListItem> {
-    const payload: GameWriteRequest = {
-      ...serializeGameCoreRequest({
-        title: data.title,
-        title_alt: null,
-        visibility: data.visibility ?? 'public',
-        summary: null,
-        release_date: null,
-        engine: null,
-        cover_image: null,
-        banner_image: null,
-      }),
-      series_id: null,
-      platform_ids: [],
-      developer_ids: [],
-      publisher_ids: [],
-      tag_ids: [],
+    const payload = {
+      title: data.title,
+      visibility: data.visibility ?? 'public',
     }
     const response = await post<ApiEnvelope<GameListItemDto>>('/games', payload)
     return normalizeGameListItem(response.data)
   },
 
   async updateGameAggregate(id: string, data: GameAggregateUpdateRequest): Promise<{ game: GameListItem; warnings: string[] }> {
-    const payload: Record<string, unknown> = {
-      game: {
-        ...serializeGameCoreRequest(data.game),
-      },
-      assets: {
-        files: data.assets.files.map((item) => ({
-          id: item.id,
-          file_path: item.file_path,
-          label: item.label ?? null,
-          notes: item.notes ?? null,
-        })),
-        delete_assets: data.assets.delete_assets.map((item) => ({
-          asset_type: item.asset_type,
-          path: item.path,
-          asset_id: item.asset_id,
-          asset_uid: item.asset_uid,
-        })),
-        screenshot_order_asset_uids: data.assets.screenshot_order_asset_uids,
-        video_order_asset_uids: data.assets.video_order_asset_uids,
-      },
-    }
-    if (Object.prototype.hasOwnProperty.call(data.game, 'series_id')) {
-      // Aggregate patch semantics distinguish omission from explicit clearing.
-      ;(payload.game as Record<string, unknown>).series_id = data.game.series_id ?? null
-    }
-    if (Object.prototype.hasOwnProperty.call(data.game, 'platform_ids')) {
-      // Relation arrays follow the same rule: omit means "leave as-is", [] means "clear all".
-      ;(payload.game as Record<string, unknown>).platform_ids = data.game.platform_ids ?? []
-    }
-    if (Object.prototype.hasOwnProperty.call(data.game, 'developer_ids')) {
-      ;(payload.game as Record<string, unknown>).developer_ids = data.game.developer_ids ?? []
-    }
-    if (Object.prototype.hasOwnProperty.call(data.game, 'publisher_ids')) {
-      ;(payload.game as Record<string, unknown>).publisher_ids = data.game.publisher_ids ?? []
-    }
-    if (Object.prototype.hasOwnProperty.call(data.game, 'tag_ids')) {
-      ;(payload.game as Record<string, unknown>).tag_ids = data.game.tag_ids ?? []
-    }
-
-    const response = await put<ApiEnvelope<AggregateUpdateApiResponse>>(`/games/${id}/aggregate`, payload)
+    const response = await put<ApiEnvelope<AggregateUpdateApiResponse>>(`/games/${id}/aggregate`, data)
     const warnings = response.data.warnings?.asset_delete_paths || []
     return {
       game: normalizeGameListItem(response.data.game),
       warnings,
     }
-  },
-
-  async createGameFile(gameId: string, data: {
-    file_path: string
-    label?: string | null
-    notes?: string | null
-    sort_order: number
-  }): Promise<GameFileEntry> {
-    const response = await post<ApiEnvelope<GameFileEntry>>(`/games/${gameId}/files`, data)
-    return response.data
-  },
-
-  async updateGameFile(gameId: string, fileId: string, data: {
-    file_path: string
-    label?: string | null
-    notes?: string | null
-    sort_order: number
-  }): Promise<GameFileEntry> {
-    const response = await put<ApiEnvelope<GameFileEntry>>(`/games/${gameId}/files/${fileId}`, data)
-    return response.data
-  },
-
-  async deleteGameFile(gameId: string, fileId: string): Promise<void> {
-    await del<ApiEnvelope<void>>(`/games/${gameId}/files/${fileId}`)
   },
 
   async deleteGame(id: string): Promise<{ warnings: string[] }> {

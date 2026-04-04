@@ -89,80 +89,80 @@ type GameFile struct {
 	SortOrder       int     `db:"sort_order"`
 	CreatedAt       string  `db:"created_at"`
 	UpdatedAt       string  `db:"updated_at"`
-	SourceCreatedAt *string `db:"source_created_at" json:"source_created_at"`
+	SourceCreatedAt *string `db:"source_created_at"`
 }
 
 type MetadataItem struct {
-	ID              int64    `db:"id" json:"id"`
-	Name            string   `db:"name" json:"name"`
-	Slug            string   `db:"slug" json:"slug"`
-	SortOrder       int      `db:"sort_order" json:"sort_order"`
-	CreatedAt       string   `db:"created_at" json:"created_at"`
-	GameCount       int      `json:"game_count,omitempty"`
-	CoverImage      *string  `json:"cover_image,omitempty"`
-	CoverCandidates []string `json:"cover_candidates,omitempty"`
-	LatestUpdatedAt *string  `json:"latest_updated_at,omitempty"`
+	ID              int64    `db:"id"`
+	Name            string   `db:"name"`
+	Slug            string   `db:"slug"`
+	SortOrder       int      `db:"sort_order"`
+	CreatedAt       string   `db:"created_at"`
+	GameCount       int
+	CoverImage      *string
+	CoverCandidates []string
+	LatestUpdatedAt *string
 }
 
 type MetadataWriteInput struct {
-	Name      string  `json:"name"`
-	Slug      *string `json:"slug"`
-	SortOrder *int    `json:"sort_order"`
+	Name      string
+	Slug      *string
+	SortOrder *int
 }
 
 type TagGroup struct {
-	ID            int64   `db:"id" json:"id"`
-	Key           string  `db:"key" json:"key"`
-	Name          string  `db:"name" json:"name"`
-	Description   *string `db:"description" json:"description"`
-	SortOrder     int     `db:"sort_order" json:"sort_order"`
-	AllowMultiple bool    `db:"allow_multiple" json:"allow_multiple"`
-	IsFilterable  bool    `db:"is_filterable" json:"is_filterable"`
-	CreatedAt     string  `db:"created_at" json:"created_at"`
-	UpdatedAt     string  `db:"updated_at" json:"updated_at"`
+	ID            int64   `db:"id"`
+	Key           string  `db:"key"`
+	Name          string  `db:"name"`
+	Description   *string `db:"description"`
+	SortOrder     int     `db:"sort_order"`
+	AllowMultiple bool    `db:"allow_multiple"`
+	IsFilterable  bool    `db:"is_filterable"`
+	CreatedAt     string  `db:"created_at"`
+	UpdatedAt     string  `db:"updated_at"`
 }
 
 type Tag struct {
-	ID                 int64  `db:"id" json:"id"`
-	GroupID            int64  `db:"group_id" json:"group_id"`
-	GroupKey           string `db:"group_key" json:"group_key"`
-	GroupName          string `db:"group_name" json:"group_name"`
-	GroupAllowMultiple bool   `db:"group_allow_multiple" json:"-"`
-	GroupIsFilterable  bool   `db:"group_is_filterable" json:"-"`
-	Name               string `db:"name" json:"name"`
-	Slug               string `db:"slug" json:"slug"`
-	ParentID           *int64 `db:"parent_id" json:"parent_id"`
-	SortOrder          int    `db:"sort_order" json:"sort_order"`
-	IsActive           bool   `db:"is_active" json:"is_active"`
-	CreatedAt          string `db:"created_at" json:"created_at"`
-	UpdatedAt          string `db:"updated_at" json:"updated_at"`
+	ID                 int64  `db:"id"`
+	GroupID            int64  `db:"group_id"`
+	GroupKey           string `db:"group_key"`
+	GroupName          string `db:"group_name"`
+	GroupAllowMultiple bool   `db:"group_allow_multiple"`
+	GroupIsFilterable  bool   `db:"group_is_filterable"`
+	Name               string `db:"name"`
+	Slug               string `db:"slug"`
+	ParentID           *int64 `db:"parent_id"`
+	SortOrder          int    `db:"sort_order"`
+	IsActive           bool   `db:"is_active"`
+	CreatedAt          string `db:"created_at"`
+	UpdatedAt          string `db:"updated_at"`
 }
 
 type GameTagGroup struct {
-	ID            int64  `json:"id"`
-	Key           string `json:"key"`
-	Name          string `json:"name"`
-	AllowMultiple bool   `json:"allow_multiple"`
-	IsFilterable  bool   `json:"is_filterable"`
-	Tags          []Tag  `json:"tags"`
+	ID            int64
+	Key           string
+	Name          string
+	AllowMultiple bool
+	IsFilterable  bool
+	Tags          []Tag
 }
 
 type TagGroupWriteInput struct {
-	Key           string  `json:"key"`
-	Name          string  `json:"name"`
-	Description   *string `json:"description"`
-	SortOrder     *int    `json:"sort_order"`
-	AllowMultiple *bool   `json:"allow_multiple"`
-	IsFilterable  *bool   `json:"is_filterable"`
+	Key           string
+	Name          string
+	Description   *string
+	SortOrder     *int
+	AllowMultiple *bool
+	IsFilterable  *bool
 }
 
 type TagWriteInput struct {
-	GroupID   int64   `json:"group_id"`
-	Name      string  `json:"name"`
-	Slug      *string `json:"slug"`
-	ParentID  *int64  `json:"parent_id"`
-	SortOrder *int    `json:"sort_order"`
-	IsActive  *bool   `json:"is_active"`
+	GroupID   int64
+	Name      string
+	Slug      *string
+	ParentID  *int64
+	SortOrder *int
+	IsActive  *bool
 }
 
 type TagsListParams struct {
@@ -202,11 +202,11 @@ type GamesTimelineParams struct {
 }
 
 type PendingGroupCounts struct {
-	MissingAssets   int `db:"missing_assets" json:"missing_assets"`
-	MissingWiki     int `db:"missing_wiki" json:"missing_wiki"`
-	MissingFiles    int `db:"missing_files" json:"missing_files"`
-	MissingMetadata int `db:"missing_metadata" json:"missing_metadata"`
-	IgnoredTotal    int `db:"ignored_total" json:"ignored_total"`
+	MissingAssets   int `db:"missing_assets"`
+	MissingWiki     int `db:"missing_wiki"`
+	MissingFiles    int `db:"missing_files"`
+	MissingMetadata int `db:"missing_metadata"`
+	IgnoredTotal    int `db:"ignored_total"`
 }
 
 type TimelineGame struct {
@@ -219,81 +219,70 @@ type TimelineGame struct {
 }
 
 type GameCoreInput struct {
-	Title       string  `json:"title"`
-	TitleAlt    *string `json:"title_alt"`
-	Visibility  string  `json:"visibility"`
-	Summary     *string `json:"summary"`
-	ReleaseDate *string `json:"release_date"`
-	Engine      *string `json:"engine"`
-	CoverImage  *string `json:"cover_image"`
-	BannerImage *string `json:"banner_image"`
+	Title       string
+	TitleAlt    *string
+	Visibility  string
+	Summary     *string
+	ReleaseDate *string
+	Engine      *string
+	CoverImage  *string
+	BannerImage *string
 }
 
-type GameWriteInput struct {
+// Create keeps the add-game flow intentionally narrow: it only creates the base game row.
+// Full aggregate edits happen through GameAggregateUpdateInput.
+type GameCreateInput struct {
+	Title      string
+	Visibility string
+}
+
+// Aggregate update rewrites the entire editable game aggregate in one request.
+type GameAggregateCoreUpdateInput struct {
 	GameCoreInput
-	SeriesID     *int64  `json:"series_id"`
-	PlatformIDs  []int64 `json:"platform_ids"`
-	DeveloperIDs []int64 `json:"developer_ids"`
-	PublisherIDs []int64 `json:"publisher_ids"`
-	TagIDs       []int64 `json:"tag_ids"`
-}
-
-type OptionalInt64Patch struct {
-	Present bool
-	Value   *int64
-}
-
-type Int64SlicePatch struct {
-	Present bool
-	Values  []int64
-}
-
-type GameAggregatePatchInput struct {
-	GameCoreInput
-	SeriesID     OptionalInt64Patch
-	PlatformIDs  Int64SlicePatch
-	DeveloperIDs Int64SlicePatch
-	PublisherIDs Int64SlicePatch
-	TagIDs       Int64SlicePatch
+	SeriesID     *int64
+	PlatformIDs  []int64
+	DeveloperIDs []int64
+	PublisherIDs []int64
+	TagIDs       []int64
 }
 
 type GameFileWriteInput struct {
-	FilePath  string  `json:"file_path"`
-	Label     *string `json:"label"`
-	Notes     *string `json:"notes"`
-	SortOrder int     `json:"sort_order"`
+	FilePath  string
+	Label     *string
+	Notes     *string
+	SortOrder int
 }
 
 type GameFileUpsertInput struct {
-	ID        *int64  `json:"id"`
-	FilePath  string  `json:"file_path"`
-	Label     *string `json:"label"`
-	Notes     *string `json:"notes"`
-	SortOrder int     `json:"sort_order"`
+	ID        *int64
+	FilePath  string
+	Label     *string
+	Notes     *string
+	SortOrder int
 }
 
 type GameAssetDeleteInput struct {
-	AssetType string `json:"asset_type"`
-	Path      string `json:"path"`
-	AssetID   *int64 `json:"asset_id"`
-	AssetUID  string `json:"asset_uid"`
+	AssetType string
+	Path      string
+	AssetID   *int64
+	AssetUID  string
 }
 
 type GameAggregateUpdateInput struct {
-	Game   GameAggregatePatchInput  `json:"game"`
-	Assets GameAggregateAssetsInput `json:"assets"`
+	Game   GameAggregateCoreUpdateInput
+	Assets GameAggregateAssetsInput
 }
 
 type GameAggregateAssetsInput struct {
-	Files                    []GameFileUpsertInput  `json:"files"`
-	DeleteAssets             []GameAssetDeleteInput `json:"delete_assets"`
-	ScreenshotOrderAssetUIDs []string               `json:"screenshot_order_asset_uids"`
-	VideoOrderAssetUIDs      []string               `json:"video_order_asset_uids"`
+	Files                    []GameFileUpsertInput
+	DeleteAssets             []GameAssetDeleteInput
+	ScreenshotOrderAssetUIDs []string
+	VideoOrderAssetUIDs      []string
 }
 
 type WikiWriteInput struct {
-	Content       string  `json:"content"`
-	ChangeSummary *string `json:"change_summary"`
+	Content       string
+	ChangeSummary *string
 }
 
 type WikiHistoryEntry struct {
@@ -305,13 +294,13 @@ type WikiHistoryEntry struct {
 }
 
 type ReviewIssueOverride struct {
-	ID        int64   `db:"id" json:"id"`
-	GameID    int64   `db:"game_id" json:"game_id"`
-	IssueKey  string  `db:"issue_key" json:"issue_key"`
-	Status    string  `db:"status" json:"status"`
-	Reason    *string `db:"reason" json:"reason"`
-	CreatedAt string  `db:"created_at" json:"created_at"`
-	UpdatedAt string  `db:"updated_at" json:"updated_at"`
+	ID        int64   `db:"id"`
+	GameID    int64   `db:"game_id"`
+	IssueKey  string  `db:"issue_key"`
+	Status    string  `db:"status"`
+	Reason    *string `db:"reason"`
+	CreatedAt string  `db:"created_at"`
+	UpdatedAt string  `db:"updated_at"`
 }
 
 type GameStats struct {

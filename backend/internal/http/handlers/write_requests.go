@@ -1,10 +1,6 @@
 package handlers
 
-import (
-	"strconv"
-
-	"github.com/hao/game/internal/domain"
-)
+import "github.com/hao/game/internal/domain"
 
 type metadataWriteRequest struct {
 	Name      string  `json:"name"`
@@ -28,19 +24,6 @@ type tagWriteRequest struct {
 	ParentID  *int64  `json:"parent_id"`
 	SortOrder *int    `json:"sort_order"`
 	IsActive  *bool   `json:"is_active"`
-}
-
-type deleteAssetRequest struct {
-	GameID    int64  `json:"game_id"`
-	AssetID   *int64 `json:"asset_id"`
-	AssetUID  string `json:"asset_uid"`
-	AssetType string `json:"asset_type"`
-	Path      string `json:"path"`
-}
-
-type assetOrderUpdateRequest struct {
-	GameID    int64    `json:"game_id"`
-	AssetUIDs []string `json:"asset_uids"`
 }
 
 type steamApplyAssetsRequest struct {
@@ -85,43 +68,12 @@ func (request tagWriteRequest) toInput() domain.TagWriteInput {
 	}
 }
 
-func (request deleteAssetRequest) toInput() domain.DeleteAssetInput {
-	return domain.DeleteAssetInput{
-		GameID:    request.GameID,
-		AssetID:   request.AssetID,
-		AssetUID:  request.AssetUID,
-		AssetType: request.AssetType,
-		Path:      request.Path,
-	}
-}
-
-func (request assetOrderUpdateRequest) toScreenshotInput() domain.ScreenshotOrderUpdateInput {
-	return domain.ScreenshotOrderUpdateInput{
-		GameID:    request.GameID,
-		AssetUIDs: request.AssetUIDs,
-	}
-}
-
-func (request assetOrderUpdateRequest) toVideoInput() domain.VideoOrderUpdateInput {
-	return domain.VideoOrderUpdateInput{
-		GameID:    request.GameID,
-		AssetUIDs: request.AssetUIDs,
-	}
-}
-
-func (request steamApplyAssetsRequest) toInput(gameIDQuery string) domain.SteamApplyAssetsInput {
-	gameID := request.GameID
-	if gameID <= 0 && gameIDQuery != "" {
-		if parsed, err := strconv.ParseInt(gameIDQuery, 10, 64); err == nil {
-			gameID = parsed
-		}
-	}
-
+func (request steamApplyAssetsRequest) toInput() domain.SteamApplyAssetsInput {
 	return domain.SteamApplyAssetsInput{
-		GameID:         gameID,
+		GameID:         request.GameID,
 		CoverURL:       request.CoverURL,
 		BannerURL:      request.BannerURL,
-		ScreenshotURLs: request.ScreenshotURLs,
+		ScreenshotURLs: normalizeStringSlice(request.ScreenshotURLs),
 	}
 }
 
@@ -130,4 +82,13 @@ func (request wikiWriteRequest) toInput() domain.WikiWriteInput {
 		Content:       request.Content,
 		ChangeSummary: request.ChangeSummary,
 	}
+}
+
+func normalizeStringSlice(items []string) []string {
+	// 2026-04-04: keep this only for steam asset apply requests.
+	// Impact: omitted screenshot_urls still mean "apply zero screenshots" before service validation.
+	if items == nil {
+		return []string{}
+	}
+	return items
 }

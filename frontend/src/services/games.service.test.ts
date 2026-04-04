@@ -135,6 +135,27 @@ describe('games service', () => {
     expect(params.get('favorite')).toBe('true')
   })
 
+  it('does not send favorite=false because backend has no negative favorite filter', async () => {
+    getMock.mockResolvedValue({
+      data: [{ ...baseGame, id: 2, public_id: 'game-2', is_favorite: true }],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 1,
+        totalPages: 1,
+      },
+    })
+
+    await gamesService.getGames({
+      query: {
+        favorite: false,
+      },
+    })
+
+    const params = getMock.mock.calls[0]?.[1]?.params as URLSearchParams
+    expect(params.get('favorite')).toBeNull()
+  })
+
   it('returns delete warnings when game removal leaves cleanup tasks', async () => {
     delMock.mockResolvedValue({
       data: {
@@ -150,6 +171,22 @@ describe('games service', () => {
     expect(delMock).toHaveBeenCalledWith('/games/game-1')
     expect(result).toEqual({
       warnings: ['/assets/bad-cover.png'],
+    })
+  })
+
+  it('serializes quick-create payload without aggregate-only fields', async () => {
+    postMock.mockResolvedValue({
+      data: baseGame,
+    })
+
+    await gamesService.createGame({
+      title: 'Quick Create',
+      visibility: 'private',
+    })
+
+    expect(postMock).toHaveBeenCalledWith('/games', {
+      title: 'Quick Create',
+      visibility: 'private',
     })
   })
 
@@ -192,23 +229,10 @@ describe('games service', () => {
     expect(getMock).toHaveBeenCalledTimes(2)
   })
 
-  it('maps game files to version metadata', () => {
+  it('maps game files to version metadata using backend file order', () => {
     const result = mapGameVersions({
       public_id: 'game-1',
       files: [
-        {
-          id: 10,
-          game_id: 1,
-          file_name: 'Alpha.vhdx',
-          file_path: '/roms/Alpha.vhdx',
-          label: '',
-          notes: 'latest build',
-          size_bytes: 123,
-          sort_order: 2,
-          source_created_at: '2026-03-25T00:00:00Z',
-          created_at: '2026-03-24T00:00:00Z',
-          updated_at: '2026-03-25T00:00:00Z',
-        },
         {
           id: 9,
           game_id: 1,
@@ -221,6 +245,19 @@ describe('games service', () => {
           source_created_at: '2026-03-20T00:00:00Z',
           created_at: '2026-03-20T00:00:00Z',
           updated_at: '2026-03-20T00:00:00Z',
+        },
+        {
+          id: 10,
+          game_id: 1,
+          file_name: 'Alpha.vhdx',
+          file_path: '/roms/Alpha.vhdx',
+          label: '',
+          notes: 'latest build',
+          size_bytes: 123,
+          sort_order: 2,
+          source_created_at: '2026-03-25T00:00:00Z',
+          created_at: '2026-03-24T00:00:00Z',
+          updated_at: '2026-03-25T00:00:00Z',
         },
       ],
     })
@@ -253,22 +290,22 @@ describe('games service', () => {
     ])
   })
 
-  it('normalizes preview video to the first sorted asset', async () => {
+  it('keeps backend preview video order', async () => {
     getMock.mockResolvedValue({
       data: {
         ...baseGame,
         preview_videos: [
           {
-            id: 11,
-            asset_uid: 'video-first',
-            path: '/assets/video-first.mp4',
-            sort_order: 0,
-          },
-          {
             id: 12,
             asset_uid: 'video-primary',
             path: '/assets/video-primary.mp4',
             sort_order: 5,
+          },
+          {
+            id: 11,
+            asset_uid: 'video-first',
+            path: '/assets/video-first.mp4',
+            sort_order: 0,
           },
         ],
         screenshots: [],
@@ -284,7 +321,7 @@ describe('games service', () => {
 
     const result = await gamesService.getGame('game-1')
 
-    expect(result.preview_videos.map((item) => item.asset_uid)).toEqual(['video-first', 'video-primary'])
+    expect(result.preview_videos.map((item) => item.asset_uid)).toEqual(['video-primary', 'video-first'])
   })
 
   it('keeps preview video empty when there are no videos', async () => {
@@ -348,7 +385,7 @@ describe('games service', () => {
     expect(result.pending_reviews).toBe(2)
   })
 
-  it('serializes aggregate relation fields only when present', async () => {
+  it('serializes aggregate relation fields as full replacement payload', async () => {
     putMock.mockResolvedValue({
       data: {
         game: baseGame,
@@ -359,6 +396,11 @@ describe('games service', () => {
       game: {
         title: 'Game One',
         visibility: 'public',
+        series_id: null,
+        platform_ids: [],
+        developer_ids: [],
+        publisher_ids: [],
+        tag_ids: [],
       },
       assets: {
         files: [],
@@ -373,54 +415,18 @@ describe('games service', () => {
     expect(putMock.mock.calls[0]?.[1]).toEqual({
       game: {
         title: 'Game One',
-        title_alt: null,
         visibility: 'public',
-        summary: null,
-        release_date: null,
-        engine: null,
-        cover_image: null,
-        banner_image: null,
+        series_id: null,
+        platform_ids: [],
+        developer_ids: [],
+        publisher_ids: [],
+        tag_ids: [],
       },
       assets: {
         files: [],
         delete_assets: [],
         screenshot_order_asset_uids: [],
         video_order_asset_uids: [],
-      },
-    })
-    expect(putMock.mock.calls[0]?.[1]?.game).not.toHaveProperty('series_id')
-    expect(putMock.mock.calls[0]?.[1]?.game).not.toHaveProperty('platform_ids')
-    expect(putMock.mock.calls[0]?.[1]?.game).not.toHaveProperty('developer_ids')
-    expect(putMock.mock.calls[0]?.[1]?.game).not.toHaveProperty('publisher_ids')
-    expect(putMock.mock.calls[0]?.[1]?.game).not.toHaveProperty('tag_ids')
-  })
-
-  it('preserves explicit aggregate clear semantics for relation fields', async () => {
-    putMock.mockResolvedValue({
-      data: {
-        game: baseGame,
-      },
-    })
-
-    await gamesService.updateGameAggregate('game-1', {
-      game: {
-        title: 'Game One',
-        series_id: null,
-        developer_ids: [],
-      },
-      assets: {
-        files: [],
-        delete_assets: [],
-        screenshot_order_asset_uids: [],
-        video_order_asset_uids: [],
-      },
-    })
-
-    expect(putMock.mock.calls[0]?.[1]).toMatchObject({
-      game: {
-        title: 'Game One',
-        series_id: null,
-        developer_ids: [],
       },
     })
   })

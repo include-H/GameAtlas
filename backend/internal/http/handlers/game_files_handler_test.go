@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -122,76 +121,5 @@ func TestGameFilesHandlerListReturnsNotFoundForPrivateGameToPublic(t *testing.T)
 
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusNotFound, recorder.Body.String())
-	}
-}
-
-func TestGameFilesHandlerCreatePersistsNormalizedFileForAdmin(t *testing.T) {
-	t.Setenv("GIN_MODE", gin.TestMode)
-
-	db := openGamesHandlerTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	root := t.TempDir()
-	filePath := filepath.Join(root, "created", "admin.rom")
-	if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
-		t.Fatalf("MkdirAll returned error: %v", err)
-	}
-	content := []byte("admin-rom")
-	if err := os.WriteFile(filePath, content, 0o644); err != nil {
-		t.Fatalf("WriteFile returned error: %v", err)
-	}
-
-	insertGamesHandlerTestGame(t, db, "files-create", "Files Create", domain.GameVisibilityPublic, "")
-	service := services.NewGameFilesService(
-		config.Config{PrimaryROMRoot: root},
-		repositories.NewGamesRepository(db),
-		repositories.NewGameFilesRepository(db),
-	)
-	handler := NewGameFilesHandler(service)
-
-	payload := []byte(`{"file_path":"  ` + filePath + `  ","label":"  Main Build  ","notes":"  Admin Notes  ","sort_order":3}`)
-	recorder := httptest.NewRecorder()
-	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPost, "/api/games/files-create/files", bytes.NewReader(payload))
-	context.Request.Header.Set("Content-Type", "application/json")
-	context.Params = gin.Params{{Key: "publicId", Value: "files-create"}}
-	context.Set("is_admin", true)
-
-	handler.Create(context)
-
-	if recorder.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusCreated, recorder.Body.String())
-	}
-
-	var response struct {
-		Data struct {
-			FileName  string  `json:"file_name"`
-			FilePath  string  `json:"file_path"`
-			Label     *string `json:"label"`
-			Notes     *string `json:"notes"`
-			SizeBytes *int64  `json:"size_bytes"`
-			SortOrder int     `json:"sort_order"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if response.Data.FilePath != filePath {
-		t.Fatalf("file_path = %q, want %q", response.Data.FilePath, filePath)
-	}
-	if response.Data.FileName != "admin.rom" {
-		t.Fatalf("file_name = %q, want admin.rom", response.Data.FileName)
-	}
-	if response.Data.Label == nil || *response.Data.Label != "Main Build" {
-		t.Fatalf("label = %v, want trimmed Main Build", response.Data.Label)
-	}
-	if response.Data.Notes == nil || *response.Data.Notes != "Admin Notes" {
-		t.Fatalf("notes = %v, want trimmed Admin Notes", response.Data.Notes)
-	}
-	if response.Data.SizeBytes == nil || *response.Data.SizeBytes != int64(len(content)) {
-		t.Fatalf("size_bytes = %v, want %d", response.Data.SizeBytes, len(content))
-	}
-	if response.Data.SortOrder != 3 {
-		t.Fatalf("sort_order = %d, want 3", response.Data.SortOrder)
 	}
 }

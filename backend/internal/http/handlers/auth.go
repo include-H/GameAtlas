@@ -28,7 +28,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		Password string `json:"password"`
 	}
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid auth payload"})
+		writeJSONError(c, http.StatusBadRequest, "invalid auth payload")
 		return
 	}
 
@@ -39,21 +39,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		if errors.As(err, &denied) {
 			switch denied.Reason {
 			case services.LoginDeniedLocked:
-				c.JSON(http.StatusTooManyRequests, gin.H{
-					"success": false,
-					"error":   "错误次数过多，请稍后再试",
-					"data": gin.H{
-						"retry_after_seconds": denied.RetryAfterSeconds,
-						"locked_until_unix":   denied.LockedUntilUnixUTC,
-					},
+				writeJSONErrorWithData(c, http.StatusTooManyRequests, "错误次数过多，请稍后再试", authLockedResponse{
+					RetryAfterSeconds: denied.RetryAfterSeconds,
+					LockedUntilUnix:   denied.LockedUntilUnixUTC,
 				})
 			default:
-				c.JSON(http.StatusUnauthorized, gin.H{
-					"success": false,
-					"error":   "密码错误",
-					"data": gin.H{
-						"remaining_attempts": denied.RemainingAttempts,
-					},
+				writeJSONErrorWithData(c, http.StatusUnauthorized, "密码错误", authDeniedResponse{
+					RemainingAttempts: denied.RemainingAttempts,
 				})
 			}
 			return
@@ -61,21 +53,16 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 		switch err {
 		case services.ErrAuthDisabled:
-			c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "error": "登录功能未配置"})
+			writeJSONError(c, http.StatusServiceUnavailable, "登录功能未配置")
 		default:
-			c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "登录失败"})
+			writeJSONError(c, http.StatusUnauthorized, "登录失败")
 		}
 		return
 	}
 
 	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie(services.AuthCookieName, session, h.service.SessionMaxAgeSeconds(), "/", "", requestUsesHTTPS(c.Request), true)
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"is_admin": true,
-		},
-	})
+	writeJSONSuccess(c, http.StatusOK, authSessionResponse{IsAdmin: true})
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
@@ -85,10 +72,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	}
 	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie(services.AuthCookieName, "", -1, "/", "", requestUsesHTTPS(c.Request), true)
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    gin.H{"logged_out": true},
-	})
+	writeJSONSuccess(c, http.StatusOK, authLogoutResponse{LoggedOut: true})
 }
 
 func (h *AuthHandler) Me(c *gin.Context) {
@@ -97,13 +81,10 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	if isAdmin {
 		adminDisplayName = h.adminDisplayName
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"is_admin":           isAdmin,
-			"role":               currentAuthRole(isAdmin),
-			"admin_display_name": adminDisplayName,
-		},
+	writeJSONSuccess(c, http.StatusOK, authStateResponse{
+		IsAdmin:          isAdmin,
+		Role:             currentAuthRole(isAdmin),
+		AdminDisplayName: adminDisplayName,
 	})
 }
 
@@ -127,10 +108,7 @@ func requireAdmin(c *gin.Context) bool {
 	if isAdminRequest(c) {
 		return true
 	}
-	c.JSON(http.StatusUnauthorized, gin.H{
-		"success": false,
-		"error":   "admin login required",
-	})
+	writeJSONError(c, http.StatusUnauthorized, "admin login required")
 	return false
 }
 

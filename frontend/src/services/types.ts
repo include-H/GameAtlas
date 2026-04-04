@@ -210,20 +210,13 @@ export interface GameCoreRequest {
   banner_image?: string | null
 }
 
-export interface GameWriteRequest extends GameCoreRequest {
-  series_id?: number | null
-  developer_ids?: number[]
-  publisher_ids?: number[]
-  platform_ids?: number[]
-  tag_ids?: number[]
-}
-
-export interface GameAggregatePatchRequest extends GameCoreRequest {
-  series_id?: number | null
-  developer_ids?: number[]
-  publisher_ids?: number[]
-  platform_ids?: number[]
-  tag_ids?: number[]
+// Aggregate update rewrites the editable game aggregate in one request.
+export interface GameAggregateGameUpdateRequest extends GameCoreRequest {
+  series_id: number | null
+  developer_ids: number[]
+  publisher_ids: number[]
+  platform_ids: number[]
+  tag_ids: number[]
 }
 
 export interface GameAggregateFileRequest {
@@ -241,7 +234,7 @@ export interface GameAggregateDeleteAssetRequest {
 }
 
 export interface GameAggregateUpdateRequest {
-  game: GameAggregatePatchRequest
+  game: GameAggregateGameUpdateRequest
   assets: {
     files: GameAggregateFileRequest[]
     delete_assets: GameAggregateDeleteAssetRequest[]

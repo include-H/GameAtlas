@@ -16,9 +16,10 @@ import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
 import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
 
-type GamesViewFilter = 'favorites' | 'recent'
 type GamesViewMode = 'grid' | 'list'
 type GamesSortKey =
+  | 'updated_desc'
+  | 'updated_asc'
   | 'created_desc'
   | 'created_asc'
   | 'title_asc'
@@ -28,12 +29,7 @@ type GamesSortKey =
   | 'downloads_desc'
   | 'random_desc'
 
-interface GamesViewProps {
-  filter?: GamesViewFilter
-}
-
 interface UseGamesViewOptions {
-  props: GamesViewProps
   route: RouteLocationNormalizedLoaded
   router: Router
   gamesStore: ReturnType<typeof useGamesStore>
@@ -44,15 +40,18 @@ interface UseGamesViewOptions {
 interface BuildGamesListRequestOptions {
   routeQuery: LocationQuery
   itemsPerPage: number
-  filterFavorites: boolean
-  sortBy: string
 }
 
-const DEFAULT_SORT: GamesSortKey = 'created_desc'
+// 2026-04-04: keep this UI-only default aligned with the backend list default sort.
+// Impact: the select shows "最近更新" when route.query omits sort, but requests still rely on the
+// backend native default instead of forcing a front-end sort parameter.
+const DEFAULT_SORT: GamesSortKey = 'updated_desc'
 const DEFAULT_ITEMS_PER_PAGE = 24
 const AMBIENT_BACKGROUND_OWNER = 'games'
 
 const SORT_VALUES = new Set<GamesSortKey>([
+  'updated_desc',
+  'updated_asc',
   'created_desc',
   'created_asc',
   'title_asc',
@@ -63,7 +62,8 @@ const SORT_VALUES = new Set<GamesSortKey>([
   'random_desc',
 ])
 
-const SORT_FIELD_MAP: Record<'created' | 'title' | 'release' | 'downloads' | 'random', GameSort['field']> = {
+const SORT_FIELD_MAP: Record<'updated' | 'created' | 'title' | 'release' | 'downloads' | 'random', GameSort['field']> = {
+  updated: 'updated_at',
   created: 'created_at',
   title: 'title',
   release: 'release_date',
@@ -102,8 +102,17 @@ export const parsePositiveRouteNumber = (
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
 }
 
-export const normalizeGamesSortValue = (value: string | undefined): GamesSortKey => {
-  return value && SORT_VALUES.has(value as GamesSortKey) ? value as GamesSortKey : DEFAULT_SORT
+export const parseRouteBoolean = (
+  value: LocationQueryValue | LocationQueryValue[] | undefined,
+): boolean | undefined => {
+  const raw = readSingleQueryValue(value)
+  if (raw === 'true') return true
+  if (raw === 'false') return false
+  return undefined
+}
+
+export const parseGamesSortValue = (value: string | undefined): GamesSortKey | undefined => {
+  return value && SORT_VALUES.has(value as GamesSortKey) ? value as GamesSortKey : undefined
 }
 
 export const buildGamesRouteQuery = (
@@ -122,7 +131,7 @@ export const buildGamesRouteQuery = (
     newParams.search !== undefined
     || newParams.platform !== undefined
     || newParams.tag !== undefined
-    || newParams.filter !== undefined
+    || newParams.favorite !== undefined
   ) {
     query.page = '1'
   }
@@ -133,39 +142,139 @@ export const buildGamesRouteQuery = (
 export const buildGamesListRequest = ({
   routeQuery,
   itemsPerPage,
-  filterFavorites,
-  sortBy,
-}: BuildGamesListRequestOptions): { query: GameListQuery; sort: GameSort } => {
+}: BuildGamesListRequestOptions): { query: GameListQuery; sort?: GameSort } => {
   const page = parsePositiveQueryNumber(readSingleQueryValue(routeQuery.page), 1)
-  const normalizedSort = normalizeGamesSortValue(sortBy)
-  const [field, order] = normalizedSort.split('_') as [
-    keyof typeof SORT_FIELD_MAP,
-    GameSort['order'] | undefined,
-  ]
-  const sortField = SORT_FIELD_MAP[field] || SORT_FIELD_MAP.created
-  const resolvedOrder: GameSort['order'] = order === 'asc' ? 'asc' : 'desc'
+  const sortValue = parseGamesSortValue(readSingleQueryValue(routeQuery.sort))
+  const favorite = parseRouteBoolean(routeQuery.favorite) === true
+    ? true
+    : undefined
 
-  return {
+  const request: { query: GameListQuery; sort?: GameSort } = {
     query: {
       page,
       limit: itemsPerPage,
       search: readSingleQueryValue(routeQuery.search),
       platform: parsePositiveRouteNumber(routeQuery.platform),
       tag: parseRouteTagIds(routeQuery.tag),
-      favorite: filterFavorites || undefined,
-    },
-    sort: {
-      field: sortField,
-      order: resolvedOrder,
-      seed: field === 'random'
-        ? parsePositiveQueryNumber(readSingleQueryValue(routeQuery.seed), Date.now())
-        : undefined,
+      favorite,
     },
   }
+
+  if (sortValue) {
+    const [field, order] = sortValue.split('_') as [
+      keyof typeof SORT_FIELD_MAP,
+      GameSort['order'] | undefined,
+    ]
+    request.sort = {
+      field: SORT_FIELD_MAP[field] || SORT_FIELD_MAP.updated,
+      order: order === 'asc' ? 'asc' : 'desc',
+      seed: field === 'random'
+        ? parsePositiveRouteNumber(routeQuery.seed)
+        : undefined,
+    }
+  }
+
+  return request
+}
+
+export const hasGamesActiveFilters = (routeQuery: LocationQuery): boolean => {
+  return Boolean(
+    readSingleQueryValue(routeQuery.search)
+    || readSingleQueryValue(routeQuery.platform)
+    || parseRouteTagIds(routeQuery.tag).length > 0
+    || parseRouteBoolean(routeQuery.favorite) === true,
+  )
+}
+
+export const normalizeGamesFavoriteRouteQuery = (routeQuery: LocationQuery): LocationQueryRaw | null => {
+  const rawFavorite = readSingleQueryValue(routeQuery.favorite)
+  if (rawFavorite === undefined) {
+    return null
+  }
+  if (parseRouteBoolean(rawFavorite) === true) {
+    return null
+  }
+
+  return buildGamesRouteQuery(routeQuery, {
+    favorite: undefined,
+  })
+}
+
+export const normalizeGamesSortRouteQuery = (routeQuery: LocationQuery): LocationQueryRaw | null => {
+  const rawSort = readSingleQueryValue(routeQuery.sort)
+  if (!rawSort) return null
+
+  const sortValue = parseGamesSortValue(rawSort)
+  if (!sortValue) {
+    return buildGamesRouteQuery(routeQuery, {
+      sort: undefined,
+      seed: undefined,
+    })
+  }
+
+  if (sortValue !== 'random_desc') {
+    if (readSingleQueryValue(routeQuery.seed) === undefined) {
+      return null
+    }
+    return buildGamesRouteQuery(routeQuery, {
+      seed: undefined,
+    })
+  }
+
+  if (parsePositiveRouteNumber(routeQuery.seed) !== undefined) {
+    return null
+  }
+
+  // 2026-04-04: keep the random seed in route state because backend pagination only stays stable
+  // when every page request reuses the same native random seed. Impact: the URL owns that state,
+  // while request building no longer invents hidden fallback seeds.
+  return buildGamesRouteQuery(routeQuery, {
+    seed: String(Date.now()),
+  })
+}
+
+const normalizeRouteQueryValue = (
+  value: LocationQueryValue | LocationQueryValue[] | undefined,
+): string[] => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item))
+  }
+  if (value === undefined) {
+    return []
+  }
+  return [String(value)]
+}
+
+const isSameRouteQuery = (left: LocationQuery, right: LocationQueryRaw): boolean => {
+  const leftKeys = Object.keys(left).sort()
+  const rightKeys = Object.keys(right).sort()
+  if (leftKeys.length != rightKeys.length) {
+    return false
+  }
+
+  for (let index = 0; index < leftKeys.length; index += 1) {
+    if (leftKeys[index] !== rightKeys[index]) {
+      return false
+    }
+  }
+
+  for (const key of leftKeys) {
+    const leftValue = normalizeRouteQueryValue(left[key])
+    const rightValue = normalizeRouteQueryValue(right[key] as LocationQueryValue | LocationQueryValue[] | undefined)
+    if (leftValue.length !== rightValue.length) {
+      return false
+    }
+    for (let index = 0; index < leftValue.length; index += 1) {
+      if (leftValue[index] !== rightValue[index]) {
+        return false
+      }
+    }
+  }
+
+  return true
 }
 
 export const useGamesView = ({
-  props,
   route,
   router,
   gamesStore,
@@ -189,6 +298,8 @@ export const useGamesView = ({
   ]
 
   const sortOptions = [
+    { label: '最近更新', value: 'updated_desc' },
+    { label: '最早更新', value: 'updated_asc' },
     { label: '最新添加', value: 'created_desc' },
     { label: '最早添加', value: 'created_asc' },
     { label: '名称 A-Z', value: 'title_asc' },
@@ -199,16 +310,8 @@ export const useGamesView = ({
     { label: '随机', value: 'random_desc' },
   ]
 
-  const visibleGames = ref<GameListItem[]>([])
-  const visiblePagination = ref({
-    total: 0,
-    page: 1,
-    limit: DEFAULT_ITEMS_PER_PAGE,
-    totalPages: 0,
-  })
-
-  const games = computed(() => visibleGames.value)
-  const pagination = computed(() => visiblePagination.value)
+  const games = computed(() => gamesStore.games)
+  const pagination = computed(() => gamesStore.pagination)
   const totalPages = computed(() => pagination.value.totalPages || 0)
 
   const currentPage = computed({
@@ -228,11 +331,14 @@ export const useGamesView = ({
   })
 
   const sortBy = computed({
-    get: () => normalizeGamesSortValue(readSingleQueryValue(route.query.sort)),
+    get: () => parseGamesSortValue(readSingleQueryValue(route.query.sort)) || DEFAULT_SORT,
     set: (sort: string) => {
+      const normalizedSort = parseGamesSortValue(sort) || DEFAULT_SORT
       updateRoute({
-        sort,
-        seed: sort === 'random_desc' ? (readSingleQueryValue(route.query.seed) || String(Date.now())) : undefined,
+        sort: normalizedSort === DEFAULT_SORT ? undefined : normalizedSort,
+        seed: normalizedSort === 'random_desc'
+          ? (readSingleQueryValue(route.query.seed) || String(Date.now()))
+          : undefined,
         page: '1',
       })
     },
@@ -246,7 +352,7 @@ export const useGamesView = ({
   })
 
   const filterFavorites = computed(() => {
-    return props.filter === 'favorites' || readSingleQueryValue(route.query.filter) === 'favorites'
+    return parseRouteBoolean(route.query.favorite) === true
   })
 
   const selectedTagIds = computed(() => parseRouteTagIds(route.query.tag))
@@ -257,19 +363,10 @@ export const useGamesView = ({
       .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id),
   )
 
-  const hasActiveFilters = computed(() => {
-    return Boolean(
-      searchQuery.value
-      || selectedPlatform.value
-      || selectedTagIds.value.length > 0
-      || filterFavorites.value,
-    )
-  })
+  const hasActiveFilters = computed(() => hasGamesActiveFilters(route.query))
 
   const pageTitle = computed(() => {
-    const currentFilter = props.filter || readSingleQueryValue(route.query.filter)
-    if (currentFilter === 'favorites') return '收藏的游戏'
-    if (currentFilter === 'recent') return '最近下载'
+    if (filterFavorites.value) return '收藏的游戏'
     return '所有游戏'
   })
 
@@ -283,7 +380,22 @@ export const useGamesView = ({
 
   const updateRoute = (newParams: LocationQueryRaw) => {
     const query = buildGamesRouteQuery(route.query, newParams)
+    if (isSameRouteQuery(route.query, query)) {
+      return
+    }
     router.push({ name: 'games', query })
+  }
+
+  const normalizeRouteSortQuery = () => {
+    const query = normalizeGamesFavoriteRouteQuery(route.query)
+      || normalizeGamesSortRouteQuery(route.query)
+    if (!query || isSameRouteQuery(route.query, query)) return false
+
+    router.replace({
+      name: 'games',
+      query,
+    })
+    return true
   }
 
   const loadGames = async () => {
@@ -292,20 +404,10 @@ export const useGamesView = ({
     const request = buildGamesListRequest({
       routeQuery: route.query,
       itemsPerPage: itemsPerPage.value,
-      filterFavorites: filterFavorites.value,
-      sortBy: sortBy.value,
     })
 
     try {
       const response = await gamesStore.fetchGames(request)
-      visibleGames.value = response.data
-      visiblePagination.value = {
-        total: response.pagination.total,
-        page: response.pagination.page,
-        limit: response.pagination.limit,
-        totalPages: response.pagination.totalPages,
-      }
-
       syncAmbientBackground(response.data, response.pagination.page)
     } catch {
       uiStore.addAlert('加载游戏失败', 'error')
@@ -314,7 +416,7 @@ export const useGamesView = ({
     }
   }
 
-  const syncAmbientBackground = (games: GameListItem[], page = visiblePagination.value.page || 1) => {
+  const syncAmbientBackground = (games: GameListItem[], page = pagination.value.page || 1) => {
     const imageUrls = getAmbientBackgroundUrlsFromGames(games)
     if (imageUrls.length > 0) {
       uiStore.setAmbientBackgroundSource({
@@ -328,6 +430,9 @@ export const useGamesView = ({
     uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
   }
 
+  // 2026-04-04: keep route.query as the only active-filter source of truth.
+  // Impact: the debounced search input remains a local draft, while badges/empty states/pagination
+  // only reflect filters that have actually reached the backend request.
   watch(() => route.query, () => {
     searchQuery.value = readSingleQueryValue(route.query.search) || ''
     void loadGames()
@@ -408,6 +513,9 @@ export const useGamesView = ({
 
   const clearFilters = () => {
     searchQuery.value = ''
+    if (Object.keys(route.query).length === 0) {
+      return
+    }
     router.push({ name: 'games' })
   }
 
@@ -489,6 +597,10 @@ export const useGamesView = ({
     viewMode.value = uiStore.gamesViewMode
 
     await loadFilterOptions()
+    const routeWasNormalized = normalizeRouteSortQuery()
+    if (routeWasNormalized) {
+      return
+    }
 
     searchQuery.value = readSingleQueryValue(route.query.search) || ''
     if (games.value.length === 0 || Object.keys(route.query).length > 0) {
@@ -498,7 +610,7 @@ export const useGamesView = ({
 
   onActivated(async () => {
     await loadFilterOptions()
-    syncAmbientBackground(visibleGames.value)
+    syncAmbientBackground(games.value)
   })
 
   let searchDebounceTimer: number | undefined
@@ -511,6 +623,9 @@ export const useGamesView = ({
 
     if (typeof window === 'undefined') return
 
+    // 2026-04-04: keep debounce at the input edge only.
+    // Impact: typing does not spam route updates, but the request state still flips only when the
+    // debounced value is committed into route.query.
     searchDebounceTimer = window.setTimeout(() => {
       if (newQuery !== (readSingleQueryValue(route.query.search) || '')) {
         handleSearch()

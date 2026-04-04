@@ -25,15 +25,23 @@ const pushResolved = (target: string[], value: string | null | undefined) => {
   }
 }
 
+const pushResolvedFallback = (target: string[], ...values: Array<string | null | undefined>) => {
+  for (const value of values) {
+    const beforeLength = target.length
+    pushResolved(target, value)
+    if (target.length > beforeLength) {
+      return
+    }
+  }
+}
+
 export const getAmbientBackgroundUrlsFromGameListItem = (game?: ImageCandidateGame | null) => {
   if (!game) {
     return []
   }
 
   const urls: string[] = []
-  pushResolved(urls, game.banner_image)
-  pushResolved(urls, game.primary_screenshot)
-  pushResolved(urls, game.cover_image)
+  pushResolvedFallback(urls, game.primary_screenshot, game.banner_image, game.cover_image)
   return urls
 }
 
@@ -46,8 +54,9 @@ export const getAmbientBackgroundUrlsFromGameDetail = (game?: ImageCandidateGame
   for (const screenshot of game.screenshots || []) {
     pushResolved(urls, screenshot.path)
   }
-  pushResolved(urls, game.banner_image)
-  pushResolved(urls, game.cover_image)
+  if (urls.length === 0) {
+    pushResolvedFallback(urls, game.banner_image, game.cover_image)
+  }
   return urls
 }
 

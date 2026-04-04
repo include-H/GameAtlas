@@ -57,8 +57,12 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
     if (game.files.length > 0) {
       filePaths = game.files
         .filter(hasResolvedFilePath)
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map((item) => ({ id: item.id, path: item.file_path || '', label: item.label || '' }))
+        .map((item) => ({
+          id: item.id,
+          path: item.file_path || '',
+          label: item.label || '',
+          notes: item.notes || null,
+        }))
     }
 
     options.form.value = {

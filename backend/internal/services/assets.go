@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"mime/multipart"
-	"strings"
 	"time"
 
 	"github.com/hao/game/internal/config"
@@ -77,74 +76,6 @@ func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart
 		result.AssetID = &asset.ID
 	}
 	return result, nil
-}
-
-func (s *AssetsService) Delete(input domain.DeleteAssetInput) error {
-	if _, err := s.gamesRepo.GetByID(input.GameID); err != nil {
-		return normalizeRepoError(err)
-	}
-
-	assetType := strings.TrimSpace(input.AssetType)
-	assetPath := strings.TrimSpace(input.Path)
-	if assetType == "" || assetPath == "" {
-		return ErrValidation
-	}
-
-	switch assetType {
-	case "cover":
-		if err := s.assetsRepo.UpdateGameImage(input.GameID, "cover_image", nil); err != nil {
-			return normalizeRepoError(err)
-		}
-	case "banner":
-		if err := s.assetsRepo.UpdateGameImage(input.GameID, "banner_image", nil); err != nil {
-			return normalizeRepoError(err)
-		}
-	case "screenshot":
-		if strings.TrimSpace(input.AssetUID) != "" {
-			asset, err := s.assetsRepo.DeleteScreenshotByUID(input.GameID, strings.TrimSpace(input.AssetUID))
-			if err != nil {
-				return normalizeRepoError(err)
-			}
-			assetPath = asset.Path
-		} else if input.AssetID != nil && *input.AssetID > 0 {
-			asset, err := s.assetsRepo.DeleteScreenshotByID(input.GameID, *input.AssetID)
-			if err != nil {
-				return normalizeRepoError(err)
-			}
-			assetPath = asset.Path
-		} else {
-			deleted, err := s.assetsRepo.DeleteScreenshot(input.GameID, assetPath)
-			if err != nil {
-				return err
-			}
-			if !deleted {
-				return ErrNotFound
-			}
-		}
-	case "video":
-		if strings.TrimSpace(input.AssetUID) != "" {
-			asset, err := s.assetsRepo.DeleteAssetByUID(input.GameID, strings.TrimSpace(input.AssetUID), "video")
-			if err != nil {
-				return normalizeRepoError(err)
-			}
-			assetPath = asset.Path
-		} else {
-			deleted, err := s.assetsRepo.DeleteAssetByPath(input.GameID, "video", assetPath)
-			if err != nil {
-				return err
-			}
-			if !deleted {
-				return ErrNotFound
-			}
-		}
-	default:
-		return ErrValidation
-	}
-
-	if _, err := cleanupAssetPath(s.store, s.assetCleanupTasksRepo, assetPath, "assets.delete"); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (s *AssetsService) ApplyRemoteAsset(gameID int64, assetType string, remoteURL string, sortOrder int) (string, error) {
@@ -259,26 +190,6 @@ func allocateAssetIdentity(assetType string) (string, string) {
 	default:
 		return "", newAssetToken(assetType)
 	}
-}
-
-func (s *AssetsService) ReorderScreenshots(input domain.ScreenshotOrderUpdateInput) error {
-	if _, err := s.gamesRepo.GetByID(input.GameID); err != nil {
-		return normalizeRepoError(err)
-	}
-	if len(input.AssetUIDs) == 0 {
-		return ErrValidation
-	}
-	return normalizeRepoError(s.assetsRepo.UpdateScreenshotSortOrders(input.GameID, input.AssetUIDs))
-}
-
-func (s *AssetsService) ReorderVideos(input domain.VideoOrderUpdateInput) error {
-	if _, err := s.gamesRepo.GetByID(input.GameID); err != nil {
-		return normalizeRepoError(err)
-	}
-	if len(input.AssetUIDs) == 0 {
-		return ErrValidation
-	}
-	return normalizeRepoError(s.assetsRepo.UpdateVideoSortOrders(input.GameID, input.AssetUIDs))
 }
 
 func normalizeAssetError(err error) error {

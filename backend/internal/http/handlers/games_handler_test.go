@@ -462,6 +462,96 @@ func TestGamesHandlerListReturnsInternalServerErrorWhenPendingOverridesLookupFai
 	}
 }
 
+func TestGamesHandlerListRejectsInvalidPageQuery(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/games?page=abc", nil)
+
+	handler.List(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: page"`) {
+		t.Fatalf("body = %s, want invalid page query error", recorder.Body.String())
+	}
+}
+
+func TestGamesHandlerListRejectsInvalidPendingQueryBoolean(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/games?pending=maybe", nil)
+
+	handler.List(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: pending"`) {
+		t.Fatalf("body = %s, want invalid pending query error", recorder.Body.String())
+	}
+}
+
+func TestGamesHandlerListRejectsRandomSortWithoutSeed(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	insertGamesHandlerTestGame(t, db, "random-seed-required", "Random Seed Required", "public", "")
+
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/games?sort=random&order=desc", nil)
+
+	handler.List(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: seed"`) {
+		t.Fatalf("body = %s, want invalid seed query error", recorder.Body.String())
+	}
+}
+
+func TestGamesHandlerListRejectsInvalidTagQueryValue(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/games?tag=1&tag=oops", nil)
+
+	handler.List(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: tag"`) {
+		t.Fatalf("body = %s, want invalid tag query error", recorder.Body.String())
+	}
+}
+
 func TestGamesHandlerCreateReturnsBadRequestWhenTitleMissing(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 
@@ -497,6 +587,30 @@ func TestGamesHandlerCreateRejectsInvalidJSON(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodPost, "/api/games", strings.NewReader("{"))
+	context.Request.Header.Set("Content-Type", "application/json")
+	context.Set("is_admin", true)
+
+	handler.Create(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"error":"invalid game payload"`) {
+		t.Fatalf("body = %s, want invalid game payload", recorder.Body.String())
+	}
+}
+
+func TestGamesHandlerCreateRejectsUnknownFields(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodPost, "/api/games", strings.NewReader(`{"title":"Unknown Field","assets":{}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Set("is_admin", true)
 
@@ -592,13 +706,13 @@ func TestGamesHandlerUpdateAggregateIncludesAssetDeleteWarnings(t *testing.T) {
 	}
 }
 
-func TestGamesHandlerUpdateAggregatePreservesOmittedRelations(t *testing.T) {
+func TestGamesHandlerUpdateAggregateReplacesRelations(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 
 	db := openGamesHandlerTestDB(t)
 	defer func() { _ = db.Close() }()
 
-	gameID := insertGamesHandlerTestGame(t, db, "aggregate-preserve-relations", "Aggregate Preserve Relations", "public", "")
+	gameID := insertGamesHandlerTestGame(t, db, "aggregate-replace-relations", "Aggregate Replace Relations", "public", "")
 	developerResult, err := db.Exec(`INSERT INTO developers (name, slug) VALUES (?, ?)`, "Nintendo", "nintendo")
 	if err != nil {
 		t.Fatalf("insert developer: %v", err)
@@ -610,14 +724,15 @@ func TestGamesHandlerUpdateAggregatePreservesOmittedRelations(t *testing.T) {
 	if _, err := db.Exec(`INSERT INTO game_developers (game_id, developer_id, sort_order) VALUES (?, ?, 0)`, gameID, developerID); err != nil {
 		t.Fatalf("link game developer: %v", err)
 	}
+	_ = developerID
 
 	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-preserve-relations/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Preserve Relations Updated"},"assets":{}}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-replace-relations/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Replace Relations Updated","series_id":null,"platform_ids":[],"developer_ids":[],"publisher_ids":[],"tag_ids":[]},"assets":{}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
-	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-preserve-relations"}}
+	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-replace-relations"}}
 	context.Set("is_admin", true)
 
 	handler.UpdateAggregate(context)
@@ -630,34 +745,8 @@ func TestGamesHandlerUpdateAggregatePreservesOmittedRelations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListMetadata(developers) returned error: %v", err)
 	}
-	if len(developers) != 1 || developers[0].ID != developerID {
-		t.Fatalf("developers = %#v, want existing developer preserved", developers)
-	}
-}
-
-func TestGamesHandlerUpdateAggregateRejectsNullRelationPatch(t *testing.T) {
-	t.Setenv("GIN_MODE", gin.TestMode)
-
-	db := openGamesHandlerTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	insertGamesHandlerTestGame(t, db, "aggregate-null-relations", "Aggregate Null Relations", "public", "")
-	handler := newSplitGamesHandlerForTest(config.Config{}, db)
-
-	recorder := httptest.NewRecorder()
-	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-null-relations/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Null Relations","developer_ids":null},"assets":{}}`))
-	context.Request.Header.Set("Content-Type", "application/json")
-	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-null-relations"}}
-	context.Set("is_admin", true)
-
-	handler.UpdateAggregate(context)
-
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
-	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid game payload"`) {
-		t.Fatalf("body = %s, want invalid game payload", recorder.Body.String())
+	if len(developers) != 0 {
+		t.Fatalf("developers = %#v, want cleared developers", developers)
 	}
 }
 
@@ -814,6 +903,32 @@ func TestGamesHandlerUpdateAggregateRejectsInvalidJSONAfterResolvingGame(t *test
 	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-invalid-json/aggregate", strings.NewReader("{"))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-invalid-json"}}
+	context.Set("is_admin", true)
+
+	handler.UpdateAggregate(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"error":"invalid game payload"`) {
+		t.Fatalf("body = %s, want invalid game payload", recorder.Body.String())
+	}
+}
+
+func TestGamesHandlerUpdateAggregateRejectsLegacyUnknownFields(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	insertGamesHandlerTestGame(t, db, "aggregate-unknown-field", "Aggregate Unknown Field", "public", "")
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-unknown-field/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Unknown Field"},"assets":{"files":[{"file_path":"/tmp/demo.rom","sort_order":99}]}}`))
+	context.Request.Header.Set("Content-Type", "application/json")
+	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-unknown-field"}}
 	context.Set("is_admin", true)
 
 	handler.UpdateAggregate(context)

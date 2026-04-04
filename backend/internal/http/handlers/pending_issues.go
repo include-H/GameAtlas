@@ -19,6 +19,6 @@ func NewPendingIssuesHandler(service *services.PendingIssuesService) *PendingIss
 func (h *PendingIssuesHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    h.service.Catalog(),
+		"data":    toPendingIssueCatalogResponse(h.service.Catalog()),
 	})
 }

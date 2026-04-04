@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,7 +12,7 @@ import (
 	"github.com/hao/game/internal/services"
 )
 
-func TestSteamHandlerApplyUsesQueryGameIDFallback(t *testing.T) {
+func TestSteamHandlerApplyRejectsQueryOnlyGameID(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 
 	handler := NewSteamHandler(services.NewSteamService(config.Config{}, nil))
@@ -27,25 +26,11 @@ func TestSteamHandlerApplyUsesQueryGameIDFallback(t *testing.T) {
 
 	handler.Apply(context)
 
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-
-	var response struct {
-		Success bool `json:"success"`
-		Data    struct {
-			AppID          int64    `json:"app_id"`
-			ScreenshotURLs []string `json:"screenshot_urls"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if !response.Success || response.Data.AppID != 123 {
-		t.Fatalf("response = %s, want success with app_id 123", recorder.Body.String())
-	}
-	if len(response.Data.ScreenshotURLs) != 0 {
-		t.Fatalf("ScreenshotURLs = %#v, want empty slice", response.Data.ScreenshotURLs)
+	if !strings.Contains(recorder.Body.String(), `"error":"invalid steam asset payload"`) {
+		t.Fatalf("body = %s, want invalid steam asset payload", recorder.Body.String())
 	}
 }
 

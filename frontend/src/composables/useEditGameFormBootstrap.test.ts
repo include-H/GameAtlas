@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import type { EditGameForm } from '@/composables/edit-game-form'
 import type { GameDetail } from '@/services/types'
 import type { Tag, TagGroup } from '@/services/types'
 import { useEditGameFormBootstrap } from './useEditGameFormBootstrap'
@@ -43,16 +44,16 @@ vi.mock('@/services/publishers.service', () => ({
 
 describe('useEditGameFormBootstrap', () => {
   it('hydrates preview videos without storing a separate primary uid', () => {
-    const form = ref({
+    const form = ref<EditGameForm>({
       title: '',
       title_alt: '',
       visibility: 'public' as const,
-      developer_ids: [] as Array<string | number>,
-      publisher_ids: [] as Array<string | number>,
+      developer_ids: [] as number[],
+      publisher_ids: [] as number[],
       release_date: undefined as string | undefined,
       engine: '',
-      platform_ids: [] as Array<string | number>,
-      series_id: null as string | number | null,
+      platform_ids: [] as number[],
+      series_id: null as number | null,
       tag_ids: [] as Array<string | number>,
       summary: '',
       cover_image: '',
@@ -123,6 +124,103 @@ describe('useEditGameFormBootstrap', () => {
     } as GameDetail)
 
     expect(form.value.preview_videos.map((item) => item.asset_uid)).toEqual(['video-first', 'video-primary'])
+  })
+
+  it('keeps backend file order when hydrating edit form', () => {
+    const form = ref<EditGameForm>({
+      title: '',
+      title_alt: '',
+      visibility: 'public' as const,
+      developer_ids: [] as number[],
+      publisher_ids: [] as number[],
+      release_date: undefined as string | undefined,
+      engine: '',
+      platform_ids: [] as number[],
+      series_id: null as number | null,
+      tag_ids: [] as Array<string | number>,
+      summary: '',
+      cover_image: '',
+      banner_image: '',
+      preview_videos: [] as Array<{ asset_uid?: string; path: string }>,
+      screenshots: [] as Array<{ client_key: string; path: string }>,
+      file_paths: [{ path: '', label: '' }],
+    })
+
+    const { hydrateFormFromGame } = useEditGameFormBootstrap({
+      form,
+      seriesOptions: ref([]),
+      platformOptions: ref([]),
+      tagGroups: ref([]),
+      tagOptions: ref([]),
+      developerOptions: ref([]),
+      publisherOptions: ref([]),
+      addAlert: vi.fn(),
+      resetTagSelectionState: vi.fn(),
+      createEditableScreenshot: (asset, index) => ({
+        path: typeof asset === 'string' ? asset : asset.path,
+        client_key: `screenshot-${index}`,
+      }),
+      createEditableVideo: (asset) => ({
+        asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
+        path: typeof asset === 'string' ? asset : asset.path,
+      }),
+    })
+
+    hydrateFormFromGame({
+      id: 1,
+      public_id: 'game-1',
+      title: 'Game One',
+      title_alt: null,
+      visibility: 'public',
+      summary: null,
+      release_date: null,
+      engine: null,
+      cover_image: null,
+      banner_image: null,
+      wiki_content: null,
+      downloads: 0,
+      preview_videos: [],
+      screenshots: [],
+      series: null,
+      platforms: [],
+      developers: [],
+      publishers: [],
+      tags: [],
+      tag_groups: [],
+      files: [
+        {
+          id: 22,
+          game_id: 1,
+          file_name: 'Second.vhdx',
+          file_path: '/roms/second.vhdx',
+          label: 'Second',
+          notes: null,
+          size_bytes: null,
+          sort_order: 9,
+          source_created_at: null,
+          created_at: '2026-03-25T00:00:00Z',
+          updated_at: '2026-03-25T00:00:00Z',
+        },
+        {
+          id: 21,
+          game_id: 1,
+          file_name: 'First.vhdx',
+          file_path: '/roms/first.vhdx',
+          label: 'First',
+          notes: null,
+          size_bytes: null,
+          sort_order: 1,
+          source_created_at: null,
+          created_at: '2026-03-25T00:00:00Z',
+          updated_at: '2026-03-25T00:00:00Z',
+        },
+      ],
+      created_at: '2026-03-25T00:00:00Z',
+      updated_at: '2026-03-25T00:00:00Z',
+      isFavorite: false,
+    } as GameDetail)
+
+    expect(form.value.file_paths.map((item) => item.id)).toEqual([22, 21])
   })
 
   it('shows alerts when edit metadata initialization fails', async () => {

@@ -226,9 +226,6 @@ bash check.sh
 ### 游戏文件
 
 - `GET /api/games/:id/files`
-- `POST /api/games/:id/files`
-- `PUT /api/games/:id/files/:fileId`
-- `DELETE /api/games/:id/files/:fileId`
 - `POST /api/games/:id/files/:fileId/downloads`
 - `GET /api/games/:id/files/:fileId/download`
 - `GET /api/games/:id/files/:fileId/launch-script`

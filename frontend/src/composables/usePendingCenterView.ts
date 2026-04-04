@@ -23,15 +23,15 @@ interface UsePendingCenterViewOptions {
 }
 
 const getPendingCenterVisualImage = (game: GameListItem) => {
-  return game.banner_image || game.primary_screenshot || game.cover_image || PLACEHOLDER_IMAGE
+  return game.primary_screenshot || game.banner_image || game.cover_image || PLACEHOLDER_IMAGE
 }
 
 const getPendingCenterAmbientPriorityImage = (game: GameListItem) => {
-  return game.banner_image || game.primary_screenshot || ''
+  return game.primary_screenshot || game.banner_image || game.cover_image || ''
 }
 
 const getPendingCenterDisplayImage = (game: GameListItem) => {
-  return game.cover_image || game.banner_image || game.primary_screenshot || PLACEHOLDER_IMAGE
+  return game.primary_screenshot || game.banner_image || game.cover_image || PLACEHOLDER_IMAGE
 }
 
 const formatPendingCenterDate = (value?: string | null) => {
@@ -56,18 +56,18 @@ export const usePendingCenterView = ({
   const {
     activeGame,
     changePage,
-    currentBatchCount,
+    pageGameCount,
     currentPage,
-    filteredGames,
+    pendingGames,
     getIssueEvaluation,
     getIgnoredIssueDetails,
     getVisibleIssueGroups,
     getVisibleIssueDetails,
-    ignoredOverridesCount,
+    pendingIssueIgnoredTotal,
     ignoreIssue,
     isSevereGame,
     isLoading,
-    issueCounts,
+    pendingIssueCounts,
     loadWorkbenchGames,
     onlyRecent,
     onlySevere,
@@ -84,7 +84,10 @@ export const usePendingCenterView = ({
   })
 
   const issueDefinitionFallbacks = computed<PendingIssueDefinition[]>(() => {
-    return Object.keys(issueCounts.value).map((key) => ({
+    // 2026-04-04: keep this fallback because pending_issue_counts already carries backend-native issue keys,
+    // so catalog fetch failures should degrade labels only instead of blanking the workbench.
+    // Impact: only issue copy falls back to raw keys; filtering, counts, and queue semantics stay backend-defined.
+    return Object.keys(pendingIssueCounts.value).map((key) => ({
       key,
       label: key,
       description: '待处理问题',
@@ -120,7 +123,7 @@ export const usePendingCenterView = ({
 
   const syncAmbientBackground = () => {
     const primaryImageUrl = activeGame.value ? getPendingCenterAmbientPriorityImage(activeGame.value) : ''
-    const fallbackUrls = getAmbientBackgroundUrlsFromGames(filteredGames.value)
+    const fallbackUrls = getAmbientBackgroundUrlsFromGames(pendingGames.value)
     const imageUrls = primaryImageUrl
       ? [primaryImageUrl]
       : fallbackUrls.filter((url, index, list) => Boolean(url) && list.indexOf(url) === index)
@@ -132,7 +135,7 @@ export const usePendingCenterView = ({
 
     uiStore.setAmbientBackgroundSource({
       owner: AMBIENT_BACKGROUND_OWNER,
-      key: activeGame.value?.public_id || filteredGames.value.map((game) => game.public_id || game.id).join(','),
+      key: activeGame.value?.public_id || pendingGames.value.map((game) => game.public_id || game.id).join(','),
       urls: imageUrls,
     })
   }
@@ -179,7 +182,7 @@ export const usePendingCenterView = ({
   }
 
   watch(
-    [activeGame, filteredGames],
+    [activeGame, pendingGames],
     () => {
       syncAmbientBackground()
       void updateDetailHero()
@@ -262,12 +265,12 @@ export const usePendingCenterView = ({
     activeGame,
     activeGameDetails,
     changePage,
-    currentBatchCount,
+    pageGameCount,
     currentPage,
     detailHeroFit,
     detailHeroSrc,
     editingGame,
-    filteredGames,
+    pendingGames,
     formatDate: formatPendingCenterDate,
     getDisplayImage: getPendingCenterDisplayImage,
     getIgnoredIssueDetails,
@@ -277,10 +280,10 @@ export const usePendingCenterView = ({
     getVisibleIssueGroups,
     handleEditSuccess,
     ignoreIssue,
-    ignoredOverridesCount,
+    pendingIssueIgnoredTotal,
     isLoading,
     isSevereGame,
-    issueCounts,
+    pendingIssueCounts,
     onlyRecent,
     onlySevere,
     openEdit,

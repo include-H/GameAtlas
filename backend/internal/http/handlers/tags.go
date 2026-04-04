@@ -27,7 +27,7 @@ func (h *TagsHandler) ListGroups(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    items,
+		"data":    toTagGroupResponses(items),
 	})
 }
 
@@ -54,7 +54,7 @@ func (h *TagsHandler) CreateGroup(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
-		"data":    item,
+		"data":    toTagGroupResponse(*item),
 	})
 }
 
@@ -78,7 +78,7 @@ func (h *TagsHandler) ListTags(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    items,
+		"data":    toTagResponses(items),
 	})
 }
 
@@ -105,6 +105,6 @@ func (h *TagsHandler) CreateTag(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
-		"data":    item,
+		"data":    toTagResponse(*item),
 	})
 }

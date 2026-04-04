@@ -56,7 +56,6 @@
               multiple
               allow-clear
               allow-search
-              allow-create
               :loading="isSearchingDevelopers"
               :remote-search="true"
               :on-search="handleDeveloperSearch"
@@ -80,7 +79,6 @@
               multiple
               allow-clear
               allow-search
-              allow-create
               :loading="isSearchingPublishers"
               :remote-search="true"
               :on-search="handlePublisherSearch"
@@ -134,7 +132,6 @@
               multiple
               allow-clear
               allow-search
-              allow-create
             >
               <a-option
                 v-for="p in platformOptions"
@@ -154,7 +151,6 @@
               placeholder="选择系列"
               allow-clear
               allow-search
-              allow-create
               :loading="isSearchingSeries"
               :remote-search="true"
               :on-search="handleSeriesSearch"

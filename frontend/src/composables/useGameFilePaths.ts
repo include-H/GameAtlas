@@ -6,6 +6,7 @@ export interface FilePathItem {
   id?: number
   path: string
   label: string
+  notes?: string | null
 }
 
 interface FilePathItemUpdatePayload {

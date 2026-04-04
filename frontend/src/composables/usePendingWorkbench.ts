@@ -28,7 +28,7 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   }
 
   const isLoading = ref(false)
-  const queueGames = ref<GameListItem[]>([])
+  const pendingGames = ref<GameListItem[]>([])
   const activeGame = ref<GameListItem | null>(null)
 
   const currentPage = ref(1)
@@ -41,11 +41,10 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   const onlySevere = ref(false)
   const onlyRecent = ref(false)
   const showIgnored = ref(false)
-  const backendIgnoredOverridesCount = ref(0)
-  const backendIssueCounts = ref<Record<string, number>>({})
+  const pendingIssueIgnoredTotal = ref(0)
+  const pendingIssueCounts = ref<Record<string, number>>({})
 
-  const ignoredOverridesCount = computed(() => backendIgnoredOverridesCount.value)
-  const currentBatchCount = computed(() => queueGames.value.length)
+  const pageGameCount = computed(() => pendingGames.value.length)
 
   const getIssueEvaluation = (game: GameListItem): PendingIssueEvaluation => {
     return game.pending_issues || emptyEvaluation
@@ -63,11 +62,8 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     getIssueEvaluation(game).details.filter((detail) => detail.ignored)
   )
 
-  const issueCounts = computed(() => backendIssueCounts.value)
-  const filteredGames = computed(() => queueGames.value)
-
   watch(
-    filteredGames,
+    pendingGames,
     (games) => {
       if (games.length === 0) {
         activeGame.value = null
@@ -119,9 +115,9 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
         },
         sort: resolvePendingWorkbenchSort(query.sortBy),
       })
-      queueGames.value = response.data
-      backendIgnoredOverridesCount.value = response.pagination.pending_issue_counts?.ignored_total || 0
-      backendIssueCounts.value = response.pagination.pending_issue_counts?.groups || {}
+      pendingGames.value = response.data
+      pendingIssueIgnoredTotal.value = response.pagination.pending_issue_counts?.ignored_total || 0
+      pendingIssueCounts.value = response.pagination.pending_issue_counts?.groups || {}
       currentPage.value = response.pagination.page
       totalPages.value = response.pagination.totalPages
       totalPendingCount.value = response.pagination.total
@@ -171,7 +167,7 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
 
   const changePage = async (page: number) => {
     const safePage = Math.max(1, page)
-    if (safePage === currentPage.value && queueGames.value.length > 0) {
+    if (safePage === currentPage.value && pendingGames.value.length > 0) {
       return
     }
     await loadWorkbenchGames(safePage)
@@ -180,11 +176,11 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   return {
     isLoading,
     activeGame,
-    currentBatchCount,
+    pageGameCount,
     currentPage,
-    filteredGames,
-    ignoredOverridesCount,
-    issueCounts,
+    pendingGames,
+    pendingIssueCounts,
+    pendingIssueIgnoredTotal,
     onlyRecent,
     onlySevere,
     searchQuery,

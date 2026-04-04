@@ -70,19 +70,19 @@ describe('usePendingWorkbench', () => {
         order: 'desc',
       },
     })
-    expect(workbench.filteredGames.value).toEqual([
+    expect(workbench.pendingGames.value).toEqual([
       { public_id: 'game-1', title: 'A' },
       { public_id: 'game-2', title: 'B' },
     ])
-    expect(workbench.issueCounts.value).toEqual({
+    expect(workbench.pendingIssueCounts.value).toEqual({
       'missing-assets': 6,
       'missing-wiki': 4,
     })
-    expect(workbench.ignoredOverridesCount.value).toBe(9)
+    expect(workbench.pendingIssueIgnoredTotal.value).toBe(9)
     expect(workbench.totalPendingCount.value).toBe(11)
     expect(workbench.totalPages.value).toBe(2)
     expect(workbench.currentPage.value).toBe(1)
-    expect(workbench.currentBatchCount.value).toBe(2)
+    expect(workbench.pageGameCount.value).toBe(2)
     expect(workbench.activeGame.value?.public_id).toBe('game-1')
     expect(addAlert).not.toHaveBeenCalled()
   })

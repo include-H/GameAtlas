@@ -39,7 +39,7 @@
             icon="mdi-heart"
             color="#f53f3f"
             :height="104"
-            @click="router.push('/games?filter=favorites')"
+            @click="router.push('/games?favorite=true')"
           />
 
           <stat-card

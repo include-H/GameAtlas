@@ -38,7 +38,7 @@ func (h *ReviewIssueOverrideHandler) List(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    items,
+		"data":    toReviewIssueOverrideResponses(items),
 	})
 }
 
@@ -73,7 +73,7 @@ func (h *ReviewIssueOverrideHandler) Ignore(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    item,
+		"data":    toReviewIssueOverrideResponse(*item),
 	})
 }
 

@@ -23,38 +23,38 @@ const (
 )
 
 type PendingIssueDefinition struct {
-	Key         PendingIssueKey `json:"key"`
-	Label       string          `json:"label"`
-	Description string          `json:"description"`
+	Key         PendingIssueKey
+	Label       string
+	Description string
 }
 
 type PendingIssueDetailDefinition struct {
-	Key   PendingIssueDetailKey `json:"key"`
-	Label string                `json:"label"`
-	Group PendingIssueKey       `json:"group"`
+	Key   PendingIssueDetailKey
+	Label string
+	Group PendingIssueKey
 }
 
 type PendingIssueDetailState struct {
-	Key     PendingIssueDetailKey `json:"key"`
-	Group   PendingIssueKey       `json:"group"`
-	Ignored bool                  `json:"ignored"`
-	Reason  *string               `json:"reason,omitempty"`
+	Key     PendingIssueDetailKey
+	Group   PendingIssueKey
+	Ignored bool
+	Reason  *string
 }
 
 type PendingIssueEvaluation struct {
-	Groups  []PendingIssueKey         `json:"groups"`
-	Details []PendingIssueDetailState `json:"details"`
-	Severe  bool                      `json:"severe"`
+	Groups  []PendingIssueKey
+	Details []PendingIssueDetailState
+	Severe  bool
 }
 
 type PendingIssueCatalog struct {
-	Groups  []PendingIssueDefinition       `json:"groups"`
-	Details []PendingIssueDetailDefinition `json:"details"`
+	Groups  []PendingIssueDefinition
+	Details []PendingIssueDetailDefinition
 }
 
 type PendingIssueCountSummary struct {
-	Groups       map[PendingIssueKey]int `json:"groups"`
-	IgnoredTotal int                     `json:"ignored_total"`
+	Groups       map[PendingIssueKey]int
+	IgnoredTotal int
 }
 
 type PendingIssueSeverityPolicy struct {

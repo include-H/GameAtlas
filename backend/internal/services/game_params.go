@@ -2,7 +2,6 @@ package services
 
 import (
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -24,9 +23,6 @@ func normalizeListParams(params *domain.GamesListParams) error {
 	}
 	if params.Order == "" {
 		params.Order = "desc"
-	}
-	if params.Sort == "random" && params.SortSeed == 0 {
-		params.SortSeed = rand.New(rand.NewSource(time.Now().UnixNano())).Int63n(2147483646) + 1
 	}
 	if !params.IncludeAll && strings.TrimSpace(params.Visibility) == "" {
 		params.Visibility = domain.GameVisibilityPublic

@@ -3,6 +3,9 @@ package repositories
 import (
 	"database/sql"
 	"fmt"
+	"strings"
+
+	"github.com/hao/game/internal/domain"
 )
 
 type FavoriteGamesRepository struct {
@@ -53,12 +56,26 @@ func (r *FavoriteGamesRepository) IsFavorite(gameID int64) (bool, error) {
 	return count > 0, nil
 }
 
-func (r *FavoriteGamesRepository) Count() (int, error) {
+func (r *FavoriteGamesRepository) Count(includeAll bool, visibility string) (int, error) {
 	var count int
-	if err := r.db.Get(&count, `
+	query := `
 		SELECT COUNT(*)
-		FROM favorite_games
-	`); err != nil {
+		FROM favorite_games fg
+		INNER JOIN games g ON g.id = fg.game_id
+	`
+	args := []any{}
+	if !includeAll {
+		resolvedVisibility := strings.TrimSpace(visibility)
+		if resolvedVisibility == "" {
+			resolvedVisibility = domain.GameVisibilityPublic
+		}
+		query += `
+		WHERE g.visibility = ?
+	`
+		args = append(args, resolvedVisibility)
+	}
+
+	if err := r.db.Get(&count, query, args...); err != nil {
 		return 0, fmt.Errorf("count favorite games: %w", err)
 	}
 	return count, nil

@@ -331,10 +331,6 @@ export const useEditGameModal = ({
     game: currentGame,
     form,
     isSubmitting,
-    seriesOptions,
-    developerOptions,
-    publisherOptions,
-    platformOptions,
     validateForm: async () => {
       try {
         await formRef.value?.validate?.()

@@ -22,7 +22,7 @@
       <a-card class="stat-card stat-card--total" :bordered="false">
         <div class="stat-card__label">待处理总数</div>
         <div class="stat-card__value">{{ totalPendingCount }}</div>
-        <div class="stat-card__hint">当前第 {{ currentPage }} 页，本页 {{ currentBatchCount }} 条</div>
+        <div class="stat-card__hint">当前第 {{ currentPage }} 页，本页 {{ pageGameCount }} 条</div>
       </a-card>
       <a-card
         v-for="definition in pendingIssueDefinitions"
@@ -33,7 +33,7 @@
         @click="toggleIssueFilter(definition.key)"
       >
         <div class="stat-card__label">{{ definition.label }}</div>
-        <div class="stat-card__value">{{ issueCounts[definition.key] || 0 }}</div>
+        <div class="stat-card__value">{{ pendingIssueCounts[definition.key] || 0 }}</div>
         <div class="stat-card__hint">{{ definition.description }}</div>
       </a-card>
     </div>
@@ -93,7 +93,7 @@
 
     <div class="pending-center__result-meta">
       <span>
-        当前页返回 {{ filteredGames.length }} 条，待处理总量 {{ totalPendingCount }} 条，已忽略 {{ ignoredOverridesCount }} 个问题
+        当前页返回 {{ pendingGames.length }} 条，待处理总量 {{ totalPendingCount }} 条，已忽略 {{ pendingIssueIgnoredTotal }} 个问题
       </span>
       <div class="pending-center__result-actions">
         <a-button class="app-text-action-btn" type="text" size="small" @click="resetFilters">重置筛选</a-button>
@@ -105,7 +105,7 @@
       <p>正在整理待处理队列...</p>
     </div>
 
-    <a-empty v-else-if="filteredGames.length === 0" class="pending-center__empty">
+    <a-empty v-else-if="pendingGames.length === 0" class="pending-center__empty">
       <template #description>
         <div>
           <h3>没有符合条件的待处理项</h3>
@@ -117,7 +117,7 @@
     <div v-else class="pending-center__content">
       <div class="pending-center__list">
         <div
-          v-for="game in filteredGames"
+          v-for="game in pendingGames"
           :key="game.id"
           class="pending-game"
           :class="{ 'pending-game--active': activeGame?.id === game.id }"
@@ -333,12 +333,12 @@ const {
   activeGame,
   activeGameDetails,
   changePage,
-  currentBatchCount,
+  pageGameCount,
   currentPage,
   detailHeroFit,
   detailHeroSrc,
   editingGame,
-  filteredGames,
+  pendingGames,
   formatDate,
   getDisplayImage,
   getIgnoredIssueDetails,
@@ -347,11 +347,11 @@ const {
   getVisibleIssueGroups,
   getVisibleIssueDetails,
   handleEditSuccess,
-  ignoredOverridesCount,
+  pendingIssueIgnoredTotal,
   ignoreIssue,
   isSevereGame,
   isLoading,
-  issueCounts,
+  pendingIssueCounts,
   onlyRecent,
   onlySevere,
   openEdit,

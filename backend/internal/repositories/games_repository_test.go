@@ -8,7 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func TestGamesRepositoryUpdateAggregatePreservesOmittedRelationsAndSeries(t *testing.T) {
+func TestGamesRepositoryUpdateAggregateReplacesRelationsAndSeries(t *testing.T) {
 	db := openRepositoryTagsTestDB(t)
 	defer func() { _ = db.Close() }()
 
@@ -34,8 +34,13 @@ func TestGamesRepositoryUpdateAggregatePreservesOmittedRelationsAndSeries(t *tes
 	linkRepositoryGameTag(t, db, gameID, tagID, 0)
 
 	if _, err := repo.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
-		Game: domain.GameAggregatePatchInput{
+		Game: domain.GameAggregateCoreUpdateInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Repo Aggregate Preserve Updated"},
+			SeriesID:      nil,
+			PlatformIDs:   []int64{},
+			DeveloperIDs:  []int64{},
+			PublisherIDs:  []int64{},
+			TagIDs:        []int64{},
 		},
 	}); err != nil {
 		t.Fatalf("UpdateAggregate returned error: %v", err)
@@ -45,40 +50,40 @@ func TestGamesRepositoryUpdateAggregatePreservesOmittedRelationsAndSeries(t *tes
 	if err != nil {
 		t.Fatalf("GetSeriesMetadata returned error: %v", err)
 	}
-	if series == nil || series.ID != seriesID {
-		t.Fatalf("series = %#v, want existing series preserved", series)
+	if series != nil {
+		t.Fatalf("series = %#v, want cleared series", series)
 	}
 
 	platforms, err := repo.ListMetadata("platforms", "game_platforms", "platform_id", gameID)
 	if err != nil {
 		t.Fatalf("ListMetadata(platforms) returned error: %v", err)
 	}
-	if len(platforms) != 1 || platforms[0].ID != platformID {
-		t.Fatalf("platforms = %#v, want existing platform preserved", platforms)
+	if len(platforms) != 0 {
+		t.Fatalf("platforms = %#v, want cleared platforms", platforms)
 	}
 
 	developers, err := repo.ListMetadata("developers", "game_developers", "developer_id", gameID)
 	if err != nil {
 		t.Fatalf("ListMetadata(developers) returned error: %v", err)
 	}
-	if len(developers) != 1 || developers[0].ID != developerID {
-		t.Fatalf("developers = %#v, want existing developer preserved", developers)
+	if len(developers) != 0 {
+		t.Fatalf("developers = %#v, want cleared developers", developers)
 	}
 
 	publishers, err := repo.ListMetadata("publishers", "game_publishers", "publisher_id", gameID)
 	if err != nil {
 		t.Fatalf("ListMetadata(publishers) returned error: %v", err)
 	}
-	if len(publishers) != 1 || publishers[0].ID != publisherID {
-		t.Fatalf("publishers = %#v, want existing publisher preserved", publishers)
+	if len(publishers) != 0 {
+		t.Fatalf("publishers = %#v, want cleared publishers", publishers)
 	}
 
 	tags, err := NewTagsRepository(db).ListByGameID(gameID)
 	if err != nil {
 		t.Fatalf("ListByGameID returned error: %v", err)
 	}
-	if len(tags) != 1 || tags[0].ID != tagID {
-		t.Fatalf("tags = %#v, want existing tag preserved", tags)
+	if len(tags) != 0 {
+		t.Fatalf("tags = %#v, want cleared tags", tags)
 	}
 }
 
@@ -98,10 +103,13 @@ func TestGamesRepositoryUpdateAggregateClearsPresentRelationsAndSeries(t *testin
 	linkRepositoryGameDeveloper(t, db, gameID, developerID, 0)
 
 	if _, err := repo.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
-		Game: domain.GameAggregatePatchInput{
+		Game: domain.GameAggregateCoreUpdateInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Repo Aggregate Clear Updated"},
-			SeriesID:      domain.OptionalInt64Patch{Present: true, Value: nil},
-			DeveloperIDs:  domain.Int64SlicePatch{Present: true, Values: []int64{}},
+			SeriesID:      nil,
+			PlatformIDs:   []int64{},
+			DeveloperIDs:  []int64{},
+			PublisherIDs:  []int64{},
+			TagIDs:        []int64{},
 		},
 	}); err != nil {
 		t.Fatalf("UpdateAggregate returned error: %v", err)
@@ -187,6 +195,9 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, secondGameID); err != nil {
 		t.Fatalf("insert favorite game: %v", err)
 	}
+	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, privateGameID); err != nil {
+		t.Fatalf("insert private favorite game: %v", err)
+	}
 
 	platformID := insertRepositoryPlatform(t, db, "Stats Platform", "stats-platform")
 	developerID := insertRepositoryDeveloper(t, db, "Stats Developer", "stats-developer")
@@ -198,7 +209,9 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	linkRepositoryGameDeveloper(t, db, privateGameID, developerID, 0)
 	linkRepositoryGamePublisher(t, db, privateGameID, publisherID, 0)
 
-	stats, err := repo.Stats(domain.GamesListParams{})
+	catalogRepo := NewGameCatalogRepository(repo)
+
+	stats, err := catalogRepo.Stats(domain.GamesListParams{})
 	if err != nil {
 		t.Fatalf("Stats returned error: %v", err)
 	}
@@ -213,7 +226,7 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 		t.Fatalf("PendingReviews = %d, want 1 native pending public game", stats.PendingReviews)
 	}
 	if stats.FavoriteCount != 1 {
-		t.Fatalf("FavoriteCount = %d, want 1", stats.FavoriteCount)
+		t.Fatalf("FavoriteCount = %d, want 1 visible public favorite", stats.FavoriteCount)
 	}
 
 	if len(stats.RecentGames) != 2 || stats.RecentGames[0].ID != secondGameID {
@@ -236,11 +249,39 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	}
 }
 
-func TestGamesRepositoryListFiltersFavoritesAndExposesFavoriteState(t *testing.T) {
+func TestGamesRepositoryStatsIncludesPrivateFavoritesForAdmin(t *testing.T) {
 	db := openRepositoryTagsTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
+	publicGameID := insertRepositoryGame(t, db, "stats-admin-public", "Stats Admin Public", "public")
+	privateGameID := insertRepositoryGame(t, db, "stats-admin-private", "Stats Admin Private", "private")
+
+	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, publicGameID); err != nil {
+		t.Fatalf("insert public favorite game: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, privateGameID); err != nil {
+		t.Fatalf("insert private favorite game: %v", err)
+	}
+
+	catalogRepo := NewGameCatalogRepository(repo)
+
+	stats, err := catalogRepo.Stats(domain.GamesListParams{IncludeAll: true})
+	if err != nil {
+		t.Fatalf("Stats returned error: %v", err)
+	}
+
+	if stats.FavoriteCount != 2 {
+		t.Fatalf("FavoriteCount = %d, want 2 favorites for admin scope", stats.FavoriteCount)
+	}
+}
+
+func TestGameCatalogRepositoryListFiltersFavoritesAndExposesFavoriteState(t *testing.T) {
+	db := openRepositoryTagsTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	repo := NewGamesRepository(db)
+	catalogRepo := NewGameCatalogRepository(repo)
 	favoriteID := insertRepositoryGame(t, db, "favorite-a", "Favorite A", "public")
 	otherID := insertRepositoryGame(t, db, "favorite-b", "Favorite B", "public")
 	privateFavoriteID := insertRepositoryGame(t, db, "favorite-private", "Favorite Private", "private")
@@ -252,7 +293,7 @@ func TestGamesRepositoryListFiltersFavoritesAndExposesFavoriteState(t *testing.T
 		t.Fatalf("insert private favorite: %v", err)
 	}
 
-	games, total, err := repo.List(domain.GamesListParams{
+	games, total, err := catalogRepo.List(domain.GamesListParams{
 		Page:         1,
 		Limit:        10,
 		FavoriteOnly: true,
@@ -273,7 +314,7 @@ func TestGamesRepositoryListFiltersFavoritesAndExposesFavoriteState(t *testing.T
 		t.Fatalf("games[0].IsFavorite = false, want true")
 	}
 
-	allGames, allTotal, err := repo.List(domain.GamesListParams{
+	allGames, allTotal, err := catalogRepo.List(domain.GamesListParams{
 		Page:         1,
 		Limit:        10,
 		IncludeAll:   true,
@@ -304,11 +345,12 @@ func TestGamesRepositoryListFiltersFavoritesAndExposesFavoriteState(t *testing.T
 	}
 }
 
-func TestGamesRepositoryListAppliesGroupedTagAndPlatformFilters(t *testing.T) {
+func TestGameCatalogRepositoryListAppliesGroupedTagAndPlatformFilters(t *testing.T) {
 	db := openRepositoryTagsTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
+	catalogRepo := NewGameCatalogRepository(repo)
 	platformID := insertRepositoryPlatform(t, db, "Windows", "windows")
 	otherPlatformID := insertRepositoryPlatform(t, db, "Linux", "linux")
 	genreGroupID := insertRepositoryTagGroup(t, db, "repo-genre", "Repo Genre", true, true)
@@ -335,7 +377,7 @@ func TestGamesRepositoryListAppliesGroupedTagAndPlatformFilters(t *testing.T) {
 	linkRepositoryGameTag(t, db, privateMatchingID, actionID, 0)
 	linkRepositoryGameTag(t, db, privateMatchingID, scifiID, 1)
 
-	games, total, err := repo.List(domain.GamesListParams{
+	games, total, err := catalogRepo.List(domain.GamesListParams{
 		Page:       1,
 		Limit:      10,
 		PlatformID: platformID,
@@ -355,11 +397,12 @@ func TestGamesRepositoryListAppliesGroupedTagAndPlatformFilters(t *testing.T) {
 	}
 }
 
-func TestGamesRepositoryListPendingOnlyFiltersResolvedAndIgnoredIssues(t *testing.T) {
+func TestGameCatalogRepositoryListPendingOnlyFiltersResolvedAndIgnoredIssues(t *testing.T) {
 	db := openRepositoryTagsTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
+	catalogRepo := NewGameCatalogRepository(repo)
 
 	visiblePendingID := insertRepositoryGame(t, db, "pending-visible", "Pending Visible", "public")
 	resolvedID := insertRepositoryGame(t, db, "pending-resolved", "Pending Resolved", "public")
@@ -403,7 +446,7 @@ func TestGamesRepositoryListPendingOnlyFiltersResolvedAndIgnoredIssues(t *testin
 		t.Fatalf("insert ignored pending override: %v", err)
 	}
 
-	games, total, err := repo.List(domain.GamesListParams{
+	games, total, err := catalogRepo.List(domain.GamesListParams{
 		Page:        1,
 		Limit:       10,
 		PendingOnly: true,
@@ -421,7 +464,7 @@ func TestGamesRepositoryListPendingOnlyFiltersResolvedAndIgnoredIssues(t *testin
 		t.Fatalf("games = %+v, want only visible pending public game", games)
 	}
 
-	includeAllGames, includeAllTotal, err := repo.List(domain.GamesListParams{
+	includeAllGames, includeAllTotal, err := catalogRepo.List(domain.GamesListParams{
 		Page:        1,
 		Limit:       10,
 		PendingOnly: true,
@@ -445,7 +488,7 @@ func TestGamesRepositoryListPendingOnlyFiltersResolvedAndIgnoredIssues(t *testin
 		t.Fatalf("includeAll games = %+v, want visible and private pending games", includeAllGames)
 	}
 
-	ignoredGames, ignoredTotal, err := repo.List(domain.GamesListParams{
+	ignoredGames, ignoredTotal, err := catalogRepo.List(domain.GamesListParams{
 		Page:                  1,
 		Limit:                 10,
 		PendingOnly:           true,
@@ -467,11 +510,12 @@ func TestGamesRepositoryListPendingOnlyFiltersResolvedAndIgnoredIssues(t *testin
 	}
 }
 
-func TestGamesRepositoryListPendingOnlySupportsNativeSortAndFilters(t *testing.T) {
+func TestGameCatalogRepositoryListPendingOnlySupportsNativeSortAndFilters(t *testing.T) {
 	db := openRepositoryTagsTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
+	catalogRepo := NewGameCatalogRepository(repo)
 
 	severeID := insertRepositoryGame(t, db, "pending-severe", "Pending Severe", "public")
 	recentID := insertRepositoryGame(t, db, "pending-recent", "Pending Recent", "public")
@@ -490,7 +534,7 @@ func TestGamesRepositoryListPendingOnlySupportsNativeSortAndFilters(t *testing.T
 		t.Fatalf("seed recent pending game: %v", err)
 	}
 
-	games, total, err := repo.List(domain.GamesListParams{
+	games, total, err := catalogRepo.List(domain.GamesListParams{
 		Page:              1,
 		Limit:             10,
 		PendingOnly:       true,
@@ -515,11 +559,12 @@ func TestGamesRepositoryListPendingOnlySupportsNativeSortAndFilters(t *testing.T
 	}
 }
 
-func TestGamesRepositoryCountPendingGroupsUsesQueueFiltersButIgnoresIssueSelector(t *testing.T) {
+func TestGameCatalogRepositoryCountPendingGroupsUsesQueueFiltersButIgnoresIssueSelector(t *testing.T) {
 	db := openRepositoryTagsTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
+	catalogRepo := NewGameCatalogRepository(repo)
 
 	_ = insertRepositoryGame(t, db, "pending-asset", "Pending Asset", "public")
 	wikiID := insertRepositoryGame(t, db, "pending-wiki", "Pending Wiki", "public")
@@ -540,7 +585,7 @@ func TestGamesRepositoryCountPendingGroupsUsesQueueFiltersButIgnoresIssueSelecto
 	linkRepositoryGameDeveloper(t, db, wikiID, developerID, 0)
 	linkRepositoryGamePublisher(t, db, wikiID, publisherID, 0)
 
-	counts, err := repo.CountPendingGroups(domain.GamesListParams{
+	counts, err := catalogRepo.CountPendingGroups(domain.GamesListParams{
 		Page:         1,
 		Limit:        10,
 		PendingOnly:  true,

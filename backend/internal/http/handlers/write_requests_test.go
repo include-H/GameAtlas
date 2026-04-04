@@ -74,48 +74,7 @@ func TestTagWriteRequestToInputPreservesTransportSemantics(t *testing.T) {
 	}
 }
 
-func TestDeleteAssetRequestToInputPreservesTransportSemantics(t *testing.T) {
-	raw := []byte(`{"game_id":3,"asset_id":5,"asset_uid":"asset-a","asset_type":"video","path":"/assets/demo.mp4"}`)
-
-	var request deleteAssetRequest
-	if err := json.Unmarshal(raw, &request); err != nil {
-		t.Fatalf("unmarshal request: %v", err)
-	}
-
-	input := request.toInput()
-	if input.GameID != 3 || input.AssetType != "video" || input.Path != "/assets/demo.mp4" {
-		t.Fatalf("input = %+v, want original transport values", input)
-	}
-	if input.AssetID == nil || *input.AssetID != 5 {
-		t.Fatalf("asset_id = %v, want 5", input.AssetID)
-	}
-	if input.AssetUID != "asset-a" {
-		t.Fatalf("asset_uid = %q, want asset-a", input.AssetUID)
-	}
-}
-
-func TestAssetOrderUpdateRequestToInputPreservesTransportSemantics(t *testing.T) {
-	raw := []byte(`{"game_id":11,"asset_uids":["shot-a","shot-b"]}`)
-
-	var request assetOrderUpdateRequest
-	if err := json.Unmarshal(raw, &request); err != nil {
-		t.Fatalf("unmarshal request: %v", err)
-	}
-
-	screenshotInput := request.toScreenshotInput()
-	videoInput := request.toVideoInput()
-	if screenshotInput.GameID != 11 || videoInput.GameID != 11 {
-		t.Fatalf("game_id = %d/%d, want 11", screenshotInput.GameID, videoInput.GameID)
-	}
-	if len(screenshotInput.AssetUIDs) != 2 || screenshotInput.AssetUIDs[0] != "shot-a" || screenshotInput.AssetUIDs[1] != "shot-b" {
-		t.Fatalf("screenshot asset_uids = %#v, want original order", screenshotInput.AssetUIDs)
-	}
-	if len(videoInput.AssetUIDs) != 2 || videoInput.AssetUIDs[0] != "shot-a" || videoInput.AssetUIDs[1] != "shot-b" {
-		t.Fatalf("video asset_uids = %#v, want original order", videoInput.AssetUIDs)
-	}
-}
-
-func TestSteamApplyAssetsRequestToInputUsesQueryFallback(t *testing.T) {
+func TestSteamApplyAssetsRequestToInputPreservesBodySemantics(t *testing.T) {
 	raw := []byte(`{"cover_url":"https://example.com/cover.jpg","screenshot_urls":["https://example.com/1.jpg"]}`)
 
 	var request steamApplyAssetsRequest
@@ -123,9 +82,9 @@ func TestSteamApplyAssetsRequestToInputUsesQueryFallback(t *testing.T) {
 		t.Fatalf("unmarshal request: %v", err)
 	}
 
-	input := request.toInput("7")
-	if input.GameID != 7 {
-		t.Fatalf("game_id = %d, want query fallback 7", input.GameID)
+	input := request.toInput()
+	if input.GameID != 0 {
+		t.Fatalf("game_id = %d, want missing body value 0", input.GameID)
 	}
 	if input.CoverURL == nil || *input.CoverURL != "https://example.com/cover.jpg" {
 		t.Fatalf("cover_url = %v, want original transport value", input.CoverURL)
@@ -135,7 +94,7 @@ func TestSteamApplyAssetsRequestToInputUsesQueryFallback(t *testing.T) {
 	}
 }
 
-func TestSteamApplyAssetsRequestToInputPrefersBodyGameID(t *testing.T) {
+func TestSteamApplyAssetsRequestToInputUsesBodyGameID(t *testing.T) {
 	raw := []byte(`{"game_id":9}`)
 
 	var request steamApplyAssetsRequest
@@ -143,9 +102,23 @@ func TestSteamApplyAssetsRequestToInputPrefersBodyGameID(t *testing.T) {
 		t.Fatalf("unmarshal request: %v", err)
 	}
 
-	input := request.toInput("7")
+	input := request.toInput()
 	if input.GameID != 9 {
 		t.Fatalf("game_id = %d, want body value 9", input.GameID)
+	}
+}
+
+func TestSteamApplyAssetsRequestToInputNormalizesMissingScreenshotURLs(t *testing.T) {
+	raw := []byte(`{"game_id":9}`)
+
+	var request steamApplyAssetsRequest
+	if err := json.Unmarshal(raw, &request); err != nil {
+		t.Fatalf("unmarshal request: %v", err)
+	}
+
+	input := request.toInput()
+	if input.ScreenshotURLs == nil {
+		t.Fatalf("screenshot_urls = nil, want empty slice")
 	}
 }
 

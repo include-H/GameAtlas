@@ -35,7 +35,7 @@ func (h *MetadataHandler) List(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    items,
+		"data":    toMetadataResponses(items),
 	})
 }
 
@@ -62,7 +62,7 @@ func (h *MetadataHandler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"series": detail.Series,
+			"series": toMetadataResponse(*detail.Series),
 			"games":  toSeriesGameSummaryResponses(detail.Games),
 		},
 	})
@@ -90,6 +90,6 @@ func (h *MetadataHandler) Create(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
-		"data":    item,
+		"data":    toMetadataResponse(*item),
 	})
 }

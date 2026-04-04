@@ -1,12 +1,6 @@
 package repositories
 
-import (
-	"database/sql"
-	"errors"
-	"testing"
-
-	"github.com/hao/game/internal/domain"
-)
+import "testing"
 
 func TestGameFilesRepositoryListByGameIDOrdersBySortOrderThenID(t *testing.T) {
 	db := openRepositoryTagsTestDB(t)
@@ -35,19 +29,5 @@ func TestGameFilesRepositoryListByGameIDOrdersBySortOrderThenID(t *testing.T) {
 	}
 	if files[0].ID != secondID || files[1].ID != thirdID || files[2].ID != firstID {
 		t.Fatalf("files order = %+v, want sort_order asc then id asc", files)
-	}
-}
-
-func TestGameFilesRepositoryUpdateReturnsNotFoundWhenFileMissing(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	gameID := insertRepositoryGame(t, db, "repo-files-missing", "Repo Files Missing", "public")
-	_, err := NewGameFilesRepository(db).Update(gameID, 9999, domain.GameFileWriteInput{
-		FilePath:  "/roms/missing.rom",
-		SortOrder: 1,
-	})
-	if !errors.Is(err, sql.ErrNoRows) {
-		t.Fatalf("Update error = %v, want sql.ErrNoRows", err)
 	}
 }

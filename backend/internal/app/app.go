@@ -39,7 +39,7 @@ func New(cfg config.Config) (*App, error) {
 	gamesRepo := repositories.NewGamesRepository(sqliteDB)
 	gameAggregateService := services.NewGameAggregateService(
 		cfg,
-		repositories.NewGameAggregateRepository(gamesRepo),
+		gamesRepo,
 		repositories.NewMetadataRepository(sqliteDB),
 		repositories.NewTagsRepository(sqliteDB),
 	)

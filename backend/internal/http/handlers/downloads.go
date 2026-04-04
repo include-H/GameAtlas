@@ -50,27 +50,13 @@ func (h *DownloadsHandler) Download(c *gin.Context) {
 
 	downloadFile, err := h.service.GetDownloadFile(gameID, fileID, isAdminRequest(c))
 	if err != nil {
-		switch {
-		case errors.Is(err, services.ErrNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "resource not found"})
-		case errors.Is(err, services.ErrForbiddenPath):
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "file path is outside PRIMARY_ROM_ROOT"})
-		case errors.Is(err, services.ErrMissingFile), errors.Is(err, services.ErrInvalidFile):
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "registered file is unavailable"})
-		case errors.Is(err, services.ErrValidation), errors.Is(err, services.ErrMissingConfig):
-			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "internal server error"})
-		}
+		writeDownloadLookupError(c, err)
 		return
 	}
 
 	file, err := os.Open(downloadFile.ResolvedPath)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "registered file is unavailable",
-		})
+		writeJSONError(c, http.StatusNotFound, "registered file is unavailable")
 		return
 	}
 	defer file.Close()
@@ -93,29 +79,16 @@ func (h *DownloadsHandler) RecordDownload(c *gin.Context) {
 
 	sourceKey := h.authService.SourceKey(c.ClientIP(), c.Request.UserAgent())
 	if !h.shouldRecordDownload(gameID, fileID, sourceKey, time.Now().UTC()) {
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"data":    gin.H{"recorded": false},
-		})
+		writeJSONSuccess(c, http.StatusOK, operationStatusResponse{Recorded: false})
 		return
 	}
 
 	if err := h.service.RecordDownload(gameID, fileID, isAdminRequest(c)); err != nil {
-		switch {
-		case errors.Is(err, services.ErrNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "resource not found"})
-		case errors.Is(err, services.ErrValidation), errors.Is(err, services.ErrMissingConfig):
-			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "internal server error"})
-		}
+		writeDownloadRecordError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    gin.H{"recorded": true},
-	})
+	writeJSONSuccess(c, http.StatusOK, operationStatusResponse{Recorded: true})
 }
 
 func (h *DownloadsHandler) shouldRecordDownload(gameID, fileID int64, sourceKey string, now time.Time) bool {
@@ -142,7 +115,7 @@ func (h *DownloadsHandler) shouldRecordDownload(gameID, fileID int64, sourceKey 
 
 func (h *DownloadsHandler) LaunchScript(c *gin.Context) {
 	if h.windowsLaunch == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "launch script service is unavailable"})
+		writeJSONError(c, http.StatusInternalServerError, "launch script service is unavailable")
 		return
 	}
 
@@ -161,26 +134,13 @@ func (h *DownloadsHandler) LaunchScript(c *gin.Context) {
 
 	script, filename, err := h.windowsLaunch.BuildLaunchScript(gameID, fileID, isAdminRequest(c))
 	if err != nil {
-		switch {
-		case errors.Is(err, services.ErrNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "resource not found"})
-		case errors.Is(err, services.ErrForbiddenPath):
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "file path is outside PRIMARY_ROM_ROOT"})
-		case errors.Is(err, services.ErrMissingFile), errors.Is(err, services.ErrInvalidFile):
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "registered file is unavailable"})
-		case errors.Is(err, services.ErrInvalidLaunchFile), errors.Is(err, services.ErrMissingSMBConfig):
-			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
-		case errors.Is(err, services.ErrValidation), errors.Is(err, services.ErrMissingConfig):
-			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "internal server error"})
-		}
+		writeLaunchScriptError(c, err)
 		return
 	}
 
 	encodedScript, encodeErr := simplifiedchinese.GBK.NewEncoder().Bytes([]byte(script))
 	if encodeErr != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to encode launch script"})
+		writeJSONError(c, http.StatusInternalServerError, "failed to encode launch script")
 		return
 	}
 
@@ -199,4 +159,47 @@ func buildAttachmentDisposition(filename string) string {
 		return "attachment"
 	}
 	return value
+}
+
+func writeDownloadLookupError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, services.ErrNotFound):
+		writeJSONError(c, http.StatusNotFound, "resource not found")
+	case errors.Is(err, services.ErrForbiddenPath):
+		writeJSONError(c, http.StatusForbidden, "file path is outside PRIMARY_ROM_ROOT")
+	case errors.Is(err, services.ErrMissingFile), errors.Is(err, services.ErrInvalidFile):
+		writeJSONError(c, http.StatusNotFound, "registered file is unavailable")
+	case errors.Is(err, services.ErrValidation), errors.Is(err, services.ErrMissingConfig):
+		writeJSONError(c, http.StatusBadRequest, err.Error())
+	default:
+		writeJSONError(c, http.StatusInternalServerError, "internal server error")
+	}
+}
+
+func writeDownloadRecordError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, services.ErrNotFound):
+		writeJSONError(c, http.StatusNotFound, "resource not found")
+	case errors.Is(err, services.ErrValidation), errors.Is(err, services.ErrMissingConfig):
+		writeJSONError(c, http.StatusBadRequest, err.Error())
+	default:
+		writeJSONError(c, http.StatusInternalServerError, "internal server error")
+	}
+}
+
+func writeLaunchScriptError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, services.ErrNotFound):
+		writeJSONError(c, http.StatusNotFound, "resource not found")
+	case errors.Is(err, services.ErrForbiddenPath):
+		writeJSONError(c, http.StatusForbidden, "file path is outside PRIMARY_ROM_ROOT")
+	case errors.Is(err, services.ErrMissingFile), errors.Is(err, services.ErrInvalidFile):
+		writeJSONError(c, http.StatusNotFound, "registered file is unavailable")
+	case errors.Is(err, services.ErrInvalidLaunchFile), errors.Is(err, services.ErrMissingSMBConfig):
+		writeJSONError(c, http.StatusBadRequest, err.Error())
+	case errors.Is(err, services.ErrValidation), errors.Is(err, services.ErrMissingConfig):
+		writeJSONError(c, http.StatusBadRequest, err.Error())
+	default:
+		writeJSONError(c, http.StatusInternalServerError, "internal server error")
+	}
 }

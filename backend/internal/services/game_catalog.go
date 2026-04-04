@@ -33,8 +33,8 @@ func (s *GameCatalogService) List(params domain.GamesListParams) (*GamesListResu
 
 	var pendingIssueCounts *domain.PendingIssueCountSummary
 	if params.PendingOnly {
-		// The list query already narrows the row set; this extra aggregation keeps the UI badges
-		// aligned with the same filters instead of showing global pending counts.
+		// 2026-04-04: keep pending group aggregation aligned with the current queue filters
+		// across the pending workbench badges; do not narrow it by the selected issue key.
 		counts, err := s.catalogRepo.CountPendingGroups(params)
 		if err != nil {
 			return nil, err
