@@ -41,7 +41,6 @@ GameAtlas 当前主线后端，提供游戏库 API、文件与素材管理、Wik
   - 自动裁剪历史条目
 - 元数据
   - `series`
-  - `platforms`
   - `developers`
   - `publishers`
 - 标签系统
@@ -241,8 +240,6 @@ bash check.sh
 - `GET /api/series`
 - `GET /api/series/:id`
 - `POST /api/series`
-- `GET /api/platforms`
-- `POST /api/platforms`
 - `GET /api/developers`
 - `POST /api/developers`
 - `GET /api/publishers`

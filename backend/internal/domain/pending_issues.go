@@ -18,7 +18,6 @@ const (
 	PendingIssueDetailMissingFilesList   PendingIssueDetailKey = "missing-files-list"
 	PendingIssueDetailMissingDeveloper   PendingIssueDetailKey = "missing-developer"
 	PendingIssueDetailMissingPublisher   PendingIssueDetailKey = "missing-publisher"
-	PendingIssueDetailMissingPlatform    PendingIssueDetailKey = "missing-platform"
 	PendingIssueDetailMissingSummary     PendingIssueDetailKey = "missing-summary"
 )
 
@@ -67,7 +66,7 @@ var pendingIssueDefinitions = []PendingIssueDefinition{
 	{Key: PendingIssueMissingAssets, Label: "缺少图片", Description: "封面、横幅或截图未补齐"},
 	{Key: PendingIssueMissingWiki, Label: "缺少 Wiki", Description: "还没有游戏介绍内容"},
 	{Key: PendingIssueMissingFiles, Label: "缺少文件", Description: "还没有可下载文件条目"},
-	{Key: PendingIssueMissingMetadata, Label: "基础信息不完整", Description: "开发商、发行商、平台或简介缺失"},
+	{Key: PendingIssueMissingMetadata, Label: "基础信息不完整", Description: "开发商、发行商或简介缺失"},
 }
 
 var pendingIssueDetailDefinitions = []PendingIssueDetailDefinition{
@@ -78,7 +77,6 @@ var pendingIssueDetailDefinitions = []PendingIssueDetailDefinition{
 	{Key: PendingIssueDetailMissingFilesList, Label: "缺下载文件", Group: PendingIssueMissingFiles},
 	{Key: PendingIssueDetailMissingDeveloper, Label: "缺开发商", Group: PendingIssueMissingMetadata},
 	{Key: PendingIssueDetailMissingPublisher, Label: "缺发行商", Group: PendingIssueMissingMetadata},
-	{Key: PendingIssueDetailMissingPlatform, Label: "缺平台", Group: PendingIssueMissingMetadata},
 	{Key: PendingIssueDetailMissingSummary, Label: "缺简介", Group: PendingIssueMissingMetadata},
 }
 
@@ -215,7 +213,6 @@ type pendingIssueGameFields struct {
 	FileCount         int64
 	DeveloperCount    int64
 	PublisherCount    int64
-	PlatformCount     int64
 }
 
 func EvaluatePendingIssues(game Game, ignoredReasons map[PendingIssueDetailKey]*string) PendingIssueEvaluation {
@@ -229,7 +226,6 @@ func EvaluatePendingIssues(game Game, ignoredReasons map[PendingIssueDetailKey]*
 		FileCount:         game.FileCount,
 		DeveloperCount:    game.DeveloperCount,
 		PublisherCount:    game.PublisherCount,
-		PlatformCount:     game.PlatformCount,
 	}, ignoredReasons)
 }
 
@@ -244,7 +240,6 @@ func EvaluatePendingIssuesForListItem(game GameListItem, ignoredReasons map[Pend
 		FileCount:         game.FileCount,
 		DeveloperCount:    game.DeveloperCount,
 		PublisherCount:    game.PublisherCount,
-		PlatformCount:     game.PlatformCount,
 	}, ignoredReasons)
 }
 
@@ -293,9 +288,6 @@ func evaluatePendingIssues(game pendingIssueGameFields, ignoredReasons map[Pendi
 	}
 	if game.PublisherCount <= 0 {
 		appendDetail(PendingIssueDetailMissingPublisher)
-	}
-	if game.PlatformCount <= 0 {
-		appendDetail(PendingIssueDetailMissingPlatform)
 	}
 	if game.Summary == nil || *game.Summary == "" {
 		appendDetail(PendingIssueDetailMissingSummary)

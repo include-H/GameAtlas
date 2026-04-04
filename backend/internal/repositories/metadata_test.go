@@ -79,23 +79,23 @@ func TestMetadataRepositoryDeleteUnusedRemovesOrphansOnly(t *testing.T) {
 	}
 
 	if _, err := db.Exec(`
-		INSERT INTO platforms (name, slug, sort_order)
-		VALUES ('Keep Platform', 'keep-platform', 0), ('Drop Platform', 'drop-platform', 1)
+		INSERT INTO developers (name, slug, sort_order)
+		VALUES ('Keep Developer', 'keep-developer', 0), ('Drop Developer', 'drop-developer', 1)
 	`); err != nil {
-		t.Fatalf("insert platforms: %v", err)
+		t.Fatalf("insert developers: %v", err)
 	}
-	var keepPlatformID int64
-	if err := db.Get(&keepPlatformID, `SELECT id FROM platforms WHERE slug = 'keep-platform'`); err != nil {
-		t.Fatalf("load keep platform id: %v", err)
+	var keepDeveloperID int64
+	if err := db.Get(&keepDeveloperID, `SELECT id FROM developers WHERE slug = 'keep-developer'`); err != nil {
+		t.Fatalf("load keep developer id: %v", err)
 	}
-	linkRepositoryGamePlatform(t, db, gameID, keepPlatformID, 0)
+	linkRepositoryGameDeveloper(t, db, gameID, keepDeveloperID, 0)
 
 	repo := NewMetadataRepository(db)
 	if err := repo.DeleteUnusedSeries(); err != nil {
 		t.Fatalf("DeleteUnusedSeries returned error: %v", err)
 	}
-	if err := repo.DeleteUnused("platforms", "game_platforms", "platform_id"); err != nil {
-		t.Fatalf("DeleteUnused platforms returned error: %v", err)
+	if err := repo.DeleteUnused("developers", "game_developers", "developer_id"); err != nil {
+		t.Fatalf("DeleteUnused developers returned error: %v", err)
 	}
 
 	var seriesCount int
@@ -106,11 +106,11 @@ func TestMetadataRepositoryDeleteUnusedRemovesOrphansOnly(t *testing.T) {
 		t.Fatalf("series count = %d, want 1 after removing orphan", seriesCount)
 	}
 
-	var platformCount int
-	if err := db.Get(&platformCount, `SELECT COUNT(*) FROM platforms`); err != nil {
-		t.Fatalf("count platforms: %v", err)
+	var developerCount int
+	if err := db.Get(&developerCount, `SELECT COUNT(*) FROM developers`); err != nil {
+		t.Fatalf("count developers: %v", err)
 	}
-	if platformCount != 1 {
-		t.Fatalf("platform count = %d, want 1 after removing orphan", platformCount)
+	if developerCount != 1 {
+		t.Fatalf("developer count = %d, want 1 after removing orphan", developerCount)
 	}
 }

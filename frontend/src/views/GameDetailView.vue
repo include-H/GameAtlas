@@ -99,26 +99,6 @@
                 <span class="sidebar-info__label">发行日期</span>
                 <span class="sidebar-info__value">{{ formatDate(game.release_date) }}</span>
               </div>
-              <div v-if="game.engine" class="sidebar-info__item">
-                <span class="sidebar-info__label">游戏引擎</span>
-                <span class="sidebar-info__value">{{ game.engine }}</span>
-              </div>
-              <div
-                v-if="game.platforms && game.platforms.length > 0"
-                :class="[
-                  'sidebar-info__item',
-                  { 'sidebar-info__item--wide': shouldSpanMetadataRow(game.platforms) }
-                ]"
-              >
-                <span class="sidebar-info__label">平台</span>
-                <div class="sidebar-info__value">
-                  <a-space wrap>
-                    <a-tag v-for="platform in game.platforms" :key="platform.id">
-                      {{ platform.name }}
-                    </a-tag>
-                  </a-space>
-                </div>
-              </div>
               <div
                 v-for="group in game.tag_groups || []"
                 :key="group.id"

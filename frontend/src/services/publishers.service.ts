@@ -15,10 +15,6 @@ export const publishersService = {
     return response.data
   },
 
-  async searchPublishers(query: string, limit?: number): Promise<Publisher[]> {
-    return this.listPublishers({ query, limit })
-  },
-
   async createPublisher(data: {
     name: string
     slug?: string

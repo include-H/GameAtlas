@@ -50,7 +50,6 @@ func TestEvaluatePendingIssuesUsesDomainSeverityRules(t *testing.T) {
 		FileCount:         0,
 		DeveloperCount:    1,
 		PublisherCount:    1,
-		PlatformCount:     1,
 		WikiContent:       &ready,
 	}
 

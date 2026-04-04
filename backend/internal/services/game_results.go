@@ -38,7 +38,6 @@ type GameDetail struct {
 	PreviewVideos []domain.GameAsset
 	Screenshots   []domain.GameAsset
 	Series        *domain.MetadataItem
-	Platforms     []domain.MetadataItem
 	Developers    []domain.MetadataItem
 	Publishers    []domain.MetadataItem
 	Tags          []domain.Tag

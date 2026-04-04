@@ -46,16 +46,6 @@
           </div>
         </a-col>
 
-        <!-- Platform Filter -->
-        <a-col :xs="12" :sm="8" :md="4" :lg="4" :xl="4" :xxl="4" class="games-filters-col games-filters-col--platform">
-          <a-select
-            v-model="selectedPlatform"
-            :options="platformOptions"
-            placeholder="平台"
-            allow-clear
-          />
-        </a-col>
-
         <!-- Sort -->
         <a-col :xs="24" :sm="8" :md="6" :lg="6" :xl="6" :xxl="6" class="games-filters-col games-filters-col--sort">
           <a-select
@@ -145,13 +135,6 @@
               @close="updateRoute({ search: undefined })"
             >
               搜索: {{ route.query.search }}
-            </a-tag>
-            <a-tag
-              v-if="route.query.platform"
-              closable
-              @close="updateRoute({ platform: undefined })"
-            >
-              平台: {{ platformLabelMap[String(route.query.platform)] || route.query.platform }}
             </a-tag>
             <a-tag
               v-if="filterFavorites"
@@ -313,11 +296,8 @@ const {
   itemsPerPageOptions,
   pageTitle,
   pagination,
-  platformLabelMap,
-  platformOptions,
   removeTagFilter,
   searchQuery,
-  selectedPlatform,
   selectedTagIds,
   showAddModal,
   showTagFilters,

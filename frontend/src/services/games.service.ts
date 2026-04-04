@@ -5,7 +5,6 @@ import type {
   AdminGameDetail,
   AdminGameDetailDto,
   ApiPageEnvelope,
-  Developer,
   GameDetail,
   GameDetailDto,
   GameAggregateUpdateRequest,
@@ -17,20 +16,9 @@ import type {
   GameSort,
   GameStats,
   GameVersion,
-  Platform,
-  Publisher,
-  Series,
   TimelineGame,
   TimelineGameResponse,
 } from './types'
-
-interface MetadataApiItem {
-  id: number
-  name: string
-  slug: string
-  sort_order: number
-  created_at: string
-}
 
 interface GameStatsApiResponse {
   total_games: number
@@ -87,7 +75,6 @@ function buildGamesQueryParams(params?: {
   if (params?.query?.limit) queryParams.append('limit', String(params.query.limit))
   if (params?.query?.search) queryParams.append('search', params.query.search)
   if (params?.query?.series) queryParams.append('series', String(params.query.series))
-  if (params?.query?.platform) queryParams.append('platform', String(params.query.platform))
   if (params?.query?.favorite === true) queryParams.append('favorite', 'true')
   if (typeof params?.query?.pending === 'boolean') queryParams.append('pending', String(params.query.pending))
   if (params?.query?.pending_issue) queryParams.append('pending_issue', params.query.pending_issue)
@@ -139,7 +126,6 @@ function normalizeGameDetail(item: GameDetailDto): GameDetail {
     screenshots: item.screenshots,
     files: item.files,
     series: item.series,
-    platforms: item.platforms,
     developers: item.developers,
     publishers: item.publishers,
     tags: item.tags,
@@ -198,11 +184,6 @@ export function mapGameVersions(game: Pick<GameDetail, 'public_id' | 'files'>): 
     launchScriptUrl: buildApiUrl(`/games/${gameId}/files/${file.id}/launch-script`),
     changelog: file.notes || undefined,
   }))
-}
-
-async function listMetadata<T extends Series | Platform | Developer | Publisher>(resource: string): Promise<T[]> {
-  const response = await get<ApiEnvelope<MetadataApiItem[]>>(`/${resource}`)
-  return response.data.map((item) => item as T)
 }
 
 const gamesService = {
@@ -333,22 +314,6 @@ const gamesService = {
       favorite_count: response.data.favorite_count,
       pending_reviews: response.data.pending_reviews,
     }
-  },
-
-  async getAllSeries(): Promise<Series[]> {
-    return listMetadata<Series>('series')
-  },
-
-  async getAllPlatforms(): Promise<Platform[]> {
-    return listMetadata<Platform>('platforms')
-  },
-
-  async getAllDevelopers(): Promise<Developer[]> {
-    return listMetadata<Developer>('developers')
-  },
-
-  async getAllPublishers(): Promise<Publisher[]> {
-    return listMetadata<Publisher>('publishers')
   },
 }
 

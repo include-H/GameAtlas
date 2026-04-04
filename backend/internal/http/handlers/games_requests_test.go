@@ -29,9 +29,6 @@ func TestGameAggregateUpdateRequestToInputNormalizesOmittedReplacementSlices(t *
 	if input.Game.SeriesID != nil {
 		t.Fatalf("series_id = %v, want nil for explicit clear", input.Game.SeriesID)
 	}
-	if input.Game.PlatformIDs == nil || len(input.Game.PlatformIDs) != 0 {
-		t.Fatalf("platform_ids = %#v, want empty slice for full replacement decode", input.Game.PlatformIDs)
-	}
 	if got := len(input.Game.DeveloperIDs); got != 0 {
 		t.Fatalf("developer_ids len = %d, want 0 for explicit clear", got)
 	}

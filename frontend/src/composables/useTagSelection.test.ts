@@ -20,8 +20,6 @@ const buildForm = (tagIds: Array<string | number>): EditGameForm => ({
   developer_ids: [],
   publisher_ids: [],
   release_date: undefined,
-  engine: '',
-  platform_ids: [],
   series_id: null,
   tag_ids: tagIds,
   summary: '',

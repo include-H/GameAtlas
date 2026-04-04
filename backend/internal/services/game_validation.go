@@ -15,7 +15,6 @@ func normalizeGameCoreInput(input domain.GameCoreInput) domain.GameCoreInput {
 	input.Visibility = strings.TrimSpace(input.Visibility)
 	input.Summary = trimStringPtr(input.Summary)
 	input.ReleaseDate = trimStringPtr(input.ReleaseDate)
-	input.Engine = trimStringPtr(input.Engine)
 	input.CoverImage = trimStringPtr(input.CoverImage)
 	input.BannerImage = trimStringPtr(input.BannerImage)
 	return input
@@ -54,7 +53,6 @@ func validateAndTrimGameAggregateCoreUpdateInput(input domain.GameAggregateCoreU
 	if err := validateGameCoreInput(input.GameCoreInput); err != nil {
 		return domain.GameAggregateCoreUpdateInput{}, err
 	}
-	input.PlatformIDs = uniqueIDs(input.PlatformIDs)
 	input.DeveloperIDs = uniqueIDs(input.DeveloperIDs)
 	input.PublisherIDs = uniqueIDs(input.PublisherIDs)
 	input.TagIDs = uniqueIDs(input.TagIDs)

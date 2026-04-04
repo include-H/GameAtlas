@@ -68,7 +68,6 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	// game. The lightweight MetadataResource mapping keeps the transport layer
 	// small while the actual lifecycle rule remains in aggregate-side cleanup.
 	seriesHandler := handlers.NewMetadataHandler(metadataService, services.MetadataResource{Table: "series", ResourceName: "series"})
-	platformsHandler := handlers.NewMetadataHandler(metadataService, services.MetadataResource{Table: "platforms", ResourceName: "platforms"})
 	developersHandler := handlers.NewMetadataHandler(metadataService, services.MetadataResource{Table: "developers", ResourceName: "developers"})
 	publishersHandler := handlers.NewMetadataHandler(metadataService, services.MetadataResource{Table: "publishers", ResourceName: "publishers"})
 	reviewIssueOverrideHandler := handlers.NewReviewIssueOverrideHandler(reviewIssueOverrideService)
@@ -110,8 +109,6 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.GET("/series", seriesHandler.List)
 	api.GET("/series/:id", seriesHandler.Get)
 	api.POST("/series", seriesHandler.Create)
-	api.GET("/platforms", platformsHandler.List)
-	api.POST("/platforms", platformsHandler.Create)
 	api.GET("/developers", developersHandler.List)
 	api.POST("/developers", developersHandler.Create)
 	api.GET("/publishers", publishersHandler.List)

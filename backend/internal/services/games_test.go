@@ -58,9 +58,6 @@ func TestGamesServiceGetDetailUsesFirstSortedVideoAndGroupsTags(t *testing.T) {
 	if !detail.TagGroups[0].IsFilterable {
 		t.Fatalf("TagGroups[0].IsFilterable = %v, want true", detail.TagGroups[0].IsFilterable)
 	}
-	if detail.Platforms == nil || len(detail.Platforms) != 0 {
-		t.Fatalf("Platforms = %#v, want empty non-nil slice", detail.Platforms)
-	}
 }
 
 func TestGamesServiceGetDetailPreservesTagGroupCapabilities(t *testing.T) {
@@ -325,7 +322,6 @@ func TestValidateAndTrimGameAggregateCoreUpdateInputNormalizesSharedCoreFields(t
 	tagsRepo := repositories.NewTagsRepository(db)
 	titleAlt := " Alt Patch "
 	summary := "   "
-	engine := " RE Engine "
 
 	trimmed, err := validateAndTrimGameAggregateCoreUpdateInput(domain.GameAggregateCoreUpdateInput{
 		GameCoreInput: domain.GameCoreInput{
@@ -333,9 +329,7 @@ func TestValidateAndTrimGameAggregateCoreUpdateInputNormalizesSharedCoreFields(t
 			TitleAlt:   &titleAlt,
 			Visibility: " public ",
 			Summary:    &summary,
-			Engine:     &engine,
 		},
-		PlatformIDs:  []int64{8, 8, 5},
 		DeveloperIDs: []int64{6, 6},
 		PublisherIDs: []int64{9, 4, 9},
 		TagIDs:       nil,
@@ -355,12 +349,6 @@ func TestValidateAndTrimGameAggregateCoreUpdateInputNormalizesSharedCoreFields(t
 	}
 	if trimmed.Summary != nil {
 		t.Fatalf("Summary = %v, want nil after blank trim", trimmed.Summary)
-	}
-	if trimmed.Engine == nil || *trimmed.Engine != "RE Engine" {
-		t.Fatalf("Engine = %v, want trimmed engine", trimmed.Engine)
-	}
-	if len(trimmed.PlatformIDs) != 2 || trimmed.PlatformIDs[0] != 8 || trimmed.PlatformIDs[1] != 5 {
-		t.Fatalf("PlatformIDs = %#v, want deduped [8 5]", trimmed.PlatformIDs)
 	}
 	if len(trimmed.DeveloperIDs) != 1 || trimmed.DeveloperIDs[0] != 6 {
 		t.Fatalf("DeveloperIDs = %#v, want deduped [6]", trimmed.DeveloperIDs)
@@ -680,18 +668,6 @@ func TestGamesServiceUpdateAggregateReplacesRelationsAndSeries(t *testing.T) {
 		t.Fatalf("update game series: %v", err)
 	}
 
-	platformResult, err := db.Exec(`INSERT INTO platforms (name, slug) VALUES (?, ?)`, "Windows", "windows")
-	if err != nil {
-		t.Fatalf("insert platform: %v", err)
-	}
-	platformID, err := platformResult.LastInsertId()
-	if err != nil {
-		t.Fatalf("platform LastInsertId returned error: %v", err)
-	}
-	if _, err := db.Exec(`INSERT INTO game_platforms (game_id, platform_id, sort_order) VALUES (?, ?, 0)`, gameID, platformID); err != nil {
-		t.Fatalf("link game platform: %v", err)
-	}
-
 	developerResult, err := db.Exec(`INSERT INTO developers (name, slug) VALUES (?, ?)`, "Valve", "valve")
 	if err != nil {
 		t.Fatalf("insert developer: %v", err)
@@ -720,7 +696,6 @@ func TestGamesServiceUpdateAggregateReplacesRelationsAndSeries(t *testing.T) {
 	tagID := insertServicesTag(t, db, tagGroupID, "RPG", "rpg")
 	linkServicesGameTag(t, db, gameID, tagID, 0)
 	_ = seriesID
-	_ = platformID
 	_ = developerID
 	_ = publisherID
 	_ = tagID
@@ -731,7 +706,6 @@ func TestGamesServiceUpdateAggregateReplacesRelationsAndSeries(t *testing.T) {
 		Game: domain.GameAggregateCoreUpdateInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Preserve Relations Updated", Visibility: domain.GameVisibilityPublic},
 			SeriesID:      nil,
-			PlatformIDs:   []int64{},
 			DeveloperIDs:  []int64{},
 			PublisherIDs:  []int64{},
 			TagIDs:        []int64{},
@@ -750,14 +724,6 @@ func TestGamesServiceUpdateAggregateReplacesRelationsAndSeries(t *testing.T) {
 	}
 	if series != nil {
 		t.Fatalf("series = %#v, want cleared series", series)
-	}
-
-	platforms, err := repo.ListMetadata("platforms", "game_platforms", "platform_id", gameID)
-	if err != nil {
-		t.Fatalf("ListMetadata(platforms) returned error: %v", err)
-	}
-	if len(platforms) != 0 {
-		t.Fatalf("platforms = %#v, want cleared platforms", platforms)
 	}
 
 	developers, err := repo.ListMetadata("developers", "game_developers", "developer_id", gameID)
@@ -821,7 +787,6 @@ func TestGamesServiceUpdateAggregateClearsRelationsAndSeries(t *testing.T) {
 		Game: domain.GameAggregateCoreUpdateInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Clear Relations Updated", Visibility: domain.GameVisibilityPublic},
 			SeriesID:      nil,
-			PlatformIDs:   []int64{},
 			DeveloperIDs:  []int64{},
 			PublisherIDs:  []int64{},
 			TagIDs:        []int64{},

@@ -9,7 +9,6 @@ import type {
 import { Modal } from '@arco-design/web-vue'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import gamesService from '@/services/games.service'
-import platformService from '@/services/platforms.service'
 import tagsService from '@/services/tags.service'
 import type { GameListItem, GameListQuery, GameSort, Tag, TagGroup } from '@/services/types'
 import { useGamesStore } from '@/stores/games'
@@ -136,7 +135,6 @@ export const buildGamesRouteQuery = (
 
   if (
     newParams.search !== undefined
-    || newParams.platform !== undefined
     || newParams.tag !== undefined
     || newParams.favorite !== undefined
   ) {
@@ -162,7 +160,6 @@ export const buildGamesListRequest = ({
       page,
       limit: itemsPerPage,
       search: readSingleQueryValue(routeQuery.search),
-      platform: parsePositiveRouteNumber(routeQuery.platform),
       tag: parseRouteTagIds(routeQuery.tag),
       favorite,
     },
@@ -184,7 +181,6 @@ export const buildGamesListRequest = ({
 export const hasGamesActiveFilters = (routeQuery: LocationQuery): boolean => {
   return Boolean(
     readSingleQueryValue(routeQuery.search)
-    || readSingleQueryValue(routeQuery.platform)
     || parseRouteTagIds(routeQuery.tag).length > 0
     || parseRouteBoolean(routeQuery.favorite) === true,
   )
@@ -300,7 +296,6 @@ export const useGamesView = ({
   const viewMode = ref<GamesViewMode>('grid')
   const showAddModal = ref(false)
   const showTagFilters = ref(false)
-  const platformOptions = ref<Array<{ label: string; value: string }>>([])
   const tagGroups = ref<TagGroup[]>([])
   const tags = ref<Tag[]>([])
 
@@ -334,13 +329,6 @@ export const useGamesView = ({
       if (page !== parsePositiveQueryNumber(readSingleQueryValue(route.query.page), 1)) {
         updateRoute({ page: String(page) })
       }
-    },
-  })
-
-  const selectedPlatform = computed({
-    get: () => readSingleQueryValue(route.query.platform) || null,
-    set: (platform: string | null) => {
-      updateRoute({ platform })
     },
   })
 
@@ -390,10 +378,6 @@ export const useGamesView = ({
   const pageTitle = computed(() => {
     if (filterFavorites.value) return '收藏的游戏'
     return '所有游戏'
-  })
-
-  const platformLabelMap = computed<Record<string, string>>(() => {
-    return Object.fromEntries(platformOptions.value.map((item) => [item.value, item.label]))
   })
 
   const tagLabelMap = computed<Record<string, string>>(() => {
@@ -593,16 +577,6 @@ export const useGamesView = ({
 
   const loadFilterOptions = async () => {
     try {
-      const platforms = await platformService.listPlatforms()
-      platformOptions.value = platforms
-        .map((item) => ({ label: item.name, value: String(item.id) }))
-        .sort((a, b) => a.label.localeCompare(b.label, 'zh-Hans-CN'))
-    } catch (error) {
-      console.error('Failed to load platforms:', error)
-      uiStore.addAlert('加载平台筛选失败', 'error')
-    }
-
-    try {
       const [loadedGroups, loadedTags] = await Promise.all([
         tagsService.getTagGroups(),
         tagsService.getTags({ active: true }),
@@ -685,11 +659,8 @@ export const useGamesView = ({
     loadGames,
     pageTitle,
     pagination,
-    platformLabelMap,
-    platformOptions,
     removeTagFilter,
     searchQuery,
-    selectedPlatform,
     selectedTagIds,
     showAddModal,
     showTagFilters,

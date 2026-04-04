@@ -218,7 +218,6 @@ func mustLoadServicesGame(t *testing.T, db *sqlx.DB, gameID int64) domain.Game {
 			visibility,
 			summary,
 			release_date,
-			engine,
 			cover_image,
 			banner_image,
 			wiki_content,
@@ -228,7 +227,6 @@ func mustLoadServicesGame(t *testing.T, db *sqlx.DB, gameID int64) domain.Game {
 			0 AS file_count,
 			0 AS developer_count,
 			0 AS publisher_count,
-			0 AS platform_count,
 			0 AS is_favorite,
 			created_at,
 			updated_at

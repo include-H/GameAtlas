@@ -3,14 +3,12 @@ export interface WikiMetadataExtraction {
   releaseDate: string
   englishTitleAlt: string
   chineseTitleAlt: string
-  engine: string
   developers: string[]
   publishers: string[]
-  platforms: string[]
 }
 
 const INLINE_FIELD_RULES: Array<{
-  key: 'summary' | 'releaseDate' | 'englishTitleAlt' | 'chineseTitleAlt' | 'engine' | 'developers' | 'publishers' | 'platforms'
+  key: 'summary' | 'releaseDate' | 'englishTitleAlt' | 'chineseTitleAlt' | 'developers' | 'publishers'
   pattern: RegExp
   multiValue?: boolean
 }> = [
@@ -18,10 +16,8 @@ const INLINE_FIELD_RULES: Array<{
   { key: 'releaseDate', pattern: /^(?:[-*+]\s*)?(?:\*\*)?\s*(?:首发日期|发售日期|发行日期|上市日期|发售时间|发行时间)\s*(?:\*\*)?\s*[:：]\s*(.+)$/i },
   { key: 'englishTitleAlt', pattern: /^(?:[-*+]\s*)?(?:\*\*)?\s*(?:英文常见译名|英文名|英文译名|外文名|原名)\s*(?:\*\*)?\s*[:：]\s*(.+)$/i, multiValue: true },
   { key: 'chineseTitleAlt', pattern: /^(?:[-*+]\s*)?(?:\*\*)?\s*(?:中文常见译名|常见译名|别名)\s*(?:\*\*)?\s*[:：]\s*(.+)$/i, multiValue: true },
-  { key: 'engine', pattern: /^(?:[-*+]\s*)?(?:\*\*)?\s*(?:游戏引擎|开发引擎|引擎)\s*(?:\*\*)?\s*[:：]\s*(.+)$/i },
   { key: 'developers', pattern: /^(?:[-*+]\s*)?(?:\*\*)?\s*(?:开发商|开发者|研发商|开发公司|制作公司|开发团队)\s*(?:\*\*)?\s*[:：]\s*(.+)$/i, multiValue: true },
   { key: 'publishers', pattern: /^(?:[-*+]\s*)?(?:\*\*)?\s*(?:发行商|发行者|发行公司)\s*(?:\*\*)?\s*[:：]\s*(.+)$/i, multiValue: true },
-  { key: 'platforms', pattern: /^(?:[-*+]\s*)?(?:\*\*)?\s*(?:平台|首发平台|已确认平台|登陆平台|登录平台|发售平台)\s*(?:\*\*)?\s*[:：]\s*(.+)$/i, multiValue: true },
 ]
 
 const BLOCK_FIELD_RULES: Array<{
@@ -57,49 +53,9 @@ const normalizeToken = (value: string) => {
     .trim()
 }
 
-const stripPlatformNarrativePrefixes = (value: string) => {
-  let normalized = normalizeToken(value)
-
-  const prefixPatterns = [
-    /^截至目前公开主流资料显示[，,、:\s]*/i,
-    /^根据目前公开资料[，,、:\s]*/i,
-    /^根据公开资料[，,、:\s]*/i,
-    /^公开资料显示[，,、:\s]*/i,
-  ]
-
-  for (const pattern of prefixPatterns) {
-    normalized = normalized.replace(pattern, '')
-  }
-
-  const leadInPatterns = [
-    /^本作已确认的?(?:主要)?平台(?:为|有)\s*/i,
-    /^已确认的?(?:主要)?平台(?:为|有)\s*/i,
-    /^本作(?:主要)?平台(?:为|有)\s*/i,
-    /^主要平台(?:为|有)\s*/i,
-    /^平台(?:为|有)\s*/i,
-    /^登陆平台(?:为|有)\s*/i,
-    /^登录平台(?:为|有)\s*/i,
-    /^发售平台(?:为|有)\s*/i,
-  ]
-
-  for (const pattern of leadInPatterns) {
-    normalized = normalized.replace(pattern, '')
-  }
-
-  return normalized
-}
-
 const splitMultiValue = (value: string) => {
   return value
     .split(/\s*[、，,;/／|]\s*|\s+\+\s+/g)
-    .map((item) => normalizeToken(item))
-    .filter(Boolean)
-}
-
-const splitPlatformValues = (value: string) => {
-  const normalized = stripPlatformNarrativePrefixes(value)
-  return normalized
-    .split(/\s*[、，,;/／|]\s*|\s+\+\s+|\s+\/\s+/g)
     .map((item) => normalizeToken(item))
     .filter(Boolean)
 }
@@ -199,10 +155,8 @@ export const extractWikiMetadata = (content?: string | null): WikiMetadataExtrac
     releaseDate: '',
     englishTitleAlt: '',
     chineseTitleAlt: '',
-    engine: '',
     developers: [],
     publishers: [],
-    platforms: [],
   }
 
   if (!content) return result
@@ -243,16 +197,8 @@ export const extractWikiMetadata = (content?: string | null): WikiMetadataExtrac
         case 'chineseTitleAlt':
           result.chineseTitleAlt = mergeTitleAlt(result.chineseTitleAlt, splitMultiValue(value))
           break
-        case 'engine':
-          if (!result.engine) {
-            result.engine = normalizeToken(value)
-          }
-          break
         case 'publishers':
           pushUnique(result.publishers, splitMultiValue(value))
-          break
-        case 'platforms':
-          pushUnique(result.platforms, splitPlatformValues(value))
           break
       }
       break

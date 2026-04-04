@@ -66,14 +66,6 @@ export interface SeriesDetail {
   games: GameListItemView[]
 }
 
-export interface Platform {
-  id: number
-  name: string
-  slug: string
-  sort_order: number
-  created_at: string
-}
-
 export interface Developer {
   id: number
   name: string
@@ -166,7 +158,6 @@ export interface GameListItemDto {
   visibility: 'public' | 'private'
   summary: string | null
   release_date: string | null
-  engine: string | null
   cover_image: string | null
   banner_image: string | null
   wiki_content: string | null
@@ -175,7 +166,6 @@ export interface GameListItemDto {
   file_count: number
   developer_count: number
   publisher_count: number
-  platform_count: number
   is_favorite: boolean
   pending_issues?: PendingIssueEvaluation | null
   downloads: number
@@ -183,11 +173,10 @@ export interface GameListItemDto {
   updated_at: string
 }
 
-export interface GameDetailDtoBase<TFile extends GameFileEntry = GameFileEntry> extends Omit<GameListItemDto, 'primary_screenshot' | 'screenshot_count' | 'file_count' | 'developer_count' | 'publisher_count' | 'platform_count'> {
+export interface GameDetailDtoBase<TFile extends GameFileEntry = GameFileEntry> extends Omit<GameListItemDto, 'primary_screenshot' | 'screenshot_count' | 'file_count' | 'developer_count' | 'publisher_count'> {
   preview_videos: VideoAssetItem[]
   screenshots: ScreenshotItem[]
   series: Series | null
-  platforms: Platform[]
   developers: Developer[]
   publishers: Publisher[]
   tags: Tag[]
@@ -219,7 +208,6 @@ export interface GameAggregateCoreRequest {
   visibility: 'public' | 'private'
   summary: string | null
   release_date: string | null
-  engine: string | null
   cover_image: string | null
   banner_image: string | null
 }
@@ -229,7 +217,6 @@ export interface GameAggregateGameUpdateRequest extends GameAggregateCoreRequest
   series_id: number | null
   developer_ids: number[]
   publisher_ids: number[]
-  platform_ids: number[]
   tag_ids: number[]
 }
 
@@ -262,7 +249,6 @@ export interface GameListQuery {
   limit?: number
   search?: string
   series?: number
-  platform?: number
   tag?: number[]
   pending?: boolean
   pending_issue?: string
@@ -343,7 +329,6 @@ export interface SteamGameDetails {
   previewVideos: Array<{ url: string; name: string; isDash: boolean }>
   genres: string[]
   tags: string[]
-  platforms: string[]
   screenshots: string[]
   headerImage: string
   libraryHero?: string

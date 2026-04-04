@@ -8,7 +8,6 @@ const {
   updateGameAggregateMock,
   createSeriesMock,
   getPopularSeriesMock,
-  createPlatformMock,
   resolveCreatableSelectionsMock,
   createDeveloperMock,
   createPublisherMock,
@@ -16,7 +15,6 @@ const {
   updateGameAggregateMock: vi.fn(),
   createSeriesMock: vi.fn(),
   getPopularSeriesMock: vi.fn(),
-  createPlatformMock: vi.fn(),
   resolveCreatableSelectionsMock: vi.fn(),
   createDeveloperMock: vi.fn(),
   createPublisherMock: vi.fn(),
@@ -32,12 +30,6 @@ vi.mock('@/services/series.service', () => ({
   seriesService: {
     createSeries: createSeriesMock,
     getPopularSeries: getPopularSeriesMock,
-  },
-}))
-
-vi.mock('@/services/platforms.service', () => ({
-  default: {
-    createPlatform: createPlatformMock,
   },
 }))
 
@@ -75,7 +67,6 @@ const buildOptions = () => {
         visibility: 'public',
         summary: null,
         release_date: null,
-        engine: null,
         cover_image: null,
         banner_image: null,
         wiki_content: null,
@@ -83,7 +74,6 @@ const buildOptions = () => {
         preview_videos: [],
         screenshots: [],
         series: null,
-        platforms: [],
         developers: [],
         publishers: [],
         tags: [],
@@ -100,8 +90,6 @@ const buildOptions = () => {
         developer_ids: [1],
         publisher_ids: [2],
         release_date: undefined,
-        engine: '',
-        platform_ids: [3],
         series_id: null,
         tag_ids: [4],
         summary: '',
@@ -115,7 +103,6 @@ const buildOptions = () => {
       seriesOptions: ref([]),
       developerOptions: ref([]),
       publisherOptions: ref([]),
-      platformOptions: ref([]),
       validateForm: vi.fn().mockResolvedValue(true),
       resolveTagSelections: vi.fn().mockResolvedValue([4]),
       addAlert,
@@ -130,7 +117,6 @@ describe('useEditGameWorkflow', () => {
     updateGameAggregateMock.mockReset()
     createSeriesMock.mockReset()
     getPopularSeriesMock.mockReset()
-    createPlatformMock.mockReset()
     resolveCreatableSelectionsMock.mockReset()
     createDeveloperMock.mockReset()
     createPublisherMock.mockReset()
@@ -213,7 +199,6 @@ describe('useEditGameWorkflow', () => {
   it('normalizes blank optional fields before aggregate submit', async () => {
     const { options } = buildOptions()
     options.form.value.title_alt = '   '
-    options.form.value.engine = ''
     options.form.value.summary = '  '
     options.form.value.cover_image = ''
     options.form.value.banner_image = '   '
@@ -224,7 +209,6 @@ describe('useEditGameWorkflow', () => {
     expect(updateGameAggregateMock).toHaveBeenCalledWith('game-1', expect.objectContaining({
       game: expect.objectContaining({
         title_alt: null,
-        engine: null,
         summary: null,
         cover_image: null,
         banner_image: null,

@@ -77,7 +77,6 @@ const steamService = {
       previewVideos: [],
       genres: [],
       tags: [],
-      platforms: [],
       screenshots: data.screenshot_urls.map((url) => proxySteamAssetUrl(url)),
       headerImage: proxySteamAssetUrl(data.cover_url),
       libraryHero: proxySteamAssetUrl(data.banner_url) || undefined,

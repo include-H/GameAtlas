@@ -20,9 +20,6 @@ func TestGamesRepositoryUpdateAggregateReplacesRelationsAndSeries(t *testing.T) 
 		t.Fatalf("set game series: %v", err)
 	}
 
-	platformID := insertRepositoryPlatform(t, db, "Repo Windows", "repo-windows")
-	linkRepositoryGamePlatform(t, db, gameID, platformID, 0)
-
 	developerID := insertRepositoryDeveloper(t, db, "Repo Dev", "repo-dev")
 	linkRepositoryGameDeveloper(t, db, gameID, developerID, 0)
 
@@ -37,7 +34,6 @@ func TestGamesRepositoryUpdateAggregateReplacesRelationsAndSeries(t *testing.T) 
 		Game: domain.GameAggregateCoreUpdateInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Repo Aggregate Preserve Updated"},
 			SeriesID:      nil,
-			PlatformIDs:   []int64{},
 			DeveloperIDs:  []int64{},
 			PublisherIDs:  []int64{},
 			TagIDs:        []int64{},
@@ -52,14 +48,6 @@ func TestGamesRepositoryUpdateAggregateReplacesRelationsAndSeries(t *testing.T) 
 	}
 	if series != nil {
 		t.Fatalf("series = %#v, want cleared series", series)
-	}
-
-	platforms, err := repo.ListMetadata("platforms", "game_platforms", "platform_id", gameID)
-	if err != nil {
-		t.Fatalf("ListMetadata(platforms) returned error: %v", err)
-	}
-	if len(platforms) != 0 {
-		t.Fatalf("platforms = %#v, want cleared platforms", platforms)
 	}
 
 	developers, err := repo.ListMetadata("developers", "game_developers", "developer_id", gameID)
@@ -106,7 +94,6 @@ func TestGamesRepositoryUpdateAggregateClearsPresentRelationsAndSeries(t *testin
 		Game: domain.GameAggregateCoreUpdateInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Repo Aggregate Clear Updated"},
 			SeriesID:      nil,
-			PlatformIDs:   []int64{},
 			DeveloperIDs:  []int64{},
 			PublisherIDs:  []int64{},
 			TagIDs:        []int64{},
@@ -199,13 +186,10 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 		t.Fatalf("insert private favorite game: %v", err)
 	}
 
-	platformID := insertRepositoryPlatform(t, db, "Stats Platform", "stats-platform")
 	developerID := insertRepositoryDeveloper(t, db, "Stats Developer", "stats-developer")
 	publisherID := insertRepositoryPublisher(t, db, "Stats Publisher", "stats-publisher")
-	linkRepositoryGamePlatform(t, db, secondGameID, platformID, 0)
 	linkRepositoryGameDeveloper(t, db, secondGameID, developerID, 0)
 	linkRepositoryGamePublisher(t, db, secondGameID, publisherID, 0)
-	linkRepositoryGamePlatform(t, db, privateGameID, platformID, 0)
 	linkRepositoryGameDeveloper(t, db, privateGameID, developerID, 0)
 	linkRepositoryGamePublisher(t, db, privateGameID, publisherID, 0)
 
@@ -345,45 +329,33 @@ func TestGameCatalogRepositoryListFiltersFavoritesAndExposesFavoriteState(t *tes
 	}
 }
 
-func TestGameCatalogRepositoryListAppliesGroupedTagAndPlatformFilters(t *testing.T) {
+func TestGameCatalogRepositoryListAppliesGroupedTagFilters(t *testing.T) {
 	db := openRepositoryTagsTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
 	catalogRepo := NewGameCatalogRepository(repo)
-	platformID := insertRepositoryPlatform(t, db, "Windows", "windows")
-	otherPlatformID := insertRepositoryPlatform(t, db, "Linux", "linux")
 	genreGroupID := insertRepositoryTagGroup(t, db, "repo-genre", "Repo Genre", true, true)
 	themeGroupID := insertRepositoryTagGroup(t, db, "repo-theme", "Repo Theme", true, true)
 	actionID := insertRepositoryTag(t, db, genreGroupID, "Action", "action", true)
-	rpgID := insertRepositoryTag(t, db, genreGroupID, "RPG", "rpg", true)
 	scifiID := insertRepositoryTag(t, db, themeGroupID, "Sci-Fi", "scifi", true)
 
 	matchingID := insertRepositoryGame(t, db, "list-match", "List Match", "public")
-	nonMatchingPlatformID := insertRepositoryGame(t, db, "list-platform", "List Platform", "public")
 	nonMatchingThemeID := insertRepositoryGame(t, db, "list-theme", "List Theme", "public")
 	privateMatchingID := insertRepositoryGame(t, db, "list-private", "List Private", "private")
 
-	linkRepositoryGamePlatform(t, db, matchingID, platformID, 0)
-	linkRepositoryGamePlatform(t, db, nonMatchingPlatformID, otherPlatformID, 0)
-	linkRepositoryGamePlatform(t, db, nonMatchingThemeID, platformID, 0)
-	linkRepositoryGamePlatform(t, db, privateMatchingID, platformID, 0)
-
 	linkRepositoryGameTag(t, db, matchingID, actionID, 0)
 	linkRepositoryGameTag(t, db, matchingID, scifiID, 1)
-	linkRepositoryGameTag(t, db, nonMatchingPlatformID, rpgID, 0)
-	linkRepositoryGameTag(t, db, nonMatchingPlatformID, scifiID, 1)
 	linkRepositoryGameTag(t, db, nonMatchingThemeID, actionID, 0)
 	linkRepositoryGameTag(t, db, privateMatchingID, actionID, 0)
 	linkRepositoryGameTag(t, db, privateMatchingID, scifiID, 1)
 
 	games, total, err := catalogRepo.List(domain.GamesListParams{
-		Page:       1,
-		Limit:      10,
-		PlatformID: platformID,
-		TagIDs:     []int64{rpgID, scifiID, actionID},
-		Sort:       "updated_at",
-		Order:      "desc",
+		Page:   1,
+		Limit:  10,
+		TagIDs: []int64{scifiID, actionID},
+		Sort:   "updated_at",
+		Order:  "desc",
 	})
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
@@ -429,13 +401,10 @@ func TestGameCatalogRepositoryListPendingOnlyFiltersResolvedAndIgnoredIssues(t *
 	insertRepositoryAsset(t, db, ignoredID, "ignored-shot", "screenshot", "/assets/ignored/shot.png", 0)
 	insertRepositoryGameFile(t, db, ignoredID, "/roms/ignored.rom")
 
-	platformID := insertRepositoryPlatform(t, db, "Pending Platform", "pending-platform")
 	developerID := insertRepositoryDeveloper(t, db, "Pending Developer", "pending-developer")
 	publisherID := insertRepositoryPublisher(t, db, "Pending Publisher", "pending-publisher")
-	linkRepositoryGamePlatform(t, db, resolvedID, platformID, 0)
 	linkRepositoryGameDeveloper(t, db, resolvedID, developerID, 0)
 	linkRepositoryGamePublisher(t, db, resolvedID, publisherID, 0)
-	linkRepositoryGamePlatform(t, db, ignoredID, platformID, 0)
 	linkRepositoryGameDeveloper(t, db, ignoredID, developerID, 0)
 	linkRepositoryGamePublisher(t, db, ignoredID, publisherID, 0)
 
@@ -578,10 +547,8 @@ func TestGameCatalogRepositoryCountPendingGroupsUsesQueueFiltersButIgnoresIssueS
 	}
 	insertRepositoryAsset(t, db, wikiID, "wiki-shot", "screenshot", "/assets/wiki/shot.png", 0)
 	insertRepositoryGameFile(t, db, wikiID, "/roms/wiki.rom")
-	platformID := insertRepositoryPlatform(t, db, "Wiki Platform", "wiki-platform")
 	developerID := insertRepositoryDeveloper(t, db, "Wiki Developer", "wiki-developer")
 	publisherID := insertRepositoryPublisher(t, db, "Wiki Publisher", "wiki-publisher")
-	linkRepositoryGamePlatform(t, db, wikiID, platformID, 0)
 	linkRepositoryGameDeveloper(t, db, wikiID, developerID, 0)
 	linkRepositoryGamePublisher(t, db, wikiID, publisherID, 0)
 
@@ -762,25 +729,6 @@ func insertRepositoryGameFile(t *testing.T, db *sqlx.DB, gameID int64, path stri
 	return id
 }
 
-func insertRepositoryPlatform(t *testing.T, db *sqlx.DB, name string, slug string) int64 {
-	t.Helper()
-
-	result, err := db.Exec(`
-		INSERT INTO platforms (name, slug)
-		VALUES (?, ?)
-	`, name, slug)
-	if err != nil {
-		t.Fatalf("insert repository platform: %v", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		t.Fatalf("LastInsertId returned error: %v", err)
-	}
-
-	return id
-}
-
 func insertRepositorySeries(t *testing.T, db *sqlx.DB, name string, slug string) int64 {
 	t.Helper()
 
@@ -836,17 +784,6 @@ func insertRepositoryPublisher(t *testing.T, db *sqlx.DB, name string, slug stri
 	}
 
 	return id
-}
-
-func linkRepositoryGamePlatform(t *testing.T, db *sqlx.DB, gameID int64, platformID int64, sortOrder int) {
-	t.Helper()
-
-	if _, err := db.Exec(`
-		INSERT INTO game_platforms (game_id, platform_id, sort_order)
-		VALUES (?, ?, ?)
-	`, gameID, platformID, sortOrder); err != nil {
-		t.Fatalf("link repository game platform: %v", err)
-	}
 }
 
 func linkRepositoryGameDeveloper(t *testing.T, db *sqlx.DB, gameID int64, developerID int64, sortOrder int) {

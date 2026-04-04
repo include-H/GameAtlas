@@ -4,7 +4,6 @@ import type { EditGameForm } from '@/composables/edit-game-form'
 import type { AdminGameDetail, Tag, TagGroup } from '@/services/types'
 import { useEditGameFormBootstrap } from './useEditGameFormBootstrap'
 import { seriesService } from '@/services/series.service'
-import platformService from '@/services/platforms.service'
 import tagsService from '@/services/tags.service'
 import { developersService } from '@/services/developers.service'
 import { publishersService } from '@/services/publishers.service'
@@ -12,13 +11,6 @@ import { publishersService } from '@/services/publishers.service'
 vi.mock('@/services/series.service', () => ({
   seriesService: {
     getPopularSeries: vi.fn(),
-  },
-}))
-
-vi.mock('@/services/platforms.service', () => ({
-  default: {
-    listPlatforms: vi.fn(),
-    getAllPlatforms: vi.fn(),
   },
 }))
 
@@ -50,8 +42,6 @@ describe('useEditGameFormBootstrap', () => {
       developer_ids: [] as Array<string | number>,
       publisher_ids: [] as Array<string | number>,
       release_date: undefined as string | undefined,
-      engine: '',
-      platform_ids: [] as Array<string | number>,
       series_id: null as string | number | null,
       tag_ids: [] as Array<string | number>,
       summary: '',
@@ -65,7 +55,6 @@ describe('useEditGameFormBootstrap', () => {
     const { hydrateFormFromGame } = useEditGameFormBootstrap({
       form,
       seriesOptions: ref([]),
-      platformOptions: ref([]),
       tagGroups: ref([]),
       tagOptions: ref([]),
       developerOptions: ref([]),
@@ -90,7 +79,6 @@ describe('useEditGameFormBootstrap', () => {
       visibility: 'public',
       summary: null,
       release_date: null,
-      engine: null,
       cover_image: null,
       banner_image: null,
       wiki_content: null,
@@ -111,7 +99,6 @@ describe('useEditGameFormBootstrap', () => {
       ],
       screenshots: [],
       series: null,
-      platforms: [],
       developers: [],
       publishers: [],
       tags: [],
@@ -133,8 +120,6 @@ describe('useEditGameFormBootstrap', () => {
       developer_ids: [] as Array<string | number>,
       publisher_ids: [] as Array<string | number>,
       release_date: undefined as string | undefined,
-      engine: '',
-      platform_ids: [] as Array<string | number>,
       series_id: null as string | number | null,
       tag_ids: [] as Array<string | number>,
       summary: '',
@@ -148,7 +133,6 @@ describe('useEditGameFormBootstrap', () => {
     const { hydrateFormFromGame } = useEditGameFormBootstrap({
       form,
       seriesOptions: ref([]),
-      platformOptions: ref([]),
       tagGroups: ref([]),
       tagOptions: ref([]),
       developerOptions: ref([]),
@@ -173,7 +157,6 @@ describe('useEditGameFormBootstrap', () => {
       visibility: 'public',
       summary: null,
       release_date: null,
-      engine: null,
       cover_image: null,
       banner_image: null,
       wiki_content: null,
@@ -181,7 +164,6 @@ describe('useEditGameFormBootstrap', () => {
       preview_videos: [],
       screenshots: [],
       series: null,
-      platforms: [],
       developers: [],
       publishers: [],
       tags: [],
@@ -228,7 +210,6 @@ describe('useEditGameFormBootstrap', () => {
     vi.mocked(seriesService.getPopularSeries).mockRejectedValueOnce(new Error('series failed'))
     vi.mocked(developersService.listDevelopers).mockRejectedValueOnce(new Error('developers failed'))
     vi.mocked(publishersService.listPublishers).mockRejectedValueOnce(new Error('publishers failed'))
-    vi.mocked(platformService.listPlatforms).mockRejectedValueOnce(new Error('platform failed'))
     vi.mocked(tagsService.getTagGroups).mockRejectedValueOnce(new Error('tags failed'))
 
     const { initializeOptions } = useEditGameFormBootstrap({
@@ -239,8 +220,6 @@ describe('useEditGameFormBootstrap', () => {
         developer_ids: [],
         publisher_ids: [],
         release_date: undefined,
-        engine: '',
-        platform_ids: [],
         series_id: null,
         tag_ids: [],
         summary: '',
@@ -251,7 +230,6 @@ describe('useEditGameFormBootstrap', () => {
         file_paths: [{ path: '', label: '' }],
       }),
       seriesOptions: ref([]),
-      platformOptions: ref([]),
       tagGroups: ref([]),
       tagOptions: ref([]),
       developerOptions: ref([]),
@@ -273,7 +251,6 @@ describe('useEditGameFormBootstrap', () => {
     expect(addAlert).toHaveBeenCalledWith('加载编辑元数据失败：系列', 'error')
     expect(addAlert).toHaveBeenCalledWith('加载编辑元数据失败：开发商', 'error')
     expect(addAlert).toHaveBeenCalledWith('加载编辑元数据失败：发行商', 'error')
-    expect(addAlert).toHaveBeenCalledWith('加载编辑元数据失败：平台', 'error')
     expect(addAlert).toHaveBeenCalledWith('加载编辑元数据失败：标签', 'error')
     consoleErrorSpy.mockRestore()
   })
@@ -282,7 +259,6 @@ describe('useEditGameFormBootstrap', () => {
     vi.mocked(seriesService.getPopularSeries).mockResolvedValueOnce([])
     vi.mocked(developersService.listDevelopers).mockResolvedValueOnce([])
     vi.mocked(publishersService.listPublishers).mockResolvedValueOnce([])
-    vi.mocked(platformService.listPlatforms).mockResolvedValueOnce([])
     vi.mocked(tagsService.getTagGroups).mockResolvedValueOnce([
       {
         id: 9,
@@ -309,8 +285,6 @@ describe('useEditGameFormBootstrap', () => {
         developer_ids: [],
         publisher_ids: [],
         release_date: undefined,
-        engine: '',
-        platform_ids: [],
         series_id: null,
         tag_ids: [],
         summary: '',
@@ -321,7 +295,6 @@ describe('useEditGameFormBootstrap', () => {
         file_paths: [{ path: '', label: '' }],
       }),
       seriesOptions: ref([]),
-      platformOptions: ref([]),
       tagGroups,
       tagOptions: ref([]),
       developerOptions: ref([]),
@@ -347,7 +320,6 @@ describe('useEditGameFormBootstrap', () => {
     vi.mocked(seriesService.getPopularSeries).mockResolvedValueOnce([])
     vi.mocked(developersService.listDevelopers).mockResolvedValueOnce([])
     vi.mocked(publishersService.listPublishers).mockResolvedValueOnce([])
-    vi.mocked(platformService.listPlatforms).mockResolvedValueOnce([])
     vi.mocked(tagsService.getTagGroups).mockResolvedValueOnce([])
     vi.mocked(tagsService.getTags).mockResolvedValueOnce([
       {
@@ -372,8 +344,6 @@ describe('useEditGameFormBootstrap', () => {
         developer_ids: [],
         publisher_ids: [],
         release_date: undefined,
-        engine: '',
-        platform_ids: [],
         series_id: null,
         tag_ids: [],
         summary: '',
@@ -384,7 +354,6 @@ describe('useEditGameFormBootstrap', () => {
         file_paths: [{ path: '', label: '' }],
       }),
       seriesOptions: ref([]),
-      platformOptions: ref([]),
       tagGroups: ref([]),
       tagOptions,
       developerOptions: ref([]),
@@ -409,7 +378,6 @@ describe('useEditGameFormBootstrap', () => {
       visibility: 'public',
       summary: null,
       release_date: null,
-      engine: null,
       cover_image: null,
       banner_image: null,
       wiki_content: null,
@@ -417,7 +385,6 @@ describe('useEditGameFormBootstrap', () => {
       preview_videos: [],
       screenshots: [],
       series: null,
-      platforms: [],
       developers: [],
       publishers: [],
       tags: [

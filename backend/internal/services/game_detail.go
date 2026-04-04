@@ -59,10 +59,6 @@ func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) 
 	if err != nil {
 		return nil, err
 	}
-	platforms, err := s.detailRepo.ListMetadata("platforms", "game_platforms", "platform_id", id)
-	if err != nil {
-		return nil, err
-	}
 	developers, err := s.detailRepo.ListMetadata("developers", "game_developers", "developer_id", id)
 	if err != nil {
 		return nil, err
@@ -91,7 +87,6 @@ func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) 
 		PreviewVideos: videos,
 		Screenshots:   screenshots,
 		Series:        primarySeries,
-		Platforms:     emptyMetadata(platforms),
 		Developers:    emptyMetadata(developers),
 		Publishers:    emptyMetadata(publishers),
 		Tags:          emptyTags(tags),

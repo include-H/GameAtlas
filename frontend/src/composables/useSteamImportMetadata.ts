@@ -16,7 +16,7 @@ export interface WikiMetadataCandidateSelection {
 }
 
 interface UseSteamImportMetadataOptions {
-  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'engine' | 'developer_ids' | 'publisher_ids' | 'platform_ids'>>
+  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'developer_ids' | 'publisher_ids'>>
   getWikiContent: () => string
   addAlert: (message: string, type: AlertType) => void
 }
@@ -131,14 +131,6 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
         selected: true,
       })
     }
-    if (metadata.engine) {
-      candidates.push({
-        key: 'engine',
-        label: '游戏引擎',
-        value: metadata.engine,
-        selected: true,
-      })
-    }
     if (metadata.developers.length > 0) {
       candidates.push({
         key: 'developers',
@@ -152,14 +144,6 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
         key: 'publishers',
         label: '发行商',
         value: metadata.publishers.join(' / '),
-        selected: true,
-      })
-    }
-    if (metadata.platforms.length > 0) {
-      candidates.push({
-        key: 'platforms',
-        label: '平台',
-        value: metadata.platforms.join(' / '),
         selected: true,
       })
     }
@@ -248,12 +232,6 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
               appliedLabels.push('简介')
             }
             break
-          case 'engine':
-            if (metadata.engine) {
-              options.form.value.engine = metadata.engine
-              appliedLabels.push('游戏引擎')
-            }
-            break
           case 'release_date':
             if (metadata.releaseDate) {
               options.form.value.release_date = metadata.releaseDate
@@ -278,16 +256,6 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
               }
               options.form.value.publisher_ids = Array.from(merged)
               appliedLabels.push('发行商')
-            }
-            break
-          case 'platforms':
-            if (metadata.platforms.length > 0) {
-              const merged = new Set<string | number>(options.form.value.platform_ids)
-              for (const name of metadata.platforms) {
-                merged.add(name)
-              }
-              options.form.value.platform_ids = Array.from(merged)
-              appliedLabels.push('平台')
             }
             break
         }

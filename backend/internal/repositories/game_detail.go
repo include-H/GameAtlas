@@ -10,6 +10,8 @@ type GameDetailRepository struct {
 	games *GamesRepository
 }
 
+// 2026-04-04: keep this thin repository so detail/read services depend on a
+// named detail boundary instead of the catch-all GamesRepository.
 func NewGameDetailRepository(games *GamesRepository) *GameDetailRepository {
 	return &GameDetailRepository{games: games}
 }

@@ -246,13 +246,10 @@ func TestGamesHandlerListPendingUsesNativePendingFilter(t *testing.T) {
 		t.Fatalf("insert ignored file: %v", err)
 	}
 
-	platformID := insertGamesHandlerMetadataItem(t, db, "platforms", "Windows", "windows")
 	developerID := insertGamesHandlerMetadataItem(t, db, "developers", "Studio", "studio")
 	publisherID := insertGamesHandlerMetadataItem(t, db, "publishers", "Publisher", "publisher")
-	linkGamesHandlerGameRelation(t, db, "game_platforms", "platform_id", resolvedID, platformID)
 	linkGamesHandlerGameRelation(t, db, "game_developers", "developer_id", resolvedID, developerID)
 	linkGamesHandlerGameRelation(t, db, "game_publishers", "publisher_id", resolvedID, publisherID)
-	linkGamesHandlerGameRelation(t, db, "game_platforms", "platform_id", ignoredID, platformID)
 	linkGamesHandlerGameRelation(t, db, "game_developers", "developer_id", ignoredID, developerID)
 	linkGamesHandlerGameRelation(t, db, "game_publishers", "publisher_id", ignoredID, publisherID)
 
@@ -339,13 +336,10 @@ func TestGamesHandlerListPendingUsesNativePendingQueryOptions(t *testing.T) {
 		t.Fatalf("insert pending query files: %v", err)
 	}
 
-	platformID := insertGamesHandlerMetadataItem(t, db, "platforms", "Query Windows", "query-windows")
 	developerID := insertGamesHandlerMetadataItem(t, db, "developers", "Query Studio", "query-studio")
 	publisherID := insertGamesHandlerMetadataItem(t, db, "publishers", "Query Publisher", "query-publisher")
-	linkGamesHandlerGameRelation(t, db, "game_platforms", "platform_id", recentID, platformID)
 	linkGamesHandlerGameRelation(t, db, "game_developers", "developer_id", recentID, developerID)
 	linkGamesHandlerGameRelation(t, db, "game_publishers", "publisher_id", recentID, publisherID)
-	linkGamesHandlerGameRelation(t, db, "game_platforms", "platform_id", ignoredID, platformID)
 	linkGamesHandlerGameRelation(t, db, "game_developers", "developer_id", ignoredID, developerID)
 	linkGamesHandlerGameRelation(t, db, "game_publishers", "publisher_id", ignoredID, publisherID)
 
@@ -730,7 +724,7 @@ func TestGamesHandlerUpdateAggregateReplacesRelations(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-replace-relations/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Replace Relations Updated","visibility":"public","series_id":null,"platform_ids":[],"developer_ids":[],"publisher_ids":[],"tag_ids":[]},"assets":{}}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-replace-relations/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Replace Relations Updated","visibility":"public","series_id":null,"developer_ids":[],"publisher_ids":[],"tag_ids":[]},"assets":{}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-replace-relations"}}
 	context.Set("is_admin", true)

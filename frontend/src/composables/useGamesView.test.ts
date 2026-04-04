@@ -60,7 +60,6 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 24,
         search: 'halo',
-        platform: undefined,
         tag: [],
         favorite: undefined,
       },
@@ -83,7 +82,6 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 24,
         search: 'halo',
-        platform: undefined,
         tag: [],
         favorite: undefined,
       },
@@ -192,7 +190,6 @@ describe('useGamesView helpers', () => {
       routeQuery: {
         page: '2',
         search: 'halo',
-        platform: '3',
         tag: ['1', '2', 'oops'],
         sort: 'random',
         order: 'desc',
@@ -207,7 +204,6 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 48,
         search: 'halo',
-        platform: 3,
         tag: [1, 2],
         favorite: true,
       },
@@ -233,7 +229,6 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 48,
         search: undefined,
-        platform: undefined,
         tag: [],
         favorite: undefined,
       },
@@ -274,7 +269,6 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 24,
         search: undefined,
-        platform: undefined,
         tag: [],
         favorite: true,
       },
@@ -295,7 +289,6 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 24,
         search: undefined,
-        platform: undefined,
         tag: [],
         favorite: undefined,
       },
@@ -305,7 +298,6 @@ describe('useGamesView helpers', () => {
   it('treats only committed route filters as active filters', () => {
     expect(hasGamesActiveFilters({})).toBe(false)
     expect(hasGamesActiveFilters({ search: 'halo' })).toBe(true)
-    expect(hasGamesActiveFilters({ platform: '3' })).toBe(true)
     expect(hasGamesActiveFilters({ tag: ['1'] })).toBe(true)
     expect(hasGamesActiveFilters({ favorite: 'true' })).toBe(true)
     expect(hasGamesActiveFilters({ favorite: 'false' })).toBe(false)

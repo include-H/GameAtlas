@@ -22,8 +22,6 @@ export interface EditGameForm {
   developer_ids: Array<string | number>
   publisher_ids: Array<string | number>
   release_date: string | undefined
-  engine: string
-  platform_ids: Array<string | number>
   series_id: string | number | null
   tag_ids: Array<string | number>
   summary: string
@@ -42,8 +40,6 @@ export const createEmptyEditGameForm = (): EditGameForm => ({
   developer_ids: [],
   publisher_ids: [],
   release_date: undefined,
-  engine: '',
-  platform_ids: [],
   series_id: null,
   tag_ids: [],
   summary: '',

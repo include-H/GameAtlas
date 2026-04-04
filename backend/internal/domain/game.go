@@ -8,7 +8,6 @@ type Game struct {
 	Visibility        string  `db:"visibility"`
 	Summary           *string `db:"summary"`
 	ReleaseDate       *string `db:"release_date"`
-	Engine            *string `db:"engine"`
 	CoverImage        *string `db:"cover_image"`
 	BannerImage       *string `db:"banner_image"`
 	WikiContent       *string `db:"wiki_content"`
@@ -18,7 +17,6 @@ type Game struct {
 	FileCount         int64   `db:"file_count"`
 	DeveloperCount    int64   `db:"developer_count"`
 	PublisherCount    int64   `db:"publisher_count"`
-	PlatformCount     int64   `db:"platform_count"`
 	IsFavorite        bool    `db:"is_favorite"`
 	PendingIssues     *PendingIssueEvaluation
 	CreatedAt         string `db:"created_at"`
@@ -33,7 +31,6 @@ type GameListItem struct {
 	Visibility        string  `db:"visibility"`
 	Summary           *string `db:"summary"`
 	ReleaseDate       *string `db:"release_date"`
-	Engine            *string `db:"engine"`
 	CoverImage        *string `db:"cover_image"`
 	BannerImage       *string `db:"banner_image"`
 	WikiContent       *string `db:"wiki_content"`
@@ -43,7 +40,6 @@ type GameListItem struct {
 	FileCount         int64   `db:"file_count"`
 	DeveloperCount    int64   `db:"developer_count"`
 	PublisherCount    int64   `db:"publisher_count"`
-	PlatformCount     int64   `db:"platform_count"`
 	IsFavorite        bool    `db:"is_favorite"`
 	PendingIssues     *PendingIssueEvaluation
 	CreatedAt         string `db:"created_at"`
@@ -58,7 +54,6 @@ type SeriesGameSummary struct {
 	Visibility        string  `db:"visibility"`
 	Summary           *string `db:"summary"`
 	ReleaseDate       *string `db:"release_date"`
-	Engine            *string `db:"engine"`
 	CoverImage        *string `db:"cover_image"`
 	BannerImage       *string `db:"banner_image"`
 	WikiContent       *string `db:"wiki_content"`
@@ -176,7 +171,6 @@ type GamesListParams struct {
 	Limit                 int
 	Search                string
 	SeriesID              int64
-	PlatformID            int64
 	TagIDs                []int64
 	PendingOnly           bool
 	PendingIncludeIgnored bool
@@ -224,7 +218,6 @@ type GameCoreInput struct {
 	Visibility  string
 	Summary     *string
 	ReleaseDate *string
-	Engine      *string
 	CoverImage  *string
 	BannerImage *string
 }
@@ -240,7 +233,6 @@ type GameCreateInput struct {
 type GameAggregateCoreUpdateInput struct {
 	GameCoreInput
 	SeriesID     *int64
-	PlatformIDs  []int64
 	DeveloperIDs []int64
 	PublisherIDs []int64
 	TagIDs       []int64

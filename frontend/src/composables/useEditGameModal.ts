@@ -30,7 +30,6 @@ import {
 import type {
   AdminGameDetail,
   Developer,
-  Platform,
   Publisher,
   ScreenshotItem,
   Series,
@@ -63,7 +62,6 @@ export const useEditGameModal = ({
 }: UseEditGameModalOptions) => {
   const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1280)
   const seriesOptions = ref<Series[]>([])
-  const platformOptions = ref<Platform[]>([])
   const tagGroups = ref<TagGroup[]>([])
   const tagOptions = ref<Tag[]>([])
   const developerOptions = ref<Developer[]>([])
@@ -95,14 +93,20 @@ export const useEditGameModal = ({
   })
 
   const filteredSeriesOptions = computed(() => {
+    // 2026-04-04: keep authoring pickers alphabetized for scan speed.
+    // Impact: this is UI-only option ordering; do not treat it as backend metadata sort semantics.
     return [...seriesOptions.value].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
   })
 
   const filteredDeveloperOptions = computed(() => {
+    // 2026-04-04: keep authoring pickers alphabetized for scan speed.
+    // Impact: this is UI-only option ordering; do not treat it as backend metadata sort semantics.
     return sortCreatableOptionsByName(developerOptions.value)
   })
 
   const filteredPublisherOptions = computed(() => {
+    // 2026-04-04: keep authoring pickers alphabetized for scan speed.
+    // Impact: this is UI-only option ordering; do not treat it as backend metadata sort semantics.
     return sortCreatableOptionsByName(publisherOptions.value)
   })
 
@@ -312,7 +316,6 @@ export const useEditGameModal = ({
   const { hydrateFormFromGame, initializeOptions } = useEditGameFormBootstrap({
     form,
     seriesOptions,
-    platformOptions,
     tagGroups,
     tagOptions,
     developerOptions,
@@ -334,7 +337,6 @@ export const useEditGameModal = ({
     seriesOptions,
     developerOptions,
     publisherOptions,
-    platformOptions,
     validateForm: async () => {
       try {
         await formRef.value?.validate?.()
@@ -596,7 +598,6 @@ export const useEditGameModal = ({
     openFileBrowser,
     openVideoSelector,
     pendingTagOptionsByGroup,
-    platformOptions,
     previewVideoSources,
     primaryPreviewVideo,
     releaseDate,

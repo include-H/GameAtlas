@@ -28,7 +28,6 @@ const baseGame = {
   visibility: 'public' as const,
   summary: null,
   release_date: null,
-  engine: null,
   cover_image: null,
   banner_image: null,
   wiki_content: null,
@@ -37,7 +36,6 @@ const baseGame = {
   file_count: 0,
   developer_count: 0,
   publisher_count: 0,
-  platform_count: 0,
   is_favorite: false,
   downloads: 0,
   created_at: '2026-03-25T00:00:00Z',
@@ -81,7 +79,6 @@ describe('games service', () => {
         limit: 20,
         search: 'halo',
         series: 12,
-        platform: 3,
         pending: false,
         tag: [3, 7],
       },
@@ -103,7 +100,6 @@ describe('games service', () => {
     expect(params.get('limit')).toBe('20')
     expect(params.get('search')).toBe('halo')
     expect(params.get('series')).toBe('12')
-    expect(params.get('platform')).toBe('3')
     expect(params.get('pending')).toBe('false')
     expect(params.get('favorite')).toBeNull()
     expect(params.getAll('tag')).toEqual(['3', '7'])
@@ -310,7 +306,6 @@ describe('games service', () => {
         ],
         screenshots: [],
         series: null,
-        platforms: [],
         developers: [],
         publishers: [],
         tags: [],
@@ -331,7 +326,6 @@ describe('games service', () => {
         preview_videos: [],
         screenshots: [],
         series: null,
-        platforms: [],
         developers: [],
         publishers: [],
         tags: [],
@@ -352,7 +346,6 @@ describe('games service', () => {
         preview_videos: [],
         screenshots: [],
         series: null,
-        platforms: [],
         developers: [],
         publishers: [],
         tags: [],
@@ -434,11 +427,9 @@ describe('games service', () => {
         visibility: 'public',
         summary: null,
         release_date: null,
-        engine: null,
         cover_image: null,
         banner_image: null,
         series_id: null,
-        platform_ids: [],
         developer_ids: [],
         publisher_ids: [],
         tag_ids: [],
@@ -460,11 +451,9 @@ describe('games service', () => {
         visibility: 'public',
         summary: null,
         release_date: null,
-        engine: null,
         cover_image: null,
         banner_image: null,
         series_id: null,
-        platform_ids: [],
         developer_ids: [],
         publisher_ids: [],
         tag_ids: [],

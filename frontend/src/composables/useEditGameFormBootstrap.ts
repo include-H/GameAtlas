@@ -6,14 +6,12 @@ import {
   type EditGameForm,
 } from '@/composables/edit-game-form'
 import { seriesService } from '@/services/series.service'
-import platformService from '@/services/platforms.service'
 import tagsService from '@/services/tags.service'
 import { developersService } from '@/services/developers.service'
 import { publishersService } from '@/services/publishers.service'
 import type {
   AdminGameDetail,
   Developer,
-  Platform,
   Publisher,
   ScreenshotItem,
   Series,
@@ -25,7 +23,6 @@ import type {
 interface UseEditGameFormBootstrapOptions {
   form: Ref<EditGameForm>
   seriesOptions: Ref<Series[]>
-  platformOptions: Ref<Platform[]>
   tagGroups: Ref<TagGroup[]>
   tagOptions: Ref<Tag[]>
   developerOptions: Ref<Developer[]>
@@ -66,8 +63,6 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
       developer_ids: game.developers.map((item) => item.id),
       publisher_ids: game.publishers.map((item) => item.id),
       release_date: game.release_date || undefined,
-      engine: game.engine || '',
-      platform_ids: game.platforms.map((item) => item.id),
       series_id: game.series?.id ?? null,
       tag_ids: game.tags.map((item) => item.id),
       summary: game.summary || '',
@@ -127,13 +122,6 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
       }
     } catch (error) {
       handleInitializeOptionsError('发行商', error)
-    }
-
-    try {
-      const allPlatforms = await platformService.listPlatforms()
-      options.platformOptions.value = allPlatforms
-    } catch (error) {
-      handleInitializeOptionsError('平台', error)
     }
 
     try {

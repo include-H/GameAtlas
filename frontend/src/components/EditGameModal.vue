@@ -56,6 +56,7 @@
               multiple
               allow-clear
               allow-search
+              allow-create
               :loading="isSearchingDevelopers"
               :remote-search="true"
               :on-search="handleDeveloperSearch"
@@ -79,6 +80,7 @@
               multiple
               allow-clear
               allow-search
+              allow-create
               :loading="isSearchingPublishers"
               :remote-search="true"
               :on-search="handlePublisherSearch"
@@ -109,11 +111,6 @@
           </a-form-item>
         </a-col>
         <a-col :xs="24" :sm="8">
-          <a-form-item label="游戏引擎">
-            <a-input v-model="form.engine" placeholder="如：Unity, Unreal" />
-          </a-form-item>
-        </a-col>
-        <a-col :xs="24" :sm="8">
           <a-form-item label="可见性">
             <a-radio-group v-model="form.visibility" type="button">
               <a-radio value="public">公开</a-radio>
@@ -125,32 +122,13 @@
 
       <a-row :gutter="16">
         <a-col :xs="24" :sm="12">
-          <a-form-item label="平台">
-            <a-select
-              v-model="form.platform_ids"
-              placeholder="选择或输入平台（可多选）"
-              multiple
-              allow-clear
-              allow-search
-            >
-              <a-option
-                v-for="p in platformOptions"
-                :key="p.id"
-                :value="p.id"
-                :label="p.name"
-              >
-                {{ p.name }}
-              </a-option>
-            </a-select>
-          </a-form-item>
-        </a-col>
-        <a-col :xs="24" :sm="12">
           <a-form-item label="系列">
             <a-select
               v-model="form.series_id"
               placeholder="选择系列"
               allow-clear
               allow-search
+              allow-create
               :loading="isSearchingSeries"
               :remote-search="true"
               :on-search="handleSeriesSearch"
@@ -487,7 +465,6 @@ const {
   openFileBrowser,
   openVideoSelector,
   pendingTagOptionsByGroup,
-  platformOptions,
   previewVideoSources,
   primaryPreviewVideo,
   releaseDate,

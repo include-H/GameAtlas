@@ -15,10 +15,6 @@ export const developersService = {
     return response.data
   },
 
-  async searchDevelopers(query: string, limit?: number): Promise<Developer[]> {
-    return this.listDevelopers({ query, limit })
-  },
-
   async createDeveloper(data: {
     name: string
     slug?: string

@@ -204,7 +204,6 @@
   }
 
   .games-filters-col--search,
-  .games-filters-col--platform,
   .games-filters-col--sort,
   .games-filters-col--page-size {
     flex: 0 0 50%;
@@ -219,7 +218,6 @@
 
 @media (max-width: 576px) {
   .games-filters-col--search,
-  .games-filters-col--platform,
   .games-filters-col--sort,
   .games-filters-col--page-size,
   .games-filters-col--tags {

@@ -9,7 +9,6 @@ describe('wiki-metadata-parser', () => {
 - 发售日期: 2007年8月1日
 - 开发商: 上海软星
 - 发行商: 寰宇之星、方块游戏
-- 平台: Windows / Steam
 `)
 
     expect(result).toEqual({
@@ -17,19 +16,16 @@ describe('wiki-metadata-parser', () => {
       releaseDate: '2007-08-01',
       englishTitleAlt: '',
       chineseTitleAlt: '',
-      engine: '',
       developers: ['上海软星'],
       publishers: ['寰宇之星', '方块游戏'],
-      platforms: ['Windows', 'Steam'],
     })
   })
 
-  it('recognizes real wiki aliases like 首发日期 and 已确认平台', () => {
+  it('recognizes real wiki aliases like 首发日期', () => {
     const result = extractWikiMetadata(`
 - 开发商：上海软星
 - 发行商：大宇资讯股份有限公司
 - 首发日期：2007 年 8 月
-- 已确认平台：Windows
 `)
 
     expect(result).toEqual({
@@ -37,10 +33,8 @@ describe('wiki-metadata-parser', () => {
       releaseDate: '2007-08-01',
       englishTitleAlt: '',
       chineseTitleAlt: '',
-      engine: '',
       developers: ['上海软星'],
       publishers: ['大宇资讯股份有限公司'],
-      platforms: ['Windows'],
     })
   })
 
@@ -53,7 +47,6 @@ describe('wiki-metadata-parser', () => {
 
 开发商: 上海软星、上海软星
 发行公司: 寰宇之星
-平台: Windows、Windows、Steam
 `)
 
     expect(result).toEqual({
@@ -61,10 +54,8 @@ describe('wiki-metadata-parser', () => {
       releaseDate: '',
       englishTitleAlt: '',
       chineseTitleAlt: '',
-      engine: '',
       developers: ['上海软星'],
       publishers: ['寰宇之星'],
-      platforms: ['Windows', 'Steam'],
     })
   })
 
@@ -79,44 +70,8 @@ describe('wiki-metadata-parser', () => {
       releaseDate: '',
       englishTitleAlt: 'The Legend of Sword and Fairy 4 / Chinese Paladin 4',
       chineseTitleAlt: '仙剑奇侠传四 / 仙剑四',
-      engine: '',
       developers: [],
       publishers: [],
-      platforms: [],
-    })
-  })
-
-  it('extracts engine fields', () => {
-    const result = extractWikiMetadata(`
-- 游戏引擎：Unreal Engine 5
-`)
-
-    expect(result).toEqual({
-      summary: '',
-      releaseDate: '',
-      englishTitleAlt: '',
-      chineseTitleAlt: '',
-      engine: 'Unreal Engine 5',
-      developers: [],
-      publishers: [],
-      platforms: [],
-    })
-  })
-
-  it('strips narrative prefixes from platform fields', () => {
-    const result = extractWikiMetadata(`
-- 已确认平台：截至目前公开主流资料显示，本作已确认的主要平台为 Windows / Steam。
-`)
-
-    expect(result).toEqual({
-      summary: '',
-      releaseDate: '',
-      englishTitleAlt: '',
-      chineseTitleAlt: '',
-      engine: '',
-      developers: [],
-      publishers: [],
-      platforms: ['Windows', 'Steam'],
     })
   })
 
@@ -132,10 +87,8 @@ describe('wiki-metadata-parser', () => {
       releaseDate: '2025-06-30',
       englishTitleAlt: '',
       chineseTitleAlt: '',
-      engine: '',
       developers: [],
       publishers: [],
-      platforms: [],
     })
   })
 
@@ -145,10 +98,8 @@ describe('wiki-metadata-parser', () => {
       releaseDate: '',
       englishTitleAlt: '',
       chineseTitleAlt: '',
-      engine: '',
       developers: [],
       publishers: [],
-      platforms: [],
     })
   })
 })

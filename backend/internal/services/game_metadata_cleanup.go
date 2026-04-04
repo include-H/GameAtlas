@@ -15,7 +15,6 @@ func cleanupUnusedMetadata(metadataRepo *repositories.MetadataRepository) error 
 		joinTable  string
 		joinColumn string
 	}{
-		{table: "platforms", joinTable: "game_platforms", joinColumn: "platform_id"},
 		{table: "developers", joinTable: "game_developers", joinColumn: "developer_id"},
 		{table: "publishers", joinTable: "game_publishers", joinColumn: "publisher_id"},
 	}

@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS games (
     visibility TEXT NOT NULL DEFAULT 'public',
     summary TEXT,
     release_date TEXT,
-    engine TEXT,
     cover_image TEXT,
     banner_image TEXT,
     wiki_content TEXT,
@@ -59,14 +58,6 @@ CREATE TABLE IF NOT EXISTS series (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS platforms (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    slug TEXT NOT NULL UNIQUE,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE TABLE IF NOT EXISTS developers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
@@ -81,15 +72,6 @@ CREATE TABLE IF NOT EXISTS publishers (
     slug TEXT NOT NULL UNIQUE,
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS game_platforms (
-    game_id INTEGER NOT NULL,
-    platform_id INTEGER NOT NULL,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (game_id, platform_id),
-    FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
-    FOREIGN KEY (platform_id) REFERENCES platforms(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS game_developers (

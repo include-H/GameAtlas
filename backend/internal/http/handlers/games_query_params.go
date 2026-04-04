@@ -23,10 +23,6 @@ func decodeGamesListParams(c *gin.Context) (domain.GamesListParams, bool) {
 	if !ok {
 		return domain.GamesListParams{}, false
 	}
-	platformID, ok := parseGamesListInt64Query(c, "platform", 0)
-	if !ok {
-		return domain.GamesListParams{}, false
-	}
 	tagIDs, ok := parseGamesListInt64List(c, "tag")
 	if !ok {
 		return domain.GamesListParams{}, false
@@ -45,7 +41,6 @@ func decodeGamesListParams(c *gin.Context) (domain.GamesListParams, bool) {
 		Limit:             limit,
 		Search:            c.Query("search"),
 		SeriesID:          seriesID,
-		PlatformID:        platformID,
 		TagIDs:            tagIDs,
 		PendingIssue:      strings.TrimSpace(c.Query("pending_issue")),
 		PendingRecentDays: pendingRecentDays,

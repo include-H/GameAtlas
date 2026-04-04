@@ -20,10 +20,10 @@ func (r *GamesRepository) Create(input domain.GameCreateInput) (*domain.Game, er
 
 	const query = `
 		INSERT INTO games (
-			public_id, title, title_alt, title_sort_key, visibility, summary, release_date, engine, cover_image, banner_image, series_id
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			public_id, title, title_alt, title_sort_key, visibility, summary, release_date, cover_image, banner_image, series_id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING
-			id, public_id, title, title_alt, visibility, summary, release_date, engine, cover_image, banner_image,
+			id, public_id, title, title_alt, visibility, summary, release_date, cover_image, banner_image,
 			wiki_content, downloads, created_at, updated_at`
 
 	var game domain.Game
@@ -35,7 +35,6 @@ func (r *GamesRepository) Create(input domain.GameCreateInput) (*domain.Game, er
 		nil,
 		buildTitleSortKey(input.Title, nil),
 		input.Visibility,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -155,7 +154,6 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 		"visibility = ?",
 		"summary = ?",
 		"release_date = ?",
-		"engine = ?",
 		"cover_image = ?",
 		"banner_image = ?",
 	}
@@ -166,7 +164,6 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 		input.Visibility,
 		input.Summary,
 		input.ReleaseDate,
-		input.Engine,
 		input.CoverImage,
 		input.BannerImage,
 	}
@@ -199,9 +196,6 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 }
 
 func (r *GamesRepository) replaceRelationsTx(tx *sqlx.Tx, gameID int64, input domain.GameAggregateCoreUpdateInput) error {
-	if err := replaceRelationRows(tx, "game_platforms", "platform_id", gameID, input.PlatformIDs); err != nil {
-		return err
-	}
 	if err := replaceRelationRows(tx, "game_developers", "developer_id", gameID, input.DeveloperIDs); err != nil {
 		return err
 	}

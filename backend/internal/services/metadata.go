@@ -96,7 +96,7 @@ func (s *MetadataService) Create(resource MetadataResource, input domain.Metadat
 	switch resource.Table {
 	case "series":
 		return s.repo.CreateSeries(cleanInput, slugValue, sortOrder)
-	case "platforms", "developers", "publishers":
+	case "developers", "publishers":
 		existing, err := s.repo.FindSimpleByName(resource.Table, name)
 		if err != nil {
 			return nil, err

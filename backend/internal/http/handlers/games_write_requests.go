@@ -20,11 +20,9 @@ type gameAggregateCoreUpdateRequest struct {
 	Visibility   string  `json:"visibility"`
 	Summary      *string `json:"summary"`
 	ReleaseDate  *string `json:"release_date"`
-	Engine       *string `json:"engine"`
 	CoverImage   *string `json:"cover_image"`
 	BannerImage  *string `json:"banner_image"`
 	SeriesID     *int64  `json:"series_id"`
-	PlatformIDs  []int64 `json:"platform_ids"`
 	DeveloperIDs []int64 `json:"developer_ids"`
 	PublisherIDs []int64 `json:"publisher_ids"`
 	TagIDs       []int64 `json:"tag_ids"`
@@ -59,11 +57,10 @@ func (request gameCreateRequest) toInput() domain.GameCreateInput {
 }
 
 func (request gameAggregateUpdateRequest) toInput() domain.GameAggregateUpdateInput {
-	return domain.GameAggregateUpdateInput{
+		return domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
 			GameCoreInput: request.Game.toDomain(),
 			SeriesID:      request.Game.SeriesID,
-			PlatformIDs:   emptyInt64Slice(request.Game.PlatformIDs),
 			DeveloperIDs:  emptyInt64Slice(request.Game.DeveloperIDs),
 			PublisherIDs:  emptyInt64Slice(request.Game.PublisherIDs),
 			TagIDs:        emptyInt64Slice(request.Game.TagIDs),
@@ -79,7 +76,6 @@ func (request gameAggregateCoreUpdateRequest) toDomain() domain.GameCoreInput {
 		Visibility:  request.Visibility,
 		Summary:     request.Summary,
 		ReleaseDate: request.ReleaseDate,
-		Engine:      request.Engine,
 		CoverImage:  request.CoverImage,
 		BannerImage: request.BannerImage,
 	}

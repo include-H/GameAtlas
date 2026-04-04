@@ -271,8 +271,8 @@
                 <strong>{{ activeGame.developer_count || 0 }}</strong>
               </div>
               <div class="detail-overview__item">
-                <span>平台</span>
-                <strong>{{ activeGame.platform_count || 0 }}</strong>
+                <span>发行商</span>
+                <strong>{{ activeGame.publisher_count || 0 }}</strong>
               </div>
             </div>
           </div>

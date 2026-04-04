@@ -77,7 +77,6 @@ type gameListItemResponse struct {
 	Visibility        string                          `json:"visibility"`
 	Summary           *string                         `json:"summary"`
 	ReleaseDate       *string                         `json:"release_date"`
-	Engine            *string                         `json:"engine"`
 	CoverImage        *string                         `json:"cover_image"`
 	BannerImage       *string                         `json:"banner_image"`
 	WikiContent       *string                         `json:"wiki_content"`
@@ -87,7 +86,6 @@ type gameListItemResponse struct {
 	FileCount         int64                           `json:"file_count"`
 	DeveloperCount    int64                           `json:"developer_count"`
 	PublisherCount    int64                           `json:"publisher_count"`
-	PlatformCount     int64                           `json:"platform_count"`
 	IsFavorite        bool                            `json:"is_favorite"`
 	PendingIssues     *pendingIssueEvaluationResponse `json:"pending_issues,omitempty"`
 	CreatedAt         string                          `json:"created_at"`
@@ -144,7 +142,6 @@ type gameDetailResponse struct {
 	Visibility    string                          `json:"visibility"`
 	Summary       *string                         `json:"summary"`
 	ReleaseDate   *string                         `json:"release_date"`
-	Engine        *string                         `json:"engine"`
 	CoverImage    *string                         `json:"cover_image"`
 	BannerImage   *string                         `json:"banner_image"`
 	WikiContent   *string                         `json:"wiki_content"`
@@ -152,7 +149,6 @@ type gameDetailResponse struct {
 	PreviewVideos []gameAssetResponse             `json:"preview_videos"`
 	Screenshots   []gameAssetResponse             `json:"screenshots"`
 	Series        *metadataItemResponse           `json:"series"`
-	Platforms     []metadataItemResponse          `json:"platforms"`
 	Developers    []metadataItemResponse          `json:"developers"`
 	Publishers    []metadataItemResponse          `json:"publishers"`
 	Tags          []tagResponse                   `json:"tags"`

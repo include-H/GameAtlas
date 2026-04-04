@@ -36,7 +36,6 @@ var pendingIssueConditionDefinitions = []pendingIssueConditionDefinition{
 	newPendingRelationIssue(domain.PendingIssueDetailMissingFilesList, "game_files gf", "gf.game_id = g.id"),
 	newPendingRelationIssue(domain.PendingIssueDetailMissingDeveloper, "game_developers gd", "gd.game_id = g.id"),
 	newPendingRelationIssue(domain.PendingIssueDetailMissingPublisher, "game_publishers gp", "gp.game_id = g.id"),
-	newPendingRelationIssue(domain.PendingIssueDetailMissingPlatform, "game_platforms gp", "gp.game_id = g.id"),
 	newPendingFieldIssue(domain.PendingIssueDetailMissingSummary, "g.summary"),
 }
 
@@ -66,7 +65,6 @@ func gamesListItemSelectColumns() string {
 			g.visibility,
 			g.summary,
 			g.release_date,
-			g.engine,
 			g.cover_image,
 			g.banner_image,
 			g.wiki_content,
@@ -76,7 +74,6 @@ func gamesListItemSelectColumns() string {
 			COALESCE(fs.file_count, 0) AS file_count,
 			COALESCE(ds.developer_count, 0) AS developer_count,
 			COALESCE(ps.publisher_count, 0) AS publisher_count,
-			COALESCE(pls.platform_count, 0) AS platform_count,
 			CASE WHEN fg.game_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
 			g.created_at,
 			g.updated_at`
@@ -124,14 +121,8 @@ func gameListItemStatsCTEs(sourceTable string) string {
 			FROM game_publishers gp
 			INNER JOIN %s src ON src.id = gp.game_id
 			GROUP BY gp.game_id
-		),
-		platform_stats AS (
-			SELECT gp.game_id, COUNT(*) AS platform_count
-			FROM game_platforms gp
-			INNER JOIN %s src ON src.id = gp.game_id
-			GROUP BY gp.game_id
 		)
-	`, sourceTable, sourceTable, sourceTable, sourceTable, sourceTable)
+	`, sourceTable, sourceTable, sourceTable, sourceTable)
 }
 
 // buildGamesListWhere owns the common catalog filtering DSL used by list-like read models.
@@ -175,10 +166,6 @@ func (r *GamesRepository) buildGamesListWhere(params domain.GamesListParams, exc
 	if params.SeriesID > 0 {
 		where = append(where, "g.series_id = :series_id")
 		args["series_id"] = params.SeriesID
-	}
-	if params.PlatformID > 0 {
-		where = append(where, "EXISTS (SELECT 1 FROM game_platforms gp WHERE gp.game_id = g.id AND gp.platform_id = :platform_id)")
-		args["platform_id"] = params.PlatformID
 	}
 	if len(params.TagIDs) > 0 {
 		tagFilters, tagArgs, err := r.buildTagFilters(params.TagIDs)

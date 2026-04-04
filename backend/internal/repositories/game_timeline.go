@@ -6,6 +6,8 @@ type GameTimelineRepository struct {
 	games *GamesRepository
 }
 
+// 2026-04-04: keep this thin repository so timeline reads stay isolated from
+// aggregate/detail concerns even though they currently delegate to GamesRepository.
 func NewGameTimelineRepository(games *GamesRepository) *GameTimelineRepository {
 	return &GameTimelineRepository{games: games}
 }

@@ -2,7 +2,6 @@ import { ref, type Ref } from 'vue'
 import type { EditGameForm } from '@/composables/edit-game-form'
 import gamesService from '@/services/games.service'
 import { seriesService } from '@/services/series.service'
-import platformService from '@/services/platforms.service'
 import { developersService } from '@/services/developers.service'
 import { publishersService } from '@/services/publishers.service'
 import { resolveCreatableSelections } from '@/utils/creatable-select'
@@ -11,7 +10,6 @@ import type {
   AdminGameDetail,
   Developer,
   GameAggregateGameUpdateRequest,
-  Platform,
   Publisher,
   Series,
 } from '@/services/types'
@@ -32,7 +30,6 @@ interface UseEditGameWorkflowOptions {
   seriesOptions: Ref<Series[]>
   developerOptions: Ref<Developer[]>
   publisherOptions: Ref<Publisher[]>
-  platformOptions: Ref<Platform[]>
   validateForm: () => Promise<boolean>
   resolveTagSelections: () => Promise<number[]>
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
@@ -123,7 +120,7 @@ const resolvePublishers = async (
   options: Publisher[],
 ) => {
   try {
-    // 2026-04-04: publishers share the same authoring flow as developers and platforms.
+    // 2026-04-04: publishers share the same authoring flow as developers.
     const result = await resolveCreatableSelections({
       values,
       options,
@@ -140,31 +137,8 @@ const resolvePublishers = async (
   }
 }
 
-const resolvePlatforms = async (
-  values: Array<string | number>,
-  options: Platform[],
-) => {
-  try {
-    // 2026-04-04: platform creation stays here so game editing can commit a complete metadata set in one submit.
-    const result = await resolveCreatableSelections({
-      values,
-      options,
-      createItem: (name) =>
-        platformService.createPlatform({
-          name,
-          slug: slugifyMetadataName(name),
-        }),
-    })
-    return result
-  } catch (error) {
-    console.error('Failed to process platform:', values, error)
-    throw createWorkflowStepError('平台处理失败', error)
-  }
-}
-
 const createUpdatePayload = (params: {
   form: EditGameForm
-  platformIds: number[]
   seriesId: number | null | undefined
   developerIds: number[]
   publisherIds: number[]
@@ -175,8 +149,6 @@ const createUpdatePayload = (params: {
     title_alt: toNullableFormText(params.form.title_alt),
     visibility: params.form.visibility,
     release_date: toNullableFormText(params.form.release_date),
-    engine: toNullableFormText(params.form.engine),
-    platform_ids: params.platformIds,
     series_id: params.seriesId ?? null,
     developer_ids: params.developerIds,
     publisher_ids: params.publisherIds,
@@ -243,14 +215,6 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       const publisherIds = publisherResult.ids
       options.form.value.publisher_ids = [...publisherIds]
 
-      const platformResult = await resolvePlatforms(
-        options.form.value.platform_ids,
-        options.platformOptions.value,
-      )
-      options.platformOptions.value = platformResult.options
-      const platformIds = platformResult.ids
-      options.form.value.platform_ids = [...platformIds]
-
       let tagIds: number[] = []
       try {
         tagIds = await options.resolveTagSelections()
@@ -272,7 +236,6 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       const aggregateResult = await gamesService.updateGameAggregate(game.public_id, {
         game: createUpdatePayload({
           form: options.form.value,
-          platformIds,
           seriesId,
           developerIds,
           publisherIds,
