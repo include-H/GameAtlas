@@ -47,6 +47,11 @@
   font-weight: 700;
 }
 
+.visibility-form-item {
+  width: fit-content;
+  margin: 0 auto 20px;
+}
+
 .tag-group-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -148,6 +153,11 @@
 }
 
 @media (max-width: 768px) {
+  .visibility-form-item {
+    width: 100%;
+    margin: 0 0 20px;
+  }
+
   .tag-group-grid {
     grid-template-columns: 1fr;
   }

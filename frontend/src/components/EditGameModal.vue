@@ -99,29 +99,7 @@
       </a-row>
 
       <a-row :gutter="16">
-        <a-col :xs="24" :sm="8">
-          <a-form-item label="发行日期">
-            <a-date-picker
-              v-model="releaseDate"
-              :min-year="1950"
-              :max-year="2100"
-              placeholder="选择发行日期"
-              class="w-full"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :xs="24" :sm="8">
-          <a-form-item label="可见性">
-            <a-radio-group v-model="form.visibility" type="button">
-              <a-radio value="public">公开</a-radio>
-              <a-radio value="private">私有</a-radio>
-            </a-radio-group>
-          </a-form-item>
-        </a-col>
-      </a-row>
-
-      <a-row :gutter="16">
-        <a-col :xs="24" :sm="12">
+        <a-col :xs="24" :sm="9">
           <a-form-item label="系列">
             <a-select
               v-model="form.series_id"
@@ -142,6 +120,25 @@
                 {{ s.name }}
               </a-option>
             </a-select>
+          </a-form-item>
+        </a-col>
+        <a-col :xs="24" :sm="6" class="visibility-col">
+          <a-form-item label="可见性" class="visibility-form-item">
+            <a-radio-group v-model="form.visibility" type="button">
+              <a-radio value="public">公开</a-radio>
+              <a-radio value="private">私有</a-radio>
+            </a-radio-group>
+          </a-form-item>
+        </a-col>
+        <a-col :xs="24" :sm="9">
+          <a-form-item label="发行日期">
+            <a-date-picker
+              v-model="releaseDate"
+              :min-year="1950"
+              :max-year="2100"
+              placeholder="选择发行日期"
+              class="w-full"
+            />
           </a-form-item>
         </a-col>
       </a-row>
@@ -380,6 +377,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   'update:visible': [value: boolean]
   'success': []
+  'sync': []
 }>()
 
 const uiStore = useUiStore()
