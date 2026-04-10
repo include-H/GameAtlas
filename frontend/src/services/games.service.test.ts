@@ -225,6 +225,14 @@ describe('games service', () => {
     expect(getMock).toHaveBeenCalledTimes(2)
   })
 
+  it('rejects timeline responses that omit backend pagination metadata', async () => {
+    getMock.mockResolvedValue({
+      data: [],
+    })
+
+    await expect(gamesService.getTimelineGames()).rejects.toThrow('timeline response missing pagination')
+  })
+
   it('maps game files to version metadata using backend file order', () => {
     const result = mapGameVersions({
       public_id: 'game-1',
@@ -371,6 +379,39 @@ describe('games service', () => {
     const result = await gamesService.getAdminGameDetail('game-1')
 
     expect(result.files[0]?.file_path).toBe('/roms/Alpha.vhdx')
+  })
+
+  it('rejects public detail payloads in admin edit flows', async () => {
+    getMock.mockResolvedValue({
+      data: {
+        ...baseGame,
+        preview_videos: [],
+        screenshots: [],
+        series: null,
+        developers: [],
+        publishers: [],
+        tags: [],
+        tag_groups: [],
+        files: [
+          {
+            id: 10,
+            game_id: 1,
+            file_name: 'Alpha.vhdx',
+            label: 'Alpha',
+            notes: null,
+            size_bytes: 123,
+            sort_order: 2,
+            source_created_at: '2026-03-25T00:00:00Z',
+            created_at: '2026-03-24T00:00:00Z',
+            updated_at: '2026-03-25T00:00:00Z',
+          },
+        ],
+      },
+    })
+
+    await expect(gamesService.getAdminGameDetail('game-1')).rejects.toThrow(
+      'admin game detail requires resolved file_path values',
+    )
   })
 
   it('sets favorite state through backend endpoints', async () => {

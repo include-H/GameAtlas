@@ -37,6 +37,7 @@ func New(cfg config.Config) (*App, error) {
 	}
 
 	gamesRepo := repositories.NewGamesRepository(sqliteDB)
+	assetReconcileService := services.NewAssetReconcileService(cfg, sqliteDB)
 	gameAggregateService := services.NewGameAggregateService(
 		cfg,
 		gamesRepo,
@@ -47,6 +48,11 @@ func New(cfg config.Config) (*App, error) {
 		log.Printf("asset cleanup retry failed after %d task(s): %v", processed, err)
 	} else if processed > 0 {
 		log.Printf("asset cleanup retry processed %d task(s)", processed)
+	}
+	if reconciled, err := assetReconcileService.ReconcileAllMissingAssets(); err != nil {
+		log.Printf("asset reconcile failed: %v", err)
+	} else if reconciled > 0 {
+		log.Printf("asset reconcile removed stale references for %d game(s)", reconciled)
 	}
 
 	router := routes.New(cfg, sqliteDB)

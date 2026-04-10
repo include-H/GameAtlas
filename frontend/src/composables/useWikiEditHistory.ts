@@ -18,24 +18,28 @@ export const useWikiEditHistory = ({
   const historyEntries = ref<WikiHistoryEntry[]>([])
   const selectedHistory = ref<WikiHistoryEntry | null>(null)
   const isHistoryLoading = ref(false)
+  const hasHistoryLoadFailure = ref(false)
   const previewHistoryContent = ref(true)
   const historyPreviewVisible = ref(false)
 
   const resetHistoryState = () => {
     historyEntries.value = []
     selectedHistory.value = null
+    hasHistoryLoadFailure.value = false
     previewHistoryContent.value = true
     historyPreviewVisible.value = false
   }
 
   const loadHistory = async (gameId: string) => {
     isHistoryLoading.value = true
+    hasHistoryLoadFailure.value = false
     try {
       historyEntries.value = await wikiService.getWikiHistory(gameId)
       selectedHistory.value = historyEntries.value[0] || null
     } catch {
       historyEntries.value = []
       selectedHistory.value = null
+      hasHistoryLoadFailure.value = true
       // History requests either return entries or an empty list; failures should stay visible to the editor.
       addAlert('加载 Wiki 历史失败', 'error')
     } finally {
@@ -71,6 +75,7 @@ export const useWikiEditHistory = ({
     historyEntries,
     selectedHistory,
     isHistoryLoading,
+    hasHistoryLoadFailure,
     previewHistoryContent,
     historyPreviewVisible,
     resetHistoryState,

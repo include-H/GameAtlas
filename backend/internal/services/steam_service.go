@@ -80,10 +80,6 @@ func NewSteamService(cfg config.Config, assetsService *AssetsService) *SteamServ
 }
 
 func (s *SteamService) Search(query string, proxyOverride string) ([]domain.SteamSearchResult, error) {
-	if query == "" {
-		return []domain.SteamSearchResult{}, nil
-	}
-
 	payloads := make([]steamStoreSearchResponse, 0, 2)
 	for _, locale := range []struct {
 		lang string
@@ -236,52 +232,5 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 		CoverURL:       coverURL,
 		BannerURL:      bannerURL,
 		ScreenshotURLs: screenshotURLs,
-	}, nil
-}
-
-func (s *SteamService) ApplyAssets(appID int64, input domain.SteamApplyAssetsInput) (*domain.SteamAssetsPreview, error) {
-	if input.GameID <= 0 {
-		return nil, ErrValidation
-	}
-
-	sortOrder := 0
-	var appliedCover *string
-	var appliedBanner *string
-	appliedScreenshots := make([]string, 0, len(input.ScreenshotURLs))
-
-	if input.CoverURL != nil && *input.CoverURL != "" {
-		path, err := s.assets.ApplyRemoteAsset(input.GameID, "cover", *input.CoverURL, 0)
-		if err != nil {
-			return nil, err
-		}
-		appliedCover = &path
-	}
-	if input.BannerURL != nil && *input.BannerURL != "" {
-		path, err := s.assets.ApplyRemoteAsset(input.GameID, "banner", *input.BannerURL, 0)
-		if err != nil {
-			return nil, err
-		}
-		appliedBanner = &path
-	}
-	for _, rawURL := range input.ScreenshotURLs {
-		if rawURL == "" {
-			continue
-		}
-		path, err := s.assets.ApplyRemoteAsset(input.GameID, "screenshot", rawURL, sortOrder)
-		if err != nil {
-			return nil, err
-		}
-		appliedScreenshots = append(appliedScreenshots, path)
-		sortOrder++
-	}
-
-	return &domain.SteamAssetsPreview{
-		AppID:          appID,
-		ReleaseDate:    "",
-		Developers:     []string{},
-		Publishers:     []string{},
-		CoverURL:       appliedCover,
-		BannerURL:      appliedBanner,
-		ScreenshotURLs: appliedScreenshots,
 	}, nil
 }

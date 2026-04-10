@@ -153,6 +153,8 @@ const loadLoginQuote = async () => {
     loginQuoteText.value = sentence.hitokoto || fallbackLoginQuote
     loginQuoteSource.value = sentence.from ? `《${sentence.from}》` : ''
   } catch {
+    // 2026-04-09: keep this display-only fallback because login remains usable without the quote service.
+    // Impact: hitokoto fetch failure only degrades decorative copy and must not block the password flow.
     loginQuoteText.value = fallbackLoginQuote
     loginQuoteSource.value = ''
   }

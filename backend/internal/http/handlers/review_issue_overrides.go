@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -15,31 +14,6 @@ type ReviewIssueOverrideHandler struct {
 
 func NewReviewIssueOverrideHandler(service *services.ReviewIssueOverrideService) *ReviewIssueOverrideHandler {
 	return &ReviewIssueOverrideHandler{service: service}
-}
-
-func (h *ReviewIssueOverrideHandler) List(c *gin.Context) {
-	if !requireAdmin(c) {
-		return
-	}
-	gameIDs, err := parseGamePublicIDsQuery(c.Query("game_ids"), h.service.ResolveGameID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "invalid game_ids query",
-		})
-		return
-	}
-
-	items, err := h.service.List(gameIDs)
-	if err != nil {
-		writeServiceError(c, err, "invalid review override payload")
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    toReviewIssueOverrideResponses(items),
-	})
 }
 
 func (h *ReviewIssueOverrideHandler) Ignore(c *gin.Context) {
@@ -56,7 +30,9 @@ func (h *ReviewIssueOverrideHandler) Ignore(c *gin.Context) {
 		Reason *string `json:"reason"`
 	}
 	if c.Request.ContentLength > 0 {
-		if err := c.ShouldBindJSON(&payload); err != nil {
+		// 2026-04-06: review override writes are strict so temporary client-side
+		// fields do not silently become part of this narrow transport contract.
+		if err := decodeJSONStrict(c, &payload); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
 				"error":   "invalid review override payload",
@@ -97,26 +73,4 @@ func (h *ReviewIssueOverrideHandler) Delete(c *gin.Context) {
 			"deleted": true,
 		},
 	})
-}
-
-func parseGamePublicIDsQuery(raw string, resolver func(publicID string) (int64, error)) ([]int64, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return nil, nil
-	}
-
-	parts := strings.Split(raw, ",")
-	items := make([]int64, 0, len(parts))
-	for _, part := range parts {
-		publicID := strings.TrimSpace(part)
-		if publicID == "" {
-			continue
-		}
-		id, err := resolver(publicID)
-		if err != nil || id <= 0 {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	return items, nil
 }

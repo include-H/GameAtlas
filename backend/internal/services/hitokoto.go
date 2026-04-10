@@ -3,6 +3,7 @@ package services
 import (
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"math/rand/v2"
 	"strings"
 )
@@ -37,7 +38,11 @@ type HitokotoService struct {
 
 func NewHitokotoService() *HitokotoService {
 	sentences := make([]HitokotoSentence, 0)
-	_ = json.Unmarshal(hitokotoGameSentencesJSON, &sentences)
+	if err := json.Unmarshal(hitokotoGameSentencesJSON, &sentences); err != nil {
+		// 2026-04-08: embedded hitokoto data is startup-time application data, not user query input.
+		// Impact: malformed bundled JSON must fail fast instead of being misreported as "no sentence matched".
+		panic(fmt.Sprintf("decode embedded hitokoto data: %v", err))
+	}
 
 	return &HitokotoService{
 		gameSentences: sentences,

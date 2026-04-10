@@ -91,9 +91,13 @@ func decodeGamesListParams(c *gin.Context) (domain.GamesListParams, bool) {
 }
 
 func decodeGamesTimelineRequest(c *gin.Context) (int, string, string, string, int64, bool) {
-	years := parseQueryInt(c, "years", 2)
+	years, ok := parseGamesTimelineIntQuery(c, "years", 2)
+	if !ok {
+		return 0, "", "", "", 0, false
+	}
 	if years <= 0 {
-		years = 2
+		writeGamesTimelineQueryError(c, "years")
+		return 0, "", "", "", 0, false
 	}
 	if years > 10 {
 		years = 10
@@ -101,10 +105,34 @@ func decodeGamesTimelineRequest(c *gin.Context) (int, string, string, string, in
 
 	cursorReleaseDate, cursorID, ok := parseTimelineCursor(c.Query("cursor"))
 	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "invalid timeline cursor",
+		})
 		return 0, "", "", "", 0, false
 	}
 
 	return years, c.Query("from"), c.Query("to"), cursorReleaseDate, cursorID, true
+}
+
+func parseGamesTimelineIntQuery(c *gin.Context, key string, fallback int) (int, bool) {
+	raw := c.Query(key)
+	if raw == "" {
+		return fallback, true
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		writeGamesTimelineQueryError(c, key)
+		return 0, false
+	}
+	return value, true
+}
+
+func writeGamesTimelineQueryError(c *gin.Context, key string) {
+	c.JSON(http.StatusBadRequest, gin.H{
+		"success": false,
+		"error":   "invalid timeline query parameter: " + key,
+	})
 }
 
 func parseGamesListInt64List(c *gin.Context, key string) ([]int64, bool) {

@@ -50,6 +50,7 @@ describe('useWikiEditHistory', () => {
     expect(history.historyEntries.value).toEqual(entries)
     expect(history.selectedHistory.value).toEqual(entries[0])
     expect(history.isHistoryLoading.value).toBe(false)
+    expect(history.hasHistoryLoadFailure.value).toBe(false)
   })
 
   it('restores selected history content back to editor state', () => {
@@ -100,6 +101,7 @@ describe('useWikiEditHistory', () => {
     expect(history.historyEntries.value).toEqual([])
     expect(history.selectedHistory.value).toBeNull()
     expect(history.isHistoryLoading.value).toBe(false)
+    expect(history.hasHistoryLoadFailure.value).toBe(true)
     expect(addAlert).toHaveBeenCalledWith('加载 Wiki 历史失败', 'error')
   })
 })

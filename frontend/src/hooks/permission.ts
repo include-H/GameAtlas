@@ -14,6 +14,8 @@ export default function usePermission() {
    * @returns true when current auth state permits access
    */
   const accessRouter = (route: RouteLocationNormalized | RouteRecordRaw) => {
+    // 2026-04-08: when auth status fails to load, admin permission stays unresolved.
+    // Impact: menu generation keeps admin-only entries hidden instead of guessing guest/admin.
     return !route.meta?.requiresAdmin || authStore.isAdmin
   }
 

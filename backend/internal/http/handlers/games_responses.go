@@ -204,9 +204,11 @@ type directoryItemResponse struct {
 }
 
 type directoryListResponse struct {
-	CurrentPath string                  `json:"current_path"`
-	ParentPath  *string                 `json:"parent_path"`
-	Items       []directoryItemResponse `json:"items"`
+	CurrentPath  string                  `json:"current_path"`
+	ParentPath   *string                 `json:"parent_path"`
+	Items        []directoryItemResponse `json:"items"`
+	Incomplete   bool                    `json:"incomplete"`
+	SkippedCount int                     `json:"skipped_count"`
 }
 
 type steamSearchResultResponse struct {

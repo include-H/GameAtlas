@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"errors"
 	"io/fs"
 	"net/http"
 	"os"
@@ -117,9 +118,8 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.POST("/tag-groups", tagsHandler.CreateGroup)
 	api.GET("/tags", tagsHandler.ListTags)
 	api.POST("/tags", tagsHandler.CreateTag)
-	api.GET("/review-issue-overrides", reviewIssueOverrideHandler.List)
-	api.PUT("/games/:publicId/review-issues/:issueKey/ignore", reviewIssueOverrideHandler.Ignore)
-	api.DELETE("/games/:publicId/review-issues/:issueKey/ignore", reviewIssueOverrideHandler.Delete)
+		api.PUT("/games/:publicId/review-issues/:issueKey/ignore", reviewIssueOverrideHandler.Ignore)
+		api.DELETE("/games/:publicId/review-issues/:issueKey/ignore", reviewIssueOverrideHandler.Delete)
 	api.POST("/assets/cover", assetsHandler.Upload("cover"))
 	api.POST("/assets/banner", assetsHandler.Upload("banner"))
 	api.POST("/assets/video", assetsHandler.Upload("video"))
@@ -128,7 +128,6 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.GET("/directory/list", directoryHandler.List)
 	api.GET("/steam/search", steamHandler.Search)
 	api.GET("/steam/:appId/assets", steamHandler.Preview)
-	api.POST("/steam/:appId/apply-assets", steamHandler.Apply)
 	api.GET("/steam/proxy", steamHandler.Proxy)
 
 	registerAssetRoutes(router, cfg.AssetsDir, gameDetailRepo)
@@ -255,6 +254,24 @@ func registerStaticRoutes(router *gin.Engine, staticDir string) {
 	registerStaticRoutesFromEmbedded(router)
 }
 
+func resolveEmbeddedDistFSFrom(distFS fs.FS) (fs.FS, error) {
+	if _, err := fs.Stat(distFS, "index.html"); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, errors.New("embedded frontend is missing index.html")
+		}
+		return nil, err
+	}
+	return distFS, nil
+}
+
+func resolveEmbeddedDistFS() (fs.FS, error) {
+	distFS, err := webassets.DistFS()
+	if err != nil {
+		return nil, err
+	}
+	return resolveEmbeddedDistFSFrom(distFS)
+}
+
 func registerStaticRoutesFromDisk(router *gin.Engine, staticDir string, indexPath string) {
 	uiAssetsDir := filepath.Join(staticDir, "ui")
 	if _, err := os.Stat(uiAssetsDir); err == nil {
@@ -272,12 +289,12 @@ func registerStaticRoutesFromDisk(router *gin.Engine, staticDir string, indexPat
 }
 
 func registerStaticRoutesFromEmbedded(router *gin.Engine) {
-	distFS, err := webassets.DistFS()
+	distFS, err := resolveEmbeddedDistFS()
 	if err != nil {
-		return
-	}
-	if _, err := fs.Stat(distFS, "index.html"); err != nil {
-		return
+		// 2026-04-08: README defines embedded frontend as the fallback hosting contract.
+		// Impact: if both disk assets and embedded assets are missing, startup must fail fast
+		// instead of quietly degrading into route-not-found responses for every SPA page.
+		panic(err)
 	}
 
 	if uiFS, err := fs.Sub(distFS, "ui"); err == nil {

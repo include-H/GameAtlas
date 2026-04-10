@@ -10,6 +10,8 @@ func TestToDirectoryListResponseMapsDirectoryDTO(t *testing.T) {
 	size := int64(123)
 	response := toDirectoryListResponse(&domain.DirectoryListResponse{
 		CurrentPath: "/roms",
+		Incomplete:  true,
+		SkippedCount: 1,
 		Items: []domain.DirectoryItem{
 			{Name: "demo", Path: "/roms/demo", IsDirectory: true},
 			{Name: "demo.vhdx", Path: "/roms/demo.vhdx", IsDirectory: false, SizeBytes: &size},
@@ -24,6 +26,9 @@ func TestToDirectoryListResponseMapsDirectoryDTO(t *testing.T) {
 	}
 	if response.Items[1].SizeBytes == nil || *response.Items[1].SizeBytes != size {
 		t.Fatalf("size_bytes = %v, want %d", response.Items[1].SizeBytes, size)
+	}
+	if !response.Incomplete || response.SkippedCount != 1 {
+		t.Fatalf("response = %+v, want incomplete directory metadata", response)
 	}
 }
 

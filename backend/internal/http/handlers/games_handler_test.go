@@ -44,6 +44,56 @@ func TestGamesHandlerListTimelineRejectsInvalidCursor(t *testing.T) {
 	}
 }
 
+func TestGamesHandlerListTimelineRejectsInvalidYears(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/games/timeline?years=oops", nil)
+
+	handler := NewSplitGamesHandler(nil, nil, nil, nil, nil)
+	handler.ListTimeline(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+
+	var response struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Error != "invalid timeline query parameter: years" {
+		t.Fatalf("error = %q, want invalid timeline query parameter: years", response.Error)
+	}
+}
+
+func TestGamesHandlerListTimelineRejectsInvalidLimit(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/games/timeline?limit=oops", nil)
+
+	handler := NewSplitGamesHandler(nil, nil, nil, nil, nil)
+	handler.ListTimeline(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+
+	var response struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Error != "invalid timeline query parameter: limit" {
+		t.Fatalf("error = %q, want invalid timeline query parameter: limit", response.Error)
+	}
+}
+
 func TestGamesHandlerListTimelineUsesLatestPublicReleaseDateAndFormatsCursor(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 

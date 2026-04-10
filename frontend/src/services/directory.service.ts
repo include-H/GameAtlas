@@ -13,6 +13,8 @@ interface DirectoryListResponse {
   currentPath: string
   parentPath: string | null
   items: DirectoryItem[]
+  incomplete: boolean
+  skippedCount: number
 }
 
 interface DirectoryDefaultData {
@@ -30,6 +32,8 @@ interface DirectoryListData {
   current_path: string
   parent_path: string | null
   items: DirectoryListApiItem[]
+  incomplete: boolean
+  skipped_count: number
 }
 
 export const directoryService = {
@@ -47,6 +51,8 @@ export const directoryService = {
         type: item.is_directory ? 'directory' : 'file',
         size: item.size_bytes,
       })),
+      incomplete: res.data.incomplete,
+      skippedCount: res.data.skipped_count,
     }))
   },
 }

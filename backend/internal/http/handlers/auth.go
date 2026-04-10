@@ -27,7 +27,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	var payload struct {
 		Password string `json:"password"`
 	}
-	if err := c.ShouldBindJSON(&payload); err != nil {
+	// 2026-04-06: auth transport now rejects unknown fields and trailing JSON.
+	// Impact: login payload semantics stay aligned with the stricter write handlers.
+	if err := decodeJSONStrict(c, &payload); err != nil {
 		writeJSONError(c, http.StatusBadRequest, "invalid auth payload")
 		return
 	}

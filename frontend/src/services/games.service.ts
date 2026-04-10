@@ -19,6 +19,7 @@ import type {
   TimelineGame,
   TimelineGameResponse,
 } from './types'
+import { isAdminGameDetail } from './types'
 
 interface GameStatsApiResponse {
   total_games: number
@@ -73,7 +74,8 @@ function buildGamesQueryParams(params?: {
   const queryParams = new URLSearchParams()
   if (params?.query?.page) queryParams.append('page', String(params.query.page))
   if (params?.query?.limit) queryParams.append('limit', String(params.query.limit))
-  if (params?.query?.search) queryParams.append('search', params.query.search)
+  const search = typeof params?.query?.search === 'string' ? params.query.search.trim() : ''
+  if (search) queryParams.append('search', search)
   if (params?.query?.series) queryParams.append('series', String(params.query.series))
   if (params?.query?.favorite === true) queryParams.append('favorite', 'true')
   if (typeof params?.query?.pending === 'boolean') queryParams.append('pending', String(params.query.pending))
@@ -118,6 +120,14 @@ function normalizeTimelineGame(item: TimelineGameResponse): TimelineGame {
   return { ...item }
 }
 
+function readTimelinePagination(response: TimelineGamesApiResponse): TimelinePaginationApi {
+  const pagination = response.pagination
+  if (!pagination) {
+    throw new Error('timeline response missing pagination')
+  }
+  return pagination
+}
+
 function normalizeGameDetail(item: GameDetailDto): GameDetail {
   return {
     ...item,
@@ -134,10 +144,14 @@ function normalizeGameDetail(item: GameDetailDto): GameDetail {
 }
 
 function normalizeAdminGameDetail(item: AdminGameDetailDto): AdminGameDetail {
-  return {
-    ...normalizeGameDetail(item),
-    files: item.files,
+  const detail = normalizeGameDetail(item)
+  // 2026-04-06: /games/:publicId still serves public/admin payloads from one route.
+  // Impact: edit flows must fail fast if auth/session state no longer yields file_path,
+  // instead of silently treating a public payload as editable admin data.
+  if (!isAdminGameDetail(detail)) {
+    throw new Error('admin game detail requires resolved file_path values')
   }
+  return detail
 }
 
 function getFileName(filePath?: string | null): string {
@@ -237,6 +251,9 @@ const gamesService = {
     from?: string | null
     to?: string | null
   }): Promise<TimelineGamesResult> {
+    // 2026-04-07: timeline route owns a small fixed query surface.
+    // Impact: the client keeps sending only supported years/limit ranges,
+    // but transport validation now belongs to the backend instead of hidden fallback coercion.
     const queryParams = new URLSearchParams()
     const years = Math.max(1, Math.min(params?.years || 2, 10))
     const limit = Math.max(1, Math.min(params?.limit || 60, 100))
@@ -246,13 +263,16 @@ const gamesService = {
     if (params?.from) queryParams.append('from', params.from)
     if (params?.to) queryParams.append('to', params.to)
     const response = await get<TimelineGamesApiResponse>('/games/timeline', { params: queryParams })
+    const pagination = readTimelinePagination(response)
 
     return {
       data: response.data.map((item) => normalizeTimelineGame(item)),
-      hasMore: Boolean(response.pagination?.hasMore),
-      nextCursor: response.pagination?.nextCursor || null,
-      from: response.pagination?.from || null,
-      to: response.pagination?.to || null,
+      // 2026-04-07: /games/timeline always returns pagination metadata with the read window.
+      // Impact: missing pagination is a broken backend payload, not a valid "no more data" state.
+      hasMore: pagination.hasMore,
+      nextCursor: pagination.nextCursor || null,
+      from: pagination.from || null,
+      to: pagination.to || null,
     }
   },
 

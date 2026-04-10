@@ -12,6 +12,17 @@
       <p>正在整理时间线...</p>
     </div>
 
+    <a-result
+      v-else-if="hasLoadFailure"
+      status="error"
+      title="时间线加载失败"
+      subtitle="请稍后重试。"
+    >
+      <template #extra>
+        <a-button type="primary" @click="loadTimeline">重新加载</a-button>
+      </template>
+    </a-result>
+
     <a-empty v-else-if="datedGames.length === 0" description="暂无带发售日期的游戏" />
 
     <template v-else>
@@ -113,6 +124,7 @@ const uiStore = useUiStore()
 
 const isLoading = ref(false)
 const isLoadingMore = ref(false)
+const hasLoadFailure = ref(false)
 const allGames = ref<TimelineGame[]>([])
 const hasMore = ref(false)
 const nextCursor = ref<string | null>(null)
@@ -254,6 +266,8 @@ const loadMoreTimeline = async () => {
     nextCursor.value = response.nextCursor
     currentWindowFrom.value = response.from
     currentWindowTo.value = response.to
+  } catch {
+    uiStore.addAlert('加载更多时间线失败', 'error')
   } finally {
     isLoadingMore.value = false
   }
@@ -266,6 +280,7 @@ const handleManualLoadMore = () => {
 const loadTimeline = async () => {
   if (isLoading.value || hasLoadedTimeline.value) return
   isLoading.value = true
+  hasLoadFailure.value = false
 
   try {
     const response = await gamesService.getTimelineGames({
@@ -280,6 +295,19 @@ const loadTimeline = async () => {
     currentWindowTo.value = response.to
     syncAmbientBackground(response.data)
     hasLoadedTimeline.value = true
+    hasLoadFailure.value = false
+  } catch {
+    // 2026-04-07: timeline empty state now means a successful read with no dated games.
+    // Impact: request failures must surface as an error state instead of pretending the
+    // timeline is empty.
+    hasLoadFailure.value = true
+    allGames.value = []
+    hasMore.value = false
+    nextCursor.value = null
+    currentWindowFrom.value = null
+    currentWindowTo.value = null
+    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+    uiStore.addAlert('加载时间线失败', 'error')
   } finally {
     isLoading.value = false
   }

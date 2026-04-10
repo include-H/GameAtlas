@@ -34,7 +34,9 @@ describe('auth store', () => {
 
     expect(getMock).toHaveBeenCalledWith('/auth/me')
     expect(store.isAdmin).toBe(true)
+    expect(store.role).toBe('admin')
     expect(store.adminDisplayName).toBe('Boss')
+    expect(store.authLoadFailed).toBe(false)
     expect(store.initialized).toBe(true)
     expect(store.user).toEqual({
       username: 'Boss',
@@ -46,10 +48,11 @@ describe('auth store', () => {
         role: 'admin',
       },
       isAdmin: true,
+      authLoadFailed: false,
     })
   })
 
-  it('falls back to guest state when fetchMe fails', async () => {
+  it('keeps auth load failures distinct from guest mode when fetchMe fails', async () => {
     getMock.mockRejectedValue(new Error('network failed'))
 
     const store = useAuthStore()
@@ -59,7 +62,9 @@ describe('auth store', () => {
     const result = await store.fetchMe()
 
     expect(store.isAdmin).toBe(false)
+    expect(store.role).toBe('guest')
     expect(store.adminDisplayName).toBe('')
+    expect(store.authLoadFailed).toBe(true)
     expect(store.initialized).toBe(true)
     expect(result).toEqual({
       user: {
@@ -67,6 +72,7 @@ describe('auth store', () => {
         role: 'guest',
       },
       isAdmin: false,
+      authLoadFailed: true,
     })
   })
 
@@ -91,7 +97,9 @@ describe('auth store', () => {
         role: 'admin',
       },
       isAdmin: true,
+      authLoadFailed: false,
     })
+    expect(store.role).toBe('admin')
   })
 
   it('logs out and resets store state', async () => {
@@ -106,7 +114,9 @@ describe('auth store', () => {
 
     expect(postMock).toHaveBeenCalledWith('/auth/logout')
     expect(store.isAdmin).toBe(false)
+    expect(store.role).toBe('guest')
     expect(store.adminDisplayName).toBe('')
+    expect(store.authLoadFailed).toBe(false)
     expect(store.initialized).toBe(true)
   })
 })

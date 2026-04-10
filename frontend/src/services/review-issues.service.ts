@@ -1,19 +1,14 @@
-import { del, get, put } from './api'
+import { del, put } from './api'
 import type { ApiEnvelope, ReviewIssueOverride } from './types'
 
 const reviewIssuesService = {
-  async list(gamePublicIds?: string[]): Promise<ReviewIssueOverride[]> {
-    const params = gamePublicIds && gamePublicIds.length > 0
-      ? { game_ids: gamePublicIds.join(',') }
-      : undefined
-    const response = await get<ApiEnvelope<ReviewIssueOverride[]>>('/review-issue-overrides', { params })
-    return response.data
-  },
-
   async ignore(gameId: string, issueKey: string, reason?: string): Promise<ReviewIssueOverride> {
     const response = await put<ApiEnvelope<ReviewIssueOverride>>(
       `/games/${gameId}/review-issues/${issueKey}/ignore`,
-      { reason: reason || undefined },
+      // 2026-04-07: keep review override reason semantics backend-owned.
+      // Impact: the client forwards explicit empty input instead of inventing its
+      // own nil/fallback rules before service-layer normalization runs.
+      { reason },
     )
     return response.data
   },

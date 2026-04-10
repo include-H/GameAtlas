@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -75,5 +76,41 @@ func TestHitokotoHandlerGetRejectsInvalidLengthRange(t *testing.T) {
 
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHitokotoHandlerGetRejectsInvalidMinLengthQuery(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/hitokoto?min_length=oops", nil)
+
+	handler := NewHitokotoHandler(services.NewHitokotoService())
+	handler.Get(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(recorder.Body.String(), `"error":"invalid hitokoto query parameter: min_length"`) {
+		t.Fatalf("body = %s, want invalid min_length query error", recorder.Body.String())
+	}
+}
+
+func TestHitokotoHandlerGetRejectsInvalidMaxLengthQuery(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/hitokoto?max_length=oops", nil)
+
+	handler := NewHitokotoHandler(services.NewHitokotoService())
+	handler.Get(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(recorder.Body.String(), `"error":"invalid hitokoto query parameter: max_length"`) {
+		t.Fatalf("body = %s, want invalid max_length query error", recorder.Body.String())
 	}
 }

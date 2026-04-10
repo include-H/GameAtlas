@@ -1,12 +1,14 @@
 package routes
 
 import (
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/gin-gonic/gin"
 )
@@ -89,5 +91,35 @@ func TestRegisterStaticRoutesFromDiskReturnsJSON404ForUnknownAPIGet(t *testing.T
 	}
 	if body := recorder.Body.String(); !strings.Contains(body, "\"error\":\"route not found\"") {
 		t.Fatalf("body = %q, want JSON 404 payload", body)
+	}
+}
+
+func TestResolveEmbeddedDistFSRequiresIndexHTML(t *testing.T) {
+	_, err := resolveEmbeddedDistFSFrom(fstest.MapFS{
+		"ui/app.js": {Data: []byte("console.log('ok')")},
+	})
+	if err == nil {
+		t.Fatal("expected resolveEmbeddedDistFSFrom to fail when index.html is missing")
+	}
+	if !strings.Contains(err.Error(), "index.html") {
+		t.Fatalf("err = %v, want missing index.html", err)
+	}
+}
+
+func TestResolveEmbeddedDistFSFromReturnsFSWhenIndexExists(t *testing.T) {
+	distFS, err := resolveEmbeddedDistFSFrom(fstest.MapFS{
+		"index.html": {Data: []byte("<html>spa</html>")},
+		"ui/app.js":  {Data: []byte("console.log('ok')")},
+	})
+	if err != nil {
+		t.Fatalf("resolveEmbeddedDistFSFrom returned error: %v", err)
+	}
+
+	content, readErr := fs.ReadFile(distFS, "index.html")
+	if readErr != nil {
+		t.Fatalf("ReadFile returned error: %v", readErr)
+	}
+	if string(content) != "<html>spa</html>" {
+		t.Fatalf("index.html = %q, want %q", string(content), "<html>spa</html>")
 	}
 }

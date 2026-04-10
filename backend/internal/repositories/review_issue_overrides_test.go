@@ -72,16 +72,30 @@ func TestReviewIssueOverrideRepositoryUpsertUpdatesExistingRow(t *testing.T) {
 	if updated.Reason == nil || *updated.Reason != "second" {
 		t.Fatalf("updated.Reason = %v, want second", updated.Reason)
 	}
+}
 
-	items, err := repo.List([]int64{gameID})
+func TestReviewIssueOverrideRepositoryDeleteRemovesExistingRow(t *testing.T) {
+	db := openRepositoryTagsTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	repo := NewReviewIssueOverrideRepository(db)
+	gameID := insertRepositoryGame(t, db, "override-delete", "Override Delete", "public")
+
+	created, err := repo.Upsert(gameID, "missing-summary", "ignored", nil)
 	if err != nil {
-		t.Fatalf("List returned error: %v", err)
+		t.Fatalf("Upsert returned error: %v", err)
 	}
-	if len(items) != 1 {
-		t.Fatalf("len(items) = %d, want 1", len(items))
+
+	if err := repo.Delete(gameID, "missing-summary"); err != nil {
+		t.Fatalf("Delete returned error: %v", err)
 	}
-	if items[0].ID != created.ID || items[0].Status != "resolved" {
-		t.Fatalf("items[0] = %+v, want updated single row", items[0])
+
+	recreated, err := repo.Upsert(gameID, "missing-summary", "ignored", nil)
+	if err != nil {
+		t.Fatalf("Upsert after delete returned error: %v", err)
+	}
+	if recreated.ID == created.ID {
+		t.Fatalf("recreated.ID = %d, want delete to remove the previous row", recreated.ID)
 	}
 }
 

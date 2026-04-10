@@ -4,6 +4,31 @@ import { describe, expect, it, vi } from 'vitest'
 import { useSteamImportMetadata } from './useSteamImportMetadata'
 
 describe('useSteamImportMetadata', () => {
+  it('treats whitespace-only wiki text as unavailable content', () => {
+    const form = ref({
+      summary: '',
+      title: 'Game One',
+      title_alt: '',
+      release_date: undefined as string | undefined,
+      engine: '',
+      developer_ids: [] as Array<string | number>,
+      publisher_ids: [] as Array<string | number>,
+      platform_ids: [] as Array<string | number>,
+    })
+    const addAlert = vi.fn()
+
+    const metadataImport = useSteamImportMetadata({
+      form,
+      getWikiContent: () => '   ',
+      addAlert,
+    })
+
+    metadataImport.importMetadataFromWiki()
+
+    expect(metadataImport.wikiMetadataPickerVisible.value).toBe(false)
+    expect(addAlert).toHaveBeenCalledWith('当前游戏没有可解析的 Wiki 内容', 'warning')
+  })
+
   it('applies the prepared wiki metadata snapshot instead of reparsing mutated content', () => {
     const form = ref({
       summary: '',

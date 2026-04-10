@@ -86,6 +86,14 @@
           <span class="tag-filter-section__hint">同组多选为或，不同组之间为且</span>
         </div>
 
+        <div v-if="filterOptionsLoadFailedWithStaleData" class="tag-filter-section__status tag-filter-section__status--warning">
+          标签筛选刷新失败，当前显示的是上次成功加载的筛选项。
+        </div>
+
+        <div v-else-if="hasFilterOptionsLoadFailure" class="tag-filter-section__status tag-filter-section__status--error">
+          标签筛选加载失败，请稍后重试。
+        </div>
+
         <a-row v-if="filterableTagGroups.length > 0" :gutter="[12, 16]" class="mt-3">
           <a-col
             v-for="group in filterableTagGroups"
@@ -119,7 +127,7 @@
             </div>
           </a-col>
         </a-row>
-        <div v-else class="tag-filter-section__empty">
+        <div v-else-if="!hasFilterOptionsLoadFailure" class="tag-filter-section__empty">
           暂无可筛选标签。重启后端完成 migration 后，这里会显示标签组。
         </div>
       </div>
@@ -165,7 +173,7 @@
     </a-card>
 
     <!-- Results Count -->
-    <div class="results-info">
+    <div v-if="!hasLoadFailure" class="results-info">
       <span class="results-count">
         显示 {{ games?.length || 0 }} / {{ pagination?.total || 0 }} 个游戏
       </span>
@@ -225,6 +233,18 @@
         />
       </div>
     </div>
+
+    <a-empty v-else-if="hasLoadFailure" class="empty-state">
+      <template #image>
+        <icon-trophy :style="{ fontSize: '96px', color: 'var(--color-text-3)' }" />
+      </template>
+      <template #description>
+        <div class="empty-description">
+          <h3>加载游戏失败</h3>
+          <p>当前列表请求没有成功返回，请稍后重试。</p>
+        </div>
+      </template>
+    </a-empty>
 
     <!-- Empty State -->
     <a-empty v-else class="empty-state">
@@ -291,11 +311,14 @@ const {
   handleSearch,
   handleTagGroupSelectionChange,
   hasActiveFilters,
+  hasFilterOptionsLoadFailure,
+  hasLoadFailure,
   isLoading,
   itemsPerPage,
   itemsPerPageOptions,
   pageTitle,
   pagination,
+  filterOptionsLoadFailedWithStaleData,
   removeTagFilter,
   searchQuery,
   selectedTagIds,

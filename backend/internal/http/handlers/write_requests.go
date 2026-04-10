@@ -26,13 +26,6 @@ type tagWriteRequest struct {
 	IsActive  *bool   `json:"is_active"`
 }
 
-type steamApplyAssetsRequest struct {
-	GameID         int64    `json:"game_id"`
-	CoverURL       *string  `json:"cover_url"`
-	BannerURL      *string  `json:"banner_url"`
-	ScreenshotURLs []string `json:"screenshot_urls"`
-}
-
 type wikiWriteRequest struct {
 	Content       string  `json:"content"`
 	ChangeSummary *string `json:"change_summary"`
@@ -68,27 +61,9 @@ func (request tagWriteRequest) toInput() domain.TagWriteInput {
 	}
 }
 
-func (request steamApplyAssetsRequest) toInput() domain.SteamApplyAssetsInput {
-	return domain.SteamApplyAssetsInput{
-		GameID:         request.GameID,
-		CoverURL:       request.CoverURL,
-		BannerURL:      request.BannerURL,
-		ScreenshotURLs: normalizeStringSlice(request.ScreenshotURLs),
-	}
-}
-
 func (request wikiWriteRequest) toInput() domain.WikiWriteInput {
 	return domain.WikiWriteInput{
 		Content:       request.Content,
 		ChangeSummary: request.ChangeSummary,
 	}
-}
-
-func normalizeStringSlice(items []string) []string {
-	// 2026-04-04: keep this only for steam asset apply requests.
-	// Impact: omitted screenshot_urls still mean "apply zero screenshots" before service validation.
-	if items == nil {
-		return []string{}
-	}
-	return items
 }

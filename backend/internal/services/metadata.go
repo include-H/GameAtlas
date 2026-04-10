@@ -48,7 +48,9 @@ func (s *MetadataService) List(resource MetadataResource, includeAll bool, optio
 		return nil, err
 	}
 	if resource.Table == "series" {
-		s.enrichSeriesItems(items, includeAll)
+		if err := s.enrichSeriesItems(items, includeAll); err != nil {
+			return nil, err
+		}
 		filtered := make([]domain.MetadataItem, 0, len(items))
 		for index := range items {
 			if includeAll || items[index].GameCount > 0 {
@@ -119,7 +121,9 @@ func (s *MetadataService) GetSeriesDetail(id int64, includeAll bool) (*SeriesDet
 		return nil, err
 	}
 
-	s.enrichSeriesItem(item, includeAll)
+	if err := s.enrichSeriesItem(item, includeAll); err != nil {
+		return nil, err
+	}
 	if !includeAll && item.GameCount == 0 {
 		return nil, ErrNotFound
 	}
@@ -191,18 +195,19 @@ func filterMetadataItems(items []domain.MetadataItem, options MetadataListOption
 	return items
 }
 
-func (s *MetadataService) enrichSeriesItem(item *domain.MetadataItem, includeAll bool) {
+func (s *MetadataService) enrichSeriesItem(item *domain.MetadataItem, includeAll bool) error {
 	games, err := s.repo.ListSeriesGames(item.ID, includeAll)
 	if err != nil {
-		return
+		return err
 	}
 
 	applySeriesItemGames(item, games)
+	return nil
 }
 
-func (s *MetadataService) enrichSeriesItems(items []domain.MetadataItem, includeAll bool) {
+func (s *MetadataService) enrichSeriesItems(items []domain.MetadataItem, includeAll bool) error {
 	if len(items) == 0 {
-		return
+		return nil
 	}
 
 	seriesIDs := make([]int64, 0, len(items))
@@ -212,12 +217,14 @@ func (s *MetadataService) enrichSeriesItems(items []domain.MetadataItem, include
 
 	gamesBySeriesID, err := s.repo.ListSeriesGamesBySeriesIDs(seriesIDs, includeAll)
 	if err != nil {
-		return
+		return err
 	}
 
 	for index := range items {
 		applySeriesItemGames(&items[index], gamesBySeriesID[items[index].ID])
 	}
+
+	return nil
 }
 
 func applySeriesItemGames(item *domain.MetadataItem, games []domain.SeriesGameSummary) {

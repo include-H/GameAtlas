@@ -42,7 +42,7 @@ func TestAssetsHandlerUploadVideoPersistsAsset(t *testing.T) {
 	if err := writer.WriteField("game_id", strconv.FormatInt(gameID, 10)); err != nil {
 		t.Fatalf("WriteField game_id: %v", err)
 	}
-	if err := writer.WriteField("sort_order", "-5"); err != nil {
+	if err := writer.WriteField("sort_order", "2"); err != nil {
 		t.Fatalf("WriteField sort_order: %v", err)
 	}
 	partHeader := textproto.MIMEHeader{}
@@ -96,11 +96,63 @@ func TestAssetsHandlerUploadVideoPersistsAsset(t *testing.T) {
 	}
 
 	asset := mustLoadHandlerAssetByUID(t, db, response.Data.AssetUID)
-	if asset.SortOrder != 0 {
-		t.Fatalf("SortOrder = %d, want 0 because negative form value should fallback", asset.SortOrder)
+	if asset.SortOrder != 2 {
+		t.Fatalf("SortOrder = %d, want 2 from upload form", asset.SortOrder)
 	}
 	if _, err := os.Stat(filepath.Join(assetsDir, "upload-game", response.Data.AssetUID+".mp4")); err != nil {
 		t.Fatalf("expected uploaded file on disk, got err=%v", err)
+	}
+}
+
+func TestAssetsHandlerUploadRejectsInvalidSortOrder(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	gameID := insertGamesHandlerTestGame(t, db, "upload-invalid-sort", "Upload Invalid Sort", domain.GameVisibilityPublic, "")
+	service := services.NewAssetsService(
+		config.Config{AssetsDir: filepath.Join(t.TempDir(), "assets")},
+		repositories.NewGamesRepository(db),
+		repositories.NewAssetsRepository(db),
+	)
+	handler := NewAssetsHandler(service)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	if err := writer.WriteField("game_id", strconv.FormatInt(gameID, 10)); err != nil {
+		t.Fatalf("WriteField game_id: %v", err)
+	}
+	if err := writer.WriteField("sort_order", "-5"); err != nil {
+		t.Fatalf("WriteField sort_order: %v", err)
+	}
+	partHeader := textproto.MIMEHeader{}
+	partHeader.Set("Content-Disposition", `form-data; name="file"; filename="trailer.mp4"`)
+	partHeader.Set("Content-Type", "video/mp4")
+	part, err := writer.CreatePart(partHeader)
+	if err != nil {
+		t.Fatalf("CreatePart returned error: %v", err)
+	}
+	if _, err := part.Write([]byte("video-content")); err != nil {
+		t.Fatalf("Write file part returned error: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer.Close returned error: %v", err)
+	}
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodPost, "/api/assets/video", body)
+	context.Request.Header.Set("Content-Type", writer.FormDataContentType())
+	context.Set("is_admin", true)
+
+	handler.Upload("video")(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"error":"valid sort_order is required"`) {
+		t.Fatalf("body = %s, want sort_order validation error", recorder.Body.String())
 	}
 }
 

@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -21,10 +23,9 @@ func NewMetadataHandler(service *services.MetadataService, resource services.Met
 }
 
 func (h *MetadataHandler) List(c *gin.Context) {
-	options := services.MetadataListOptions{
-		Search: c.Query("search"),
-		Limit:  parseQueryInt(c, "limit", 0),
-		Sort:   c.Query("sort"),
+	options, ok := decodeMetadataListOptions(c)
+	if !ok {
+		return
 	}
 
 	items, err := h.service.List(h.resource, isAdminRequest(c), options)
@@ -36,6 +37,58 @@ func (h *MetadataHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    toMetadataResponses(items),
+	})
+}
+
+func decodeMetadataListOptions(c *gin.Context) (services.MetadataListOptions, bool) {
+	limit, ok := parseMetadataListLimit(c)
+	if !ok {
+		return services.MetadataListOptions{}, false
+	}
+	sort, ok := parseMetadataListSort(c)
+	if !ok {
+		return services.MetadataListOptions{}, false
+	}
+
+	options := services.MetadataListOptions{
+		Search: c.Query("search"),
+		Limit:  limit,
+		Sort:   sort,
+	}
+	return options, true
+}
+
+func parseMetadataListLimit(c *gin.Context) (int, bool) {
+	raw := c.Query("limit")
+	if raw == "" {
+		return 0, true
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		writeMetadataQueryError(c, "limit")
+		return 0, false
+	}
+	return value, true
+}
+
+func parseMetadataListSort(c *gin.Context) (string, bool) {
+	raw := strings.TrimSpace(c.Query("sort"))
+	if raw == "" {
+		return "", true
+	}
+	switch raw {
+	case "name", "popular":
+		return raw, true
+	default:
+		writeMetadataQueryError(c, "sort")
+		return "", false
+	}
+}
+
+func writeMetadataQueryError(c *gin.Context, key string) {
+	c.JSON(http.StatusBadRequest, gin.H{
+		"success": false,
+		"error":   "invalid metadata query parameter: " + key,
 	})
 }
 
@@ -73,7 +126,9 @@ func (h *MetadataHandler) Create(c *gin.Context) {
 		return
 	}
 	var request metadataWriteRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
+	// 2026-04-06: metadata writes use strict JSON decode so transport contracts
+	// do not silently accept unknown fields that service/domain never defined.
+	if err := decodeJSONStrict(c, &request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "invalid metadata payload",

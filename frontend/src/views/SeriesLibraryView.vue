@@ -31,11 +31,13 @@
     </div>
 
     <template v-else>
+      <a-empty v-if="hasLoadFailure" description="系列列表加载失败，请稍后重试。" />
+
       <div class="series-library__meta">
         共 {{ seriesCards.length }} 个系列
       </div>
 
-      <div v-if="seriesCards.length > 0" class="series-library__grid">
+      <div v-if="!hasLoadFailure && seriesCards.length > 0" class="series-library__grid">
         <div
           v-for="series in seriesCards"
           :key="series.id"
@@ -115,6 +117,7 @@ interface SeriesCardItem extends Series {
 const router = useRouter()
 const uiStore = useUiStore()
 const isLoading = ref(false)
+const hasLoadFailure = ref(false)
 const searchQuery = ref('')
 const seriesCards = ref<SeriesCardItem[]>([])
 let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -138,6 +141,7 @@ const syncAmbientBackground = () => {
 
 const loadSeries = async () => {
   isLoading.value = true
+  hasLoadFailure.value = false
   try {
     const allSeries = await seriesService.getAllSeries({
       search: searchQuery.value.trim() || undefined,
@@ -152,6 +156,13 @@ const loadSeries = async () => {
         latest_updated_at: item.latest_updated_at ?? null,
       }))
     syncAmbientBackground()
+  } catch {
+    // 2026-04-07: series list failures must stay distinct from an empty library result.
+    // Impact: this page no longer reuses stale cards or empty-state copy as a substitute for a failed read.
+    hasLoadFailure.value = true
+    seriesCards.value = []
+    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+    uiStore.addAlert('加载系列列表失败', 'error')
   } finally {
     isLoading.value = false
   }

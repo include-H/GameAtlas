@@ -91,7 +91,7 @@
       </a-row>
     </a-card>
 
-    <div class="pending-center__result-meta">
+    <div v-if="!hasLoadFailure" class="pending-center__result-meta">
       <span>
         当前页返回 {{ pendingGames.length }} 条，待处理总量 {{ totalPendingCount }} 条，已忽略 {{ pendingIssueIgnoredTotal }} 个问题
       </span>
@@ -104,6 +104,16 @@
       <a-spin :size="24" />
       <p>正在整理待处理队列...</p>
     </div>
+
+    <a-empty v-else-if="hasLoadFailure" class="pending-center__empty">
+      <template #description>
+        <div>
+          <h3>待处理队列加载失败</h3>
+          <p>当前请求没有成功返回，无法判断是否真的没有待处理项。</p>
+        </div>
+      </template>
+      <a-button type="primary" @click="refreshWorkbench">重新加载</a-button>
+    </a-empty>
 
     <a-empty v-else-if="pendingGames.length === 0" class="pending-center__empty">
       <template #description>
@@ -310,6 +320,7 @@
       v-model:visible="showEditModal"
       :game="editingGame"
       @success="handleEditSuccess"
+      @sync="handleEditSync"
     />
   </div>
 </template>
@@ -347,6 +358,8 @@ const {
   getVisibleIssueGroups,
   getVisibleIssueDetails,
   handleEditSuccess,
+  handleEditSync,
+  hasLoadFailure,
   pendingIssueIgnoredTotal,
   ignoreIssue,
   isSevereGame,

@@ -31,6 +31,7 @@ interface UseEditGameAssetsOptions {
   createEditableScreenshot: (asset: UploadedAssetResult, index: number) => EditGameEditableScreenshot
   createEditableVideo: (asset: UploadedAssetResult) => EditGameEditableVideo
   addAlert: (message: string, type: AlertType) => void
+  onAssetPersisted?: () => Promise<void> | void
 }
 
 const readUploadError = (response?: UploadResponseLike) => {
@@ -49,6 +50,7 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
         options.queueAssetDeletion('cover', options.form.value.cover_image)
       }
       options.form.value.cover_image = response.data.path
+      void options.onAssetPersisted?.()
       options.showCoverSelector.value = false
       options.addAlert('封面上传成功', 'success')
       return
@@ -68,6 +70,7 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
         options.queueAssetDeletion('banner', options.form.value.banner_image)
       }
       options.form.value.banner_image = response.data.path
+      void options.onAssetPersisted?.()
       options.showBannerSelector.value = false
       options.addAlert('横幅上传成功', 'success')
       return
@@ -86,6 +89,7 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
       options.form.value.screenshots.push(
         options.createEditableScreenshot(response.data, options.form.value.screenshots.length),
       )
+      void options.onAssetPersisted?.()
       options.showScreenshotSelector.value = false
       options.addAlert('截图上传成功', 'success')
       return
@@ -117,6 +121,7 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
         options.videoUploadProgress.value = percent
       })
       appendPreviewVideo(options.createEditableVideo(uploaded))
+      await options.onAssetPersisted?.()
       options.videoUploadProgress.value = 100
       options.addAlert('预告片上传成功', 'success')
     } catch (error) {

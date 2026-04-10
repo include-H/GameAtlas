@@ -1,5 +1,14 @@
 <template>
-  <div v-if="game" class="game-detail">
+  <a-empty v-if="hasLoadFailure" class="game-detail__load-failure">
+    <template #description>
+      <div class="empty-description">
+        <h3>加载游戏详情失败</h3>
+        <p>当前页面未成功获取这条游戏数据，请稍后重试。</p>
+      </div>
+    </template>
+  </a-empty>
+
+  <div v-else-if="game" class="game-detail">
     <div class="game-detail__container">
       <!-- Game Header Navigation & Title -->
       <div class="game-detail__header">
@@ -198,7 +207,7 @@
                 </a-button>
               </div>
             </template>
-            <markdown-renderer :content="wiki?.content || ''" />
+            <markdown-renderer :content="game.wiki_content || ''" />
           </a-card>
         </div>
 
@@ -232,6 +241,7 @@
     v-model:visible="showEditModal"
     :game="editableGame"
     @success="handleEditSuccess"
+    @sync="handleEditSync"
   />
 
 </template>
@@ -271,9 +281,11 @@ const {
   formatDate,
   formatSize,
   game,
+  hasLoadFailure,
   handleDownloadLaunchScript,
   handleDownloadVersion,
   handleEditSuccess,
+  handleEditSync,
   handleGoBack,
   handleToggleFavorite,
   hasWikiContent,
@@ -284,7 +296,6 @@ const {
   showEditModal,
   topSectionRef,
   versions,
-  wiki,
 } = useGameDetailView({
   route,
   router,

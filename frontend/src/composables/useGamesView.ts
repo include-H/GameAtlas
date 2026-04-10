@@ -48,6 +48,7 @@ interface BuildGamesListRequestOptions {
 const DEFAULT_SORT = { field: 'updated_at', order: 'desc' } as const satisfies Pick<GameSort, 'field' | 'order'>
 const DEFAULT_ITEMS_PER_PAGE = 24
 const AMBIENT_BACKGROUND_OWNER = 'games'
+const ITEMS_PER_PAGE_VALUES = new Set([12, 24, 48, 96])
 
 const SORT_VALUES = new Set<GamesSortOptionValue>([
   'updated_at:desc',
@@ -74,6 +75,11 @@ export const readSingleQueryValue = (
   return typeof value === 'string' && value.length > 0 ? value : undefined
 }
 
+const normalizeCommittedSearchValue = (value: string | undefined): string | undefined => {
+  const normalized = value?.trim()
+  return normalized ? normalized : undefined
+}
+
 export const parsePositiveQueryNumber = (value: string | undefined, fallback: number): number => {
   if (!value) return fallback
   const parsed = Number.parseInt(value, 10)
@@ -94,6 +100,13 @@ export const parsePositiveRouteNumber = (
 ): number | undefined => {
   const parsed = Number(readSingleQueryValue(value))
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
+}
+
+export const parseGamesItemsPerPage = (
+  value: LocationQueryValue | LocationQueryValue[] | undefined,
+): number | undefined => {
+  const parsed = parsePositiveRouteNumber(value)
+  return parsed !== undefined && ITEMS_PER_PAGE_VALUES.has(parsed) ? parsed : undefined
 }
 
 export const parseRouteBoolean = (
@@ -159,7 +172,7 @@ export const buildGamesListRequest = ({
     query: {
       page,
       limit: itemsPerPage,
-      search: readSingleQueryValue(routeQuery.search),
+      search: normalizeCommittedSearchValue(readSingleQueryValue(routeQuery.search)),
       tag: parseRouteTagIds(routeQuery.tag),
       favorite,
     },
@@ -180,7 +193,7 @@ export const buildGamesListRequest = ({
 
 export const hasGamesActiveFilters = (routeQuery: LocationQuery): boolean => {
   return Boolean(
-    readSingleQueryValue(routeQuery.search)
+    normalizeCommittedSearchValue(readSingleQueryValue(routeQuery.search))
     || parseRouteTagIds(routeQuery.tag).length > 0
     || parseRouteBoolean(routeQuery.favorite) === true,
   )
@@ -243,6 +256,53 @@ export const normalizeGamesSortRouteQuery = (routeQuery: LocationQuery): Locatio
   })
 }
 
+export const normalizeGamesPaginationRouteQuery = (routeQuery: LocationQuery): LocationQueryRaw | null => {
+  const rawPage = readSingleQueryValue(routeQuery.page)
+  const rawLimit = readSingleQueryValue(routeQuery.limit)
+
+  if (rawPage === undefined && rawLimit === undefined) {
+    return null
+  }
+
+  const normalizedPage = parsePositiveRouteNumber(routeQuery.page)
+  const normalizedLimit = parseGamesItemsPerPage(routeQuery.limit)
+
+  if ((rawPage === undefined || normalizedPage !== undefined) && (rawLimit === undefined || normalizedLimit !== undefined)) {
+    return null
+  }
+
+  // 2026-04-06: games route paging stays inside the UI-supported page sizes and valid positive pages.
+  // Impact: shared URLs no longer depend on backend coercion to recover malformed limit/page inputs.
+  return buildGamesRouteQuery(routeQuery, {
+    page: normalizedPage !== undefined ? String(normalizedPage) : undefined,
+    limit: normalizedLimit !== undefined ? String(normalizedLimit) : undefined,
+  })
+}
+
+export const normalizeGamesPaginationResponseQuery = (
+  routeQuery: LocationQuery,
+  pagination: Pick<GameListQuery, 'page' | 'limit'> & { totalPages: number },
+): LocationQueryRaw | null => {
+  const requestedPage = parsePositiveQueryNumber(readSingleQueryValue(routeQuery.page), 1)
+
+  if (pagination.totalPages === 0) {
+    if (requestedPage === 1) {
+      return null
+    }
+    return buildGamesRouteQuery(routeQuery, {
+      page: undefined,
+    })
+  }
+
+  if (requestedPage <= pagination.totalPages) {
+    return null
+  }
+
+  return buildGamesRouteQuery(routeQuery, {
+    page: String(pagination.totalPages),
+  })
+}
+
 const normalizeRouteQueryValue = (
   value: LocationQueryValue | LocationQueryValue[] | undefined,
 ): string[] => {
@@ -298,6 +358,8 @@ export const useGamesView = ({
   const showTagFilters = ref(false)
   const tagGroups = ref<TagGroup[]>([])
   const tags = ref<Tag[]>([])
+  const hasFilterOptionsLoadFailure = ref(false)
+  const filterOptionsLoadFailedWithStaleData = ref(false)
 
   const itemsPerPageOptions = [
     { label: '12', value: 12 },
@@ -322,6 +384,11 @@ export const useGamesView = ({
   const games = computed(() => gamesStore.games)
   const pagination = computed(() => gamesStore.pagination)
   const totalPages = computed(() => pagination.value.totalPages || 0)
+  const hasLoadFailure = computed(() => {
+    // 2026-04-07: a failed catalog read must not fall through to the empty-state copy.
+    // Impact: "暂无游戏" now only means the backend successfully returned an empty page.
+    return Boolean(gamesStore.listError) && games.value.length === 0
+  })
 
   const currentPage = computed({
     get: () => parsePositiveQueryNumber(readSingleQueryValue(route.query.page), 1),
@@ -355,7 +422,7 @@ export const useGamesView = ({
   })
 
   const itemsPerPage = computed({
-    get: () => parsePositiveQueryNumber(readSingleQueryValue(route.query.limit), DEFAULT_ITEMS_PER_PAGE),
+    get: () => parseGamesItemsPerPage(route.query.limit) ?? DEFAULT_ITEMS_PER_PAGE,
     set: (limit: number) => {
       updateRoute({ limit: String(limit), page: '1' })
     },
@@ -394,6 +461,7 @@ export const useGamesView = ({
 
   const normalizeRouteSortQuery = () => {
     const query = normalizeGamesFavoriteRouteQuery(route.query)
+      || normalizeGamesPaginationRouteQuery(route.query)
       || normalizeGamesSortRouteQuery(route.query)
     if (!query || isSameRouteQuery(route.query, query)) return false
 
@@ -414,6 +482,16 @@ export const useGamesView = ({
 
     try {
       const response = await gamesStore.fetchGames(request)
+      const normalizedPaginationQuery = normalizeGamesPaginationResponseQuery(route.query, response.pagination)
+      if (normalizedPaginationQuery && !isSameRouteQuery(route.query, normalizedPaginationQuery)) {
+        // 2026-04-06: when filters or deletes invalidate the current page, route state must follow
+        // the backend pagination contract instead of rendering an out-of-range empty page as "no data".
+        router.replace({
+          name: 'games',
+          query: normalizedPaginationQuery,
+        })
+        return
+      }
       syncAmbientBackground(response.data, response.pagination.page)
     } catch {
       uiStore.addAlert('加载游戏失败', 'error')
@@ -514,7 +592,9 @@ export const useGamesView = ({
   }
 
   const handleSearch = () => {
-    updateRoute({ search: searchQuery.value })
+    // 2026-04-06: empty and whitespace-only input should mean "no backend search filter".
+    // Impact: route state, active-filter badges, and request params now share one native search semantic.
+    updateRoute({ search: normalizeCommittedSearchValue(searchQuery.value) })
   }
 
   const clearFilters = () => {
@@ -576,6 +656,8 @@ export const useGamesView = ({
   }
 
   const loadFilterOptions = async () => {
+    hasFilterOptionsLoadFailure.value = false
+    filterOptionsLoadFailedWithStaleData.value = false
     try {
       const [loadedGroups, loadedTags] = await Promise.all([
         tagsService.getTagGroups(),
@@ -584,6 +666,13 @@ export const useGamesView = ({
       tagGroups.value = loadedGroups
       tags.value = loadedTags
     } catch (error) {
+      // 2026-04-09: tag filter metadata failures must not masquerade as either
+      // "no filterable tags" or freshly loaded filter options from the current request.
+      if (tagGroups.value.length > 0 || tags.value.length > 0) {
+        filterOptionsLoadFailedWithStaleData.value = true
+      } else {
+        hasFilterOptionsLoadFailure.value = true
+      }
       console.error('Failed to load tags:', error)
       uiStore.addAlert('加载标签筛选失败', 'error')
     }
@@ -601,7 +690,12 @@ export const useGamesView = ({
     searchQuery.value = readSingleQueryValue(route.query.search) || ''
     if (games.value.length === 0 || Object.keys(route.query).length > 0) {
       await loadGames()
+      return
     }
+
+    // Re-entering the catalog can reuse the cached store payload, which skips loadGames().
+    // Keep the ambient background in sync even when the page comes entirely from client cache.
+    syncAmbientBackground(games.value)
   })
 
   onActivated(async () => {
@@ -653,12 +747,15 @@ export const useGamesView = ({
     handleSearch,
     handleTagGroupSelectionChange,
     hasActiveFilters,
+    hasLoadFailure,
+    hasFilterOptionsLoadFailure,
     isLoading,
     itemsPerPage,
     itemsPerPageOptions,
     loadGames,
     pageTitle,
     pagination,
+    filterOptionsLoadFailedWithStaleData,
     removeTagFilter,
     searchQuery,
     selectedTagIds,

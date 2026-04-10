@@ -52,3 +52,19 @@ func TestHitokotoServiceRandomReturnsNotFoundForUnsupportedCategory(t *testing.T
 		t.Fatalf("err = %v, want %v", err, ErrNotFound)
 	}
 }
+
+func TestNewHitokotoServicePanicsOnInvalidEmbeddedJSON(t *testing.T) {
+	original := hitokotoGameSentencesJSON
+	hitokotoGameSentencesJSON = []byte("{")
+	defer func() {
+		hitokotoGameSentencesJSON = original
+	}()
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected NewHitokotoService to panic on invalid embedded json")
+		}
+	}()
+
+	NewHitokotoService()
+}

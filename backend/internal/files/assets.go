@@ -140,22 +140,43 @@ func (s *AssetStore) DownloadRemoteAsset(
 }
 
 func (s *AssetStore) DeleteAsset(assetPath string) error {
+	targetPath, err := s.resolveAssetPath(assetPath)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(targetPath); err != nil {
+		return err
+	}
+	return nil
+}
+
+// AssetExists treats invalid or escaped asset paths as missing so callers can safely prune
+// stale database references without leaking filesystem traversal semantics back up the stack.
+func (s *AssetStore) AssetExists(assetPath string) bool {
+	targetPath, err := s.resolveAssetPath(assetPath)
+	if err != nil {
+		return false
+	}
+	if _, err := os.Stat(targetPath); err != nil {
+		return false
+	}
+	return true
+}
+
+func (s *AssetStore) resolveAssetPath(assetPath string) (string, error) {
 	cleaned := strings.TrimSpace(assetPath)
 	cleaned = strings.TrimPrefix(cleaned, "/")
 	if cleaned == "" || !strings.HasPrefix(cleaned, "assets/") {
-		return os.ErrNotExist
+		return "", os.ErrNotExist
 	}
 
 	relativeAssetPath := strings.TrimPrefix(cleaned, "assets/")
 	targetPath := filepath.Join(s.baseDir, filepath.FromSlash(relativeAssetPath))
 	relative, err := filepath.Rel(s.baseDir, targetPath)
 	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return ErrInvalidRemoteURL
+		return "", ErrInvalidRemoteURL
 	}
-	if err := os.Remove(targetPath); err != nil {
-		return err
-	}
-	return nil
+	return targetPath, nil
 }
 
 func validateAssetContentType(assetType string, contentType string) (string, error) {

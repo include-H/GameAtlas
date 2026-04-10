@@ -1,6 +1,6 @@
-import { get, post } from './api'
+import { get } from './api'
 import { buildApiUrl, buildSteamProxyUrl } from './api-url'
-import type { ApiEnvelope, SteamFetchImagesResponse, SteamGameDetails, SteamGameSearchResult } from './types'
+import type { ApiEnvelope, SteamGameDetails, SteamGameSearchResult } from './types'
 
 interface SteamSearchApiItem {
   app_id: number
@@ -56,6 +56,8 @@ export function proxySteamAssetUrl(rawUrl?: string | null): string {
 
 const steamService = {
   async searchGames(query: string): Promise<SteamGameSearchResult[]> {
+    // 2026-04-09: keep blank-query short-circuit in the UI request layer so the picker
+    // does not fire meaningless admin search requests before the backend transport contract applies.
     if (!query || query.trim().length === 0) return []
     const response = await get<ApiEnvelope<SteamSearchApiItem[]>>('/steam/search', {
       params: {
@@ -78,21 +80,11 @@ const steamService = {
       genres: [],
       tags: [],
       screenshots: data.screenshot_urls.map((url) => proxySteamAssetUrl(url)),
-      headerImage: proxySteamAssetUrl(data.cover_url),
-      libraryHero: proxySteamAssetUrl(data.banner_url) || undefined,
-      background: proxySteamAssetUrl(data.banner_url) || undefined,
-    }
-  },
-
-  async applyAssets(appId: string, payload: { game_id: number; cover_url?: string; banner_url?: string; screenshot_urls: string[] }): Promise<SteamFetchImagesResponse> {
-    const response = await post<ApiEnvelope<SteamAssetsApiItem>>(`/steam/${appId}/apply-assets`, payload, {
-      // DASH trailer import can take longer than default API timeout.
-      timeout: 5 * 60 * 1000,
-    })
-    return {
-      coverImage: response.data.cover_url || '',
-      bannerImage: response.data.banner_url || '',
-      screenshots: response.data.screenshot_urls,
+      // 2026-04-06: keep Steam asset semantics aligned with the backend preview contract.
+      // Impact: the frontend only carries cover/banner/screenshots here and does not invent
+      // extra asset aliases from the same banner url.
+      coverImage: proxySteamAssetUrl(data.cover_url),
+      bannerImage: proxySteamAssetUrl(data.banner_url) || undefined,
     }
   },
 }

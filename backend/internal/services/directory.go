@@ -41,10 +41,12 @@ func (s *DirectoryService) List(path string) (*domain.DirectoryListResponse, err
 	}
 
 	items := make([]domain.DirectoryItem, 0, len(entries))
+	skippedCount := 0
 	for _, entry := range entries {
 		itemPath := filepath.Join(dir.ResolvedPath, entry.Name())
 		info, statErr := entry.Info()
 		if statErr != nil {
+			skippedCount++
 			continue
 		}
 
@@ -71,9 +73,11 @@ func (s *DirectoryService) List(path string) (*domain.DirectoryListResponse, err
 	})
 
 	return &domain.DirectoryListResponse{
-		CurrentPath: dir.ResolvedPath,
-		ParentPath:  s.guard.ParentDirectory(dir.ResolvedPath),
-		Items:       items,
+		CurrentPath:  dir.ResolvedPath,
+		ParentPath:   s.guard.ParentDirectory(dir.ResolvedPath),
+		Items:        items,
+		Incomplete:   skippedCount > 0,
+		SkippedCount: skippedCount,
 	}, nil
 }
 

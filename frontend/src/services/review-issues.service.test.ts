@@ -21,26 +21,6 @@ describe('review issues service', () => {
     putMock.mockReset()
   })
 
-  it('lists overrides with joined game public ids when provided', async () => {
-    getMock.mockResolvedValue({
-      data: [{ game_public_id: 'game-1', issue_key: 'missing-cover' }],
-    })
-
-    await expect(reviewIssuesService.list(['game-1', 'game-2'])).resolves.toEqual([
-      { game_public_id: 'game-1', issue_key: 'missing-cover' },
-    ])
-    expect(getMock).toHaveBeenCalledWith('/review-issue-overrides', {
-      params: { game_ids: 'game-1,game-2' },
-    })
-  })
-
-  it('lists overrides without params when no ids are provided', async () => {
-    getMock.mockResolvedValue({ data: [] })
-
-    await expect(reviewIssuesService.list()).resolves.toEqual([])
-    expect(getMock).toHaveBeenCalledWith('/review-issue-overrides', { params: undefined })
-  })
-
   it('ignores and restores review issues through the expected endpoints', async () => {
     putMock.mockResolvedValue({
       data: { game_public_id: 'game-1', issue_key: 'missing-cover', reason: 'done' },
@@ -58,5 +38,17 @@ describe('review issues service', () => {
 
     await reviewIssuesService.restore('game-1', 'missing-cover')
     expect(delMock).toHaveBeenCalledWith('/games/game-1/review-issues/missing-cover/ignore')
+  })
+
+  it('forwards explicit empty reasons instead of normalizing them on the client', async () => {
+    putMock.mockResolvedValue({
+      data: { game_public_id: 'game-1', issue_key: 'missing-cover', reason: null },
+    })
+
+    await reviewIssuesService.ignore('game-1', 'missing-cover', '')
+
+    expect(putMock).toHaveBeenCalledWith('/games/game-1/review-issues/missing-cover/ignore', {
+      reason: '',
+    })
   })
 })

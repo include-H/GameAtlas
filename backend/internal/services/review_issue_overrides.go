@@ -30,10 +30,6 @@ func (s *ReviewIssueOverrideService) ResolveGameID(publicID string) (int64, erro
 	return id, nil
 }
 
-func (s *ReviewIssueOverrideService) List(gameIDs []int64) ([]domain.ReviewIssueOverride, error) {
-	return s.overridesRepo.List(gameIDs)
-}
-
 func (s *ReviewIssueOverrideService) Ignore(gameID int64, issueKey string, reason *string) (*domain.ReviewIssueOverride, error) {
 	if _, err := s.gamesRepo.GetByID(gameID); err != nil {
 		return nil, normalizeRepoError(err)

@@ -188,15 +188,10 @@ func (s *SteamService) resolveSteamAssetURL(appID int64, proxyOverride string, c
 			return &value
 		}
 	}
-	if len(candidates) == 0 {
-		return nil
-	}
-	fallback := strings.TrimSpace(candidates[len(candidates)-1])
-	if fallback == "" {
-		return nil
-	}
-	value := fmt.Sprintf(fallback, appID)
-	return &value
+	// 2026-04-09: Steam preview should only expose asset URLs that upstream checks
+	// actually confirmed. Returning a guessed fallback URL here turns "asset missing"
+	// into a broken-but-present preview field.
+	return nil
 }
 
 func (s *SteamService) checkAssetExists(client *http.Client, assetURL string) (bool, error) {

@@ -7,7 +7,9 @@ async function listSeriesWithParams(params?: {
   sort?: 'name' | 'popular'
 }): Promise<Series[]> {
   const queryParams = new URLSearchParams()
-  if (params?.search) queryParams.append('search', params.search)
+  // 2026-04-06: series search uses the same trimmed transport semantics as
+  // developers/publishers, so metadata search inputs stop drifting by resource.
+  if (params?.search?.trim()) queryParams.append('search', params.search.trim())
   if (params?.limit) queryParams.append('limit', String(params.limit))
   if (params?.sort) queryParams.append('sort', params.sort)
   const response = await get<ApiEnvelope<Series[]>>('/series', { params: queryParams })

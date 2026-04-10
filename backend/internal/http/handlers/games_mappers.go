@@ -303,9 +303,11 @@ func toDirectoryListResponse(item *domain.DirectoryListResponse) directoryListRe
 		})
 	}
 	return directoryListResponse{
-		CurrentPath: item.CurrentPath,
-		ParentPath:  item.ParentPath,
-		Items:       items,
+		CurrentPath:  item.CurrentPath,
+		ParentPath:   item.ParentPath,
+		Items:        items,
+		Incomplete:   item.Incomplete,
+		SkippedCount: item.SkippedCount,
 	}
 }
 

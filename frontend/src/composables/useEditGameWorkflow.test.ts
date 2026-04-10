@@ -216,4 +216,20 @@ describe('useEditGameWorkflow', () => {
     }))
   })
 
+  it('warns when series picker refresh fails after a successful save', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { options, addAlert, emitSuccess, closeModal } = buildOptions()
+    getPopularSeriesMock.mockRejectedValueOnce(new Error('series refresh failed'))
+
+    const workflow = useEditGameWorkflow(options)
+    await workflow.handleSubmit()
+
+    expect(updateGameAggregateMock).toHaveBeenCalledTimes(1)
+    expect(addAlert).toHaveBeenCalledWith('保存成功', 'success')
+    expect(addAlert).toHaveBeenCalledWith('保存已生效，但系列选项刷新失败，请稍后重试', 'warning')
+    expect(emitSuccess).toHaveBeenCalledTimes(1)
+    expect(closeModal).toHaveBeenCalledTimes(1)
+    consoleErrorSpy.mockRestore()
+  })
+
 })

@@ -21,13 +21,8 @@ interface UsePendingWorkbenchOptions {
 }
 
 export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
-  const emptyEvaluation: PendingIssueEvaluation = {
-    groups: [],
-    details: [],
-    severe: false,
-  }
-
   const isLoading = ref(false)
+  const hasLoadFailure = ref(false)
   const pendingGames = ref<GameListItem[]>([])
   const activeGame = ref<GameListItem | null>(null)
 
@@ -47,7 +42,10 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   const pageGameCount = computed(() => pendingGames.value.length)
 
   const getIssueEvaluation = (game: GameListItem): PendingIssueEvaluation => {
-    return game.pending_issues || emptyEvaluation
+    if (game.pending_issues) {
+      return game.pending_issues
+    }
+    throw new Error(`pending workbench game ${game.public_id || game.id} is missing pending_issues`)
   }
 
   const isSevereGame = (game: GameListItem) => {
@@ -100,6 +98,7 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
 
   const loadWorkbenchGames = async (page = currentPage.value) => {
     isLoading.value = true
+    hasLoadFailure.value = false
     try {
       const query = buildWorkbenchQuery()
       const response = await gamesService.getGames({
@@ -115,9 +114,19 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
         },
         sort: resolvePendingWorkbenchSort(query.sortBy),
       })
+      // 2026-04-07: pending workbench reads the backend-native pending queue contract directly.
+      // Impact: this screen no longer fabricates empty counts/evaluations when the API stops
+      // attaching pending_issue_counts or pending_issues to a pending=true response.
+      const countsSummary = response.pagination.pending_issue_counts
+      if (!countsSummary) {
+        throw new Error('pending workbench response missing pending_issue_counts')
+      }
+      if (response.data.some((game) => !game.pending_issues)) {
+        throw new Error('pending workbench response missing pending_issues')
+      }
       pendingGames.value = response.data
-      pendingIssueIgnoredTotal.value = response.pagination.pending_issue_counts?.ignored_total || 0
-      pendingIssueCounts.value = response.pagination.pending_issue_counts?.groups || {}
+      pendingIssueIgnoredTotal.value = countsSummary.ignored_total
+      pendingIssueCounts.value = countsSummary.groups
       currentPage.value = response.pagination.page
       totalPages.value = response.pagination.totalPages
       totalPendingCount.value = response.pagination.total
@@ -126,6 +135,7 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
         await loadWorkbenchGames(response.pagination.totalPages)
       }
     } catch {
+      hasLoadFailure.value = true
       options.addAlert('加载待处理工作台失败', 'error')
     } finally {
       isLoading.value = false
@@ -175,6 +185,7 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
 
   return {
     isLoading,
+    hasLoadFailure,
     activeGame,
     pageGameCount,
     currentPage,

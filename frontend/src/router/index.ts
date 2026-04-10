@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
 
 // Import route modules
 import base from './modules/base'
@@ -44,12 +45,18 @@ const isCompactNavigationViewport = () => {
 
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
+  const uiStore = useUiStore()
 
   if (!authStore.initialized) {
     await authStore.fetchMe()
   }
 
   const requiresAdmin = !!to.meta?.requiresAdmin
+
+  if (requiresAdmin && authStore.authLoadFailed) {
+    uiStore.addAlert('认证状态加载失败，请稍后重试', 'error')
+    return { name: 'dashboard' }
+  }
 
   if (requiresAdmin && !authStore.isAdmin) {
     return {

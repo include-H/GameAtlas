@@ -57,6 +57,7 @@ export const usePendingCenterView = ({
     getIgnoredIssueDetails,
     getVisibleIssueGroups,
     getVisibleIssueDetails,
+    hasLoadFailure,
     pendingIssueIgnoredTotal,
     ignoreIssue,
     isSevereGame,
@@ -187,6 +188,8 @@ export const usePendingCenterView = ({
   const activeGameDetails = computed(() => {
     if (!activeGame.value) return []
 
+    // 2026-04-07: pending detail reasons come from backend-native review override
+    // semantics. Keep null distinct from text instead of fabricating empty strings.
     return getIssueEvaluation(activeGame.value).details.map((detail) => {
       const definition = pendingIssueDetailDefinitionMap.value[detail.key]
       return {
@@ -194,7 +197,7 @@ export const usePendingCenterView = ({
         group: detail.group,
         label: definition?.label || getPendingIssueDetailLabel(detail.key),
         ignored: detail.ignored,
-        reason: detail.reason || '',
+        reason: detail.reason ?? null,
       }
     })
   })
@@ -242,6 +245,18 @@ export const usePendingCenterView = ({
     await loadWorkbenchGames()
   }
 
+  const handleEditSync = async () => {
+    const currentPublicId = editingGame.value?.public_id
+    if (currentPublicId) {
+      try {
+        editingGame.value = await gamesService.getAdminGameDetail(currentPublicId)
+      } catch {
+        uiStore.addAlert('保存已生效，但编辑器未刷新到最新数据，请稍后重试', 'warning')
+      }
+    }
+    await loadWorkbenchGames()
+  }
+
   onMounted(async () => {
     try {
       pendingIssueCatalog.value = await pendingIssuesService.getCatalog()
@@ -273,6 +288,8 @@ export const usePendingCenterView = ({
     getVisibleIssueDetails,
     getVisibleIssueGroups,
     handleEditSuccess,
+    handleEditSync,
+    hasLoadFailure,
     ignoreIssue,
     pendingIssueIgnoredTotal,
     isLoading,

@@ -8,7 +8,9 @@ type DirectoryItem struct {
 }
 
 type DirectoryListResponse struct {
-	CurrentPath string
-	ParentPath  *string
-	Items       []DirectoryItem
+	CurrentPath  string
+	ParentPath   *string
+	Items        []DirectoryItem
+	Incomplete   bool
+	SkippedCount int
 }

@@ -180,8 +180,10 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
     try {
       const popularSeries = await seriesService.getPopularSeries(50)
       options.seriesOptions.value = popularSeries
+      return true
     } catch (error) {
       console.error('Failed to refresh series:', error)
+      return false
     }
   }
 
@@ -265,9 +267,14 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       if (aggregateResult.warnings.length > 0) {
         options.addAlert('部分素材文件未能物理删除，系统稍后可重试', 'warning')
       }
-      await refreshSeriesOptions()
+      const seriesRefreshSucceeded = await refreshSeriesOptions()
 
       options.addAlert('保存成功', 'success')
+      if (!seriesRefreshSucceeded) {
+        // 2026-04-08: aggregate save success does not guarantee local picker metadata refreshed.
+        // Impact: keep the save successful, but surface that the post-save series lookup stayed stale.
+        options.addAlert('保存已生效，但系列选项刷新失败，请稍后重试', 'warning')
+      }
       options.emitSuccess()
       options.closeModal()
     } catch (error) {

@@ -48,6 +48,7 @@ interface UseSteamImportOptions {
     index: number,
   ) => EditGameEditableScreenshot
   addAlert: (message: string, type: AlertType) => void
+  onAssetPersisted?: () => Promise<void> | void
 }
 
 export const useSteamImport = (options: UseSteamImportOptions) => {
@@ -119,10 +120,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const bannerSteamPicker = useSteamPicker<string[]>({
     onSelect: async (game) => {
       const details = await steamService.getGameDetails(game.id)
-      const libraryHero = details.libraryHero
-      const background = details.background
-      const headerImage = details.headerImage
-      const images = Array.from(new Set([libraryHero, background, headerImage].filter(Boolean) as string[]))
+      const images = Array.from(new Set([details.bannerImage, details.coverImage].filter(Boolean) as string[]))
       const finalImages = images.length < 2 && details.screenshots && details.screenshots.length > 0
         ? [...images, ...details.screenshots.slice(0, 5)]
         : images
@@ -139,7 +137,9 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     onSelect: async (game) => {
       const details = await steamService.getGameDetails(game.id)
       const screenshotCandidates = (details.screenshots || []).filter(Boolean)
-      const fallbackAssets = [details.libraryHero, details.background, details.headerImage].filter(
+      // 2026-04-06: Steam import falls back only to backend-native asset classes.
+      // Impact: screenshot fallback now draws from banner/cover instead of frontend-invented aliases.
+      const fallbackAssets = [details.bannerImage, details.coverImage].filter(
         (value): value is string => !!value,
       )
       const finalAssets =
@@ -215,6 +215,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
         options.queueAssetDeletion('cover', options.form.value.cover_image)
       }
       options.form.value.cover_image = uploaded.path
+      await options.onAssetPersisted?.()
       showCoverSelector.value = false
       coverSearchUrl.value = ''
       coverPreviewUrl.value = ''
@@ -236,6 +237,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
         options.queueAssetDeletion('cover', options.form.value.cover_image)
       }
       options.form.value.cover_image = uploaded.path
+      await options.onAssetPersisted?.()
       showCoverSelector.value = false
       backToCoverGameSearch()
       steamCoverSearchQuery.value = ''
@@ -279,6 +281,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
         options.queueAssetDeletion('banner', options.form.value.banner_image)
       }
       options.form.value.banner_image = uploaded.path
+      await options.onAssetPersisted?.()
       showBannerSelector.value = false
       bannerSearchUrl.value = ''
       bannerPreviewUrl.value = ''
@@ -306,6 +309,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
         options.queueAssetDeletion('banner', options.form.value.banner_image)
       }
       options.form.value.banner_image = uploaded.path
+      await options.onAssetPersisted?.()
       showBannerSelector.value = false
       backToBannerGameSearch()
       steamBannerSearchQuery.value = ''
@@ -368,6 +372,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       options.form.value.screenshots.push(
         options.createEditableScreenshot(uploaded, options.form.value.screenshots.length),
       )
+      await options.onAssetPersisted?.()
       showScreenshotSelector.value = false
       screenshotSearchUrl.value = ''
       screenshotPreviewUrl.value = ''
@@ -395,6 +400,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
         options.form.value.screenshots.push(options.createEditableScreenshot(uploaded, currentIndex))
       }
 
+      await options.onAssetPersisted?.()
       showScreenshotSelector.value = false
       backToScreenshotGameSearch()
       steamScreenshotSearchQuery.value = ''

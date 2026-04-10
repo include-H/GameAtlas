@@ -47,7 +47,9 @@ func (h *WikiHandler) Update(c *gin.Context) {
 	}
 
 	var request wikiWriteRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
+	// 2026-04-06: wiki writes keep a strict transport boundary so request-only
+	// fields cannot silently leak into this persisted document contract.
+	if err := decodeJSONStrict(c, &request); err != nil {
 		writeJSONError(c, http.StatusBadRequest, "invalid wiki payload")
 		return
 	}

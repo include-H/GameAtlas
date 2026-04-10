@@ -33,6 +33,25 @@ func TestAuthHandlerLoginReturnsBadRequestForInvalidPayload(t *testing.T) {
 	}
 }
 
+func TestAuthHandlerLoginRejectsUnknownJSONFields(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"password":"secret","legacy":true}`))
+	context.Request.Header.Set("Content-Type", "application/json")
+
+	handler := NewAuthHandler(services.NewAuthService(config.Config{}, nil, nil), config.Config{AdminDisplayName: "Admin"})
+	handler.Login(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(recorder.Body.String(), `"error":"invalid auth payload"`) {
+		t.Fatalf("body = %s, want invalid auth payload", recorder.Body.String())
+	}
+}
+
 func TestAuthHandlerLoginReturnsServiceUnavailableWhenDisabled(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 

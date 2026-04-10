@@ -77,10 +77,10 @@ func (h *GamesHandler) ListTimeline(c *gin.Context) {
 	years, fromDate, toDate, cursorReleaseDate, cursorID, ok := decodeGamesTimelineRequest(c)
 	now := time.Now().UTC()
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "invalid timeline cursor",
-		})
+		return
+	}
+	limit, ok := parseGamesTimelineIntQuery(c, "limit", 60)
+	if !ok {
 		return
 	}
 
@@ -105,7 +105,10 @@ func (h *GamesHandler) ListTimeline(c *gin.Context) {
 	}
 
 	params := domain.GamesTimelineParams{
-		Limit:             parseQueryInt(c, "limit", 60),
+		// 2026-04-07: timeline query validation now rejects invalid years/limit at transport decode.
+		// Impact: this cursor-based read model no longer silently falls back to handler defaults
+		// that differ from the main games list query contract.
+		Limit:             limit,
 		FromDate:          fromDate,
 		ToDate:            toDate,
 		CursorReleaseDate: cursorReleaseDate,

@@ -51,6 +51,7 @@ describe('useWikiEditDocument', () => {
         fetchGame,
       } as never,
       uiStore: { addAlert: vi.fn() } as never,
+      requestedGameId: ref('game-1'),
       onLoadGameFailed: vi.fn(),
     })
 
@@ -59,16 +60,79 @@ describe('useWikiEditDocument', () => {
       change_summary: 'stale summary',
     }
 
-    await document.loadWikiEditorData('game-1')
+    const loaded = await document.loadWikiEditorData('game-1')
 
     expect(fetchGame).toHaveBeenCalledWith('game-1')
     expect(getWikiPageMock).toHaveBeenCalledWith('game-1')
+    expect(loaded).toBe(true)
     expect(document.wiki.value?.content).toBe('# Existing Wiki')
     expect(document.wikiData.value).toEqual({
       content: '# Existing Wiki',
       change_summary: '',
     })
     expect(document.isExisting.value).toBe(true)
+  })
+
+  it('treats empty wiki content as an existing document instead of missing state', async () => {
+    const currentGame = ref<WikiEditTestGame | null>(null)
+    const fetchGame = vi.fn().mockImplementation(async (gameId: string) => {
+      currentGame.value = {
+        id: 1,
+        public_id: gameId,
+        title: 'Game One',
+      }
+    })
+    getWikiPageMock.mockResolvedValue({
+      content: '',
+      updated_at: '2026-04-03T00:00:00Z',
+    })
+
+    const document = useWikiEditDocument({
+      gamesStore: {
+        get currentGame() {
+          return currentGame.value
+        },
+        fetchGame,
+      } as never,
+      uiStore: { addAlert: vi.fn() } as never,
+      requestedGameId: ref('game-1'),
+      onLoadGameFailed: vi.fn(),
+    })
+
+    const loaded = await document.loadWikiEditorData('game-1')
+
+    expect(loaded).toBe(true)
+    expect(document.wiki.value).toEqual({
+      content: '',
+      updated_at: '2026-04-03T00:00:00Z',
+    })
+    expect(document.wikiData.value).toEqual({
+      content: '',
+      change_summary: '',
+    })
+    expect(document.isExisting.value).toBe(true)
+  })
+
+  it('ignores stale currentGame data that does not match the requested route game', async () => {
+    const currentGame = ref<WikiEditTestGame | null>({
+      id: 1,
+      public_id: 'old-game',
+      title: 'Old Game',
+    })
+
+    const document = useWikiEditDocument({
+      gamesStore: {
+        get currentGame() {
+          return currentGame.value
+        },
+        fetchGame: vi.fn(),
+      } as never,
+      uiStore: { addAlert: vi.fn() } as never,
+      requestedGameId: ref('new-game'),
+      onLoadGameFailed: vi.fn(),
+    })
+
+    expect(document.game.value).toBeNull()
   })
 
   it('saves wiki content and trims empty summaries', async () => {
@@ -93,6 +157,7 @@ describe('useWikiEditDocument', () => {
         fetchGame: vi.fn(),
       } as never,
       uiStore: { addAlert } as never,
+      requestedGameId: ref('game-1'),
       onLoadGameFailed: vi.fn(),
       onSaveSuccess,
     })
@@ -114,7 +179,51 @@ describe('useWikiEditDocument', () => {
     expect(document.isSaving.value).toBe(false)
   })
 
-  it('ignores missing wiki documents but surfaces other load failures', async () => {
+  it('keeps the update semantics when the loaded wiki exists but its content is empty', async () => {
+    const addAlert = vi.fn()
+    const currentGame = ref<WikiEditTestGame | null>({
+      id: 1,
+      public_id: 'game-1',
+      title: 'Game One',
+    })
+
+    getWikiPageMock.mockResolvedValue({
+      content: '',
+      updated_at: '2026-04-03T00:00:00Z',
+    })
+    updateWikiPageMock.mockResolvedValue({
+      content: 'filled later',
+      updated_at: '2026-04-04T00:00:00Z',
+    })
+
+    const document = useWikiEditDocument({
+      gamesStore: {
+        get currentGame() {
+          return currentGame.value
+        },
+        fetchGame: vi.fn(),
+      } as never,
+      uiStore: { addAlert } as never,
+      requestedGameId: ref('game-1'),
+      onLoadGameFailed: vi.fn(),
+      onSaveSuccess: vi.fn(),
+    })
+
+    const loaded = await document.loadWikiEditorData('game-1')
+    document.wikiData.value = {
+      content: 'filled later',
+      change_summary: '',
+    }
+
+    expect(loaded).toBe(true)
+    await document.handleSave()
+
+    expect(addAlert).toHaveBeenCalledWith('Wiki 已更新', 'success')
+    expect(document.wiki.value?.content).toBe('filled later')
+    expect(document.isExisting.value).toBe(true)
+  })
+
+  it('surfaces wiki load failures instead of pretending the document is missing', async () => {
     const addAlert = vi.fn()
     const onLoadGameFailed = vi.fn()
     const currentGame = ref<WikiEditTestGame | null>(null)
@@ -126,7 +235,16 @@ describe('useWikiEditDocument', () => {
       }
     })
 
-    const notFoundError = { isAxiosError: true, response: { status: 404 } }
+    const notFoundError = {
+      isAxiosError: true,
+      response: {
+        status: 404,
+        data: {
+          error: 'resource not found',
+        },
+      },
+      message: 'Not Found',
+    }
     getWikiPageMock.mockRejectedValueOnce(notFoundError)
 
     const document = useWikiEditDocument({
@@ -137,21 +255,36 @@ describe('useWikiEditDocument', () => {
         fetchGame,
       } as never,
       uiStore: { addAlert } as never,
+      requestedGameId: ref('game-1'),
       onLoadGameFailed,
     })
 
-    await document.loadWikiEditorData('game-1')
+    let loaded = await document.loadWikiEditorData('game-1')
 
-    expect(addAlert).not.toHaveBeenCalled()
-    expect(onLoadGameFailed).not.toHaveBeenCalled()
+    expect(addAlert).toHaveBeenCalledWith('resource not found', 'error')
+    expect(onLoadGameFailed).toHaveBeenCalledTimes(1)
     expect(document.wiki.value).toBeNull()
+    expect(loaded).toBe(false)
 
-    const serverError = { isAxiosError: true, response: { status: 500 } }
+    addAlert.mockClear()
+    onLoadGameFailed.mockClear()
+
+    const serverError = {
+      isAxiosError: true,
+      response: {
+        status: 500,
+        data: {
+          error: 'internal server error',
+        },
+      },
+      message: 'Internal Server Error',
+    }
     getWikiPageMock.mockRejectedValueOnce(serverError)
 
-    await document.loadWikiEditorData('game-1')
+    loaded = await document.loadWikiEditorData('game-1')
 
-    expect(addAlert).toHaveBeenCalledWith('Failed to load game', 'error')
-    expect(onLoadGameFailed).toHaveBeenCalled()
+    expect(addAlert).toHaveBeenCalledWith('internal server error', 'error')
+    expect(onLoadGameFailed).toHaveBeenCalledTimes(1)
+    expect(loaded).toBe(false)
   })
 })

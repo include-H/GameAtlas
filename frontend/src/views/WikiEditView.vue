@@ -77,6 +77,10 @@
         <a-spin :size="20" />
       </section>
 
+      <section v-else-if="hasHistoryLoadFailure" class="wiki-edit-history-empty wiki-edit-history-empty--dialog">
+        历史记录加载失败，请稍后重试
+      </section>
+
       <section v-else-if="historyEntries.length === 0" class="wiki-edit-history-empty wiki-edit-history-empty--dialog">
         还没有历史记录
       </section>
@@ -134,7 +138,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, onActivated, watch } from 'vue'
+import { computed, defineAsyncComponent, onActivated, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWikiEditDocument } from '@/composables/useWikiEditDocument'
 import { useWikiEditHistory } from '@/composables/useWikiEditHistory'
@@ -156,6 +160,11 @@ const gamesStore = useGamesStore()
 const uiStore = useUiStore()
 
 const MarkdownRenderer = defineAsyncComponent(() => import('@/components/MarkdownRenderer.vue'))
+
+const requestedGameId = computed(() => {
+  const rawValue = route.params.publicId
+  return typeof rawValue === 'string' ? rawValue.trim() : Array.isArray(rawValue) ? String(rawValue[0] || '').trim() : ''
+})
 
 const getGameDetailRoute = () => {
   if (!game.value?.public_id) {
@@ -184,6 +193,7 @@ const {
 } = useWikiEditDocument({
   gamesStore,
   uiStore,
+  requestedGameId,
   onLoadGameFailed: () => {
     router.push({ name: 'games' })
   },
@@ -199,6 +209,7 @@ const {
   historyEntries,
   selectedHistory,
   isHistoryLoading,
+  hasHistoryLoadFailure,
   previewHistoryContent,
   historyPreviewVisible,
   resetHistoryState,
@@ -227,15 +238,15 @@ const syncAmbientBackground = () => {
 }
 
 watch(
-  () => {
-    const rawValue = route.params.publicId
-    return typeof rawValue === 'string' ? rawValue.trim() : Array.isArray(rawValue) ? String(rawValue[0] || '').trim() : ''
-  },
+  requestedGameId,
   async (gameId) => {
     if (!gameId) {
       return
     }
-    await loadWikiEditorData(gameId)
+    const loaded = await loadWikiEditorData(gameId)
+    if (!loaded) {
+      return
+    }
     resetHistoryState()
     await loadHistory(gameId)
   },

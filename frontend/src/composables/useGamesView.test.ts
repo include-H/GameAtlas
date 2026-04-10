@@ -6,7 +6,10 @@ import {
   buildGamesRouteQuery,
   hasGamesActiveFilters,
   normalizeGamesFavoriteRouteQuery,
+  normalizeGamesPaginationResponseQuery,
+  normalizeGamesPaginationRouteQuery,
   normalizeGamesSortRouteQuery,
+  parseGamesItemsPerPage,
   parseGamesSortField,
   parseGamesSortOrder,
   parsePositiveQueryNumber,
@@ -31,6 +34,8 @@ describe('useGamesView helpers', () => {
     expect(parseRouteBoolean('favorites')).toBeUndefined()
     expect(parsePositiveRouteNumber('3')).toBe(3)
     expect(parsePositiveRouteNumber('pc')).toBeUndefined()
+    expect(parseGamesItemsPerPage('24')).toBe(24)
+    expect(parseGamesItemsPerPage('13')).toBeUndefined()
     expect(parseRouteTagIds(['1', 'x', '2', '-3'])).toEqual([1, 2])
   })
 
@@ -148,6 +153,18 @@ describe('useGamesView helpers', () => {
     })
   })
 
+  it('drops invalid pagination query values before request building', () => {
+    const result = normalizeGamesPaginationRouteQuery({
+      page: 'oops',
+      limit: '999',
+      search: 'halo',
+    })
+
+    expect(result).toEqual({
+      search: 'halo',
+    })
+  })
+
   it('adds route seed when random sort is missing one', () => {
     const result = normalizeGamesSortRouteQuery({
       page: '2',
@@ -215,6 +232,48 @@ describe('useGamesView helpers', () => {
     })
   })
 
+  it('falls back to the supported default page size when route limit is unsupported', () => {
+    const result = buildGamesListRequest({
+      routeQuery: {
+        page: '2',
+        limit: '13',
+        search: 'halo',
+      },
+      itemsPerPage: 24,
+    })
+
+    expect(result).toEqual({
+      query: {
+        page: 2,
+        limit: 24,
+        search: 'halo',
+        tag: [],
+        favorite: undefined,
+      },
+    })
+  })
+
+  it('treats whitespace-only search as no committed backend filter', () => {
+    const result = buildGamesListRequest({
+      routeQuery: {
+        page: '2',
+        search: '   ',
+      },
+      itemsPerPage: 24,
+    })
+
+    expect(result).toEqual({
+      query: {
+        page: 2,
+        limit: 24,
+        search: undefined,
+        tag: [],
+        favorite: undefined,
+      },
+    })
+    expect(hasGamesActiveFilters({ search: '   ' })).toBe(false)
+  })
+
   it('does not invent random seed when route has not committed one', () => {
     const result = buildGamesListRequest({
       routeQuery: {
@@ -251,6 +310,45 @@ describe('useGamesView helpers', () => {
     expect(result).toEqual({
       page: '2',
       sort: 'title',
+      search: 'halo',
+    })
+  })
+
+  it('rewrites out-of-range pages to the backend last page', () => {
+    const result = normalizeGamesPaginationResponseQuery(
+      {
+        page: '9',
+        limit: '24',
+        search: 'halo',
+      },
+      {
+        page: 9,
+        limit: 24,
+        totalPages: 3,
+      },
+    )
+
+    expect(result).toEqual({
+      page: '3',
+      limit: '24',
+      search: 'halo',
+    })
+  })
+
+  it('clears stale page query when the result set becomes empty', () => {
+    const result = normalizeGamesPaginationResponseQuery(
+      {
+        page: '3',
+        search: 'halo',
+      },
+      {
+        page: 3,
+        limit: 24,
+        totalPages: 0,
+      },
+    )
+
+    expect(result).toEqual({
       search: 'halo',
     })
   })

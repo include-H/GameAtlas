@@ -18,10 +18,3 @@ type SteamAssetsPreview struct {
 	BannerURL      *string
 	ScreenshotURLs []string
 }
-
-type SteamApplyAssetsInput struct {
-	GameID         int64
-	CoverURL       *string
-	BannerURL      *string
-	ScreenshotURLs []string
-}

@@ -29,7 +29,7 @@
                   type="text"
                   size="mini"
                   html-type="button"
-                  :disabled="!props.game?.wiki_content"
+                  :disabled="!hasParsableWikiContent"
                   :loading="isPreparingWikiMetadataCandidates"
                   @click="importMetadataFromWiki"
                 >
@@ -148,7 +148,7 @@
         :tag-field-values-by-group="tagFieldValuesByGroup"
         :pending-tag-options-by-group="pendingTagOptionsByGroup"
         :tag-options-by-group="tagOptionsByGroup"
-        :wiki-content-exists="!!props.game?.wiki_content"
+        :wiki-content-available="hasParsableWikiContent"
         :is-preparing-wiki-tag-candidates="isPreparingWikiTagCandidates"
         @parse-wiki-tags="handleParseWikiTags"
         @tag-selection-change="handleTagSectionSelectionChange"
@@ -438,6 +438,7 @@ const {
   handleVideoFileChange,
   handleWikiMetadataCandidateSelectionChange,
   handleWikiTagCandidateGroupChange,
+  hasParsableWikiContent,
   importMetadataFromWiki,
   initialPath,
   isApplyingWikiMetadata,

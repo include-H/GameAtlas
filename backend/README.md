@@ -278,7 +278,6 @@ bash check.sh
 
 - `GET /api/steam/search`
 - `GET /api/steam/:appId/assets`
-- `POST /api/steam/:appId/apply-assets`
 - `GET /api/steam/proxy`
 
 ## 素材与静态资源

@@ -19,7 +19,7 @@
       <p>加载系列作品中...</p>
     </div>
 
-    <div v-else-if="games.length > 0" class="series-detail__grid">
+    <div v-else-if="!hasLoadFailure && games.length > 0" class="series-detail__grid">
       <div
         v-for="game in games"
         :key="game.id"
@@ -32,6 +32,8 @@
         />
       </div>
     </div>
+
+    <a-empty v-else-if="hasLoadFailure" description="系列详情加载失败，请稍后重试。" />
 
     <a-empty v-else description="这个系列下还没有游戏" />
   </div>
@@ -61,6 +63,7 @@ const uiStore = useUiStore()
 const gamesStore = useGamesStore()
 
 const isLoading = ref(false)
+const hasLoadFailure = ref(false)
 const games = ref<GameListItem[]>([])
 const seriesName = ref('系列')
 
@@ -91,11 +94,20 @@ const loadSeriesDetail = async () => {
   }
 
   isLoading.value = true
+  hasLoadFailure.value = false
   try {
     const detail = await seriesService.getSeriesDetail(id)
     seriesName.value = detail.series.name || `系列 ${id}`
     games.value = detail.games
     syncAmbientBackground(detail.series.id || id)
+  } catch {
+    // 2026-04-07: series route changes must not keep rendering the previous series
+    // when the current detail request fails. Failure is distinct from an empty series.
+    hasLoadFailure.value = true
+    games.value = []
+    seriesName.value = `系列 ${id}`
+    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+    uiStore.addAlert('加载系列详情失败', 'error')
   } finally {
     isLoading.value = false
   }

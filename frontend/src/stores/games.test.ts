@@ -2,12 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import type { GameDetail, GameListItem, GameStats } from '@/services/types'
 
-const { setFavoriteMock } = vi.hoisted(() => ({
+const { getStatsMock, setFavoriteMock } = vi.hoisted(() => ({
+  getStatsMock: vi.fn(),
   setFavoriteMock: vi.fn(),
 }))
 
 vi.mock('@/services/games.service', () => ({
   default: {
+    getStats: getStatsMock,
     setFavorite: setFavoriteMock,
   },
   mapGameVersions: vi.fn(() => []),
@@ -18,6 +20,7 @@ import { useGamesStore } from './games'
 describe('games store favorite sync', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    getStatsMock.mockReset()
     setFavoriteMock.mockReset()
   })
 
@@ -58,5 +61,16 @@ describe('games store favorite sync', () => {
     expect(store.stats?.recent_games[0]?.isFavorite).toBe(true)
     expect(store.stats?.popular_games[0]?.isFavorite).toBe(true)
     expect(store.stats?.favorite_count).toBe(1)
+  })
+
+  it('keeps stats failures out of the list error slot', async () => {
+    getStatsMock.mockRejectedValue(new Error('stats failed'))
+
+    const store = useGamesStore()
+
+    await expect(store.fetchStats()).rejects.toThrow('stats failed')
+
+    expect(store.statsError).toBe('stats failed')
+    expect(store.listError).toBeNull()
   })
 })

@@ -8,7 +8,7 @@
           type="text"
           size="mini"
           html-type="button"
-          :disabled="!wikiContentExists"
+          :disabled="!wikiContentAvailable"
           :loading="isPreparingWikiTagCandidates"
           @click="emit('parse-wiki-tags')"
         >
@@ -84,7 +84,7 @@ defineProps<{
   tagFieldValuesByGroup: Record<number, GameTagSelectionValue>
   pendingTagOptionsByGroup: Record<number, PendingTagOption[]>
   tagOptionsByGroup: Record<number, Tag[]>
-  wikiContentExists: boolean
+  wikiContentAvailable: boolean
   isPreparingWikiTagCandidates: boolean
 }>()
 

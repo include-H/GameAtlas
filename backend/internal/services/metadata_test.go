@@ -1,9 +1,11 @@
 package services
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/hao/game/internal/domain"
+	"github.com/hao/game/internal/repositories"
 )
 
 func TestSlugify(t *testing.T) {
@@ -110,5 +112,52 @@ func TestPickSeriesCoverSourceFallsBackInOrder(t *testing.T) {
 	}
 	if got := pickSeriesCoverSource(domain.SeriesGameSummary{PrimaryScreenshot: &screenshot}); got != "screenshot" {
 		t.Fatalf("pickSeriesCoverSource() = %q, want screenshot", got)
+	}
+}
+
+func TestMetadataServiceListSeriesReturnsEnrichmentErrorInsteadOfSilentEmptyState(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	if _, err := db.Exec(`INSERT INTO series (name, slug, sort_order) VALUES ('Broken Series', 'broken-series', 0)`); err != nil {
+		t.Fatalf("insert series: %v", err)
+	}
+	if _, err := db.Exec(`DROP TABLE games`); err != nil {
+		t.Fatalf("drop games table: %v", err)
+	}
+
+	service := NewMetadataService(repositories.NewMetadataRepository(db))
+	_, err := service.List(MetadataResource{Table: "series", ResourceName: "series"}, true, MetadataListOptions{})
+	if err == nil {
+		t.Fatal("List returned nil error, want enrichment failure")
+	}
+	if !strings.Contains(err.Error(), "list series games by ids") {
+		t.Fatalf("List error = %v, want series enrichment context", err)
+	}
+}
+
+func TestMetadataServiceGetSeriesDetailReturnsEnrichmentErrorInsteadOfSilentEmptyState(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	result, err := db.Exec(`INSERT INTO series (name, slug, sort_order) VALUES ('Broken Detail', 'broken-detail', 0)`)
+	if err != nil {
+		t.Fatalf("insert series: %v", err)
+	}
+	seriesID, err := result.LastInsertId()
+	if err != nil {
+		t.Fatalf("LastInsertId: %v", err)
+	}
+	if _, err := db.Exec(`DROP TABLE games`); err != nil {
+		t.Fatalf("drop games table: %v", err)
+	}
+
+	service := NewMetadataService(repositories.NewMetadataRepository(db))
+	_, err = service.GetSeriesDetail(seriesID, true)
+	if err == nil {
+		t.Fatal("GetSeriesDetail returned nil error, want enrichment failure")
+	}
+	if !strings.Contains(err.Error(), "list series games") {
+		t.Fatalf("GetSeriesDetail error = %v, want series enrichment context", err)
 	}
 }

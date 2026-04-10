@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard" :class="{ 'is-ready': isDashboardReady }">
     <!-- Welcome Section (Slimmer Header) -->
-    <div v-show="isDashboardReady" class="dashboard-section-title page-hero">
+    <div v-show="isDashboardReady && !loadFailed" class="dashboard-section-title page-hero">
       <div class="page-hero__content">
         <h1 class="page-hero__title text-gradient">
           发现
@@ -12,8 +12,17 @@
       </div>
     </div>
 
+    <a-alert
+      v-if="isDashboardReady && !loadFailed && refreshFailedWithStaleData"
+      class="dashboard-refresh-warning"
+      type="warning"
+      show-icon
+    >
+      仪表盘刷新失败，当前显示的是上次成功加载的数据。
+    </a-alert>
+
     <!-- Top Hero Section -->
-    <a-row v-show="isDashboardReady" :gutter="[16, 16]" class="dashboard-hero-section">
+    <a-row v-show="isDashboardReady && !loadFailed" :gutter="[16, 16]" class="dashboard-hero-section">
       <a-col :xs="24" :sm="24" :md="24" :lg="17" :xl="17">
         <game-carousel
           v-if="carouselGames.length > 0"
@@ -64,11 +73,11 @@
     </a-row>
 
     <!-- Divider between stats and content -->
-    <a-divider v-show="isDashboardReady" class="dashboard-divider" />
+    <a-divider v-show="isDashboardReady && !loadFailed" class="dashboard-divider" />
 
     <!-- Recently Added -->
     <card-row
-      v-show="isDashboardReady"
+      v-show="isDashboardReady && !loadFailed"
       v-if="recentAdditions.length > 0"
       title="最近添加"
       icon="mdi-new-box"
@@ -87,7 +96,7 @@
 
     <!-- Most Downloaded -->
     <card-row
-      v-show="isDashboardReady"
+      v-show="isDashboardReady && !loadFailed"
       v-if="mostPlayed.length > 0"
       title="下载最多"
       icon="mdi-download"
@@ -105,7 +114,13 @@
     </card-row>
 
     <!-- Empty State -->
-    <div v-show="isDashboardReady" v-if="isEmpty" class="dashboard-empty">
+    <a-empty v-show="isDashboardReady" v-if="loadFailed" description="仪表盘加载失败，请稍后重试。">
+      <a-button type="primary" @click="loadDashboardData">
+        重新加载
+      </a-button>
+    </a-empty>
+
+    <div v-show="isDashboardReady && !loadFailed" v-if="isEmpty" class="dashboard-empty">
       <icon-trophy class="dashboard-empty-icon" />
       <h2 class="dashboard-empty-title">还没有游戏</h2>
       <p class="dashboard-empty-text">
@@ -151,16 +166,18 @@ const uiStore = useUiStore()
 
 const isLoading = ref(false)
 const isDashboardReady = ref(false)
+const loadFailed = ref(false)
+const refreshFailedWithStaleData = ref(false)
 
 // Directly use gamesStore.stats (it's already a ref)
-const totalGames = computed(() => gamesStore.stats?.total_games || 0)
-const recentAdditions = computed(() => gamesStore.stats?.recent_games || [])
-const mostPlayed = computed(() => gamesStore.stats?.popular_games || [])
-const favoriteCount = computed(() => gamesStore.stats?.favorite_count || 0)
-const pendingReviews = computed(() => gamesStore.stats?.pending_reviews || 0)
+const totalGames = computed(() => gamesStore.stats?.total_games ?? 0)
+const recentAdditions = computed(() => gamesStore.stats?.recent_games ?? [])
+const mostPlayed = computed(() => gamesStore.stats?.popular_games ?? [])
+const favoriteCount = computed(() => gamesStore.stats?.favorite_count ?? 0)
+const pendingReviews = computed(() => gamesStore.stats?.pending_reviews ?? 0)
 
 const isEmpty = computed(() => {
-  return recentAdditions.value.length === 0
+  return totalGames.value === 0
 })
 
 // Get games for carousel (combine recent and most played, shuffle them)
@@ -183,7 +200,7 @@ const syncAmbientBackground = () => {
   if (imageUrls.length > 0) {
     uiStore.setAmbientBackgroundSource({
       owner: AMBIENT_BACKGROUND_OWNER,
-      key: String(gamesStore.stats?.total_games || 0),
+      key: String(gamesStore.stats?.total_games ?? 0),
       urls: imageUrls,
     })
     return
@@ -215,13 +232,23 @@ const toggleFavorite = async (gameRef: string) => {
 const loadDashboardData = async () => {
   isLoading.value = true
   isDashboardReady.value = false
+  loadFailed.value = false
+  refreshFailedWithStaleData.value = false
   try {
     await gamesStore.fetchStats()
+    // 2026-04-07: dashboard load failure must stay distinct from a truly empty library.
+    // Impact: only a successful stats response with total_games=0 renders the empty state;
+    // a failed read now surfaces as an error state instead of pretending the library is empty.
     syncAmbientBackground()
     isDashboardReady.value = true
     lastLoadedAt.value = Date.now()
   } catch {
     uiStore.addAlert('加载数据失败', 'error')
+    // 2026-04-08: dashboard refresh failures keep last good stats visible, but must not
+    // pretend the current refresh succeeded. Distinguish stale-data rendering from both
+    // first-load failure and successful refresh.
+    refreshFailedWithStaleData.value = gamesStore.stats !== null
+    loadFailed.value = gamesStore.stats === null
     isDashboardReady.value = true
   } finally {
     isLoading.value = false

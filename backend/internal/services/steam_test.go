@@ -7,8 +7,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-
-	"github.com/hao/game/internal/domain"
 )
 
 func TestNormalizeSteamReleaseDateSupportsCommonFormats(t *testing.T) {
@@ -184,17 +182,6 @@ func TestSteamServicePreviewAssetsUsesEnglishFallbackWhenPrimaryMissing(t *testi
 	}
 }
 
-func TestSteamServiceApplyAssetsRejectsMissingGameID(t *testing.T) {
-	service := &SteamService{}
-
-	_, err := service.ApplyAssets(42, domain.SteamApplyAssetsInput{
-		GameID: 0,
-	})
-	if err != ErrValidation {
-		t.Fatalf("error = %v, want ErrValidation", err)
-	}
-}
-
 func TestSteamServiceSearchReturnsErrorWhenAllLocalesFail(t *testing.T) {
 	service := &SteamService{
 		client: &http.Client{Transport: steamRoundTripper(func(req *http.Request) (*http.Response, error) {
@@ -211,18 +198,6 @@ func TestSteamServiceSearchReturnsErrorWhenAllLocalesFail(t *testing.T) {
 	}
 	if err.Error() != "steam search failed" {
 		t.Fatalf("error = %q, want steam search failed", err.Error())
-	}
-}
-
-func TestSteamServiceSearchReturnsEmptySliceForBlankQuery(t *testing.T) {
-	service := &SteamService{}
-
-	results, err := service.Search("", "")
-	if err != nil {
-		t.Fatalf("Search returned error: %v", err)
-	}
-	if len(results) != 0 {
-		t.Fatalf("results = %#v, want empty slice", results)
 	}
 }
 
@@ -334,7 +309,7 @@ func TestSteamServiceFetchDescriptionFallsBackToEnglishStorePage(t *testing.T) {
 	}
 }
 
-func TestSteamServiceResolveSteamAssetURLFallsBackToLastCandidate(t *testing.T) {
+func TestSteamServiceResolveSteamAssetURLReturnsNilWhenAllCandidatesMiss(t *testing.T) {
 	service := &SteamService{
 		client: &http.Client{Transport: steamRoundTripper(func(req *http.Request) (*http.Response, error) {
 			return steamTextResponse(http.StatusNotFound, ""), nil
@@ -345,8 +320,8 @@ func TestSteamServiceResolveSteamAssetURLFallsBackToLastCandidate(t *testing.T) 
 		"https://cdn.example.com/%d/high.jpg",
 		"https://cdn.example.com/%d/fallback.jpg",
 	)
-	if assetURL == nil || *assetURL != "https://cdn.example.com/789/fallback.jpg" {
-		t.Fatalf("assetURL = %v, want fallback asset url", assetURL)
+	if assetURL != nil {
+		t.Fatalf("assetURL = %v, want nil when no candidate exists", assetURL)
 	}
 }
 

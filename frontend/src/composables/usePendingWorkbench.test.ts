@@ -1,6 +1,7 @@
 import { nextTick } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { usePendingWorkbench, PENDING_WORKBENCH_PAGE_SIZE } from './usePendingWorkbench'
+import type { PendingIssueEvaluation } from '@/services/types'
 
 const { getGamesMock, ignoreMock, restoreMock } = vi.hoisted(() => ({
   getGamesMock: vi.fn(),
@@ -22,6 +23,19 @@ vi.mock('@/services/review-issues.service', () => ({
 }))
 
 describe('usePendingWorkbench', () => {
+  const baseEvaluation: PendingIssueEvaluation = {
+    groups: ['missing-assets'],
+    details: [
+      {
+        key: 'missing-cover',
+        group: 'missing-assets',
+        ignored: false,
+        reason: null,
+      },
+    ],
+    severe: false,
+  }
+
   beforeEach(() => {
     getGamesMock.mockReset()
     ignoreMock.mockReset()
@@ -31,8 +45,8 @@ describe('usePendingWorkbench', () => {
   it('loads pending queue with native games pagination', async () => {
     getGamesMock.mockResolvedValue({
       data: [
-        { public_id: 'game-1', title: 'A' },
-        { public_id: 'game-2', title: 'B' },
+        { public_id: 'game-1', title: 'A', pending_issues: baseEvaluation },
+        { public_id: 'game-2', title: 'B', pending_issues: baseEvaluation },
       ],
       pagination: {
         total: 11,
@@ -71,8 +85,8 @@ describe('usePendingWorkbench', () => {
       },
     })
     expect(workbench.pendingGames.value).toEqual([
-      { public_id: 'game-1', title: 'A' },
-      { public_id: 'game-2', title: 'B' },
+      { public_id: 'game-1', title: 'A', pending_issues: baseEvaluation },
+      { public_id: 'game-2', title: 'B', pending_issues: baseEvaluation },
     ])
     expect(workbench.pendingIssueCounts.value).toEqual({
       'missing-assets': 6,
@@ -84,6 +98,7 @@ describe('usePendingWorkbench', () => {
     expect(workbench.currentPage.value).toBe(1)
     expect(workbench.pageGameCount.value).toBe(2)
     expect(workbench.activeGame.value?.public_id).toBe('game-1')
+    expect(workbench.hasLoadFailure.value).toBe(false)
     expect(addAlert).not.toHaveBeenCalled()
   })
 
@@ -95,7 +110,10 @@ describe('usePendingWorkbench', () => {
         totalPages: 0,
         page: 1,
         limit: PENDING_WORKBENCH_PAGE_SIZE,
-        pending_issue_counts: null,
+        pending_issue_counts: {
+          groups: {},
+          ignored_total: 0,
+        },
       },
     })
 
@@ -127,5 +145,57 @@ describe('usePendingWorkbench', () => {
         order: 'desc',
       },
     })
+  })
+
+  it('treats missing pending counts as a load error instead of fabricating empty queue metadata', async () => {
+    getGamesMock.mockResolvedValue({
+      data: [],
+      pagination: {
+        total: 0,
+        totalPages: 0,
+        page: 1,
+        limit: PENDING_WORKBENCH_PAGE_SIZE,
+        pending_issue_counts: null,
+      },
+    })
+
+    const addAlert = vi.fn()
+    const workbench = usePendingWorkbench({ addAlert })
+
+    await workbench.loadWorkbenchGames()
+
+    expect(workbench.pendingIssueCounts.value).toEqual({})
+    expect(workbench.pendingIssueIgnoredTotal.value).toBe(0)
+    expect(workbench.hasLoadFailure.value).toBe(true)
+    expect(addAlert).toHaveBeenCalledWith('加载待处理工作台失败', 'error')
+  })
+
+  it('treats missing pending evaluations as a load error instead of fabricating empty issue details', async () => {
+    getGamesMock.mockResolvedValue({
+      data: [
+        { public_id: 'game-1', title: 'A', pending_issues: null },
+      ],
+      pagination: {
+        total: 1,
+        totalPages: 1,
+        page: 1,
+        limit: PENDING_WORKBENCH_PAGE_SIZE,
+        pending_issue_counts: {
+          groups: {
+            'missing-assets': 1,
+          },
+          ignored_total: 0,
+        },
+      },
+    })
+
+    const addAlert = vi.fn()
+    const workbench = usePendingWorkbench({ addAlert })
+
+    await workbench.loadWorkbenchGames()
+
+    expect(workbench.pendingGames.value).toEqual([])
+    expect(workbench.hasLoadFailure.value).toBe(true)
+    expect(addAlert).toHaveBeenCalledWith('加载待处理工作台失败', 'error')
   })
 })

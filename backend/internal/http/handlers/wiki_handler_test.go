@@ -139,3 +139,35 @@ func TestWikiHandlerUpdateRejectsInvalidJSONAfterResolvingGame(t *testing.T) {
 		t.Fatalf("body = %s, want invalid wiki payload error", recorder.Body.String())
 	}
 }
+
+func TestWikiHandlerUpdateRejectsUnknownJSONFields(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	insertGamesHandlerTestGame(t, db, "wiki-unknown", "Wiki Unknown", domain.GameVisibilityPublic, "")
+
+	service := services.NewWikiService(
+		repositories.NewGamesRepository(db),
+		repositories.NewWikiRepository(db),
+		10,
+	)
+	handler := NewWikiHandler(service)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/wiki-unknown/wiki", strings.NewReader(`{"content":"# Demo","legacy":true}`))
+	context.Request.Header.Set("Content-Type", "application/json")
+	context.Params = gin.Params{{Key: "publicId", Value: "wiki-unknown"}}
+	context.Set("is_admin", true)
+
+	handler.Update(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(recorder.Body.String(), `"error":"invalid wiki payload"`) {
+		t.Fatalf("body = %s, want invalid wiki payload error", recorder.Body.String())
+	}
+}

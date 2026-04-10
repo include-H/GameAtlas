@@ -1,6 +1,5 @@
 import { computed, nextTick, onActivated, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
-import wikiService, { type WikiDocumentResponse } from '@/services/wiki.service'
 import downloadService from '@/services/download.service'
 import { isAdminGameDetail, type AdminGameDetail, type GameVersion } from '@/services/types'
 import { getHttpStatus } from '@/utils/http-error'
@@ -48,9 +47,20 @@ export const useGameDetailView = ({
   uiStore,
   isAdmin,
 }: UseGameDetailViewOptions) => {
-  const game = computed(() => gamesStore.currentGame)
+  const requestedGameId = computed(() => {
+    const rawValue = route.params.publicId
+    return typeof rawValue === 'string' ? rawValue.trim() : Array.isArray(rawValue) ? String(rawValue[0] || '').trim() : ''
+  })
+  const hasLoadFailure = ref(false)
+  const game = computed(() => {
+    if (!requestedGameId.value) {
+      return null
+    }
+    return gamesStore.currentGame?.public_id === requestedGameId.value
+      ? gamesStore.currentGame
+      : null
+  })
   const versions = computed(() => gamesStore.currentVersions)
-  const wiki = ref<WikiDocumentResponse | null>(null)
   const showEditModal = ref(false)
   const topSectionRef = ref<HTMLElement | null>(null)
   const topSectionHeight = ref<number | undefined>(undefined)
@@ -59,7 +69,10 @@ export const useGameDetailView = ({
 
   const developerNames = computed(() => (game.value?.developers || []).map((item) => item.name).join(' / '))
   const publisherNames = computed(() => (game.value?.publishers || []).map((item) => item.name).join(' / '))
-  const hasWikiContent = computed(() => Boolean(wiki.value?.content?.trim()))
+  // 2026-04-06: the detail page reads wiki content from the native /games detail
+  // payload only. Do not compose a second wiki source here and invent split-brain
+  // semantics between game.wiki_content and /games/:publicId/wiki.
+  const hasWikiContent = computed(() => Boolean(game.value?.wiki_content?.trim()))
   const canEdit = computed(() => isAdmin.value)
   // The detail page can render either public or admin payloads, but the edit modal
   // must never receive the public shape because missing file_path means broken edit state,
@@ -101,11 +114,24 @@ export const useGameDetailView = ({
     }
   }
 
-  const handleEditSuccess = async () => {
-    if (game.value?.public_id) {
-      await gamesStore.fetchGame(game.value.public_id)
+  const refreshDetailAfterEdit = async () => {
+    if (!requestedGameId.value) {
+      return
+    }
+
+    try {
+      // 2026-04-07: edit saves can succeed even if the follow-up detail refresh fails.
+      // Impact: surface that sync failure explicitly instead of silently leaving stale detail data on screen.
+      await gamesStore.fetchGame(requestedGameId.value)
+      hasLoadFailure.value = false
+    } catch {
+      uiStore.addAlert('保存已生效，但详情刷新失败，请稍后重试', 'warning')
     }
   }
+
+  const handleEditSuccess = refreshDetailAfterEdit
+
+  const handleEditSync = refreshDetailAfterEdit
 
   const handleGoBack = () => {
     navigateBackOrFallback(router, { name: 'games' })
@@ -166,32 +192,25 @@ export const useGameDetailView = ({
   }
 
   const loadGameDetail = async (gameId: string) => {
+    hasLoadFailure.value = false
     try {
       await gamesStore.fetchGame(gameId)
-
-      wiki.value = null
-      try {
-        wiki.value = await wikiService.getWikiPage(gameId)
-      } catch (error) {
-        if (getHttpStatus(error) !== 404) {
-          throw error
-        }
-      }
     } catch (error) {
       const status = getHttpStatus(error)
       if (status === 404) {
         router.replace({ name: 'not-found' })
         return
       }
+      // 2026-04-07: detail routing must never keep rendering the previous game when
+      // the current publicId fails to load. A failed read is not the same as "show stale detail".
+      hasLoadFailure.value = true
+      uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
       uiStore.addAlert('加载游戏详情失败', 'error')
     }
   }
 
   watch(
-    () => {
-      const rawValue = route.params.publicId
-      return typeof rawValue === 'string' ? rawValue.trim() : Array.isArray(rawValue) ? String(rawValue[0] || '').trim() : ''
-    },
+    requestedGameId,
     async (gameId) => {
       if (!gameId) {
         return
@@ -271,9 +290,11 @@ export const useGameDetailView = ({
     formatDate: formatGameDetailDate,
     formatSize: formatGameDetailSize,
     game,
+    hasLoadFailure,
     handleDownloadLaunchScript,
     handleDownloadVersion,
     handleEditSuccess,
+    handleEditSync,
     handleGoBack,
     handleToggleFavorite,
     hasWikiContent,
@@ -284,6 +305,5 @@ export const useGameDetailView = ({
     showEditModal,
     topSectionRef,
     versions,
-    wiki,
   }
 }

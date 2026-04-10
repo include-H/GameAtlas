@@ -20,8 +20,9 @@
       <div class="header-right">
         <a-space :size="20">
           <span v-if="isAdmin" class="welcome-text">欢迎您，{{ adminDisplayName }}</span>
+          <span v-else-if="authLoadFailed" class="welcome-text welcome-text--warning">认证状态加载失败</span>
           <a-button class="app-text-action-btn" type="text" @click="handleAuthAction">
-            {{ isAdmin ? '退出' : '登录' }}
+            {{ authActionLabel }}
           </a-button>
           <a-button class="app-text-action-btn" type="text" shape="circle" @click="scrollToTop">
             <template #icon>
@@ -141,7 +142,7 @@ const uiStore = useUiStore()
 const authStore = useAuthStore()
 const { menuList, activeKey, openKeys: routeOpenKeys } = useMenu()
 const { sidebarCollapsed } = storeToRefs(uiStore)
-const { isAdmin, adminDisplayName } = storeToRefs(authStore)
+const { isAdmin, adminDisplayName, authLoadFailed } = storeToRefs(authStore)
 
 const appName = 'GameAtlas'
 const sideWidth = 240
@@ -160,6 +161,13 @@ const isCompactNavigation = ref(false)
 const showMobileMenu = ref(false)
 const desktopOpenKeys = ref<string[]>([])
 const mobileOpenKeys = ref<string[]>([])
+const authActionLabel = computed(() => {
+  if (authLoadFailed.value) {
+    return '重试认证'
+  }
+
+  return isAdmin.value ? '退出' : '登录'
+})
 
 const syncOpenKeysWithRoute = () => {
   desktopOpenKeys.value = [...routeOpenKeys.value]
@@ -167,6 +175,16 @@ const syncOpenKeysWithRoute = () => {
 }
 
 const handleAuthAction = async () => {
+  if (authLoadFailed.value) {
+    await authStore.fetchMe()
+    if (!authStore.authLoadFailed) {
+      uiStore.addAlert('认证状态已刷新', 'success')
+      return
+    }
+    uiStore.addAlert('认证状态刷新失败', 'error')
+    return
+  }
+
   if (!isAdmin.value) {
     if (router.currentRoute.value.name === 'login') {
       return
@@ -317,6 +335,10 @@ onUnmounted(() => {
   color: color-mix(in srgb, var(--color-text-1) 68%, var(--color-primary-light-2) 32%);
   font-size: 14px;
   white-space: nowrap;
+}
+
+.welcome-text--warning {
+  color: color-mix(in srgb, #ffcc66 74%, var(--color-text-1) 26%);
 }
 
 .pro-header :deep(.arco-btn-text) {

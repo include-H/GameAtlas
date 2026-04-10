@@ -13,9 +13,10 @@ func TestReviewIssueOverrideServiceIgnoreNormalizesReasonAndDeleteRemovesOverrid
 	defer func() { _ = db.Close() }()
 
 	gameID := insertServicesTestGame(t, db, "review-game", "Review Game", domain.GameVisibilityPublic)
+	repo := repositories.NewReviewIssueOverrideRepository(db)
 	service := NewReviewIssueOverrideService(
 		repositories.NewGamesRepository(db),
-		repositories.NewReviewIssueOverrideRepository(db),
+		repo,
 	)
 
 	reason := "  accepted gap  "
@@ -30,24 +31,16 @@ func TestReviewIssueOverrideServiceIgnoreNormalizesReasonAndDeleteRemovesOverrid
 		t.Fatalf("Reason = %v, want trimmed reason", item.Reason)
 	}
 
-	items, err := service.List([]int64{gameID})
-	if err != nil {
-		t.Fatalf("List returned error: %v", err)
-	}
-	if len(items) != 1 {
-		t.Fatalf("len(items) = %d, want 1", len(items))
-	}
-
 	if err := service.Delete(gameID, "missing-cover"); err != nil {
 		t.Fatalf("Delete returned error: %v", err)
 	}
 
-	items, err = service.List([]int64{gameID})
+	recreated, err := repo.Upsert(gameID, "missing-cover", "ignored", nil)
 	if err != nil {
-		t.Fatalf("List after delete returned error: %v", err)
+		t.Fatalf("Upsert after delete returned error: %v", err)
 	}
-	if len(items) != 0 {
-		t.Fatalf("len(items) after delete = %d, want 0", len(items))
+	if recreated.ID == item.ID {
+		t.Fatalf("recreated.ID = %d, want delete to remove the previous row", recreated.ID)
 	}
 }
 

@@ -330,16 +330,9 @@ export interface SteamGameDetails {
   genres: string[]
   tags: string[]
   screenshots: string[]
-  headerImage: string
-  libraryHero?: string
-  background?: string
-  website?: string
-}
-
-export interface SteamFetchImagesResponse {
   coverImage: string
-  bannerImage: string
-  screenshots: string[]
+  bannerImage?: string
+  website?: string
 }
 
 export interface ReviewIssueOverride {

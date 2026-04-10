@@ -34,11 +34,9 @@ func (h *AssetsHandler) Upload(assetType string) gin.HandlerFunc {
 			return
 		}
 
-		sortOrder := 0
-		if raw := c.PostForm("sort_order"); raw != "" {
-			if parsed, parseErr := strconv.Atoi(raw); parseErr == nil && parsed >= 0 {
-				sortOrder = parsed
-			}
+		sortOrder, ok := parseAssetUploadSortOrder(c)
+		if !ok {
+			return
 		}
 
 		result, err := h.service.Upload(gameID, assetType, file, sortOrder)
@@ -59,4 +57,19 @@ func (h *AssetsHandler) Upload(assetType string) gin.HandlerFunc {
 
 		writeJSONSuccess(c, http.StatusCreated, response)
 	}
+}
+
+func parseAssetUploadSortOrder(c *gin.Context) (int, bool) {
+	raw := c.PostForm("sort_order")
+	if raw == "" {
+		return 0, true
+	}
+
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 0 {
+		writeJSONError(c, http.StatusBadRequest, "valid sort_order is required")
+		return 0, false
+	}
+
+	return value, true
 }

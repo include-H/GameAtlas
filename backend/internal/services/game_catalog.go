@@ -14,7 +14,10 @@ type GameCatalogService struct {
 
 // NewGameCatalogService wires the read-only catalog boundary used by list, stats, and pending
 // review summaries. Keep write workflows and timeline behavior out of this service.
-func NewGameCatalogService(catalogRepo *repositories.GameCatalogRepository, reviewIssueOverridesRepo *repositories.ReviewIssueOverrideRepository) *GameCatalogService {
+func NewGameCatalogService(
+	catalogRepo *repositories.GameCatalogRepository,
+	reviewIssueOverridesRepo *repositories.ReviewIssueOverrideRepository,
+) *GameCatalogService {
 	return &GameCatalogService{
 		catalogRepo:              catalogRepo,
 		reviewIssueOverridesRepo: reviewIssueOverridesRepo,

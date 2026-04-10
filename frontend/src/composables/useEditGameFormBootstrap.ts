@@ -79,6 +79,35 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
     options.resetTagSelectionState()
   }
 
+  const resetSeriesOptionsForGame = (game?: AdminGameDetail | null) => {
+    options.seriesOptions.value = game?.series ? [game.series] : []
+  }
+
+  const resetDeveloperOptionsForGame = (game?: AdminGameDetail | null) => {
+    options.developerOptions.value = game?.developers ? [...game.developers] : []
+  }
+
+  const resetPublisherOptionsForGame = (game?: AdminGameDetail | null) => {
+    options.publisherOptions.value = game?.publishers ? [...game.publishers] : []
+  }
+
+  const resetTagOptionsForGame = (game?: AdminGameDetail | null) => {
+    options.tagGroups.value = game?.tag_groups
+      ? game.tag_groups.map((group, index) => ({
+        id: group.id,
+        key: group.key,
+        name: group.name,
+        description: null,
+        sort_order: index,
+        allow_multiple: group.allow_multiple,
+        is_filterable: group.is_filterable,
+        created_at: '',
+        updated_at: '',
+      }))
+      : []
+    options.tagOptions.value = game?.tags ? [...game.tags] : []
+  }
+
   const initializeOptions = async (currentGame?: AdminGameDetail | null) => {
     try {
       const popularSeries = await seriesService.getPopularSeries(50)
@@ -91,6 +120,9 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
         }
       }
     } catch (error) {
+      // 2026-04-08: failed edit metadata requests must not leave stale options from another game.
+      // Impact: the modal falls back to the current game's native relations instead of old lookup data.
+      resetSeriesOptionsForGame(currentGame)
       handleInitializeOptionsError('系列', error)
     }
 
@@ -106,6 +138,7 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
         }
       }
     } catch (error) {
+      resetDeveloperOptionsForGame(currentGame)
       handleInitializeOptionsError('开发商', error)
     }
 
@@ -121,6 +154,7 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
         }
       }
     } catch (error) {
+      resetPublisherOptionsForGame(currentGame)
       handleInitializeOptionsError('发行商', error)
     }
 
@@ -138,6 +172,7 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
         }
       }
     } catch (error) {
+      resetTagOptionsForGame(currentGame)
       handleInitializeOptionsError('标签', error)
     }
   }

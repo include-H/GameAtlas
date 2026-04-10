@@ -18,8 +18,15 @@ export const useGamesStore = defineStore('games', () => {
     totalPages: 0,
   })
 
-  const isLoading = ref(false)
-  const error = ref<string | null>(null)
+  // 2026-04-08: games list/detail/stats/favorite flows keep separate request state.
+  // Impact: one read/write failure no longer leaks into another surface's loading/error semantics.
+  const listLoading = ref(false)
+  const detailLoading = ref(false)
+  const statsLoading = ref(false)
+  const listError = ref<string | null>(null)
+  const detailError = ref<string | null>(null)
+  const statsError = ref<string | null>(null)
+  const favoriteError = ref<string | null>(null)
 
   // Computed
   const hasMorePages = computed(() => pagination.value.page < pagination.value.totalPages)
@@ -93,8 +100,8 @@ export const useGamesStore = defineStore('games', () => {
       append?: boolean
     } = {}
   ) => {
-    isLoading.value = true
-    error.value = null
+    listLoading.value = true
+    listError.value = null
 
     const page = params.query?.page ?? 1
     const limit = params.query?.limit ?? pagination.value.limit
@@ -125,16 +132,16 @@ export const useGamesStore = defineStore('games', () => {
 
       return response
     } catch (err) {
-      error.value = getHttpErrorMessage(err, 'Failed to fetch games')
+      listError.value = getHttpErrorMessage(err, 'Failed to fetch games')
       throw err
     } finally {
-      isLoading.value = false
+      listLoading.value = false
     }
   }
 
   const fetchGame = async (id: string) => {
-    isLoading.value = true
-    error.value = null
+    detailLoading.value = true
+    detailError.value = null
 
     try {
       const game = await gamesService.getGameDetail(id)
@@ -142,31 +149,36 @@ export const useGamesStore = defineStore('games', () => {
       currentVersions.value = mapGameVersions(game)
       return game
     } catch (err) {
-      error.value = getHttpErrorMessage(err, 'Failed to fetch game')
+      detailError.value = getHttpErrorMessage(err, 'Failed to fetch game')
       throw err
     } finally {
-      isLoading.value = false
+      detailLoading.value = false
     }
   }
 
   const fetchStats = async () => {
+    statsLoading.value = true
+    statsError.value = null
     try {
       stats.value = await gamesService.getStats()
       return stats.value
     } catch (err) {
-      error.value = getHttpErrorMessage(err, 'Failed to fetch stats')
+      statsError.value = getHttpErrorMessage(err, 'Failed to fetch stats')
       throw err
+    } finally {
+      statsLoading.value = false
     }
   }
 
   const toggleFavorite = async (gameId: string) => {
+    favoriteError.value = null
     try {
       const result = await gamesService.setFavorite(gameId, !getFavoriteState(gameId))
       applyFavoriteState(gameId, result.isFavorite)
 
       return result.isFavorite
     } catch (err) {
-      error.value = getHttpErrorMessage(err, 'Failed to toggle favorite')
+      favoriteError.value = getHttpErrorMessage(err, 'Failed to toggle favorite')
       throw err
     }
   }
@@ -178,8 +190,13 @@ export const useGamesStore = defineStore('games', () => {
     currentVersions,
     stats,
     pagination,
-    isLoading,
-    error,
+    listLoading,
+    detailLoading,
+    statsLoading,
+    listError,
+    detailError,
+    statsError,
+    favoriteError,
     // Computed
     hasMorePages,
     totalPages,

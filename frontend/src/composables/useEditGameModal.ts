@@ -47,6 +47,7 @@ interface UseEditGameModalOptions {
   emit: {
     (event: 'update:visible', value: boolean): void
     (event: 'success'): void
+    (event: 'sync'): void
   }
   uiStore: ReturnType<typeof useUiStore>
   formRef: Ref<{ validate?: () => Promise<unknown> } | undefined>
@@ -112,6 +113,9 @@ export const useEditGameModal = ({
 
   const currentGame = computed(() => props.game)
   const currentGameId = computed(() => props.game?.id)
+  // 2026-04-06: Wiki-derived authoring actions depend on parsable content,
+  // not merely on the transport field being present.
+  const hasParsableWikiContent = computed(() => Boolean(props.game?.wiki_content?.trim()))
   const releaseDate = computed<Date | null>({
     get: () => parseEditGameReleaseDate(form.value.release_date),
     set: (value) => {
@@ -120,6 +124,10 @@ export const useEditGameModal = ({
   })
   const addAlert = (message: string, type: 'success' | 'warning' | 'error') => {
     uiStore.addAlert(message, type)
+  }
+
+  const emitAssetSync = async () => {
+    emit('sync')
   }
 
   const syncViewportWidth = () => {
@@ -148,6 +156,10 @@ export const useEditGameModal = ({
       if (current && !results.find((item) => item.id === current.id)) {
         seriesOptions.value.push(current)
       }
+    } catch {
+      // 2026-04-08: picker search failures must stay distinguishable from a real empty result set.
+      // Impact: keep the last successful options visible and surface an explicit error instead of "no options".
+      addAlert('系列搜索失败', 'error')
     } finally {
       isSearchingSeries.value = false
     }
@@ -163,6 +175,8 @@ export const useEditGameModal = ({
         currentOptions: developerOptions.value,
         search: (keyword) => developersService.listDevelopers({ query: keyword }),
       })
+    } catch {
+      addAlert('开发商搜索失败', 'error')
     } finally {
       isSearchingDevelopers.value = false
     }
@@ -178,6 +192,8 @@ export const useEditGameModal = ({
         currentOptions: publisherOptions.value,
         search: (keyword) => publishersService.listPublishers({ query: keyword }),
       })
+    } catch {
+      addAlert('发行商搜索失败', 'error')
     } finally {
       isSearchingPublishers.value = false
     }
@@ -459,6 +475,7 @@ export const useEditGameModal = ({
     queueAssetDeletion,
     createEditableScreenshot,
     addAlert,
+    onAssetPersisted: emitAssetSync,
   })
 
   const handleCoverError = (event: Event) => {
@@ -494,6 +511,7 @@ export const useEditGameModal = ({
     createEditableScreenshot,
     createEditableVideo,
     addAlert,
+    onAssetPersisted: emitAssetSync,
   })
 
   const resetTransientState = () => {
@@ -504,8 +522,13 @@ export const useEditGameModal = ({
     resetVideoUploadState()
   }
 
-  watch(() => props.game, async (game) => {
+  watch(() => props.game, async (game, previousGame) => {
     await initializeOptions(game)
+    const isSameGame = game?.id && previousGame?.id && game.id === previousGame.id
+    if (props.visible && isSameGame) {
+      // Keep in-progress form edits intact while background asset sync refreshes the source game payload.
+      return
+    }
     hydrateFormFromGame(game)
   }, { immediate: true })
 
@@ -573,6 +596,7 @@ export const useEditGameModal = ({
     handleVideoFileChange,
     handleWikiMetadataCandidateSelectionChange,
     handleWikiTagCandidateGroupChange,
+    hasParsableWikiContent,
     importMetadataFromWiki,
     initialPath,
     isApplyingWikiMetadata,

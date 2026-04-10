@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -18,8 +19,14 @@ func NewHitokotoHandler(service *services.HitokotoService) *HitokotoHandler {
 }
 
 func (h *HitokotoHandler) Get(c *gin.Context) {
-	minLength := parseQueryInt(c, "min_length", 0)
-	maxLength := parseQueryInt(c, "max_length", 30)
+	minLength, ok := parseHitokotoLengthQuery(c, "min_length", 0)
+	if !ok {
+		return
+	}
+	maxLength, ok := parseHitokotoLengthQuery(c, "max_length", 30)
+	if !ok {
+		return
+	}
 	if maxLength > 1000 {
 		maxLength = 1000
 	}
@@ -63,4 +70,20 @@ func (h *HitokotoHandler) Get(c *gin.Context) {
 	default:
 		c.JSON(http.StatusOK, sentence)
 	}
+}
+
+func parseHitokotoLengthQuery(c *gin.Context, key string, fallback int) (int, bool) {
+	raw := c.Query(key)
+	if raw == "" {
+		return fallback, true
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "invalid hitokoto query parameter: " + key,
+		})
+		return 0, false
+	}
+	return value, true
 }
