@@ -7,6 +7,7 @@ BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIR="$ROOT_DIR/frontend"
 RELEASE_ROOT="$ROOT_DIR/release"
 EMBEDDED_WEB_DIR="$BACKEND_DIR/web/dist"
+RELEASE_ENV_TEMPLATE="$BACKEND_DIR/.env.release.example"
 
 VERSION="${1:-$(date +%Y%m%d-%H%M%S)}"
 PACKAGE_DIR="$RELEASE_ROOT/game-release-$VERSION"
@@ -36,51 +37,6 @@ copy_optional_runtime_data() {
       cp "$source_dir/$filename" "$target_dir/$filename"
     fi
   done
-}
-
-generate_session_secret() {
-  od -An -tx1 -N 32 /dev/urandom | tr -d ' \n'
-}
-
-write_runtime_env() {
-  local target="$1"
-  local primary_rom_root="ROM"
-  cat > "$target" <<EOF
-APP_ENV=production
-HOST=0.0.0.0
-PORT=3000
-
-# 发布包相对路径
-DB_PATH=data/app.db
-STATIC_DIR=../frontend/dist
-ASSETS_DIR=data/gamelist
-
-# 游戏库根目录
-PRIMARY_ROM_ROOT=$primary_rom_root
-
-# SMB / VHD 启动脚本配置
-SMB_SHARE_ROOT=\\\\192.168.1.4\\Game1
-SMB_USERNAME=game
-SMB_PASSWORD=game
-VHD_DIFF_ROOT=C:
-
-# 管理员认证
-# 生产环境启动前必须填写，留空会拒绝启动
-ADMIN_DISPLAY_NAME=不知名网友Hao!
-ADMIN_PASSWORD=
-AUTH_MAX_FAILS=3
-AUTH_COOLDOWN=1m
-AUTH_FAIL_WINDOW=30m
-AUTH_STATE_TTL=24h
-AUTH_TRACK_BY=ip_ua
-WIKI_HISTORY_LIMIT=3
-
-# 可选代理
-PROXY=
-
-READ_HEADER_TIMEOUT=5s
-SHUTDOWN_TIMEOUT=10s
-EOF
 }
 
 check_dependency go
@@ -115,7 +71,7 @@ echo "复制可选自定义资源..."
 copy_optional_runtime_data "$BACKEND_DIR/data" "$PACKAGE_DIR/data"
 
 echo "写入运行配置..."
-write_runtime_env "$PACKAGE_DIR/.env"
+cp "$RELEASE_ENV_TEMPLATE" "$PACKAGE_DIR/.env"
 
 echo "复制参考文档..."
 cp "$ROOT_DIR/README.md" "$PACKAGE_DIR/README.md"

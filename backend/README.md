@@ -14,7 +14,7 @@ GameAtlas 当前主线后端，提供游戏库 API、文件与素材管理、Wik
 ## 当前能力
 
 - 配置加载
-  - 自动读取 `backend/.env`
+  - 自动读取当前运行目录下的 `.env`
   - 支持路径、认证、代理、VHD 启动脚本等配置
 - 数据层
   - SQLite 连接初始化
@@ -64,7 +64,7 @@ GameAtlas 当前主线后端，提供游戏库 API、文件与素材管理、Wik
 ## 快速启动
 
 1. 安装 Go 1.22 或更新版本。
-2. 复制 `backend/.env.example` 为 `backend/.env`。
+2. 开发环境复制 `backend/.env.example` 为 `backend/.env`；发布环境参考 `backend/.env.release.example`。
 3. 按你的本地环境修改数据库、素材目录、ROM 根目录等配置。
 4. 运行：
 
@@ -118,6 +118,7 @@ bash check.sh
 可参考：
 
 - [backend/.env.example](/home/Hao/Game/Game/backend/.env.example)
+- [backend/.env.release.example](/home/Hao/Game/Game/backend/.env.release.example)
 
 ### 服务与路径
 
@@ -130,7 +131,7 @@ bash check.sh
 - `DB_PATH`
   SQLite 数据库路径
 - `STATIC_DIR`
-  磁盘前端静态目录，默认 `../frontend/dist`
+  磁盘前端静态目录，默认 `../frontend/dist`；目录不存在时会回退到内嵌 `web/dist`
 - `ASSETS_DIR`
   游戏素材目录，默认 `data/gamelist`
 
@@ -195,7 +196,7 @@ bash check.sh
 - `/api/auth/login` 会校验管理员密码，并在成功后写入 HttpOnly cookie；当请求本身是 HTTPS，或由反向代理通过 `X-Forwarded-Proto: https` 转发时，会同时写入 `Secure`。
 - 登录失败会按 `AUTH_*` 配置记录次数，并在达到阈值后短时锁定。
 - 大多数写操作要求管理员权限。
-- 文件下载和启动脚本下载仅允许管理员访问。
+- 文件下载和启动脚本下载沿用游戏可见性边界：公开游戏可匿名访问，私有游戏仅管理员可访问。
 - 下载统计通过显式接口 `POST /api/games/:id/files/:fileId/downloads` 完成，并在进程内按 `gameId + fileId + sourceKey` 做 10 分钟时间窗去重。
   这只是单进程内的近似防重复记录机制，主要用于吸收同一用户短时间内的重复点击；它不是跨重启、跨实例或跨部署环境的稳定限流契约。
 - 对于私有游戏，未登录用户无法通过 `/assets/*` 直接访问其素材。

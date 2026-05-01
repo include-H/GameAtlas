@@ -129,6 +129,7 @@ release/game-release-<version>/
 ├── game-server
 ├── start.sh
 ├── .env
+├── README-backend.md
 ├── data/
 │   ├── app.db
 │   ├── gamelist/
@@ -141,10 +142,15 @@ release/game-release-<version>/
 1. 执行 `build-release.sh`
 2. 进入生成的发布目录
 3. 编辑 `.env`
-4. 至少填写管理员密码，并确认 ROM、素材目录和 SMB 配置正确
+4. 至少填写 `ADMIN_PASSWORD`，并按实际环境补齐 `PRIMARY_ROM_ROOT`、SMB 与素材目录配置
 5. 运行 `./start.sh`
 
 后端默认监听 `3000` 端口。
+
+补充说明：
+
+- 发布包的 `.env` 直接复制自 [backend/.env.release.example](/home/Hao/Game/Game/backend/.env.release.example)，它应当作为发布环境配置模板的唯一来源。
+- 发布包默认依赖内嵌前端资源启动；只有你想覆盖内嵌前端时，才需要额外提供 `STATIC_DIR` 指向的磁盘目录。
 
 ## 如何用 GitHub Release 发发布包
 
@@ -160,7 +166,7 @@ release/game-release-<version>/
 
 工作流文件在：
 
-- [.github/workflows/release.yml](/home/Hao/Game/.github/workflows/release.yml)
+- [.github/workflows/release.yml](/home/Hao/Game/Game/.github/workflows/release.yml)
 
 ### 推荐流程
 
@@ -206,7 +212,7 @@ git push origin v1.0.0
 
 1. 修改 `.env`
 2. 至少填写 `ADMIN_PASSWORD`
-3. 按实际环境调整 `PRIMARY_ROM_ROOT`、`SMB_SHARE_ROOT` 等配置
+3. 按实际环境调整 `PRIMARY_ROM_ROOT`、`SMB_SHARE_ROOT` / `SMB_PATH_MAPPINGS`、素材目录等配置
 4. 执行 `./start.sh`
 
 ### 手动上传仍然可用
@@ -399,7 +405,7 @@ git clone https://github.com/include-H/Game_Wiki.git
 
 ## 常用配置
 
-后端启动时会读取发布目录或 `backend/` 下的 `.env`。
+后端启动时会优先读取当前运行目录下的 `.env`。开发环境通常是 `backend/.env`，发布包则是发布目录下的 `.env`。
 
 ### 最低必填项
 
@@ -416,9 +422,15 @@ ADMIN_PASSWORD=你的密码
 
 ```env
 DB_PATH=data/app.db
+STATIC_DIR=frontend/dist
 ASSETS_DIR=data/gamelist
 PRIMARY_ROM_ROOT=ROM
 ```
+
+说明：
+
+- `STATIC_DIR` 是可选磁盘前端覆盖目录；目录不存在时，后端会自动回退到内嵌前端资源。
+- 发布配置模板可参考 [backend/.env.release.example](/home/Hao/Game/Game/backend/.env.release.example)；开发模板可参考 [backend/.env.example](/home/Hao/Game/Game/backend/.env.example)。
 
 ### 常用服务配置
 
@@ -456,7 +468,7 @@ PORT=3000
 - 默认浏览场景支持匿名访问
 - 管理员登录后才允许新增、编辑、删除、上传素材、编辑 Wiki 等写操作
 - 登录态由后端 Cookie 提供
-- 文件下载和启动脚本下载支持“管理员或局域网访问”的边界
+- 文件下载和启动脚本下载沿用游戏可见性边界：公开游戏可匿名访问，私有游戏仅管理员可访问
 
 如果你把服务暴露到更大范围网络，建议额外做：
 
