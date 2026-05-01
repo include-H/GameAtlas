@@ -15,9 +15,18 @@ func decodeGamesListParams(c *gin.Context) (domain.GamesListParams, bool) {
 	if !ok {
 		return domain.GamesListParams{}, false
 	}
+	if page <= 0 {
+		page = 1
+	}
 	limit, ok := parseGamesListIntQuery(c, "limit", 20)
 	if !ok {
 		return domain.GamesListParams{}, false
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
 	}
 	seriesID, ok := parseGamesListInt64Query(c, "series", 0)
 	if !ok {
@@ -44,10 +53,32 @@ func decodeGamesListParams(c *gin.Context) (domain.GamesListParams, bool) {
 		TagIDs:            tagIDs,
 		PendingIssue:      strings.TrimSpace(c.Query("pending_issue")),
 		PendingRecentDays: pendingRecentDays,
-		Sort:              c.Query("sort"),
-		Order:             c.Query("order"),
+		Sort:              strings.TrimSpace(c.Query("sort")),
+		Order:             strings.TrimSpace(c.Query("order")),
 		SortSeed:          sortSeed,
 		IncludeAll:        isAdminRequest(c),
+	}
+
+	// 2026-05-01: keep list query defaults and transport validation at decode time so
+	// handler-visible semantics stay explicit and the catalog service no longer hides
+	// page/limit/sort/order/pending_issue fallback behavior for HTTP callers. This is the
+	// only layer that may supply default sort/order for the HTTP contract; deeper layers
+	// must reject bad values instead of silently rewriting them.
+	if params.Sort == "" {
+		params.Sort = "updated_at"
+	} else if !domain.IsAllowedGamesListSort(params.Sort) {
+		writeGamesListQueryError(c, "sort")
+		return domain.GamesListParams{}, false
+	}
+	if params.Order == "" {
+		params.Order = "desc"
+	} else if !domain.IsAllowedGamesListOrder(params.Order) {
+		writeGamesListQueryError(c, "order")
+		return domain.GamesListParams{}, false
+	}
+	if params.PendingIssue != "" && !domain.IsAllowedPendingIssueFilter(params.PendingIssue) {
+		writeGamesListQueryError(c, "pending_issue")
+		return domain.GamesListParams{}, false
 	}
 
 	// 2026-04-04: random list order now requires an explicit transport seed.
@@ -82,6 +113,13 @@ func decodeGamesListParams(c *gin.Context) (domain.GamesListParams, bool) {
 	if raw := c.Query("favorite"); raw != "" {
 		value, ok := parseGamesListBoolQuery(c, "favorite")
 		if !ok {
+			return domain.GamesListParams{}, false
+		}
+		// 2026-05-01: games list transport only accepts favorite=true as a valid filter.
+		// Impact: favorite=false is not a negative predicate; reject it here instead of
+		// letting repository semantics silently collapse it into the same behavior as "missing".
+		if !value {
+			writeGamesListQueryError(c, "favorite")
 			return domain.GamesListParams{}, false
 		}
 		params.FavoriteOnly = value

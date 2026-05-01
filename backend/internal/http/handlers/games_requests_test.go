@@ -35,6 +35,9 @@ func TestGameAggregateUpdateRequestToInputNormalizesOmittedReplacementSlices(t *
 	if got := len(input.Game.TagIDs); got != 3 {
 		t.Fatalf("tag_ids len = %d, want decode to stay transport-only before service normalization", got)
 	}
+	if input.Game.PublisherIDs == nil || len(input.Game.PublisherIDs) != 0 {
+		t.Fatalf("publisher_ids = %#v, want empty slice when field is omitted under aggregate replace semantics", input.Game.PublisherIDs)
+	}
 }
 
 func TestGameCreateRequestToInputKeepsOnlyQuickCreateFields(t *testing.T) {

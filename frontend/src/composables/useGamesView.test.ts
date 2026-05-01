@@ -71,7 +71,7 @@ describe('useGamesView helpers', () => {
     })
   })
 
-  it('uses backend default sort when route declares an unsupported value', () => {
+  it('forwards unsupported sort values so the backend transport layer can reject them', () => {
     const result = buildGamesListRequest({
       routeQuery: {
         page: '2',
@@ -90,10 +90,15 @@ describe('useGamesView helpers', () => {
         tag: [],
         favorite: undefined,
       },
+      sort: {
+        field: 'legacy_default',
+        order: 'desc',
+        seed: undefined,
+      },
     })
   })
 
-  it('drops invalid sort and seed from route query', () => {
+  it('preserves invalid sort query so the backend can return a transport error', () => {
     const result = normalizeGamesSortRouteQuery(
       {
         page: '2',
@@ -104,10 +109,7 @@ describe('useGamesView helpers', () => {
       },
     )
 
-    expect(result).toEqual({
-      page: '2',
-      search: 'halo',
-    })
+    expect(result).toBeNull()
   })
 
   it('drops stale seed when sort is no longer random', () => {
@@ -127,30 +129,34 @@ describe('useGamesView helpers', () => {
     })
   })
 
-  it('drops favorite=false because backend only defines favorite=true as a filter', () => {
+  it('preserves favorite=false so the backend transport layer can reject it', () => {
     const result = normalizeGamesFavoriteRouteQuery({
       page: '2',
       favorite: 'false',
       search: 'halo',
     })
 
-    expect(result).toEqual({
-      page: '2',
-      search: 'halo',
-    })
+    expect(result).toBeNull()
   })
 
-  it('drops invalid favorite query values', () => {
+  it('preserves invalid favorite query values so the backend can reject them', () => {
     const result = normalizeGamesFavoriteRouteQuery({
       page: '2',
       favorite: 'favorites',
       search: 'halo',
     })
 
-    expect(result).toEqual({
+    expect(result).toBeNull()
+  })
+
+  it('preserves favorite=true as the only valid favorite route value', () => {
+    const result = normalizeGamesFavoriteRouteQuery({
       page: '2',
+      favorite: 'true',
       search: 'halo',
     })
+
+    expect(result).toBeNull()
   })
 
   it('drops invalid pagination query values before request building', () => {
@@ -293,13 +299,13 @@ describe('useGamesView helpers', () => {
       },
       sort: {
         field: 'random',
-        order: 'desc',
+        order: undefined,
         seed: undefined,
       },
     })
   })
 
-  it('drops invalid native order while preserving supported sort', () => {
+  it('preserves invalid native order so the backend can reject it', () => {
     const result = normalizeGamesSortRouteQuery({
       page: '2',
       sort: 'title',
@@ -307,11 +313,7 @@ describe('useGamesView helpers', () => {
       search: 'halo',
     })
 
-    expect(result).toEqual({
-      page: '2',
-      sort: 'title',
-      search: 'halo',
-    })
+    expect(result).toBeNull()
   })
 
   it('rewrites out-of-range pages to the backend last page', () => {
@@ -373,7 +375,7 @@ describe('useGamesView helpers', () => {
     })
   })
 
-  it('drops favorite=false before building the backend request', () => {
+  it('forwards favorite=false so the backend can reject the invalid query', () => {
     const result = buildGamesListRequest({
       routeQuery: {
         page: '2',
@@ -388,7 +390,28 @@ describe('useGamesView helpers', () => {
         limit: 24,
         search: undefined,
         tag: [],
+        favorite: false,
+      },
+    })
+  })
+
+  it('forwards invalid favorite strings so the backend can reject them', () => {
+    const result = buildGamesListRequest({
+      routeQuery: {
+        page: '2',
+        favorite: 'favorites',
+      },
+      itemsPerPage: 24,
+    })
+
+    expect(result).toEqual({
+      query: {
+        page: 2,
+        limit: 24,
+        search: undefined,
+        tag: [],
         favorite: undefined,
+        favorite_raw: 'favorites',
       },
     })
   })

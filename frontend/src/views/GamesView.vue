@@ -270,6 +270,7 @@
     <!-- Add Game Modal -->
     <add-game-modal
       v-model:visible="showAddModal"
+      :submitting="addGameSubmitting"
       @submit="handleAddGameSubmit"
     />
   </div>
@@ -300,6 +301,7 @@ const { isAdmin } = storeToRefs(authStore)
 const {
   clearFilters,
   currentPage,
+  addGameSubmitting,
   filterFavorites,
   filterableTagGroups,
   games,

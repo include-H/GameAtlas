@@ -57,7 +57,11 @@ func (request gameCreateRequest) toInput() domain.GameCreateInput {
 }
 
 func (request gameAggregateUpdateRequest) toInput() domain.GameAggregateUpdateInput {
-		return domain.GameAggregateUpdateInput{
+	// 2026-05-01: aggregate update is a full replacement write, not a sparse patch.
+	// Impact: omitted relation/order arrays are intentionally treated the same as explicit
+	// empty arrays at the handler DTO boundary. This is domain write semantics for the
+	// aggregate endpoint itself, not frontend-form compatibility glue.
+	return domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
 			GameCoreInput: request.Game.toDomain(),
 			SeriesID:      request.Game.SeriesID,
@@ -111,6 +115,9 @@ func (request gameAggregateAssetsRequest) toDomain() domain.GameAggregateAssetsI
 }
 
 func emptyInt64Slice(values []int64) []int64 {
+	// 2026-05-01: normalize omitted JSON arrays to empty slices for aggregate replace semantics.
+	// Missing developer_ids/publisher_ids/tag_ids means "clear this collection" on this endpoint,
+	// because aggregate updates rewrite the full editable relationship set in one request.
 	if values == nil {
 		return []int64{}
 	}
@@ -118,6 +125,9 @@ func emptyInt64Slice(values []int64) []int64 {
 }
 
 func emptyStringSlice(values []string) []string {
+	// 2026-05-01: reorder arrays follow the same full-replacement contract as relation arrays.
+	// Missing screenshot/video order fields mean "no items remain in this ordered collection",
+	// not "leave the existing order untouched".
 	if values == nil {
 		return []string{}
 	}

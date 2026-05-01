@@ -10,7 +10,7 @@ import { Modal } from '@arco-design/web-vue'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import gamesService from '@/services/games.service'
 import tagsService from '@/services/tags.service'
-import type { GameListItem, GameListQuery, GameSort, Tag, TagGroup } from '@/services/types'
+import type { GameListItem, GameListQuery, GameSort, GameSortQuery, Tag, TagGroup } from '@/services/types'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
 import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
@@ -160,15 +160,15 @@ export const buildGamesRouteQuery = (
 export const buildGamesListRequest = ({
   routeQuery,
   itemsPerPage,
-}: BuildGamesListRequestOptions): { query: GameListQuery; sort?: GameSort } => {
+}: BuildGamesListRequestOptions): { query: GameListQuery; sort?: GameSortQuery } => {
   const page = parsePositiveQueryNumber(readSingleQueryValue(routeQuery.page), 1)
-  const sortField = parseGamesSortField(readSingleQueryValue(routeQuery.sort))
-  const sortOrder = parseGamesSortOrder(readSingleQueryValue(routeQuery.order))
-  const favorite = parseRouteBoolean(routeQuery.favorite) === true
-    ? true
-    : undefined
+  const rawSort = readSingleQueryValue(routeQuery.sort)
+  const rawOrder = readSingleQueryValue(routeQuery.order)
+  const sortField = parseGamesSortField(rawSort)
+  const rawFavorite = readSingleQueryValue(routeQuery.favorite)
+  const favorite = parseRouteBoolean(routeQuery.favorite)
 
-  const request: { query: GameListQuery; sort?: GameSort } = {
+  const request: { query: GameListQuery; sort?: GameSortQuery } = {
     query: {
       page,
       limit: itemsPerPage,
@@ -178,10 +178,17 @@ export const buildGamesListRequest = ({
     },
   }
 
-  if (sortField) {
+  if (rawFavorite !== undefined && favorite === undefined) {
+    request.query.favorite_raw = rawFavorite
+  }
+
+  // 2026-05-01: forward route-owned sort/order values verbatim whenever they are present.
+  // GamesView may interpret only a supported subset for local UI state, but it must not
+  // silently coerce malformed sort/order query params back to backend defaults.
+  if (rawSort !== undefined || rawOrder !== undefined) {
     request.sort = {
-      field: sortField,
-      order: sortOrder || 'desc',
+      field: rawSort,
+      order: rawOrder,
       seed: sortField === 'random'
         ? parsePositiveRouteNumber(routeQuery.seed)
         : undefined,
@@ -204,13 +211,10 @@ export const normalizeGamesFavoriteRouteQuery = (routeQuery: LocationQuery): Loc
   if (rawFavorite === undefined) {
     return null
   }
-  if (parseRouteBoolean(rawFavorite) === true) {
-    return null
-  }
-
-  return buildGamesRouteQuery(routeQuery, {
-    favorite: undefined,
-  })
+  // 2026-05-01: keep malformed favorite values in the route so shared URLs and bad links
+  // fail at the backend transport boundary. GamesView only treats favorite=true as an active
+  // UI filter, but it must not silently rewrite favorite=false or arbitrary strings away.
+  return null
 }
 
 export const normalizeGamesSortRouteQuery = (routeQuery: LocationQuery): LocationQueryRaw | null => {
@@ -221,18 +225,14 @@ export const normalizeGamesSortRouteQuery = (routeQuery: LocationQuery): Locatio
 
   if (!rawSort && !rawOrder) return null
 
-  if (!sortField) {
-    return buildGamesRouteQuery(routeQuery, {
-      sort: undefined,
-      order: undefined,
-      seed: undefined,
-    })
+  // 2026-05-01: keep malformed sort/order in the route so the backend transport decoder can reject them.
+  // This avoids client-side silent correction masking invalid shared URLs or bad internal links.
+  if (!rawSort || !sortField) {
+    return null
   }
 
   if (rawOrder !== undefined && !sortOrder) {
-    return buildGamesRouteQuery(routeQuery, {
-      order: undefined,
-    })
+    return null
   }
 
   if (sortField !== 'random') {
@@ -355,6 +355,7 @@ export const useGamesView = ({
   const searchQuery = ref('')
   const viewMode = ref<GamesViewMode>('grid')
   const showAddModal = ref(false)
+  const addGameSubmitting = ref(false)
   const showTagFilters = ref(false)
   const tagGroups = ref<TagGroup[]>([])
   const tags = ref<Tag[]>([])
@@ -407,8 +408,11 @@ export const useGamesView = ({
     },
     set: (sort: string) => {
       const [nextFieldRaw, nextOrderRaw] = String(sort).split(':')
-      const nextField = parseGamesSortField(nextFieldRaw) || DEFAULT_SORT.field
-      const nextOrder = parseGamesSortOrder(nextOrderRaw) || DEFAULT_SORT.order
+      const nextField = parseGamesSortField(nextFieldRaw)
+      const nextOrder = parseGamesSortOrder(nextOrderRaw)
+      if (!nextField || !nextOrder) {
+        return
+      }
       const isDefaultSort = nextField === DEFAULT_SORT.field && nextOrder === DEFAULT_SORT.order
       updateRoute({
         sort: isDefaultSort ? undefined : nextField,
@@ -536,6 +540,8 @@ export const useGamesView = ({
   }
 
   const handleAddGameSubmit = async (data: { title: string; visibility: 'public' | 'private' }) => {
+    if (addGameSubmitting.value) return
+    addGameSubmitting.value = true
     try {
       await gamesService.createGame({
         title: data.title,
@@ -543,9 +549,18 @@ export const useGamesView = ({
       })
 
       uiStore.addAlert(`游戏 "${data.title}" 添加成功`, 'success')
-      await loadGames()
+      showAddModal.value = false
+      try {
+        // 2026-04-10: creating the game and refreshing the catalog are separate outcomes.
+        // Impact: a successful write must stay visible even if the follow-up list refresh fails.
+        await loadGames()
+      } catch {
+        uiStore.addAlert('添加已生效，但列表刷新失败，请稍后重试', 'warning')
+      }
     } catch (error) {
       uiStore.addAlert(`添加游戏失败：${getHttpErrorMessage(error)}`, 'error')
+    } finally {
+      addGameSubmitting.value = false
     }
   }
 
@@ -568,7 +583,14 @@ export const useGamesView = ({
         'warning'
       )
     }
-    await loadGames()
+    try {
+      // 2026-04-10: deletion and catalog refresh are separate outcomes.
+      // Impact: once the delete request succeeds, a later list refresh failure must not
+      // be reported as "delete failed".
+      await loadGames()
+    } catch {
+      uiStore.addAlert('删除已生效，但列表刷新失败，请稍后重试', 'warning')
+    }
   }
 
   const handleDelete = (gameRef: string, title: string) => {
@@ -736,6 +758,7 @@ export const useGamesView = ({
   return {
     clearFilters,
     currentPage,
+    addGameSubmitting,
     filterFavorites,
     filterableTagGroups,
     games,

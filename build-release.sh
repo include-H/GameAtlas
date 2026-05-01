@@ -44,7 +44,6 @@ generate_session_secret() {
 
 write_runtime_env() {
   local target="$1"
-  local session_secret="$2"
   local primary_rom_root="ROM"
   cat > "$target" <<EOF
 APP_ENV=production
@@ -69,8 +68,6 @@ VHD_DIFF_ROOT=C:
 # 生产环境启动前必须填写，留空会拒绝启动
 ADMIN_DISPLAY_NAME=不知名网友Hao!
 ADMIN_PASSWORD=
-# 打包时自动生成；如需轮换可手动修改
-SESSION_SECRET=$session_secret
 AUTH_MAX_FAILS=3
 AUTH_COOLDOWN=1m
 AUTH_FAIL_WINDOW=30m
@@ -88,8 +85,6 @@ EOF
 
 check_dependency go
 check_dependency npm
-
-SESSION_SECRET_VALUE="$(generate_session_secret)"
 
 echo "清理旧发布目录..."
 rm -rf "$PACKAGE_DIR"
@@ -120,7 +115,7 @@ echo "复制可选自定义资源..."
 copy_optional_runtime_data "$BACKEND_DIR/data" "$PACKAGE_DIR/data"
 
 echo "写入运行配置..."
-write_runtime_env "$PACKAGE_DIR/.env" "$SESSION_SECRET_VALUE"
+write_runtime_env "$PACKAGE_DIR/.env"
 
 echo "复制参考文档..."
 cp "$ROOT_DIR/README.md" "$PACKAGE_DIR/README.md"

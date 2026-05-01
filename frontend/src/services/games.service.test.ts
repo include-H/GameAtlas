@@ -131,7 +131,7 @@ describe('games service', () => {
     expect(params.get('favorite')).toBe('true')
   })
 
-  it('does not send favorite=false because backend has no negative favorite filter', async () => {
+  it('sends favorite=false so the backend transport layer can reject it', async () => {
     getMock.mockResolvedValue({
       data: [{ ...baseGame, id: 2, public_id: 'game-2', is_favorite: true }],
       pagination: {
@@ -149,7 +149,28 @@ describe('games service', () => {
     })
 
     const params = getMock.mock.calls[0]?.[1]?.params as URLSearchParams
-    expect(params.get('favorite')).toBeNull()
+    expect(params.get('favorite')).toBe('false')
+  })
+
+  it('passes through invalid favorite transport values from route-owned callers', async () => {
+    getMock.mockResolvedValue({
+      data: [{ ...baseGame, id: 2, public_id: 'game-2', is_favorite: true }],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 1,
+        totalPages: 1,
+      },
+    })
+
+    await gamesService.getGames({
+      query: {
+        favorite_raw: 'favorites',
+      },
+    })
+
+    const params = getMock.mock.calls[0]?.[1]?.params as URLSearchParams
+    expect(params.get('favorite')).toBe('favorites')
   })
 
   it('returns delete warnings when game removal leaves cleanup tasks', async () => {

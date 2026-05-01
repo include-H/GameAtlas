@@ -405,13 +405,11 @@ git clone https://github.com/include-H/Game_Wiki.git
 
 ```env
 ADMIN_PASSWORD=你的密码
-SESSION_SECRET=随机长字符串
 ```
 
 注意：
 
 - `ADMIN_PASSWORD` 不能为空
-- `SESSION_SECRET` 不能为空，也不能保留默认值 `change-me`
 - 任一条件不满足时，后端会直接拒绝启动
 
 ### 常用路径配置

@@ -9,29 +9,8 @@ import (
 )
 
 func normalizeListParams(params *domain.GamesListParams) error {
-	if params.Page <= 0 {
-		params.Page = 1
-	}
-	if params.Limit <= 0 {
-		params.Limit = 20
-	}
-	if params.Limit > 100 {
-		params.Limit = 100
-	}
-	if params.Sort == "" {
-		params.Sort = "updated_at"
-	}
-	if params.Order == "" {
-		params.Order = "desc"
-	}
 	if !params.IncludeAll && strings.TrimSpace(params.Visibility) == "" {
 		params.Visibility = domain.GameVisibilityPublic
-	}
-	params.PendingIssue = strings.TrimSpace(params.PendingIssue)
-	if params.PendingIssue != "" {
-		if !domain.IsAllowedPendingIssueFilter(params.PendingIssue) {
-			return ErrValidation
-		}
 	}
 	if params.PendingRecentDays < 0 {
 		params.PendingRecentDays = 0
@@ -39,6 +18,31 @@ func normalizeListParams(params *domain.GamesListParams) error {
 	if params.PendingRecentDays > 365 {
 		params.PendingRecentDays = 365
 	}
+	return nil
+}
+
+func validateListParamsContract(params domain.GamesListParams) error {
+	// 2026-05-01: internal callers may bypass the HTTP decoder, but they still must satisfy
+	// the same list contract. Reject incomplete/invalid sort+order here instead of allowing
+	// repository code to fall through into implicit defaults or malformed SQL behavior.
+	if params.Page <= 0 || params.Limit <= 0 {
+		return ErrValidation
+	}
+
+	sort := strings.TrimSpace(params.Sort)
+	if !domain.IsAllowedGamesListSort(sort) {
+		return ErrValidation
+	}
+
+	order := strings.TrimSpace(params.Order)
+	if !domain.IsAllowedGamesListOrder(order) {
+		return ErrValidation
+	}
+
+	if sort == "random" && params.SortSeed <= 0 {
+		return ErrValidation
+	}
+
 	return nil
 }
 

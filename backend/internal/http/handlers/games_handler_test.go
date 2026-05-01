@@ -550,6 +550,28 @@ func TestGamesHandlerListRejectsInvalidPendingQueryBoolean(t *testing.T) {
 	}
 }
 
+func TestGamesHandlerListRejectsFavoriteFalseQuery(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/games?favorite=false", nil)
+
+	handler.List(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: favorite"`) {
+		t.Fatalf("body = %s, want invalid favorite query error", recorder.Body.String())
+	}
+}
+
 func TestGamesHandlerListRejectsRandomSortWithoutSeed(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 
@@ -1132,6 +1154,131 @@ func TestGamesHandlerUpdateAggregateReturnsForbiddenForFileOutsidePrimaryROMRoot
 	}
 	if !strings.Contains(recorder.Body.String(), `"error":"file path is outside PRIMARY_ROM_ROOT"`) {
 		t.Fatalf("body = %s, want forbidden path error", recorder.Body.String())
+	}
+}
+
+func TestGamesHandlerListRejectsInvalidSortQuery(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/games?sort=legacy_default", nil)
+
+	handler.List(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: sort"`) {
+		t.Fatalf("body = %s, want invalid sort query error", recorder.Body.String())
+	}
+}
+
+func TestGamesHandlerListRejectsInvalidOrderQuery(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/games?sort=updated_at&order=sideways", nil)
+
+	handler.List(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: order"`) {
+		t.Fatalf("body = %s, want invalid order query error", recorder.Body.String())
+	}
+}
+
+func TestGamesHandlerListDefaultsAndClampsTransportListParamsBeforeService(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	firstID := insertGamesHandlerTestGame(t, db, "transport-default-a", "Transport Default A", "public", "")
+	secondID := insertGamesHandlerTestGame(t, db, "transport-default-b", "Transport Default B", "public", "")
+	if _, err := db.Exec(`
+		UPDATE games
+		SET updated_at = CASE id
+			WHEN ? THEN '2026-04-22 12:00:00'
+			WHEN ? THEN '2026-04-22 11:00:00'
+		END
+		WHERE id IN (?, ?)
+	`, firstID, secondID, firstID, secondID); err != nil {
+		t.Fatalf("set updated_at ordering: %v", err)
+	}
+
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/games?page=0&limit=999", nil)
+
+	handler.List(context)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+
+	var response struct {
+		Data []struct {
+			ID int64 `json:"id"`
+		} `json:"data"`
+		Pagination struct {
+			Page  int `json:"page"`
+			Limit int `json:"limit"`
+			Total int `json:"total"`
+		} `json:"pagination"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if response.Pagination.Page != 1 {
+		t.Fatalf("pagination.page = %d, want 1 after transport fallback", response.Pagination.Page)
+	}
+	if response.Pagination.Limit != 100 {
+		t.Fatalf("pagination.limit = %d, want 100 after transport clamp", response.Pagination.Limit)
+	}
+	if response.Pagination.Total != 2 || len(response.Data) != 2 {
+		t.Fatalf("response = %+v, want both games in the first page", response)
+	}
+	if response.Data[0].ID != firstID || response.Data[1].ID != secondID {
+		t.Fatalf("data = %+v, want updated_at desc transport defaults", response.Data)
+	}
+}
+
+func TestGamesHandlerListRejectsInvalidPendingIssueQuery(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/games?pending_issue=legacy-default", nil)
+
+	handler.List(context)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: pending_issue"`) {
+		t.Fatalf("body = %s, want invalid pending_issue query error", recorder.Body.String())
 	}
 }
 

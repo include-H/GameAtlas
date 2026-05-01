@@ -185,6 +185,25 @@ type GamesListParams struct {
 	SortSeed              int64
 }
 
+var allowedGamesListSorts = map[string]struct{}{
+	"title":               {},
+	"created_at":          {},
+	"updated_at":          {},
+	"release_date":        {},
+	"downloads":           {},
+	"random":              {},
+	"pending_issue_count": {},
+}
+
+func IsAllowedGamesListSort(value string) bool {
+	_, ok := allowedGamesListSorts[value]
+	return ok
+}
+
+func IsAllowedGamesListOrder(value string) bool {
+	return value == "asc" || value == "desc"
+}
+
 type GamesTimelineParams struct {
 	Limit             int
 	FromDate          string
@@ -229,7 +248,9 @@ type GameCreateInput struct {
 	Visibility string
 }
 
-// Aggregate update rewrites the entire editable game aggregate in one request.
+// 2026-05-01: aggregate update is a full-replacement write for the editable game aggregate.
+// Impact: omitted relation/order collections are interpreted as empty at the write boundary;
+// this endpoint does not support sparse patch semantics.
 type GameAggregateCoreUpdateInput struct {
 	GameCoreInput
 	SeriesID     *int64

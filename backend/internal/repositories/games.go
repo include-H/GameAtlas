@@ -178,6 +178,9 @@ func (r *GamesRepository) buildGamesListWhere(params domain.GamesListParams, exc
 		}
 	}
 	if params.FavoriteOnly {
+		// 2026-05-01: FavoriteOnly is intentionally one-way. Transport/service code must
+		// reject favorite=false before reaching the repository; do not reinterpret false
+		// here as "exclude favorites" or add fallback behavior.
 		where = append(where, "EXISTS (SELECT 1 FROM favorite_games fg WHERE fg.game_id = g.id)")
 	}
 

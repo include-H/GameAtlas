@@ -13,7 +13,7 @@ import type {
   GameListItem,
   GameListItemDto,
   GameListQuery,
-  GameSort,
+  GameSortQuery,
   GameStats,
   GameVersion,
   TimelineGame,
@@ -69,7 +69,7 @@ type GameFileReleaseSource = Pick<GameFileEntry, 'source_created_at' | 'created_
 
 function buildGamesQueryParams(params?: {
   query?: GameListQuery
-  sort?: GameSort
+  sort?: GameSortQuery
 }): URLSearchParams {
   const queryParams = new URLSearchParams()
   if (params?.query?.page) queryParams.append('page', String(params.query.page))
@@ -77,7 +77,14 @@ function buildGamesQueryParams(params?: {
   const search = typeof params?.query?.search === 'string' ? params.query.search.trim() : ''
   if (search) queryParams.append('search', search)
   if (params?.query?.series) queryParams.append('series', String(params.query.series))
-  if (params?.query?.favorite === true) queryParams.append('favorite', 'true')
+  // 2026-05-01: forward route-owned favorite transport values verbatim so the backend
+  // decoder decides validity. Do not silently drop favorite=false or unknown strings here,
+  // otherwise the client hides a bad query instead of surfacing the backend 400 contract.
+  if (typeof params?.query?.favorite_raw === 'string' && params.query.favorite_raw.trim().length > 0) {
+    queryParams.append('favorite', params.query.favorite_raw.trim())
+  } else if (typeof params?.query?.favorite === 'boolean') {
+    queryParams.append('favorite', String(params.query.favorite))
+  }
   if (typeof params?.query?.pending === 'boolean') queryParams.append('pending', String(params.query.pending))
   if (params?.query?.pending_issue) queryParams.append('pending_issue', params.query.pending_issue)
   if (typeof params?.query?.pending_include_ignored === 'boolean') queryParams.append('pending_include_ignored', String(params.query.pending_include_ignored))
@@ -91,8 +98,12 @@ function buildGamesQueryParams(params?: {
     })
   }
   if (params?.sort) {
-    queryParams.append('sort', params.sort.field)
-    queryParams.append('order', params.sort.order)
+    if (typeof params.sort.field === 'string' && params.sort.field.length > 0) {
+      queryParams.append('sort', params.sort.field)
+    }
+    if (typeof params.sort.order === 'string' && params.sort.order.length > 0) {
+      queryParams.append('order', params.sort.order)
+    }
     if (typeof params.sort.seed === 'number') {
       queryParams.append('seed', String(params.sort.seed))
     }
@@ -102,7 +113,7 @@ function buildGamesQueryParams(params?: {
 
 async function fetchGamesPage(params?: {
   query?: GameListQuery
-  sort?: GameSort
+  sort?: GameSortQuery
 }): Promise<ApiPageEnvelope<GameListItemDto>> {
   return get<ApiPageEnvelope<GameListItemDto>>('/games', {
     params: buildGamesQueryParams(params),
@@ -143,6 +154,9 @@ function normalizeGameDetail(item: GameDetailDto): GameDetail {
   }
 }
 
+// Keep a dedicated admin detail normalization path for edit flows:
+// getAdminGameDetail uses this guard to fail fast when /games/:publicId
+// returns a public payload without resolved file_path values.
 function normalizeAdminGameDetail(item: AdminGameDetailDto): AdminGameDetail {
   const detail = normalizeGameDetail(item)
   // 2026-04-06: /games/:publicId still serves public/admin payloads from one route.
@@ -168,6 +182,9 @@ function canLaunchFromFileName(fileName?: string | null): boolean {
 }
 
 function getGameFileReleaseDate(file: GameFileReleaseSource): string {
+  // 2026-04-10: keep the version date fallback as an explicit product rule.
+  // Impact: download/version UI shows source_created_at first, then falls back
+  // to the file record's created_at when filesystem creation time is unavailable.
   return file.source_created_at || file.created_at || ''
 }
 
@@ -203,7 +220,7 @@ export function mapGameVersions(game: Pick<GameDetail, 'public_id' | 'files'>): 
 const gamesService = {
   async getGames(params?: {
     query?: GameListQuery
-    sort?: GameSort
+    sort?: GameSortQuery
   }): Promise<ApiPageEnvelope<GameListItem>> {
     const response = await fetchGamesPage(params)
     const games = response.data.map((item) => normalizeGameListItem(item))
@@ -216,7 +233,7 @@ const gamesService = {
 
   async getAllGames(params?: {
     query?: Omit<GameListQuery, 'page' | 'limit'>
-    sort?: GameSort
+    sort?: GameSortQuery
     limit?: number
   }): Promise<GameListItem[]> {
     const limit = Math.max(1, Math.min(params?.limit || 100, 200))
@@ -283,8 +300,9 @@ const gamesService = {
     return normalizeGameDetail(response.data)
   },
 
-  // Keep an explicit admin detail entry point for edit flows so callers do not need to
-  // repeatedly narrow a mixed public/admin payload before touching file_path.
+  // 2026-05-01: keep an explicit admin detail entry point even though getGameDetail exists.
+  // Impact: edit/bootstrap flows can require resolved admin file_path data at the service
+  // boundary and fail fast there, instead of carrying a public/admin union deeper into form code.
   async getAdminGameDetail(id: string): Promise<AdminGameDetail> {
     const response = await get<ApiEnvelope<AdminGameDetailDto>>(`/games/${id}`)
     return normalizeAdminGameDetail(response.data)

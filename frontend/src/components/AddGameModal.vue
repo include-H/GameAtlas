@@ -28,10 +28,10 @@
     </a-form>
 
     <div class="add-game-modal__actions">
-      <a-button class="app-text-action-btn" type="text" @click="handleCancel">
+      <a-button class="app-text-action-btn" type="text" :disabled="props.submitting" @click="handleCancel">
         取消
       </a-button>
-      <a-button type="primary" :loading="isSubmitting" @click="handleSubmit">
+      <a-button type="primary" :loading="props.submitting" :disabled="props.submitting" @click="handleSubmit">
         添加
       </a-button>
     </div>
@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import type { FieldRule } from '@arco-design/web-vue'
 
 interface FormState {
@@ -49,15 +49,15 @@ interface FormState {
 
 const props = defineProps<{
   visible: boolean
+  submitting?: boolean
 }>()
 
 const emit = defineEmits<{
   'update:visible': [value: boolean]
-  'submit': [data: FormState]
+  submit: [data: FormState]
 }>()
 
 const formRef = ref()
-const isSubmitting = ref(false)
 const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1280)
 const form = ref<FormState>({
   title: '',
@@ -101,25 +101,27 @@ const handleSubmit = async () => {
     return
   }
 
-  isSubmitting.value = true
-
+  // 2026-04-10: the parent owns request execution and modal closing.
+  // Impact: failed add requests keep the dialog open instead of resetting as if the write succeeded.
   emit('submit', {
     title: form.value.title,
     visibility: form.value.visibility,
   })
-
-  // Reset form
-  visible.value = false
-  form.value.title = ''
-  form.value.visibility = 'public'
-  isSubmitting.value = false
 }
 
 const handleCancel = () => {
+  if (props.submitting) return
   visible.value = false
   form.value.title = ''
   form.value.visibility = 'public'
 }
+
+watch(visible, (nextVisible) => {
+  if (!nextVisible) {
+    form.value.title = ''
+    form.value.visibility = 'public'
+  }
+})
 </script>
 
 <style scoped>

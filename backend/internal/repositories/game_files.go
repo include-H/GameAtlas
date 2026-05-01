@@ -54,15 +54,3 @@ func (r *GameFilesRepository) UpdateSizeBytes(gameID, fileID, sizeBytes int64) e
 	}
 	return nil
 }
-
-func (r *GameFilesRepository) UpdateSourceCreatedAt(gameID, fileID int64, sourceCreatedAt *string) error {
-	_, err := r.db.Exec(`
-		UPDATE game_files
-		SET source_created_at = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE game_id = ? AND id = ?
-	`, sourceCreatedAt, gameID, fileID)
-	if err != nil {
-		return fmt.Errorf("update game file source_created_at: %w", err)
-	}
-	return nil
-}

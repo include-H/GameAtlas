@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import gamesService, { mapGameVersions } from '@/services/games.service'
-import type { GameDetail, GameListItem, GameListQuery, GameSort, GameStats, GameVersion } from '@/services/types'
+import type { GameDetail, GameListItem, GameListQuery, GameSortQuery, GameStats, GameVersion } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
 
 export const useGamesStore = defineStore('games', () => {
@@ -96,7 +96,7 @@ export const useGamesStore = defineStore('games', () => {
   const fetchGames = async (
     params: {
       query?: GameListQuery
-      sort?: GameSort
+      sort?: GameSortQuery
       append?: boolean
     } = {}
   ) => {

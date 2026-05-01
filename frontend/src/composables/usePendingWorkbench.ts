@@ -158,7 +158,13 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     try {
       await reviewIssuesService.ignore(game.public_id, issueKey)
       options.addAlert('已忽略待处理项', 'success')
-      await refreshCurrentPage()
+      try {
+        // 2026-04-10: pending override writes and queue refresh are separate outcomes.
+        // Impact: ignore success must stay visible even if the follow-up queue refresh fails.
+        await refreshCurrentPage()
+      } catch {
+        options.addAlert('忽略已生效，但待处理列表刷新失败，请稍后重试', 'warning')
+      }
     } catch {
       options.addAlert('忽略问题失败', 'error')
     }
@@ -169,7 +175,13 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     try {
       await reviewIssuesService.restore(game.public_id, issueKey)
       options.addAlert('已恢复待处理项', 'success')
-      await refreshCurrentPage()
+      try {
+        // 2026-04-10: restore success must not be rewritten into a generic failure
+        // by a later refreshCurrentPage() error.
+        await refreshCurrentPage()
+      } catch {
+        options.addAlert('恢复已生效，但待处理列表刷新失败，请稍后重试', 'warning')
+      }
     } catch {
       options.addAlert('恢复问题失败', 'error')
     }

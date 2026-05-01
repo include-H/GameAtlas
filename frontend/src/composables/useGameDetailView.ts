@@ -17,6 +17,10 @@ interface UseGameDetailViewOptions {
   isAdmin: Ref<boolean>
 }
 
+// 2026-05-01: these helpers are intentionally consumed only by GameDetailView.vue template
+// bindings after being returned from this composable. They have no local call sites inside
+// useGameDetailView.ts, so "unused in this file" does not mean dead code; do not delete them
+// unless the corresponding template bindings are removed in GameDetailView.vue as well.
 const formatGameDetailDate = (dateStr: string) => {
   return formatDisplayDate(dateStr)
 }
@@ -38,6 +42,47 @@ const formatGameDetailSize = (bytes: number) => {
 
 const shouldSpanGameMetadataRow = (items?: { length: number } | null) => {
   return (items?.length || 0) > 2
+}
+
+interface StartVersionDownloadOptions {
+  gameId: string
+  versionId: string
+  versionLabel: string
+  downloadUrl: string
+  recordDownload: (gameId: string, fileId: string) => Promise<void>
+  navigateToUrl: (url?: string) => void
+  addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
+}
+
+export const startVersionDownload = async ({
+  gameId,
+  versionId,
+  versionLabel,
+  downloadUrl,
+  recordDownload,
+  navigateToUrl,
+  addAlert,
+}: StartVersionDownloadOptions) => {
+  let recordFailed = false
+
+  try {
+    await recordDownload(gameId, versionId)
+  } catch {
+    recordFailed = true
+  }
+
+  try {
+    // 2026-05-01: keep the file download as the primary action on this chain.
+    // Impact: download-stat recording is ancillary. A record failure must surface as a warning,
+    // not be upgraded into a fake "download failed" result that blocks the real file transfer.
+    navigateToUrl(downloadUrl)
+    addAlert(
+      recordFailed ? `已开始下载 ${versionLabel}，但下载记录失败` : `已开始下载 ${versionLabel}`,
+      recordFailed ? 'warning' : 'success',
+    )
+  } catch {
+    addAlert('下载启动失败', 'error')
+  }
 }
 
 export const useGameDetailView = ({
@@ -93,14 +138,15 @@ export const useGameDetailView = ({
 
   const handleDownloadVersion = async (version: GameVersion) => {
     if (!game.value?.public_id || !version.downloadUrl) return
-
-    try {
-      await downloadService.recordDownload(game.value.public_id, version.id)
-      navigateToUrl(version.downloadUrl)
-      uiStore.addAlert(`已开始下载 ${version.version}`, 'success')
-    } catch {
-      uiStore.addAlert('下载启动失败', 'error')
-    }
+    await startVersionDownload({
+      gameId: game.value.public_id,
+      versionId: version.id,
+      versionLabel: version.version,
+      downloadUrl: version.downloadUrl,
+      recordDownload: downloadService.recordDownload,
+      navigateToUrl,
+      addAlert: uiStore.addAlert,
+    })
   }
 
   const handleDownloadLaunchScript = (version: GameVersion) => {

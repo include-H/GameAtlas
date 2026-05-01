@@ -147,12 +147,94 @@ func TestGamesServiceListReturnsOverrideLookupError(t *testing.T) {
 
 	service := newServicesCatalogService(db)
 
-	_, err := service.List(domain.GamesListParams{Page: 1, Limit: 20})
+	_, err := service.List(domain.GamesListParams{
+		Page:  1,
+		Limit: 20,
+		Sort:  "updated_at",
+		Order: "desc",
+	})
 	if err == nil {
 		t.Fatal("List returned nil error, want override lookup failure")
 	}
 	if !strings.Contains(err.Error(), "list review overrides") {
 		t.Fatalf("List error = %v, want review override lookup context", err)
+	}
+}
+
+func TestNormalizeListParamsKeepsDomainOnlyNormalization(t *testing.T) {
+	params := domain.GamesListParams{
+		Visibility:        "  ",
+		PendingIssue:      "missing-assets",
+		PendingRecentDays: 999,
+	}
+
+	if err := normalizeListParams(&params); err != nil {
+		t.Fatalf("normalizeListParams returned error: %v", err)
+	}
+	if params.Visibility != domain.GameVisibilityPublic {
+		t.Fatalf("Visibility = %q, want public default", params.Visibility)
+	}
+	if params.PendingIssue != "missing-assets" {
+		t.Fatalf("PendingIssue = %q, want service to leave transport-decoded value untouched", params.PendingIssue)
+	}
+	if params.PendingRecentDays != 365 {
+		t.Fatalf("PendingRecentDays = %d, want domain clamp 365", params.PendingRecentDays)
+	}
+}
+
+func TestGamesServiceListRejectsUndecodedSortContract(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	service := newServicesCatalogService(db)
+
+	testCases := []struct {
+		name   string
+		params domain.GamesListParams
+	}{
+		{
+			name: "missing sort and order",
+			params: domain.GamesListParams{
+				Page:  1,
+				Limit: 20,
+			},
+		},
+		{
+			name: "invalid sort",
+			params: domain.GamesListParams{
+				Page:  1,
+				Limit: 20,
+				Sort:  "legacy_default",
+				Order: "desc",
+			},
+		},
+		{
+			name: "invalid order",
+			params: domain.GamesListParams{
+				Page:  1,
+				Limit: 20,
+				Sort:  "updated_at",
+				Order: "sideways",
+			},
+		},
+		{
+			name: "random sort without seed",
+			params: domain.GamesListParams{
+				Page:  1,
+				Limit: 20,
+				Sort:  "random",
+				Order: "desc",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := service.List(tc.params)
+			if !errors.Is(err, ErrValidation) {
+				t.Fatalf("List error = %v, want ErrValidation", err)
+			}
+		})
 	}
 }
 

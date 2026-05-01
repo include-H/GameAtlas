@@ -256,6 +256,7 @@ export interface GameListQuery {
   pending_severe?: boolean
   pending_recent_days?: number
   favorite?: boolean
+  favorite_raw?: string
 }
 
 export interface Favoritable {
@@ -309,6 +310,12 @@ export interface GameStats {
 export interface GameSort {
   field: 'title' | 'created_at' | 'updated_at' | 'release_date' | 'downloads' | 'random' | 'pending_issue_count'
   order: 'asc' | 'desc'
+  seed?: number
+}
+
+export interface GameSortQuery {
+  field?: string
+  order?: string
   seed?: number
 }
 

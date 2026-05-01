@@ -30,13 +30,10 @@ func (r *GameCatalogRepository) List(params domain.GamesListParams) ([]domain.Ga
 	} else if params.Sort == "pending_issue_count" {
 		sortField = pendingVisibleIssueCountExpression()
 	}
-	if sortField == "" {
-		sortField = allowedGameSortFields["updated_at"]
-	}
+	// 2026-05-01: this repository assumes sort/order were already validated by transport/service.
+	// Do not restore fallback-to-updated_at or fallback-to-DESC behavior here; invalid callers
+	// must fail earlier so unsupported sort semantics stay auditably explicit.
 	order := strings.ToUpper(params.Order)
-	if order != "ASC" && order != "DESC" {
-		order = "DESC"
-	}
 	idOrder := "DESC"
 	if order == "ASC" {
 		idOrder = "ASC"

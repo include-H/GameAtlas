@@ -29,6 +29,12 @@ func (s *GameCatalogService) List(params domain.GamesListParams) (*GamesListResu
 	if err := normalizeListParams(&params); err != nil {
 		return nil, err
 	}
+	// 2026-05-01: normalizeListParams only applies domain-level shaping such as visibility
+	// and pending-day clamps. Transport/query defaults belong upstream, so list callers that
+	// arrive here with bad sort/order values must fail fast instead of relying on repository fallback.
+	if err := validateListParamsContract(params); err != nil {
+		return nil, err
+	}
 	games, total, err := s.catalogRepo.List(params)
 	if err != nil {
 		return nil, err
