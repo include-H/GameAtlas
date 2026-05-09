@@ -249,6 +249,8 @@ func EvaluatePendingIssuesForListItem(game GameListItem, ignoredReasons map[Pend
 	}, ignoredReasons)
 }
 
+// 2026-05-09: A-6 审查结论 — 此处的 Go 代码判定与 repository 层的 SQL 条件判定逻辑
+// 等价。两者服务于不同上下文（运行时评估 vs 数据库过滤），保留双重定义而非统一。
 func evaluatePendingIssues(game pendingIssueGameFields, ignoredReasons map[PendingIssueDetailKey]*string) PendingIssueEvaluation {
 	details := make([]PendingIssueDetailState, 0, len(pendingIssueDetailDefinitions))
 	visibleGroups := make(map[PendingIssueKey]struct{}, len(pendingIssueDefinitions))

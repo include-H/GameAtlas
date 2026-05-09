@@ -2,6 +2,11 @@ package domain
 
 import "strings"
 
+// 2026-05-09: A-5 审查结论 — Game 与 GameListItem 字段重复但不合并。
+// 两者各有清晰边界：Game 用于单条读写路径（detail/create/update），GameListItem
+// 用于列表聚合查询（含 screenshot_stats/file_stats 等 CTE）。合并会模糊 SQL
+// 语义差异，收益低。Game.PendingIssues 已删除（详情路径从未写入，结果在
+// GameDetail.PendingIssues 上）。
 type Game struct {
 	ID                int64   `db:"id"`
 	PublicID          string  `db:"public_id"`
@@ -20,7 +25,6 @@ type Game struct {
 	DeveloperCount    int64   `db:"developer_count"`
 	PublisherCount    int64   `db:"publisher_count"`
 	IsFavorite        bool    `db:"is_favorite"`
-	PendingIssues     *PendingIssueEvaluation
 	CreatedAt         string `db:"created_at"`
 	UpdatedAt         string `db:"updated_at"`
 }

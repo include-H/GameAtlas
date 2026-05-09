@@ -29,6 +29,10 @@ type pendingIssueConditionDefinition struct {
 	VisibleCondition string
 }
 
+// 2026-05-09: A-6 审查结论 — pending issue 判定规则在 domain 层（Go 代码）和此处（SQL
+// 条件）双重定义，逻辑等价但表达不同。不合并原因：domain 层的 EvaluatePendingIssues
+// 用于详情路径的运行时评估，此处的 SQL 条件用于列表查询的数据库过滤，两者服务于不同
+// 的执行上下文。统一需要重构整个评估路径，收益不足以覆盖改动风险。
 var pendingIssueConditionDefinitions = []pendingIssueConditionDefinition{
 	newPendingFieldIssue(domain.PendingIssueDetailMissingCover, "g.cover_image"),
 	newPendingFieldIssue(domain.PendingIssueDetailMissingBanner, "g.banner_image"),
