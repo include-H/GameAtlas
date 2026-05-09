@@ -44,31 +44,6 @@ func TestGamesHandlerListTimelineRejectsInvalidCursor(t *testing.T) {
 	}
 }
 
-func TestGamesHandlerListTimelineRejectsInvalidYears(t *testing.T) {
-	t.Setenv("GIN_MODE", gin.TestMode)
-
-	recorder := httptest.NewRecorder()
-	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodGet, "/api/games/timeline?years=oops", nil)
-
-	handler := NewSplitGamesHandler(nil, nil, nil, nil, nil)
-	handler.ListTimeline(context)
-
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
-	}
-
-	var response struct {
-		Error string `json:"error"`
-	}
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if response.Error != "无效的时间线查询参数: years" {
-		t.Fatalf("error = %q, want 无效的时间线查询参数: years", response.Error)
-	}
-}
-
 func TestGamesHandlerListTimelineRejectsInvalidLimit(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 
@@ -94,7 +69,7 @@ func TestGamesHandlerListTimelineRejectsInvalidLimit(t *testing.T) {
 	}
 }
 
-func TestGamesHandlerListTimelineUsesLatestPublicReleaseDateAndFormatsCursor(t *testing.T) {
+func TestGamesHandlerListTimelinePaginatesWithCursor(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 
 	db := openGamesHandlerTestDB(t)
@@ -103,66 +78,80 @@ func TestGamesHandlerListTimelineUsesLatestPublicReleaseDateAndFormatsCursor(t *
 	_ = insertGamesHandlerTestGame(t, db, "private-new", "Private New", "private", "2025-01-01")
 	firstID := insertGamesHandlerTestGame(t, db, "public-new", "Public New", "public", "2024-02-01")
 	secondID := insertGamesHandlerTestGame(t, db, "public-mid", "Public Mid", "public", "2023-05-01")
-	_ = insertGamesHandlerTestGame(t, db, "public-old", "Public Old", "public", "2022-03-01")
+	thirdID := insertGamesHandlerTestGame(t, db, "public-old", "Public Old", "public", "2022-03-01")
+	_ = insertGamesHandlerTestGame(t, db, "public-ancient", "Public Ancient", "public", "2019-06-01")
 
 	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
+	// First page: limit=2
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodGet, "/api/games/timeline?limit=2", nil)
-
 	handler.ListTimeline(context)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
 	}
 
-	var response struct {
+	var page1 struct {
 		Success bool `json:"success"`
 		Data    []struct {
-			ID          int64   `json:"id"`
-			PublicID    string  `json:"public_id"`
-			ReleaseDate *string `json:"release_date"`
+			ID       int64  `json:"id"`
+			PublicID string `json:"public_id"`
 		} `json:"data"`
 		Pagination struct {
 			Limit      int    `json:"limit"`
-			From       string `json:"from"`
-			To         string `json:"to"`
 			HasMore    bool   `json:"hasMore"`
 			NextCursor string `json:"nextCursor"`
 		} `json:"pagination"`
 	}
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatalf("decode response: %v", err)
+	if err := json.Unmarshal(recorder.Body.Bytes(), &page1); err != nil {
+		t.Fatalf("decode page1: %v", err)
 	}
-
-	if !response.Success {
+	if !page1.Success {
 		t.Fatalf("expected success=true")
 	}
-	if len(response.Data) != 2 {
-		t.Fatalf("len(data) = %d, want 2", len(response.Data))
+	if len(page1.Data) != 2 {
+		t.Fatalf("len(data) = %d, want 2", len(page1.Data))
 	}
-	if response.Data[0].ID != firstID || response.Data[0].PublicID != "public-new" {
-		t.Fatalf("data[0] = %+v, want first public game", response.Data[0])
+	if page1.Data[0].ID != firstID || page1.Data[1].ID != secondID {
+		t.Fatalf("page1 data = %+v, want first two public games", page1.Data)
 	}
-	if response.Data[1].ID != secondID || response.Data[1].PublicID != "public-mid" {
-		t.Fatalf("data[1] = %+v, want second public game", response.Data[1])
-	}
-	if response.Pagination.Limit != 2 {
-		t.Fatalf("pagination.limit = %d, want 2", response.Pagination.Limit)
-	}
-	if response.Pagination.To != "2024-02-01" {
-		t.Fatalf("pagination.to = %q, want 2024-02-01", response.Pagination.To)
-	}
-	if response.Pagination.From != "2022-02-01" {
-		t.Fatalf("pagination.from = %q, want 2022-02-01", response.Pagination.From)
-	}
-	if !response.Pagination.HasMore {
+	if !page1.Pagination.HasMore {
 		t.Fatalf("expected hasMore=true")
 	}
-	wantCursor := fmt.Sprintf("2023-05-01|%d", secondID)
-	if response.Pagination.NextCursor != wantCursor {
-		t.Fatalf("pagination.nextCursor = %q, want %q", response.Pagination.NextCursor, wantCursor)
+	if page1.Pagination.NextCursor == "" {
+		t.Fatalf("expected non-empty nextCursor")
+	}
+
+	// Second page: use cursor
+	recorder2 := httptest.NewRecorder()
+	context2, _ := gin.CreateTestContext(recorder2)
+	context2.Request = httptest.NewRequest(http.MethodGet, "/api/games/timeline?limit=2&cursor="+page1.Pagination.NextCursor, nil)
+	handler.ListTimeline(context2)
+
+	var page2 struct {
+		Success bool `json:"success"`
+		Data    []struct {
+			ID       int64  `json:"id"`
+			PublicID string `json:"public_id"`
+		} `json:"data"`
+		Pagination struct {
+			HasMore    bool   `json:"hasMore"`
+			NextCursor string `json:"nextCursor"`
+		} `json:"pagination"`
+	}
+	if err := json.Unmarshal(recorder2.Body.Bytes(), &page2); err != nil {
+		t.Fatalf("decode page2: %v", err)
+	}
+	if len(page2.Data) != 2 {
+		t.Fatalf("len(data) = %d, want 2", len(page2.Data))
+	}
+	if page2.Data[0].ID != thirdID {
+		t.Fatalf("page2 data[0] = %+v, want public-old", page2.Data[0])
+	}
+	if page2.Pagination.HasMore {
+		t.Fatalf("expected hasMore=false (no games after ancient)")
 	}
 }
 

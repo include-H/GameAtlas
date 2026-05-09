@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/services"
@@ -105,30 +103,6 @@ func toSeriesGameSummaryResponses(games []domain.SeriesGameSummary) []gameListIt
 		})
 	}
 	return result
-}
-
-func parseTimelineCursor(raw string) (string, int64, bool) {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return "", 0, true
-	}
-
-	parts := strings.Split(trimmed, "|")
-	if len(parts) != 2 {
-		return "", 0, false
-	}
-
-	releaseDate := strings.TrimSpace(parts[0])
-	id, err := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
-	if err != nil || id <= 0 {
-		return "", 0, false
-	}
-
-	return releaseDate, id, true
-}
-
-func formatTimelineCursor(releaseDate string, id int64) string {
-	return releaseDate + "|" + strconv.FormatInt(id, 10)
 }
 
 func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDetailResponse {

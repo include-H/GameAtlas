@@ -128,30 +128,26 @@ func decodeGamesListParams(c *gin.Context) (domain.GamesListParams, bool) {
 	return params, true
 }
 
-func decodeGamesTimelineRequest(c *gin.Context) (int, string, string, string, int64, bool) {
-	years, ok := parseGamesTimelineIntQuery(c, "years", 2)
-	if !ok {
-		return 0, "", "", "", 0, false
-	}
-	if years <= 0 {
-		writeGamesTimelineQueryError(c, "years")
-		return 0, "", "", "", 0, false
-	}
-	if years > 10 {
-		years = 10
+func decodeGamesTimelineRequest(c *gin.Context) (string, int64, bool) {
+	raw := strings.TrimSpace(c.Query("cursor"))
+	if raw == "" {
+		return "", 0, true
 	}
 
-	cursorReleaseDate, cursorID, ok := parseTimelineCursor(c.Query("cursor"))
-	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			// 2026-05-09: 统一为中文错误信息
-		"error":   "无效的时间线游标",
-		})
-		return 0, "", "", "", 0, false
+	parts := strings.SplitN(raw, "|", 2)
+	if len(parts) != 2 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "无效的时间线游标"})
+		return "", 0, false
 	}
 
-	return years, c.Query("from"), c.Query("to"), cursorReleaseDate, cursorID, true
+	afterDate := strings.TrimSpace(parts[0])
+	id, err := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "无效的时间线游标"})
+		return "", 0, false
+	}
+
+	return afterDate, id, true
 }
 
 func parseGamesTimelineIntQuery(c *gin.Context, key string, fallback int) (int, bool) {

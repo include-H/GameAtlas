@@ -213,13 +213,11 @@ func IsAllowedGamesListOrder(value string) bool {
 }
 
 type GamesTimelineParams struct {
-	Limit             int
-	FromDate          string
-	ToDate            string
-	CursorReleaseDate string
-	CursorID          int64
-	Visibility        string
-	IncludeAll        bool
+	Limit      int
+	AfterDate  string // cursor: release_date of last item from previous page
+	AfterID    int64  // cursor: id of last item from previous page
+	Visibility string
+	IncludeAll bool
 }
 
 type PendingGroupCounts struct {

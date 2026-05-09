@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -72,11 +70,9 @@ func (h *GamesHandler) List(c *gin.Context) {
 	})
 }
 
-// ListTimeline is intentionally isolated from catalog/detail queries because it has its own cursor
-// and release-date semantics.
+// ListTimeline returns games ordered by release date descending with cursor-based pagination.
 func (h *GamesHandler) ListTimeline(c *gin.Context) {
-	years, fromDate, toDate, cursorReleaseDate, cursorID, ok := decodeGamesTimelineRequest(c)
-	now := time.Now().UTC()
+	afterDate, afterID, ok := decodeGamesTimelineRequest(c)
 	if !ok {
 		return
 	}
@@ -85,42 +81,15 @@ func (h *GamesHandler) ListTimeline(c *gin.Context) {
 		return
 	}
 
-	if strings.TrimSpace(toDate) == "" {
-		latestReleaseDate, ok, err := h.timeline.LatestReleaseDate(isAdminRequest(c))
-		if err != nil {
-			// 2026-05-09: 统一为中文错误信息
-		writeServiceError(c, err, "无效的时间线参数")
-			return
-		}
-		if ok {
-			toDate = latestReleaseDate
-		} else {
-			toDate = now.Format("2006-01-02")
-		}
-	}
-	if strings.TrimSpace(fromDate) == "" {
-		baseDate, err := time.Parse("2006-01-02", toDate)
-		if err != nil {
-			baseDate = now
-		}
-		fromDate = baseDate.AddDate(-years, 0, 0).Format("2006-01-02")
-	}
-
 	params := domain.GamesTimelineParams{
-		// 2026-04-07: timeline query validation now rejects invalid years/limit at transport decode.
-		// Impact: this cursor-based read model no longer silently falls back to handler defaults
-		// that differ from the main games list query contract.
-		Limit:             limit,
-		FromDate:          fromDate,
-		ToDate:            toDate,
-		CursorReleaseDate: cursorReleaseDate,
-		CursorID:          cursorID,
-		IncludeAll:        isAdminRequest(c),
+		Limit:      limit,
+		AfterDate:  afterDate,
+		AfterID:    afterID,
+		IncludeAll: isAdminRequest(c),
 	}
 
 	result, err := h.timeline.List(params)
 	if err != nil {
-		// 2026-05-09: 统一为中文错误信息
 		writeServiceError(c, err, "无效的时间线参数")
 		return
 	}
@@ -130,20 +99,13 @@ func (h *GamesHandler) ListTimeline(c *gin.Context) {
 		data = append(data, toTimelineGameItemResponse(game))
 	}
 
-	nextCursor := ""
-	if result.NextCursor != nil {
-		nextCursor = formatTimelineCursor(result.NextCursor.ReleaseDate, result.NextCursor.ID)
-	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    data,
 		"pagination": gin.H{
 			"limit":      result.Limit,
-			"from":       result.FromDate,
-			"to":         result.ToDate,
 			"hasMore":    result.HasMore,
-			"nextCursor": nextCursor,
+			"nextCursor": result.NextCursor,
 		},
 	})
 }

@@ -509,7 +509,7 @@ export const useGamesView = ({
     if (imageUrls.length > 0) {
       uiStore.setAmbientBackgroundSource({
         owner: AMBIENT_BACKGROUND_OWNER,
-        key: `${pageTitle.value}:${page}:${games.length}`,
+        key: `${pageTitle.value}:${page}:${games.length}:${Date.now()}`,
         urls: imageUrls,
       })
       return
@@ -710,19 +710,12 @@ export const useGamesView = ({
     }
 
     searchQuery.value = readSingleQueryValue(route.query.search) || ''
-    if (games.value.length === 0 || Object.keys(route.query).length > 0) {
-      await loadGames()
-      return
-    }
-
-    // Re-entering the catalog can reuse the cached store payload, which skips loadGames().
-    // Keep the ambient background in sync even when the page comes entirely from client cache.
-    syncAmbientBackground(games.value)
+    await loadGames()
   })
 
   onActivated(async () => {
     await loadFilterOptions()
-    syncAmbientBackground(games.value)
+    await loadGames()
   })
 
   let searchDebounceTimer: number | undefined

@@ -15,18 +15,11 @@ type GamesListResult struct {
 	PendingIssueCounts *domain.PendingIssueCountSummary
 }
 
-type TimelineCursor struct {
-	ReleaseDate string
-	ID          int64
-}
-
 type GamesTimelineResult struct {
 	Games      []domain.TimelineGame
 	Limit      int
-	FromDate   string
-	ToDate     string
 	HasMore    bool
-	NextCursor *TimelineCursor
+	NextCursor string // "date|id" cursor for the next page; empty when no more data
 }
 
 // GameDetail is the service-layer detail read model assembled for a single game response.

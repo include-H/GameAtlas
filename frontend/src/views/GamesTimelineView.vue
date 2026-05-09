@@ -116,7 +116,6 @@ interface TimelineRow {
   showYearBadge: boolean
 }
 
-const TIMELINE_YEARS = 2
 const TIMELINE_PAGE_SIZE = 60
 
 const router = useRouter()
@@ -128,8 +127,6 @@ const hasLoadFailure = ref(false)
 const allGames = ref<TimelineGame[]>([])
 const hasMore = ref(false)
 const nextCursor = ref<string | null>(null)
-const currentWindowFrom = ref<string | null>(null)
-const currentWindowTo = ref<string | null>(null)
 const scrollRootRef = ref<HTMLElement | null>(null)
 const hasLoadedTimeline = ref(false)
 
@@ -138,7 +135,7 @@ const syncAmbientBackground = (games: TimelineGame[]) => {
   if (imageUrls.length > 0) {
     uiStore.setAmbientBackgroundSource({
       owner: AMBIENT_BACKGROUND_OWNER,
-      key: `${currentWindowFrom.value || 'timeline'}:${games.length}`,
+      key: `timeline:${games.length}:${Date.now()}`,
       urls: imageUrls,
     })
     return
@@ -233,39 +230,17 @@ const appendTimelineChunk = (games: TimelineGame[]) => {
   }
 }
 
-const getPreviousWindowTo = (fromDate?: string | null) => {
-  const raw = (fromDate || '').trim()
-  if (!raw) return null
-
-  const baseDate = new Date(`${raw}T00:00:00Z`)
-  if (Number.isNaN(baseDate.getTime())) return null
-
-  baseDate.setUTCDate(baseDate.getUTCDate() - 1)
-  return baseDate.toISOString().slice(0, 10)
-}
-
 const loadMoreTimeline = async () => {
-  if (!hasMore.value || isLoadingMore.value) return
+  if (!hasMore.value || isLoadingMore.value || !nextCursor.value) return
   isLoadingMore.value = true
   try {
-    const response = nextCursor.value
-      ? await gamesService.getTimelineGames({
-        years: TIMELINE_YEARS,
-        limit: TIMELINE_PAGE_SIZE,
-        cursor: nextCursor.value,
-        from: currentWindowFrom.value,
-        to: currentWindowTo.value,
-      })
-      : await gamesService.getTimelineGames({
-        years: TIMELINE_YEARS,
-        limit: TIMELINE_PAGE_SIZE,
-        to: getPreviousWindowTo(currentWindowFrom.value),
-      })
+    const response = await gamesService.getTimelineGames({
+      limit: TIMELINE_PAGE_SIZE,
+      cursor: nextCursor.value,
+    })
     appendTimelineChunk(response.data)
     hasMore.value = response.hasMore
     nextCursor.value = response.nextCursor
-    currentWindowFrom.value = response.from
-    currentWindowTo.value = response.to
   } catch {
     uiStore.addAlert('加载更多时间线失败', 'error')
   } finally {
@@ -284,28 +259,20 @@ const loadTimeline = async () => {
 
   try {
     const response = await gamesService.getTimelineGames({
-      years: TIMELINE_YEARS,
       limit: TIMELINE_PAGE_SIZE,
     })
     allGames.value = []
     appendTimelineChunk(response.data)
     hasMore.value = response.hasMore
     nextCursor.value = response.nextCursor
-    currentWindowFrom.value = response.from
-    currentWindowTo.value = response.to
     syncAmbientBackground(response.data)
     hasLoadedTimeline.value = true
     hasLoadFailure.value = false
   } catch {
-    // 2026-04-07: timeline empty state now means a successful read with no dated games.
-    // Impact: request failures must surface as an error state instead of pretending the
-    // timeline is empty.
     hasLoadFailure.value = true
     allGames.value = []
     hasMore.value = false
     nextCursor.value = null
-    currentWindowFrom.value = null
-    currentWindowTo.value = null
     uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
     uiStore.addAlert('加载时间线失败', 'error')
   } finally {

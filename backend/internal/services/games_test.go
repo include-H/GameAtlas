@@ -341,13 +341,9 @@ func TestGamesServiceProcessPendingAssetCleanupDeletesRecoveredFile(t *testing.T
 	assertAssetCleanupTaskMissing(t, db, path)
 }
 
-func TestNormalizeTimelineParamsNormalizesDatesAndValidatesCursorRange(t *testing.T) {
+func TestNormalizeTimelineParamsClampsLimit(t *testing.T) {
 	params := domain.GamesTimelineParams{
-		Limit:             120,
-		FromDate:          "2024",
-		ToDate:            "2024-2",
-		CursorReleaseDate: "2024-02",
-		CursorID:          7,
+		Limit: 120,
 	}
 
 	if err := normalizeTimelineParams(&params); err != nil {
@@ -356,27 +352,8 @@ func TestNormalizeTimelineParamsNormalizesDatesAndValidatesCursorRange(t *testin
 	if params.Limit != 100 {
 		t.Fatalf("Limit = %d, want 100", params.Limit)
 	}
-	if params.FromDate != "2024-01-01" {
-		t.Fatalf("FromDate = %q, want 2024-01-01", params.FromDate)
-	}
-	if params.ToDate != "2024-02-01" {
-		t.Fatalf("ToDate = %q, want 2024-02-01", params.ToDate)
-	}
-	if params.CursorReleaseDate != "2024-02-01" {
-		t.Fatalf("CursorReleaseDate = %q, want 2024-02-01", params.CursorReleaseDate)
-	}
 	if params.Visibility != domain.GameVisibilityPublic {
 		t.Fatalf("Visibility = %q, want public", params.Visibility)
-	}
-
-	err := normalizeTimelineParams(&domain.GamesTimelineParams{
-		FromDate:          "2024-01-01",
-		ToDate:            "2024-02-01",
-		CursorReleaseDate: "2024-03-01",
-		CursorID:          1,
-	})
-	if !errors.Is(err, ErrValidation) {
-		t.Fatalf("out-of-range cursor error = %v, want ErrValidation", err)
 	}
 }
 

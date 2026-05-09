@@ -32,8 +32,6 @@ interface GameStatsApiResponse {
 
 interface TimelinePaginationApi {
   limit: number
-  from: string
-  to: string
   hasMore: boolean
   nextCursor: string
 }
@@ -61,8 +59,6 @@ type TimelineGamesResult = {
   data: TimelineGame[]
   hasMore: boolean
   nextCursor: string | null
-  from: string | null
-  to: string | null
 }
 
 type GameFileReleaseSource = Pick<GameFileEntry, 'source_created_at' | 'created_at'>
@@ -262,34 +258,20 @@ const gamesService = {
   },
 
   async getTimelineGames(params?: {
-    years?: number
     limit?: number
     cursor?: string | null
-    from?: string | null
-    to?: string | null
   }): Promise<TimelineGamesResult> {
-    // 2026-04-07: timeline route owns a small fixed query surface.
-    // Impact: the client keeps sending only supported years/limit ranges,
-    // but transport validation now belongs to the backend instead of hidden fallback coercion.
     const queryParams = new URLSearchParams()
-    const years = Math.max(1, Math.min(params?.years || 2, 10))
     const limit = Math.max(1, Math.min(params?.limit || 60, 100))
-    queryParams.append('years', String(years))
     queryParams.append('limit', String(limit))
     if (params?.cursor) queryParams.append('cursor', params.cursor)
-    if (params?.from) queryParams.append('from', params.from)
-    if (params?.to) queryParams.append('to', params.to)
     const response = await get<TimelineGamesApiResponse>('/games/timeline', { params: queryParams })
     const pagination = readTimelinePagination(response)
 
     return {
       data: response.data.map((item) => normalizeTimelineGame(item)),
-      // 2026-04-07: /games/timeline always returns pagination metadata with the read window.
-      // Impact: missing pagination is a broken backend payload, not a valid "no more data" state.
       hasMore: pagination.hasMore,
       nextCursor: pagination.nextCursor || null,
-      from: pagination.from || null,
-      to: pagination.to || null,
     }
   },
 

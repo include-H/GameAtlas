@@ -119,32 +119,6 @@ func TestGamesRepositoryUpdateAggregateClearsPresentRelationsAndSeries(t *testin
 	}
 }
 
-func TestGamesRepositoryLatestTimelineReleaseDateRespectsVisibility(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	repo := NewGamesRepository(db)
-	_ = insertRepositoryGameWithReleaseDate(t, db, "public-old", "Public Old", "public", "2023-06-01")
-	_ = insertRepositoryGameWithReleaseDate(t, db, "public-new", "Public New", "public", "2024-08-01")
-	_ = insertRepositoryGameWithReleaseDate(t, db, "private-newest", "Private Newest", "private", "2025-01-01")
-
-	publicOnly, err := repo.LatestTimelineReleaseDate(false, "")
-	if err != nil {
-		t.Fatalf("LatestTimelineReleaseDate(false) returned error: %v", err)
-	}
-	if publicOnly == nil || *publicOnly != "2024-08-01" {
-		t.Fatalf("publicOnly = %v, want 2024-08-01", publicOnly)
-	}
-
-	includeAll, err := repo.LatestTimelineReleaseDate(true, "")
-	if err != nil {
-		t.Fatalf("LatestTimelineReleaseDate(true) returned error: %v", err)
-	}
-	if includeAll == nil || *includeAll != "2025-01-01" {
-		t.Fatalf("includeAll = %v, want 2025-01-01", includeAll)
-	}
-}
-
 func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.T) {
 	db := openRepositoryTagsTestDB(t)
 	defer func() { _ = db.Close() }()
@@ -571,7 +545,7 @@ func TestGameCatalogRepositoryCountPendingGroupsUsesQueueFiltersButIgnoresIssueS
 	}
 }
 
-func TestGamesRepositoryListTimelineAppliesCursorAndVisibility(t *testing.T) {
+func TestGamesRepositoryListTimelineAppliesVisibilityAndCursor(t *testing.T) {
 	db := openRepositoryTagsTestDB(t)
 	defer func() { _ = db.Close() }()
 
@@ -581,70 +555,37 @@ func TestGamesRepositoryListTimelineAppliesCursorAndVisibility(t *testing.T) {
 	_ = insertRepositoryGameWithReleaseDate(t, db, "timeline-private", "Timeline Private", "private", "2024-04-15")
 	oldestID := insertRepositoryGameWithReleaseDate(t, db, "timeline-oldest", "Timeline Oldest", "public", "2024-04-01")
 
-	games, hasMore, err := repo.ListTimeline(domain.GamesTimelineParams{
+	// First page: limit=2, should get newest and middle (private excluded).
+	games, err := repo.ListTimeline(domain.GamesTimelineParams{
 		Limit:      2,
-		FromDate:   "2024-01-01",
-		ToDate:     "2024-12-31",
 		Visibility: domain.GameVisibilityPublic,
 	})
 	if err != nil {
 		t.Fatalf("ListTimeline first page returned error: %v", err)
 	}
-	if !hasMore {
-		t.Fatalf("expected hasMore=true on first page")
+	if len(games) != 3 {
+		// Repo fetches limit+1=3 rows for hasMore detection.
+		t.Fatalf("len(games) = %d, want 3 (limit+1)", len(games))
 	}
-	if len(games) != 2 || games[0].ID != newestID || games[1].ID != middleID {
-		t.Fatalf("first page games = %+v, want newest then middle public games", games)
+	if games[0].ID != newestID || games[1].ID != middleID {
+		t.Fatalf("first two games = %+v, want newest then middle", games[:2])
 	}
 
-	games, hasMore, err = repo.ListTimeline(domain.GamesTimelineParams{
-		Limit:             2,
-		FromDate:          "2024-01-01",
-		ToDate:            "2024-12-31",
-		Visibility:        domain.GameVisibilityPublic,
-		CursorReleaseDate: "2024-05-01",
-		CursorID:          middleID,
+	// Second page: cursor after middle.
+	games, err = repo.ListTimeline(domain.GamesTimelineParams{
+		Limit:     2,
+		AfterDate: "2024-05-01",
+		AfterID:   middleID,
+		Visibility: domain.GameVisibilityPublic,
 	})
 	if err != nil {
 		t.Fatalf("ListTimeline second page returned error: %v", err)
 	}
-	if hasMore {
-		t.Fatalf("expected hasMore=false on second page")
+	if len(games) != 1 {
+		t.Fatalf("len(games) = %d, want 1 (only oldest)", len(games))
 	}
-	if len(games) != 1 || games[0].ID != oldestID {
-		t.Fatalf("second page games = %+v, want only oldest visible public game", games)
-	}
-}
-
-func TestGamesRepositoryHasOlderTimelineGameHonorsVisibility(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	repo := NewGamesRepository(db)
-	currentID := insertRepositoryGameWithReleaseDate(t, db, "older-current", "Older Current", "public", "2024-05-01")
-	_ = insertRepositoryGameWithReleaseDate(t, db, "older-private", "Older Private", "private", "2024-04-01")
-
-	exists, err := repo.HasOlderTimelineGame(domain.GamesTimelineParams{
-		ToDate:     "2024-12-31",
-		Visibility: domain.GameVisibilityPublic,
-	}, "2024-05-01", currentID)
-	if err != nil {
-		t.Fatalf("HasOlderTimelineGame public returned error: %v", err)
-	}
-	if exists {
-		t.Fatalf("expected public visibility to ignore older private game")
-	}
-
-	exists, err = repo.HasOlderTimelineGame(domain.GamesTimelineParams{
-		ToDate:     "2024-12-31",
-		IncludeAll: true,
-		Visibility: domain.GameVisibilityPublic,
-	}, "2024-05-01", currentID)
-	if err != nil {
-		t.Fatalf("HasOlderTimelineGame includeAll returned error: %v", err)
-	}
-	if !exists {
-		t.Fatalf("expected includeAll=true to see older private game")
+	if games[0].ID != oldestID {
+		t.Fatalf("games[0] = %+v, want oldest", games[0])
 	}
 }
 
