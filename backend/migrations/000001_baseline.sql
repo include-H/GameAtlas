@@ -1,3 +1,6 @@
+-- GameAtlas baseline schema
+-- Consolidated from migrations 000001–000005
+
 CREATE TABLE IF NOT EXISTS games (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     public_id TEXT NOT NULL DEFAULT '',
@@ -151,6 +154,31 @@ CREATE TABLE IF NOT EXISTS auth_login_attempts (
     expires_at_unix INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS asset_cleanup_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_path TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT '',
+    last_error TEXT,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (asset_path)
+);
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    token TEXT PRIMARY KEY,
+    expires_at_unix INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS favorite_games (
+    game_id INTEGER PRIMARY KEY,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
+);
+
+-- Indexes
+
 CREATE INDEX IF NOT EXISTS idx_game_files_game_id ON game_files (game_id);
 CREATE INDEX IF NOT EXISTS idx_game_assets_game_id ON game_assets (game_id);
 CREATE INDEX IF NOT EXISTS idx_wiki_history_game_id ON wiki_history (game_id);
@@ -170,6 +198,11 @@ CREATE INDEX IF NOT EXISTS idx_tags_parent_id ON tags (parent_id);
 CREATE INDEX IF NOT EXISTS idx_tags_is_active ON tags (is_active);
 CREATE INDEX IF NOT EXISTS idx_game_tags_tag_id ON game_tags (tag_id);
 CREATE INDEX IF NOT EXISTS idx_auth_login_attempts_expires ON auth_login_attempts (expires_at_unix);
+CREATE INDEX IF NOT EXISTS idx_asset_cleanup_tasks_updated_at ON asset_cleanup_tasks (updated_at);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires ON auth_sessions (expires_at_unix);
+CREATE INDEX IF NOT EXISTS idx_favorite_games_created_at ON favorite_games (created_at DESC);
+
+-- Seed default tag groups
 
 INSERT INTO tag_groups (key, name, description, sort_order, allow_multiple, is_filterable)
 SELECT 'genre', '题材', '游戏的主要题材分类', 10, 1, 1
