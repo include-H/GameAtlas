@@ -29,21 +29,48 @@
               @load="onImageLoad"
               @error="handleImageError(currentMedia.url)"
             />
-            <video
-              v-else
-              ref="videoRef"
-              :src="currentMedia.url"
-              class="screenshot-carousel__video"
-              :poster="videoPoster || undefined"
-              autoplay
-              controls
-              muted
-              playsinline
-              preload="metadata"
-              @canplay="tryPlayVideo"
-              @loadedmetadata="onVideoLoaded"
-              @ended="handleVideoEnded"
-            />
+            <template v-else>
+              <video
+                ref="videoRef"
+                :src="currentMedia.url"
+                class="screenshot-carousel__video"
+                :class="{ 'screenshot-carousel__video--ready': videoReady }"
+                :poster="videoPoster || undefined"
+                autoplay
+                controls
+                muted
+                playsinline
+                preload="metadata"
+                @canplay="tryPlayVideo"
+                @loadedmetadata="onVideoLoaded"
+                @playing="onVideoPlaying"
+                @ended="handleVideoEnded"
+              />
+              <transition name="screenshot-carousel-spinner-fade">
+                <div v-if="!videoReady" class="screenshot-carousel__video-loader">
+                  <div class="screenshot-carousel__loader-ring">
+                    <img
+                      v-if="videoPoster"
+                      :src="resolveAssetUrl(videoPoster)"
+                      class="screenshot-carousel__loader-thumb"
+                      alt=""
+                    />
+                    <svg class="screenshot-carousel__loader-arc" viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3" />
+                      <circle
+                        cx="50" cy="50" r="46"
+                        fill="none"
+                        stroke="rgba(170,222,255,0.9)"
+                        stroke-width="3"
+                        stroke-linecap="round"
+                        stroke-dasharray="80 210"
+                        class="screenshot-carousel__loader-arc-spin"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </transition>
+            </template>
           </div>
         </transition>
       </div>
@@ -138,6 +165,7 @@ const viewportWidth = ref(0)
 const brokenImages = ref<string[]>([])
 const aspectResolved = ref(false)
 const imageLoaded = ref(false)
+const videoReady = ref(false)
 let resizeObserver: ResizeObserver | null = null
 let imageAutoplayTimer: number | null = null
 
@@ -230,11 +258,13 @@ watch(mediaItems, (items) => {
 watch(currentMedia, (nextMedia, previousMedia) => {
   if (!nextMedia) {
     imageLoaded.value = false
+    videoReady.value = false
     stopImageAutoplay()
     return
   }
   if (nextMedia.type === 'video') {
     imageLoaded.value = true
+    videoReady.value = false
     aspectResolved.value = true
     viewportAspect.value = '16 / 9'
     stopImageAutoplay()
@@ -243,6 +273,7 @@ watch(currentMedia, (nextMedia, previousMedia) => {
     })
     return
   }
+  videoReady.value = false
   imageLoaded.value = nextMedia.url === previousMedia?.url
   startImageAutoplay()
 })
@@ -285,6 +316,10 @@ const onVideoLoaded = () => {
   imageLoaded.value = true
   viewportAspect.value = '16 / 9'
   aspectResolved.value = true
+}
+
+const onVideoPlaying = () => {
+  videoReady.value = true
 }
 
 const tryPlayVideo = () => {
@@ -420,6 +455,68 @@ const handleImageError = (url: string) => {
   object-fit: cover;
   background: transparent;
   object-position: center center;
+  opacity: 0;
+  transform: scale(1.02);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.screenshot-carousel__video--ready {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.screenshot-carousel__video-loader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 8, 14, 0.6);
+  z-index: 5;
+}
+
+.screenshot-carousel__loader-ring {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.screenshot-carousel__loader-thumb {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.screenshot-carousel__loader-arc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.screenshot-carousel__loader-arc-spin {
+  transform-origin: center;
+  animation: screenshot-carousel-arc-spin 1s linear infinite;
+}
+
+@keyframes screenshot-carousel-arc-spin {
+  to { transform: rotate(360deg); }
+}
+
+.screenshot-carousel-spinner-fade-enter-active,
+.screenshot-carousel-spinner-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.screenshot-carousel-spinner-fade-enter-from,
+.screenshot-carousel-spinner-fade-leave-to {
+  opacity: 0;
 }
 
 .screenshot-carousel-fade-enter-active,

@@ -392,6 +392,7 @@ const {
   handleBannerUploadError,
   handleBannerUploadSuccess,
   handleCancel,
+  hasParsableWikiContent,
   handleCoverError,
   handleCoverSearchClear,
   handleCoverUploadError,
