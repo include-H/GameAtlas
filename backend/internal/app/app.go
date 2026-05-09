@@ -54,6 +54,15 @@ func New(cfg config.Config) (*App, error) {
 		log.Printf("asset reconcile removed stale references for %d game(s)", reconciled)
 	}
 
+	go func() {
+		orphaned, err := assetReconcileService.CleanOrphanedAssetFiles()
+		if err != nil {
+			log.Printf("orphaned asset cleanup failed: %v", err)
+		} else if orphaned > 0 {
+			log.Printf("orphaned asset cleanup deleted %d file(s)", orphaned)
+		}
+	}()
+
 	router := routes.New(cfg, sqliteDB)
 
 	server := &http.Server{

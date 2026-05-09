@@ -6,6 +6,7 @@
           <div class="media-frame media-frame--cover">
             <template v-if="coverImage">
               <a-image
+                :key="coverImage"
                 :src="coverImage"
                 :alt="title"
                 width="100%"

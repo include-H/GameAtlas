@@ -535,6 +535,91 @@ func TestGamesRepositoryListTimelineAppliesVisibilityAndCursor(t *testing.T) {
 	}
 }
 
+func TestGamesRepositoryUpdateAggregateReplaceCoverPreservesNewPath(t *testing.T) {
+	db := openRepositoryTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	repo := NewGamesRepository(db)
+	gameID := insertRepositoryGame(t, db, "replace-cover", "Replace Cover", "public")
+
+	// Seed an existing cover image.
+	if _, err := db.Exec(`UPDATE games SET cover_image = ? WHERE id = ?`, "/assets/replace-cover/old-cover.jpg", gameID); err != nil {
+		t.Fatalf("seed cover image: %v", err)
+	}
+
+	// Simulate the frontend "replace cover" flow: the aggregate update sends
+	// the new cover_image in the game payload AND the old path in delete_assets.
+	if _, err := repo.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+		Game: domain.GameAggregateCoreUpdateInput{
+			GameCoreInput: domain.GameCoreInput{
+				Title:      "Replace Cover",
+				Visibility: "public",
+				CoverImage: strPtr("/assets/replace-cover/new-cover.jpg"),
+			},
+		},
+		Assets: domain.GameAggregateAssetsInput{
+			DeleteAssets: []domain.GameAssetDeleteInput{
+				{AssetType: "cover", Path: "/assets/replace-cover/old-cover.jpg"},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("UpdateAggregate returned error: %v", err)
+	}
+
+	// The new cover path must be preserved, not NULLed by the delete step.
+	game, err := repo.GetByID(gameID)
+	if err != nil {
+		t.Fatalf("GetByID returned error: %v", err)
+	}
+	if game.CoverImage == nil || *game.CoverImage != "/assets/replace-cover/new-cover.jpg" {
+		t.Fatalf("cover_image = %v, want /assets/replace-cover/new-cover.jpg", game.CoverImage)
+	}
+}
+
+func TestGamesRepositoryUpdateAggregateRemoveCoverSetsNull(t *testing.T) {
+	db := openRepositoryTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	repo := NewGamesRepository(db)
+	gameID := insertRepositoryGame(t, db, "remove-cover", "Remove Cover", "public")
+
+	// Seed an existing cover image.
+	if _, err := db.Exec(`UPDATE games SET cover_image = ? WHERE id = ?`, "/assets/remove-cover/old-cover.jpg", gameID); err != nil {
+		t.Fatalf("seed cover image: %v", err)
+	}
+
+	// Simulate the frontend "remove cover" flow: cover_image is null/empty
+	// and the old path is in delete_assets.
+	if _, err := repo.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+		Game: domain.GameAggregateCoreUpdateInput{
+			GameCoreInput: domain.GameCoreInput{
+				Title:      "Remove Cover",
+				Visibility: "public",
+				CoverImage: nil,
+			},
+		},
+		Assets: domain.GameAggregateAssetsInput{
+			DeleteAssets: []domain.GameAssetDeleteInput{
+				{AssetType: "cover", Path: "/assets/remove-cover/old-cover.jpg"},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("UpdateAggregate returned error: %v", err)
+	}
+
+	game, err := repo.GetByID(gameID)
+	if err != nil {
+		t.Fatalf("GetByID returned error: %v", err)
+	}
+	if game.CoverImage != nil {
+		t.Fatalf("cover_image = %v, want nil", game.CoverImage)
+	}
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
 func insertRepositoryGame(t *testing.T, db *sqlx.DB, publicID string, title string, visibility string) int64 {
 	t.Helper()
 

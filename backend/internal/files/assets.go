@@ -139,6 +139,11 @@ func (s *AssetStore) DownloadRemoteAsset(
 	return s.SaveUploadedAsset(gamePublicID, assetType, assetName, resp.Body, contentType)
 }
 
+// BaseDir returns the root directory for asset storage.
+func (s *AssetStore) BaseDir() string {
+	return s.baseDir
+}
+
 func (s *AssetStore) DeleteAsset(assetPath string) error {
 	targetPath, err := s.resolveAssetPath(assetPath)
 	if err != nil {

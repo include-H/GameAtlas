@@ -267,15 +267,11 @@ func (r *GamesRepository) deleteAssetsTx(tx *sqlx.Tx, gameID int64, deleteAssets
 
 	for _, item := range deleteAssets {
 		switch strings.TrimSpace(item.AssetType) {
-		case "cover":
-			if _, err := tx.Exec("UPDATE games SET cover_image = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?", gameID); err != nil {
-				return nil, fmt.Errorf("delete cover image: %w", err)
-			}
-			assetPaths = append(assetPaths, strings.TrimSpace(item.Path))
-		case "banner":
-			if _, err := tx.Exec("UPDATE games SET banner_image = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?", gameID); err != nil {
-				return nil, fmt.Errorf("delete banner image: %w", err)
-			}
+		case "cover", "banner":
+			// Only collect the old path for file cleanup. The column value was already
+			// set correctly by updateGameRowTx earlier in this transaction (either a
+			// new path for replacement, or NULL for explicit removal), so we must not
+			// overwrite it here.
 			assetPaths = append(assetPaths, strings.TrimSpace(item.Path))
 		case "screenshot":
 			deletedPath, _, deleted, err := r.deleteSingleAssetTx(tx, gameID, "screenshot", item)

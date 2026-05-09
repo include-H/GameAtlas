@@ -3,6 +3,10 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -10,13 +14,16 @@ import (
 
 	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/files"
+	"github.com/hao/game/internal/repositories"
 )
 
 type AssetReconcileService struct {
 	db                *sqlx.DB
 	store             *files.AssetStore
+	tasksRepo         *repositories.AssetCleanupTasksRepository
 	mu                sync.Mutex
 	lastFullSweepAt   time.Time
+	lastOrphanSweepAt time.Time
 	fullSweepCooldown time.Duration
 }
 
@@ -28,6 +35,7 @@ func NewAssetReconcileService(cfg config.Config, db *sqlx.DB) *AssetReconcileSer
 	return &AssetReconcileService{
 		db:                db,
 		store:             files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
+		tasksRepo:         repositories.NewAssetCleanupTasksRepository(db),
 		fullSweepCooldown: 2 * time.Second,
 	}
 }
@@ -161,4 +169,130 @@ func (s *AssetReconcileService) reconcileGameMissingAssetsTx(gameID int64) (bool
 		return false, fmt.Errorf("commit asset reconcile tx: %w", err)
 	}
 	return true, nil
+}
+
+// CleanOrphanedAssetFiles scans the assets filesystem and deletes files not
+// referenced by any game in the database. It runs at startup after
+// ReconcileAllMissingAssets has already pruned stale DB references.
+func (s *AssetReconcileService) CleanOrphanedAssetFiles() (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.lastOrphanSweepAt.IsZero() && time.Since(s.lastOrphanSweepAt) < s.fullSweepCooldown {
+		return 0, nil
+	}
+
+	referenced, err := s.loadAllReferencedAssetPaths()
+	if err != nil {
+		return 0, err
+	}
+
+	deleted, err := s.deleteUnreferencedFiles(referenced)
+	if err != nil {
+		return deleted, err
+	}
+
+	s.lastOrphanSweepAt = time.Now()
+	return deleted, nil
+}
+
+func (s *AssetReconcileService) loadAllReferencedAssetPaths() (map[string]struct{}, error) {
+	var paths []string
+	if err := s.db.Select(&paths, `
+		SELECT path FROM (
+			SELECT cover_image AS path FROM games WHERE COALESCE(TRIM(cover_image), '') != ''
+			UNION
+			SELECT banner_image AS path FROM games WHERE COALESCE(TRIM(banner_image), '') != ''
+			UNION
+			SELECT path FROM game_assets WHERE COALESCE(TRIM(path), '') != ''
+		) refs
+	`); err != nil {
+		return nil, fmt.Errorf("load all referenced asset paths: %w", err)
+	}
+
+	set := make(map[string]struct{}, len(paths))
+	for _, p := range paths {
+		set[strings.TrimSpace(p)] = struct{}{}
+	}
+	return set, nil
+}
+
+var knownAssetExtensions = map[string]struct{}{
+	".jpg": {}, ".jpeg": {}, ".png": {}, ".webp": {}, ".gif": {},
+	".mp4": {}, ".webm": {},
+}
+
+func isKnownAssetFile(name string) bool {
+	ext := strings.ToLower(filepath.Ext(name))
+	_, ok := knownAssetExtensions[ext]
+	return ok
+}
+
+func (s *AssetReconcileService) deleteUnreferencedFiles(referenced map[string]struct{}) (int, error) {
+	baseDir := s.store.BaseDir()
+
+	if _, statErr := os.Stat(baseDir); os.IsNotExist(statErr) {
+		return 0, nil
+	}
+
+	var dirs []string
+	deleted := 0
+
+	err := filepath.WalkDir(baseDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if path != baseDir {
+				dirs = append(dirs, path)
+			}
+			return nil
+		}
+
+		if !isKnownAssetFile(d.Name()) {
+			return nil
+		}
+
+		assetPath, pathErr := fsPathToAssetPath(baseDir, path)
+		if pathErr != nil {
+			return nil
+		}
+
+		if _, ok := referenced[assetPath]; ok {
+			return nil
+		}
+
+		if _, cleanupErr := cleanupAssetPath(s.store, s.tasksRepo, assetPath, "asset_reconcile.orphan"); cleanupErr != nil {
+			log.Printf("asset_reconcile.orphan: failed to delete %s: %v", assetPath, cleanupErr)
+			return nil
+		}
+		deleted++
+		return nil
+	})
+	if err != nil {
+		return deleted, fmt.Errorf("walk assets directory: %w", err)
+	}
+
+	// Remove empty game directories (reverse order = deepest first).
+	for i := len(dirs) - 1; i >= 0; i-- {
+		entries, readErr := os.ReadDir(dirs[i])
+		if readErr == nil && len(entries) == 0 {
+			_ = os.Remove(dirs[i])
+		}
+	}
+
+	return deleted, nil
+}
+
+// fsPathToAssetPath converts an absolute filesystem path under baseDir to the
+// URL-style asset path used by AssetStore (e.g. "/assets/game-id/file.jpg").
+func fsPathToAssetPath(baseDir string, fsPath string) (string, error) {
+	rel, err := filepath.Rel(baseDir, fsPath)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path %q is outside base dir", fsPath)
+	}
+	return "/assets/" + filepath.ToSlash(rel), nil
 }
