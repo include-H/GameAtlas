@@ -107,10 +107,13 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
 
   const coverSteamPicker = useSteamPicker<string[]>({
     onSelect: async (game) => {
-      const coverUrl = proxySteamAssetUrl(`https://steamcdn-a.akamaihd.net/steam/apps/${game.id}/library_600x900_2x.jpg`)
-      steamCoverImages.value = [coverUrl]
+      const details = await steamService.getGameDetails(game.id)
+      const images = [details.coverImage, details.bannerImage].filter(
+        (value): value is string => !!value,
+      )
+      steamCoverImages.value = images
       selectedCoverImage.value = ''
-      return [coverUrl]
+      return images
     },
     onError: (message) => {
       options.addAlert('Steam 封面处理失败：' + message, 'error')

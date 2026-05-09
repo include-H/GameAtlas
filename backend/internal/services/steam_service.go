@@ -225,6 +225,12 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_600x900_2x.jpg",
 		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_600x900.jpg",
 	)
+	// Some newer games only have store capsule art, not the tall library cover.
+	if coverURL == nil {
+		coverURL = s.resolveSteamAssetURL(appID, proxyOverride,
+			"https://steamcdn-a.akamaihd.net/steam/apps/%d/capsule_616x353.jpg",
+		)
+	}
 	bannerURL := s.resolveSteamAssetURL(appID, proxyOverride,
 		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_hero_2x.jpg",
 		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_hero.jpg",
@@ -264,6 +270,12 @@ func (s *SteamService) previewAssetsFromStorePage(appID int64, proxyOverride str
 		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_600x900_2x.jpg",
 		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_600x900.jpg",
 	)
+	// Some newer games only have store capsule art, not the tall library cover.
+	if coverURL == nil {
+		coverURL = s.resolveSteamAssetURL(appID, proxyOverride,
+			"https://steamcdn-a.akamaihd.net/steam/apps/%d/capsule_616x353.jpg",
+		)
+	}
 	bannerURL := s.resolveSteamAssetURL(appID, proxyOverride,
 		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_hero_2x.jpg",
 		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_hero.jpg",
