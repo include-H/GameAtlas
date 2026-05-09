@@ -4,7 +4,7 @@
     <div class="view-header">
       <div class="view-header-title-group">
         <h1 class="view-title text-gradient">{{ pageTitle }}</h1>
-        <p class="view-subtitle">集中浏览、筛选并整理你的全部游戏收藏。</p>
+        <p class="view-subtitle">你收藏的每一款，都在这里。</p>
       </div>
 
       <a-space>

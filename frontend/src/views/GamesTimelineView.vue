@@ -3,7 +3,7 @@
     <div class="games-timeline__hero page-hero">
       <div class="page-hero__content">
         <h1 class="page-hero__title text-gradient">发售时间轴</h1>
-        <p class="page-hero__subtitle">默认展示近两年，继续下滑可追溯更早年份，按年与月份查看游戏发售记录。</p>
+        <p class="page-hero__subtitle">沿发售日期，回溯你的游戏记忆。</p>
       </div>
     </div>
 

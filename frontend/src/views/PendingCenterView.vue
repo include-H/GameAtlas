@@ -4,7 +4,7 @@
       <div class="page-hero__content">
         <h1 class="pending-center__title page-hero__title text-gradient">待处理工作台</h1>
         <p class="pending-center__subtitle page-hero__subtitle">
-          队列视图：后端原生处理待处理筛选、排序与分页，每页 {{ PENDING_WORKBENCH_PAGE_SIZE }} 条。
+          还差一点，就能让它们更完整。
         </p>
       </div>
 

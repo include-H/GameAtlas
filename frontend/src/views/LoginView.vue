@@ -113,7 +113,7 @@ interface LoginErrorData {
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
-const fallbackLoginQuote = '输入访问密码，继续进入你的游戏库。'
+const fallbackLoginQuote = '推开这扇门，回到你的游戏库。'
 
 const password = ref('')
 const showPassword = ref(false)

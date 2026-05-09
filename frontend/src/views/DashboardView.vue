@@ -7,7 +7,7 @@
           发现
         </h1>
         <p class="page-hero__subtitle">
-          探索您的游戏库动态
+          你的游戏库，此刻正在发生什么。
         </p>
       </div>
     </div>

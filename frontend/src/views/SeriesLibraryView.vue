@@ -3,7 +3,7 @@
     <div class="series-library__header page-hero">
       <div class="page-hero__content">
         <h1 class="series-library__title page-hero__title text-gradient">系列库</h1>
-        <p class="series-library__subtitle page-hero__subtitle">按系列浏览，再进入对应作品集合。</p>
+        <p class="series-library__subtitle page-hero__subtitle">每个系列，都值得被好好归档。</p>
       </div>
       <div class="series-library__search app-glass-surface">
         <div class="series-library__search-body app-input-action-row">
