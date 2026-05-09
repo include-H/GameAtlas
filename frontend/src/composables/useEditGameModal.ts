@@ -542,6 +542,7 @@ export const useEditGameModal = ({
     handleBannerUploadError,
     handleBannerUploadSuccess,
     handleCancel,
+    hasParsableWikiContent,
     handleCoverError,
     handleCoverSearchClear,
     handleCoverUploadError,
