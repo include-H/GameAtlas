@@ -123,7 +123,9 @@ const loadBackground = async () => {
   }
 
   if (canUseCustomBackground.value) {
-    return CUSTOM_BACKGROUND_PATH
+    // Already confirmed available via HEAD at startup — skip preloadImage round-trip.
+    const currentUrl = layerUrls.value[activeLayerIndex.value] || ''
+    return currentUrl === CUSTOM_BACKGROUND_PATH ? currentUrl : CUSTOM_BACKGROUND_PATH
   }
 
   return ''

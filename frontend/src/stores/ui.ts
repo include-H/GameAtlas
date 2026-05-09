@@ -66,7 +66,15 @@ export const useUiStore = defineStore('ui', () => {
     ambientBackgroundSource.value = null
   }
 
+  const BG_CACHE_KEY = 'ga:bg-availability'
+
   const initializeSharedBackgroundAvailability = async () => {
+    const cached = sessionStorage.getItem(BG_CACHE_KEY)
+    if (cached === 'available' || cached === 'missing') {
+      sharedBackgroundAvailability.value = cached
+      return
+    }
+
     try {
       const response = await fetch(CUSTOM_BACKGROUND_PATH, {
         method: 'HEAD',
@@ -74,9 +82,10 @@ export const useUiStore = defineStore('ui', () => {
       })
       sharedBackgroundAvailability.value = response.ok ? 'available' : 'missing'
     } catch {
-      // Background artwork is optional; network or file misses should degrade to the built-in backdrop.
       sharedBackgroundAvailability.value = 'missing'
     }
+
+    sessionStorage.setItem(BG_CACHE_KEY, sharedBackgroundAvailability.value)
   }
 
   // Alert methods

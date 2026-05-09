@@ -4,12 +4,10 @@ import { resolveAssetUrl } from '@/utils/asset-url'
 type ImageCandidateGame = {
   banner_image?: GameListItemDto['banner_image']
   primary_screenshot?: GameListItemDto['primary_screenshot']
-  cover_image?: GameListItemDto['cover_image']
 }
 
 type ImageCandidateGameDetail = {
   banner_image?: GameDetailDto['banner_image']
-  cover_image?: GameDetailDto['cover_image']
   screenshots?: GameDetailDto['screenshots']
 }
 
@@ -25,23 +23,14 @@ const pushResolved = (target: string[], value: string | null | undefined) => {
   }
 }
 
-const pushResolvedFallback = (target: string[], ...values: Array<string | null | undefined>) => {
-  for (const value of values) {
-    const beforeLength = target.length
-    pushResolved(target, value)
-    if (target.length > beforeLength) {
-      return
-    }
-  }
-}
-
 export const getAmbientBackgroundUrlsFromGameListItem = (game?: ImageCandidateGame | null) => {
   if (!game) {
     return []
   }
 
   const urls: string[] = []
-  pushResolvedFallback(urls, game.primary_screenshot, game.banner_image, game.cover_image)
+  pushResolved(urls, game.primary_screenshot)
+  pushResolved(urls, game.banner_image)
   return urls
 }
 
@@ -54,9 +43,7 @@ export const getAmbientBackgroundUrlsFromGameDetail = (game?: ImageCandidateGame
   for (const screenshot of game.screenshots || []) {
     pushResolved(urls, screenshot.path)
   }
-  if (urls.length === 0) {
-    pushResolvedFallback(urls, game.banner_image, game.cover_image)
-  }
+  pushResolved(urls, game.banner_image)
   return urls
 }
 
