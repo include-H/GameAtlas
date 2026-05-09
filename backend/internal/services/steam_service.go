@@ -221,20 +221,37 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 		screenshotURLs = s.fetchScreenshotURLsFromStorePage(appID, proxyOverride)
 	}
 
+	// Resolve cover/banner: try old CDN patterns first, then fall back to API-provided URLs.
 	coverURL := s.resolveSteamAssetURL(appID, proxyOverride,
 		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_600x900_2x.jpg",
 		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_600x900.jpg",
 	)
-	// Some newer games only have store capsule art, not the tall library cover.
+	bannerURL := s.resolveSteamAssetURL(appID, proxyOverride,
+		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_hero_2x.jpg",
+		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_hero.jpg",
+	)
+
+	// Use API-provided header_image as fallback — it uses hashed CDN paths that
+	// the old-style URL guessing cannot discover.
+	apiHeaderImage := ""
+	if primaryUsable && primaryDetails.Data.HeaderImage != "" {
+		apiHeaderImage = primaryDetails.Data.HeaderImage
+	} else if fallbackUsable && fallbackDetails.Data.HeaderImage != "" {
+		apiHeaderImage = fallbackDetails.Data.HeaderImage
+	}
+
+	if bannerURL == nil && apiHeaderImage != "" {
+		bannerURL = &apiHeaderImage
+	}
 	if coverURL == nil {
 		coverURL = s.resolveSteamAssetURL(appID, proxyOverride,
 			"https://steamcdn-a.akamaihd.net/steam/apps/%d/capsule_616x353.jpg",
 		)
 	}
-	bannerURL := s.resolveSteamAssetURL(appID, proxyOverride,
-		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_hero_2x.jpg",
-		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_hero.jpg",
-	)
+	if coverURL == nil && apiHeaderImage != "" {
+		// Last resort: use header_image as cover (not ideal aspect ratio but better than nothing).
+		coverURL = &apiHeaderImage
+	}
 
 	return &domain.SteamAssetsPreview{
 		AppID:          appID,

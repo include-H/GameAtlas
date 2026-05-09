@@ -1,0 +1,122 @@
+package handlers
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/hao/game/internal/services"
+)
+
+type SteamGridDBHandler struct {
+	service *services.SteamGridDBService
+}
+
+func NewSteamGridDBHandler(service *services.SteamGridDBService) *SteamGridDBHandler {
+	return &SteamGridDBHandler{service: service}
+}
+
+func (h *SteamGridDBHandler) GetGrids(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
+	h.handleImages(c, h.service.GetGridsBySteamAppID)
+}
+
+func (h *SteamGridDBHandler) GetHeroes(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
+	h.handleImages(c, h.service.GetHeroesBySteamAppID)
+}
+
+func (h *SteamGridDBHandler) GetLogos(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
+	h.handleImages(c, h.service.GetLogosBySteamAppID)
+}
+
+func (h *SteamGridDBHandler) GetIcons(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
+	h.handleImages(c, h.service.GetIconsBySteamAppID)
+}
+
+func (h *SteamGridDBHandler) Available(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": h.service.Available()})
+}
+
+func (h *SteamGridDBHandler) Search(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
+	if !h.service.Available() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "error": "SteamGridDB API 未配置"})
+		return
+	}
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "搜索关键词为必填项"})
+		return
+	}
+	results, err := h.service.Search(query)
+	if err != nil {
+		writeJSONError(c, http.StatusBadGateway, "SteamGridDB 搜索失败")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": results})
+}
+
+func (h *SteamGridDBHandler) GetGridsByGameID(c *gin.Context) {
+	h.handleImagesByGameID(c, h.service.GetGridsByGameID)
+}
+
+func (h *SteamGridDBHandler) GetHeroesByGameID(c *gin.Context) {
+	h.handleImagesByGameID(c, h.service.GetHeroesByGameID)
+}
+
+func (h *SteamGridDBHandler) GetLogosByGameID(c *gin.Context) {
+	h.handleImagesByGameID(c, h.service.GetLogosByGameID)
+}
+
+func (h *SteamGridDBHandler) handleImagesByGameID(c *gin.Context, fetch func(int) ([]services.SteamGridDBImage, error)) {
+	if !requireAdmin(c) {
+		return
+	}
+	if !h.service.Available() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "error": "SteamGridDB API 未配置"})
+		return
+	}
+	gameID, ok := parseIDParam(c, "gameId")
+	if !ok {
+		return
+	}
+	images, err := fetch(int(gameID))
+	if err != nil {
+		writeJSONError(c, http.StatusBadGateway, "SteamGridDB 请求失败")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": images})
+}
+
+func (h *SteamGridDBHandler) handleImages(c *gin.Context, fetch func(int64) ([]services.SteamGridDBImage, error)) {
+	if !h.service.Available() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "error": "SteamGridDB API 未配置"})
+		return
+	}
+
+	appID, ok := parseIDParam(c, "appId")
+	if !ok {
+		return
+	}
+
+	images, err := fetch(appID)
+	if err != nil {
+		writeJSONError(c, http.StatusBadGateway, "SteamGridDB 请求失败")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": images})
+}

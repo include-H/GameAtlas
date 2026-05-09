@@ -38,7 +38,8 @@
         class="steam-search-result-item"
         @click="emit('select', game)"
       >
-        <img :src="game.tinyImage" :alt="game.name" />
+        <img v-if="game.tinyImage" :src="game.tinyImage" :alt="game.name" />
+        <div v-else class="steam-result-placeholder" />
         <div class="steam-result-info">
           <div class="steam-result-name">{{ game.name }}</div>
           <div class="steam-result-meta">{{ game.releaseDate || '' }}</div>
@@ -118,13 +119,18 @@ const emit = defineEmits<{
   transform: translateY(-1px);
 }
 
-.steam-search-result-item img {
+.steam-search-result-item img,
+.steam-result-placeholder {
   width: 60px;
   height: 32px;
   flex-shrink: 0;
   object-fit: cover;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.04);
+}
+
+.steam-result-placeholder {
+  background: var(--color-fill-2);
 }
 
 .steam-result-info {

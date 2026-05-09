@@ -222,9 +222,11 @@
       :selected-steam-summary-game="selectedSteamSummaryGame"
       :steam-summary-preview="steamSummaryPreview"
       :show-cover-selector="showCoverSelector"
+      :cover-source="coverSource"
+      :sgdb-available="sgdbAvailable"
       :steam-cover-search-query="steamCoverSearchQuery"
-      :is-searching-steam-cover="isSearchingSteamCover"
-      :steam-cover-search-results="steamCoverSearchResults"
+      :is-searching-cover="isSearchingCover"
+      :cover-search-results="coverSearchResults"
       :selected-steam-game="selectedSteamGame"
       :steam-cover-images="steamCoverImages"
       :selected-cover-image="selectedCoverImage"
@@ -235,9 +237,10 @@
       :cover-preview-url="coverPreviewUrl"
       :is-downloading-cover="isDownloadingCover"
       :show-banner-selector="showBannerSelector"
+      :banner-source="bannerSource"
       :steam-banner-search-query="steamBannerSearchQuery"
-      :is-searching-steam-banner="isSearchingSteamBanner"
-      :steam-banner-search-results="steamBannerSearchResults"
+      :is-searching-banner="isSearchingBanner"
+      :banner-search-results="bannerSearchResults"
       :selected-steam-banner-game="selectedSteamBannerGame"
       :steam-banner-images="steamBannerImages"
       :selected-banner-image="selectedBannerImage"
@@ -248,8 +251,8 @@
       :is-downloading-banner="isDownloadingBanner"
       :show-screenshot-selector="showScreenshotSelector"
       :steam-screenshot-search-query="steamScreenshotSearchQuery"
-      :is-searching-steam-screenshots="isSearchingSteamScreenshots"
-      :steam-screenshot-search-results="steamScreenshotSearchResults"
+      :is-searching-screenshots="isSearchingScreenshots"
+      :screenshot-search-results="screenshotSearchResults"
       :selected-steam-screenshot-game="selectedSteamScreenshotGame"
       :steam-screenshots-data="steamScreenshotsData"
       :selected-steam-screenshots="selectedSteamScreenshots"
@@ -268,6 +271,7 @@
       @confirm-summary-import="confirmSummaryImport"
       @update:show-cover-selector="showCoverSelector = $event"
       @update:steam-cover-search-query="steamCoverSearchQuery = $event"
+      @source-change-cover="coverSource = $event"
       @search-cover="searchSteamForCover"
       @clear-cover="handleCoverSearchClear"
       @select-cover-game="selectSteamCoverGame"
@@ -282,6 +286,7 @@
       @cover-image-error="handleCoverError"
       @update:show-banner-selector="showBannerSelector = $event"
       @update:steam-banner-search-query="steamBannerSearchQuery = $event"
+      @source-change-banner="bannerSource = $event"
       @search-banner="searchSteamForBanner"
       @clear-banner="handleBannerSearchClear"
       @select-banner-game="selectSteamBannerGame"
@@ -424,9 +429,9 @@ const {
   isSearchingDevelopers,
   isSearchingPublishers,
   isSearchingSeries,
-  isSearchingSteamBanner,
-  isSearchingSteamCover,
-  isSearchingSteamScreenshots,
+  isSearchingBanner,
+  isSearchingCover,
+  isSearchingScreenshots,
   isSearchingSteamSummary,
   isUploadingVideo,
   loadBannerFromUrl,
@@ -472,12 +477,12 @@ const {
   showVideoSelector,
   steamBannerImages,
   steamBannerSearchQuery,
-  steamBannerSearchResults,
+  bannerSearchResults,
   steamCoverImages,
   steamCoverSearchQuery,
-  steamCoverSearchResults,
+  coverSearchResults,
   steamScreenshotSearchQuery,
-  steamScreenshotSearchResults,
+  screenshotSearchResults,
   steamScreenshotsData,
   steamSummaryPreview,
   steamSummarySearchQuery,
@@ -491,6 +496,9 @@ const {
   visible,
   wikiMetadataCandidates,
   wikiMetadataPickerVisible,
+  coverSource,
+  bannerSource,
+  sgdbAvailable,
 } = useEditGameModal({
   props,
   emit,

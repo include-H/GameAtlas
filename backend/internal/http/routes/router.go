@@ -72,6 +72,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	reviewIssueOverrideHandler := handlers.NewReviewIssueOverrideHandler(reviewIssueOverrideService)
 	pendingIssuesHandler := handlers.NewPendingIssuesHandler(pendingIssuesService)
 	steamHandler := handlers.NewSteamHandler(steamService)
+	steamGridDBHandler := handlers.NewSteamGridDBHandler(services.NewSteamGridDBService(cfg.SteamGridDBAPIKey))
 	wikiHandler := handlers.NewWikiHandler(wikiService)
 	hitokotoHandler := handlers.NewHitokotoHandler(hitokotoService)
 
@@ -122,6 +123,15 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.GET("/steam/search", steamHandler.Search)
 	api.GET("/steam/:appId/assets", steamHandler.Preview)
 	api.GET("/steam/proxy", steamHandler.Proxy)
+	api.GET("/steamgriddb/available", steamGridDBHandler.Available)
+	api.GET("/steamgriddb/search", steamGridDBHandler.Search)
+	api.GET("/steamgriddb/:appId/grids", steamGridDBHandler.GetGrids)
+	api.GET("/steamgriddb/:appId/heroes", steamGridDBHandler.GetHeroes)
+	api.GET("/steamgriddb/:appId/logos", steamGridDBHandler.GetLogos)
+	api.GET("/steamgriddb/:appId/icons", steamGridDBHandler.GetIcons)
+	api.GET("/steamgriddb/game/:gameId/grids", steamGridDBHandler.GetGridsByGameID)
+	api.GET("/steamgriddb/game/:gameId/heroes", steamGridDBHandler.GetHeroesByGameID)
+	api.GET("/steamgriddb/game/:gameId/logos", steamGridDBHandler.GetLogosByGameID)
 
 	registerAssetRoutes(router, cfg.AssetsDir, gameDetailRepo)
 	registerCustomDataRoutes(router, filepath.Dir(cfg.AssetsDir))

@@ -56,12 +56,29 @@
     @update:visible="emit('update:show-cover-selector', $event)"
   >
     <div class="cover-selector-content">
-      <a-divider>从 Steam 获取</a-divider>
+      <div class="source-selector">
+        <span class="source-selector__label">数据源</span>
+        <a-button
+          class="app-text-action-btn"
+          :type="coverSource === 'steam' ? 'outline' : 'text'"
+          size="small"
+          html-type="button"
+          @click="emit('source-change-cover', 'steam')"
+        >Steam</a-button>
+        <a-button
+          class="app-text-action-btn"
+          :type="coverSource === 'steamgriddb' ? 'outline' : 'text'"
+          size="small"
+          html-type="button"
+          :disabled="!sgdbAvailable"
+          @click="emit('source-change-cover', 'steamgriddb')"
+        >SteamGridDB</a-button>
+      </div>
       <steam-search-panel
         :query="steamCoverSearchQuery"
-        placeholder="搜索 Steam 游戏..."
-        :loading="isSearchingSteamCover"
-        :results="steamCoverSearchResults"
+        :placeholder="coverSource === 'steamgriddb' ? '搜索 SteamGridDB...' : '搜索 Steam 游戏...'"
+        :loading="isSearchingCover"
+        :results="coverSearchResults"
         :selected-game="selectedSteamGame"
         @update:query="emit('update:steam-cover-search-query', $event)"
         @search="emit('search-cover')"
@@ -88,7 +105,7 @@
             v-if="selectedCoverImage"
             type="primary"
             long
-            :loading="isSearchingSteamCover"
+            :loading="isSearchingCover"
             html-type="button"
             @click="emit('download-selected-steam-cover')"
           >
@@ -154,12 +171,29 @@
     @update:visible="emit('update:show-banner-selector', $event)"
   >
     <div class="cover-selector-content">
-      <a-divider>从 Steam 获取</a-divider>
+      <div class="source-selector">
+        <span class="source-selector__label">数据源</span>
+        <a-button
+          class="app-text-action-btn"
+          :type="bannerSource === 'steam' ? 'outline' : 'text'"
+          size="small"
+          html-type="button"
+          @click="emit('source-change-banner', 'steam')"
+        >Steam</a-button>
+        <a-button
+          class="app-text-action-btn"
+          :type="bannerSource === 'steamgriddb' ? 'outline' : 'text'"
+          size="small"
+          html-type="button"
+          :disabled="!sgdbAvailable"
+          @click="emit('source-change-banner', 'steamgriddb')"
+        >SteamGridDB</a-button>
+      </div>
       <steam-search-panel
         :query="steamBannerSearchQuery"
-        placeholder="搜索 Steam 游戏..."
-        :loading="isSearchingSteamBanner"
-        :results="steamBannerSearchResults"
+        :placeholder="bannerSource === 'steamgriddb' ? '搜索 SteamGridDB...' : '搜索 Steam 游戏...'"
+        :loading="isSearchingBanner"
+        :results="bannerSearchResults"
         :selected-game="selectedSteamBannerGame"
         @update:query="emit('update:steam-banner-search-query', $event)"
         @search="emit('search-banner')"
@@ -186,7 +220,7 @@
             v-if="selectedBannerImage"
             type="primary"
             long
-            :loading="isSearchingSteamBanner"
+            :loading="isSearchingBanner"
             html-type="button"
             @click="emit('download-selected-steam-banner')"
           >
@@ -252,12 +286,11 @@
     @update:visible="emit('update:show-screenshot-selector', $event)"
   >
     <div class="screenshot-selector-content">
-      <a-divider>从 Steam 获取</a-divider>
       <steam-search-panel
         :query="steamScreenshotSearchQuery"
         placeholder="搜索 Steam 游戏..."
-        :loading="isSearchingSteamScreenshots"
-        :results="steamScreenshotSearchResults"
+        :loading="isSearchingScreenshots"
+        :results="screenshotSearchResults"
         :selected-game="selectedSteamScreenshotGame"
         @update:query="emit('update:steam-screenshot-search-query', $event)"
         @search="emit('search-screenshot')"
@@ -367,6 +400,7 @@
 import { IconCheck, IconUpload } from '@arco-design/web-vue/es/icon'
 import SteamSearchPanel from '@/components/SteamSearchPanel.vue'
 import type { SteamGameSearchResult } from '@/services/types'
+import type { ImportSource } from '@/composables/useSteamImport'
 import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
 
 interface SteamScreenshotsData {
@@ -386,9 +420,11 @@ defineProps<{
   steamSummaryPreview: string
 
   showCoverSelector: boolean
+  coverSource: ImportSource
+  sgdbAvailable: boolean
   steamCoverSearchQuery: string
-  isSearchingSteamCover: boolean
-  steamCoverSearchResults: SteamGameSearchResult[]
+  isSearchingCover: boolean
+  coverSearchResults: SteamGameSearchResult[]
   selectedSteamGame: SteamGameSearchResult | null
   steamCoverImages: string[]
   selectedCoverImage: string
@@ -400,9 +436,10 @@ defineProps<{
   isDownloadingCover: boolean
 
   showBannerSelector: boolean
+  bannerSource: ImportSource
   steamBannerSearchQuery: string
-  isSearchingSteamBanner: boolean
-  steamBannerSearchResults: SteamGameSearchResult[]
+  isSearchingBanner: boolean
+  bannerSearchResults: SteamGameSearchResult[]
   selectedSteamBannerGame: SteamGameSearchResult | null
   steamBannerImages: string[]
   selectedBannerImage: string
@@ -414,8 +451,8 @@ defineProps<{
 
   showScreenshotSelector: boolean
   steamScreenshotSearchQuery: string
-  isSearchingSteamScreenshots: boolean
-  steamScreenshotSearchResults: SteamGameSearchResult[]
+  isSearchingScreenshots: boolean
+  screenshotSearchResults: SteamGameSearchResult[]
   selectedSteamScreenshotGame: SteamGameSearchResult | null
   steamScreenshotsData: SteamScreenshotsData | null
   selectedSteamScreenshots: Set<number>
@@ -437,6 +474,7 @@ const emit = defineEmits<{
   'confirm-summary-import': []
 
   'update:show-cover-selector': [value: boolean]
+  'source-change-cover': [source: ImportSource]
   'update:steam-cover-search-query': [value: string]
   'search-cover': []
   'clear-cover': []
@@ -452,6 +490,7 @@ const emit = defineEmits<{
   'cover-image-error': [event: Event]
 
   'update:show-banner-selector': [value: boolean]
+  'source-change-banner': [source: ImportSource]
   'update:steam-banner-search-query': [value: string]
   'search-banner': []
   'clear-banner': []
@@ -528,6 +567,8 @@ const emit = defineEmits<{
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 .steam-image-item {
@@ -684,5 +725,17 @@ const emit = defineEmits<{
   width: 100%;
   height: auto;
   display: block;
+}
+
+.source-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.source-selector__label {
+  font-size: 14px;
+  color: var(--color-text-2);
+  flex-shrink: 0;
 }
 </style>

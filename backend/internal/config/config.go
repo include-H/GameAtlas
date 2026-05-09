@@ -34,6 +34,7 @@ type Config struct {
 	AuthFailWindow    time.Duration
 	AuthStateTTL      time.Duration
 	AuthTrackBy       string
+	SteamGridDBAPIKey string
 	ReadHeaderTimeout time.Duration
 	ShutdownTimeout   time.Duration
 }
@@ -66,9 +67,10 @@ func Load() (Config, error) {
 		SMBUsername:      getEnv("SMB_USERNAME", ""),
 		SMBPassword:      getEnv("SMB_PASSWORD", ""),
 		VHDDiffRoot:      getEnv("VHD_DIFF_ROOT", `C:`),
-		AdminDisplayName: getEnv("ADMIN_DISPLAY_NAME", "Admin"),
-		AdminPassword:    getEnv("ADMIN_PASSWORD", ""),
-		AuthTrackBy:      getEnv("AUTH_TRACK_BY", "ip"),
+		AdminDisplayName:  getEnv("ADMIN_DISPLAY_NAME", "Admin"),
+		AdminPassword:     getEnv("ADMIN_PASSWORD", ""),
+		SteamGridDBAPIKey: getEnv("STEAMGRIDDB_API_KEY", ""),
+		AuthTrackBy:       getEnv("AUTH_TRACK_BY", "ip"),
 	}
 
 	var errs []error

@@ -90,5 +90,7 @@ func isAllowedSteamAssetHost(host string) bool {
 		return true
 	}
 
-	return strings.HasSuffix(host, ".steamstatic.com") || strings.HasSuffix(host, ".steampowered.com")
+	return strings.HasSuffix(host, ".steamstatic.com") ||
+		strings.HasSuffix(host, ".steampowered.com") ||
+		strings.HasSuffix(host, ".steamgriddb.com")
 }
