@@ -585,28 +585,6 @@ func TestGamesHandlerListRejectsRandomSortWithoutSeed(t *testing.T) {
 	}
 }
 
-func TestGamesHandlerListRejectsInvalidTagQueryValue(t *testing.T) {
-	t.Setenv("GIN_MODE", gin.TestMode)
-
-	db := openGamesHandlerTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	handler := newSplitGamesHandlerForTest(config.Config{}, db)
-
-	recorder := httptest.NewRecorder()
-	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodGet, "/api/games?tag=1&tag=oops", nil)
-
-	handler.List(context)
-
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
-	}
-	if !strings.Contains(recorder.Body.String(), `"error":"无效的游戏查询参数: tag"`) {
-		t.Fatalf("body = %s, want 无效的游戏查询参数: tag", recorder.Body.String())
-	}
-}
-
 func TestGamesHandlerCreateReturnsBadRequestWhenTitleMissing(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 
@@ -785,7 +763,7 @@ func TestGamesHandlerUpdateAggregateReplacesRelations(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-replace-relations/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Replace Relations Updated","visibility":"public","series_id":null,"developer_ids":[],"publisher_ids":[],"tag_ids":[]},"assets":{}}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-replace-relations/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Replace Relations Updated","visibility":"public","series_id":null,"developer_ids":[],"publisher_ids":[]},"assets":{}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-replace-relations"}}
 	context.Set("is_admin", true)

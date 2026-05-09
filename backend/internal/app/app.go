@@ -42,7 +42,6 @@ func New(cfg config.Config) (*App, error) {
 		cfg,
 		gamesRepo,
 		repositories.NewMetadataRepository(sqliteDB),
-		repositories.NewTagsRepository(sqliteDB),
 	)
 	if processed, err := gameAggregateService.ProcessPendingAssetCleanup(100); err != nil {
 		log.Printf("asset cleanup retry failed after %d task(s): %v", processed, err)

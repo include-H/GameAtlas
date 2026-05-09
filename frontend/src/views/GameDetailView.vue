@@ -108,23 +108,6 @@
                 <span class="sidebar-info__label">发行日期</span>
                 <span class="sidebar-info__value">{{ formatDate(game.release_date) }}</span>
               </div>
-              <div
-                v-for="group in game.tag_groups || []"
-                :key="group.id"
-                :class="[
-                  'sidebar-info__item',
-                  { 'sidebar-info__item--wide': shouldSpanMetadataRow(group.tags) }
-                ]"
-              >
-                <span class="sidebar-info__label">{{ group.name }}</span>
-                <div class="sidebar-info__value">
-                  <a-space wrap>
-                    <a-tag v-for="tag in group.tags" :key="tag.id">
-                      {{ tag.name }}
-                    </a-tag>
-                  </a-space>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -292,7 +275,6 @@ const {
   openEditModal,
   openWikiEditor,
   publisherNames,
-  shouldSpanMetadataRow,
   showEditModal,
   topSectionRef,
   versions,

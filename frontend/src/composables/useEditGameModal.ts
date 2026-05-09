@@ -17,7 +17,6 @@ import { publishersService } from '@/services/publishers.service'
 import { resolveAssetCandidates } from '@/utils/asset-url'
 import { getAssetFileExtension } from '@/utils/asset-file-extension'
 import { useGameFilePaths } from '@/composables/useGameFilePaths'
-import { useTagSelection } from '@/composables/useTagSelection'
 import { useSteamImport } from '@/composables/useSteamImport'
 import { useEditGameWorkflow } from '@/composables/useEditGameWorkflow'
 import { useEditGameAssets } from '@/composables/useEditGameAssets'
@@ -33,8 +32,6 @@ import type {
   Publisher,
   ScreenshotItem,
   Series,
-  Tag,
-  TagGroup,
   VideoAssetItem,
 } from '@/services/types'
 import { useUiStore } from '@/stores/ui'
@@ -63,8 +60,6 @@ export const useEditGameModal = ({
 }: UseEditGameModalOptions) => {
   const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1280)
   const seriesOptions = ref<Series[]>([])
-  const tagGroups = ref<TagGroup[]>([])
-  const tagOptions = ref<Tag[]>([])
   const developerOptions = ref<Developer[]>([])
   const publisherOptions = ref<Publisher[]>([])
   const isSearchingSeries = ref(false)
@@ -199,27 +194,6 @@ export const useEditGameModal = ({
     }
   }
 
-  const {
-    isPreparingWikiTagCandidates,
-    isApplyingWikiTags,
-    wikiTagPickerVisible,
-    wikiTagCandidates,
-    tagOptionsByGroup,
-    tagFieldValuesByGroup,
-    pendingTagOptionsByGroup,
-    handleTagSectionSelectionChange,
-    handleParseWikiTags,
-    handleWikiTagCandidateGroupChange,
-    applySelectedWikiTags,
-    resolveTagSelections,
-    resetTagSelectionState,
-  } = useTagSelection({
-    tagGroups,
-    tagOptions,
-    form,
-    getWikiContent: () => props.game?.wiki_content || '',
-    addAlert,
-  })
 
   const uploadAction = computed(() => {
     return buildAssetUploadUrl('cover')
@@ -332,12 +306,9 @@ export const useEditGameModal = ({
   const { hydrateFormFromGame, initializeOptions } = useEditGameFormBootstrap({
     form,
     seriesOptions,
-    tagGroups,
-    tagOptions,
     developerOptions,
     publisherOptions,
     addAlert,
-    resetTagSelectionState,
     createEditableScreenshot,
     createEditableVideo,
   })
@@ -361,7 +332,6 @@ export const useEditGameModal = ({
         return false
       }
     },
-    resolveTagSelections,
     addAlert,
     emitSuccess: () => {
       emit('success')
@@ -515,7 +485,6 @@ export const useEditGameModal = ({
   })
 
   const resetTransientState = () => {
-    resetTagSelectionState()
     resetPendingDeleteAssets()
     resetFileBrowserState()
     resetSteamImportState()
@@ -580,7 +549,6 @@ export const useEditGameModal = ({
     handleDeveloperSearch,
     handleFilePathItemUpdate,
     handleFileSelect,
-    handleParseWikiTags,
     handlePublisherSearch,
     handleScreenshotDragEnd,
     handleScreenshotDragEnter,
@@ -592,21 +560,16 @@ export const useEditGameModal = ({
     handleSeriesSearch,
     handleSubmit,
     handleSummarySearchClear,
-    handleTagSectionSelectionChange,
     handleVideoFileChange,
     handleWikiMetadataCandidateSelectionChange,
-    handleWikiTagCandidateGroupChange,
-    hasParsableWikiContent,
     importMetadataFromWiki,
     initialPath,
     isApplyingWikiMetadata,
-    isApplyingWikiTags,
     isDownloadingBanner,
     isDownloadingCover,
     isDownloadingScreenshot,
     isDownloadingSteamScreenshots,
     isPreparingWikiMetadataCandidates,
-    isPreparingWikiTagCandidates,
     isSearchingDevelopers,
     isSearchingPublishers,
     isSearchingSeries,
@@ -621,7 +584,6 @@ export const useEditGameModal = ({
     modalWidth,
     openFileBrowser,
     openVideoSelector,
-    pendingTagOptionsByGroup,
     previewVideoSources,
     primaryPreviewVideo,
     releaseDate,
@@ -670,9 +632,6 @@ export const useEditGameModal = ({
     steamSummaryPreview,
     steamSummarySearchQuery,
     steamSummarySearchResults,
-    tagGroups,
-    tagOptionsByGroup,
-    tagFieldValuesByGroup,
     toggleSteamScreenshot,
     uploadAction,
     uploadData,
@@ -682,10 +641,7 @@ export const useEditGameModal = ({
     visible,
     wikiMetadataCandidates,
     wikiMetadataPickerVisible,
-    wikiTagCandidates,
-    wikiTagPickerVisible,
     applySelectedWikiMetadata,
-    applySelectedWikiTags,
     addFilePath,
   }
 }

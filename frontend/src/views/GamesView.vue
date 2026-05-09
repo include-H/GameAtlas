@@ -66,71 +66,7 @@
             :options="itemsPerPageOptions"
           />
         </a-col>
-
-        <a-col :xs="24" :sm="8" :md="4" :lg="4" :xl="4" :xxl="4" class="games-filters-col games-filters-col--tags">
-          <a-button class="app-text-action-btn games-filter-drawer-btn" type="text" long @click="showTagFilters = !showTagFilters">
-            <template #icon>
-              <icon-filter />
-            </template>
-            {{ showTagFilters ? '收起标签筛选' : '展开标签筛选' }}
-            <span v-if="selectedTagIds.length > 0" class="games-filter-drawer-btn__count">
-              {{ selectedTagIds.length }}
-            </span>
-          </a-button>
-        </a-col>
       </a-row>
-
-      <div v-if="showTagFilters" class="tag-filter-section">
-        <div class="tag-filter-section__header">
-          <span class="tag-filter-section__title">标签筛选</span>
-          <span class="tag-filter-section__hint">同组多选为或，不同组之间为且</span>
-        </div>
-
-        <div v-if="filterOptionsLoadFailedWithStaleData" class="tag-filter-section__status tag-filter-section__status--warning">
-          标签筛选刷新失败，当前显示的是上次成功加载的筛选项。
-        </div>
-
-        <div v-else-if="hasFilterOptionsLoadFailure" class="tag-filter-section__status tag-filter-section__status--error">
-          标签筛选加载失败，请稍后重试。
-        </div>
-
-        <a-row v-if="filterableTagGroups.length > 0" :gutter="[12, 16]" class="mt-3">
-          <a-col
-            v-for="group in filterableTagGroups"
-            :key="group.id"
-            :xs="24"
-            :sm="12"
-            :md="12"
-            :lg="12"
-            :xl="12"
-            :xxl="12"
-          >
-            <div class="tag-filter-grid-item">
-              <div class="tag-filter-drawer__label">{{ group.name }}</div>
-              <a-select
-                :model-value="getSelectedTagIdsForGroup(group.id)"
-                :multiple="group.allow_multiple"
-                :allow-search="true"
-                allow-clear
-                :placeholder="group.name"
-                @change="handleTagGroupSelectionChange(group.id, $event)"
-              >
-                <a-option
-                  v-for="tag in getTagsForGroup(group.id)"
-                  :key="tag.id"
-                  :value="tag.id"
-                  :label="tag.name"
-                >
-                  {{ tag.name }}
-                </a-option>
-              </a-select>
-            </div>
-          </a-col>
-        </a-row>
-        <div v-else-if="!hasFilterOptionsLoadFailure" class="tag-filter-section__empty">
-          暂无可筛选标签。重启后端完成 migration 后，这里会显示标签组。
-        </div>
-      </div>
 
       <!-- Active Filters -->
       <a-row v-if="hasActiveFilters" class="mt-3">
@@ -150,14 +86,6 @@
               @close="updateRoute({ favorite: undefined })"
             >
               仅收藏
-            </a-tag>
-            <a-tag
-              v-for="tagId in selectedTagIds"
-              :key="tagId"
-              closable
-              @close="removeTagFilter(tagId)"
-            >
-              标签: {{ tagLabelMap[String(tagId)] || tagId }}
             </a-tag>
             <a-button
               class="app-text-action-btn"
@@ -285,7 +213,7 @@ import { useUiStore } from '@/stores/ui'
 import GameCard from '@/components/GameCard.vue'
 import AddGameModal from '@/components/AddGameModal.vue'
 import { useGamesView } from '@/composables/useGamesView'
-import { IconApps, IconFilter, IconList, IconPlus, IconSearch, IconSort, IconTrophy } from '@arco-design/web-vue/es/icon'
+import { IconApps, IconList, IconPlus, IconSearch, IconSort, IconTrophy } from '@arco-design/web-vue/es/icon'
 
 defineOptions({
   name: 'GamesView',
@@ -303,32 +231,22 @@ const {
   currentPage,
   addGameSubmitting,
   filterFavorites,
-  filterableTagGroups,
   games,
-  getSelectedTagIdsForGroup,
-  getTagsForGroup,
   handleAddGame,
   handleAddGameSubmit,
   handleDelete,
   handleSearch,
-  handleTagGroupSelectionChange,
   hasActiveFilters,
-  hasFilterOptionsLoadFailure,
   hasLoadFailure,
   isLoading,
   itemsPerPage,
   itemsPerPageOptions,
   pageTitle,
   pagination,
-  filterOptionsLoadFailedWithStaleData,
-  removeTagFilter,
   searchQuery,
-  selectedTagIds,
   showAddModal,
-  showTagFilters,
   sortBy,
   sortOptions,
-  tagLabelMap,
   toggleFavorite,
   totalPages,
   updateRoute,

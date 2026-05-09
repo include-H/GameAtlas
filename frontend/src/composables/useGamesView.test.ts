@@ -9,13 +9,8 @@ import {
   normalizeGamesPaginationResponseQuery,
   normalizeGamesPaginationRouteQuery,
   normalizeGamesSortRouteQuery,
-  parseGamesItemsPerPage,
   parseGamesSortField,
   parseGamesSortOrder,
-  parsePositiveQueryNumber,
-  parseRouteBoolean,
-  parsePositiveRouteNumber,
-  parseRouteTagIds,
   readSingleQueryValue,
 } from './useGamesView'
 
@@ -24,19 +19,6 @@ describe('useGamesView helpers', () => {
     expect(readSingleQueryValue(['', 'halo', 'ignored'])).toBe('halo')
     expect(readSingleQueryValue('steam')).toBe('steam')
     expect(readSingleQueryValue(undefined)).toBeUndefined()
-  })
-
-  it('parses positive query numbers and tag ids safely', () => {
-    expect(parsePositiveQueryNumber('24', 12)).toBe(24)
-    expect(parsePositiveQueryNumber('0', 12)).toBe(12)
-    expect(parseRouteBoolean('true')).toBe(true)
-    expect(parseRouteBoolean('false')).toBe(false)
-    expect(parseRouteBoolean('favorites')).toBeUndefined()
-    expect(parsePositiveRouteNumber('3')).toBe(3)
-    expect(parsePositiveRouteNumber('pc')).toBeUndefined()
-    expect(parseGamesItemsPerPage('24')).toBe(24)
-    expect(parseGamesItemsPerPage('13')).toBeUndefined()
-    expect(parseRouteTagIds(['1', 'x', '2', '-3'])).toEqual([1, 2])
   })
 
   it('parses only supported native sort fields and orders', () => {
@@ -65,7 +47,6 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 24,
         search: 'halo',
-        tag: [],
         favorite: undefined,
       },
     })
@@ -87,7 +68,6 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 24,
         search: 'halo',
-        tag: [],
         favorite: undefined,
       },
       sort: {
@@ -227,7 +207,6 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 48,
         search: 'halo',
-        tag: [1, 2],
         favorite: true,
       },
       sort: {
@@ -253,7 +232,6 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 24,
         search: 'halo',
-        tag: [],
         favorite: undefined,
       },
     })
@@ -273,7 +251,6 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 24,
         search: undefined,
-        tag: [],
         favorite: undefined,
       },
     })
@@ -294,7 +271,6 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 48,
         search: undefined,
-        tag: [],
         favorite: undefined,
       },
       sort: {
@@ -369,7 +345,6 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 24,
         search: undefined,
-        tag: [],
         favorite: true,
       },
     })
@@ -389,7 +364,6 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 24,
         search: undefined,
-        tag: [],
         favorite: false,
       },
     })
@@ -409,7 +383,6 @@ describe('useGamesView helpers', () => {
         page: 2,
         limit: 24,
         search: undefined,
-        tag: [],
         favorite: undefined,
         favorite_raw: 'favorites',
       },
@@ -419,7 +392,6 @@ describe('useGamesView helpers', () => {
   it('treats only committed route filters as active filters', () => {
     expect(hasGamesActiveFilters({})).toBe(false)
     expect(hasGamesActiveFilters({ search: 'halo' })).toBe(true)
-    expect(hasGamesActiveFilters({ tag: ['1'] })).toBe(true)
     expect(hasGamesActiveFilters({ favorite: 'true' })).toBe(true)
     expect(hasGamesActiveFilters({ favorite: 'false' })).toBe(false)
   })

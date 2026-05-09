@@ -9,8 +9,7 @@ import type {
 import { Modal } from '@arco-design/web-vue'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import gamesService from '@/services/games.service'
-import tagsService from '@/services/tags.service'
-import type { GameListItem, GameListQuery, GameSort, GameSortQuery, Tag, TagGroup } from '@/services/types'
+import type { GameListItem, GameListQuery, GameSort, GameSortQuery } from '@/services/types'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
 import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
@@ -86,15 +85,6 @@ export const parsePositiveQueryNumber = (value: string | undefined, fallback: nu
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
 
-export const parseRouteTagIds = (
-  value: LocationQueryValue | LocationQueryValue[] | undefined,
-): number[] => {
-  const values = Array.isArray(value) ? value : value ? [value] : []
-  return values
-    .map((item) => Number(item))
-    .filter((item) => Number.isInteger(item) && item > 0)
-}
-
 export const parsePositiveRouteNumber = (
   value: LocationQueryValue | LocationQueryValue[] | undefined,
 ): number | undefined => {
@@ -148,7 +138,6 @@ export const buildGamesRouteQuery = (
 
   if (
     newParams.search !== undefined
-    || newParams.tag !== undefined
     || newParams.favorite !== undefined
   ) {
     query.page = '1'
@@ -173,7 +162,6 @@ export const buildGamesListRequest = ({
       page,
       limit: itemsPerPage,
       search: normalizeCommittedSearchValue(readSingleQueryValue(routeQuery.search)),
-      tag: parseRouteTagIds(routeQuery.tag),
       favorite,
     },
   }
@@ -201,7 +189,6 @@ export const buildGamesListRequest = ({
 export const hasGamesActiveFilters = (routeQuery: LocationQuery): boolean => {
   return Boolean(
     normalizeCommittedSearchValue(readSingleQueryValue(routeQuery.search))
-    || parseRouteTagIds(routeQuery.tag).length > 0
     || parseRouteBoolean(routeQuery.favorite) === true,
   )
 }
@@ -356,11 +343,6 @@ export const useGamesView = ({
   const viewMode = ref<GamesViewMode>('grid')
   const showAddModal = ref(false)
   const addGameSubmitting = ref(false)
-  const showTagFilters = ref(false)
-  const tagGroups = ref<TagGroup[]>([])
-  const tags = ref<Tag[]>([])
-  const hasFilterOptionsLoadFailure = ref(false)
-  const filterOptionsLoadFailedWithStaleData = ref(false)
 
   const itemsPerPageOptions = [
     { label: '12', value: 12 },
@@ -436,23 +418,11 @@ export const useGamesView = ({
     return parseRouteBoolean(route.query.favorite) === true
   })
 
-  const selectedTagIds = computed(() => parseRouteTagIds(route.query.tag))
-
-  const filterableTagGroups = computed(() =>
-    [...tagGroups.value]
-      .filter((group) => group.is_filterable)
-      .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id),
-  )
-
   const hasActiveFilters = computed(() => hasGamesActiveFilters(route.query))
 
   const pageTitle = computed(() => {
     if (filterFavorites.value) return '收藏的游戏'
     return '所有游戏'
-  })
-
-  const tagLabelMap = computed<Record<string, string>>(() => {
-    return Object.fromEntries(tags.value.map((item) => [String(item.id), item.name]))
   })
 
   const updateRoute = (newParams: LocationQueryRaw) => {
@@ -627,83 +597,9 @@ export const useGamesView = ({
     router.push({ name: 'games' })
   }
 
-  const getTagsForGroup = (groupId: number) => {
-    return tags.value
-      .filter((item) => item.group_id === groupId && item.is_active)
-      .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)
-  }
-
-  const getSelectedTagIdsForGroup = (groupId: number) => {
-    const values = selectedTagIds.value.filter((tagId) => {
-      const tag = tags.value.find((item) => item.id === tagId)
-      return tag?.group_id === groupId
-    })
-    const group = tagGroups.value.find((item) => item.id === groupId)
-    return group?.allow_multiple ? values : (values[0] ?? undefined)
-  }
-
-  const updateSelectedTagsForGroup = (
-    groupId: number,
-    value: number | number[] | string | string[] | undefined,
-  ) => {
-    const nextGroupValues = (
-      Array.isArray(value)
-        ? value
-        : value === undefined || value === null || value === ''
-          ? []
-          : [value]
-    )
-      .map((item) => Number(item))
-      .filter((item) => Number.isInteger(item) && item > 0)
-
-    const nextTagIds = selectedTagIds.value.filter((tagId) => {
-      const tag = tags.value.find((item) => item.id === tagId)
-      return tag?.group_id !== groupId
-    })
-
-    nextTagIds.push(...nextGroupValues)
-    updateRoute({ tag: nextTagIds.length > 0 ? nextTagIds.map(String) : undefined })
-  }
-
-  const removeTagFilter = (tagId: number) => {
-    const nextTagIds = selectedTagIds.value.filter((value) => value !== tagId)
-    updateRoute({ tag: nextTagIds.length > 0 ? nextTagIds.map(String) : undefined })
-  }
-
-  const handleTagGroupSelectionChange = (
-    groupId: number,
-    value: number | number[] | string | string[] | undefined,
-  ) => {
-    updateSelectedTagsForGroup(groupId, value)
-  }
-
-  const loadFilterOptions = async () => {
-    hasFilterOptionsLoadFailure.value = false
-    filterOptionsLoadFailedWithStaleData.value = false
-    try {
-      const [loadedGroups, loadedTags] = await Promise.all([
-        tagsService.getTagGroups(),
-        tagsService.getTags({ active: true }),
-      ])
-      tagGroups.value = loadedGroups
-      tags.value = loadedTags
-    } catch (error) {
-      // 2026-04-09: tag filter metadata failures must not masquerade as either
-      // "no filterable tags" or freshly loaded filter options from the current request.
-      if (tagGroups.value.length > 0 || tags.value.length > 0) {
-        filterOptionsLoadFailedWithStaleData.value = true
-      } else {
-        hasFilterOptionsLoadFailure.value = true
-      }
-      console.error('Failed to load tags:', error)
-      uiStore.addAlert('加载标签筛选失败', 'error')
-    }
-  }
-
   onMounted(async () => {
     viewMode.value = uiStore.gamesViewMode
 
-    await loadFilterOptions()
     const routeWasNormalized = normalizeRouteSortQuery()
     if (routeWasNormalized) {
       return
@@ -714,7 +610,6 @@ export const useGamesView = ({
   })
 
   onActivated(async () => {
-    await loadFilterOptions()
     await loadGames()
   })
 
@@ -753,33 +648,23 @@ export const useGamesView = ({
     currentPage,
     addGameSubmitting,
     filterFavorites,
-    filterableTagGroups,
     games,
-    getSelectedTagIdsForGroup,
-    getTagsForGroup,
     handleAddGame,
     handleAddGameSubmit,
     handleDelete,
     handleSearch,
-    handleTagGroupSelectionChange,
     hasActiveFilters,
     hasLoadFailure,
-    hasFilterOptionsLoadFailure,
     isLoading,
     itemsPerPage,
     itemsPerPageOptions,
     loadGames,
     pageTitle,
     pagination,
-    filterOptionsLoadFailedWithStaleData,
-    removeTagFilter,
     searchQuery,
-    selectedTagIds,
     showAddModal,
-    showTagFilters,
     sortBy,
     sortOptions,
-    tagLabelMap,
     toggleFavorite,
     totalPages,
     updateRoute,

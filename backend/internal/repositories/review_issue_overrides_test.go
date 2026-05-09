@@ -3,7 +3,7 @@ package repositories
 import "testing"
 
 func TestReviewIssueOverrideRepositoryListFiltersAndSortsResults(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewReviewIssueOverrideRepository(db)
@@ -47,7 +47,7 @@ func TestReviewIssueOverrideRepositoryListFiltersAndSortsResults(t *testing.T) {
 }
 
 func TestReviewIssueOverrideRepositoryUpsertUpdatesExistingRow(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewReviewIssueOverrideRepository(db)
@@ -75,7 +75,7 @@ func TestReviewIssueOverrideRepositoryUpsertUpdatesExistingRow(t *testing.T) {
 }
 
 func TestReviewIssueOverrideRepositoryDeleteRemovesExistingRow(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewReviewIssueOverrideRepository(db)
@@ -100,7 +100,7 @@ func TestReviewIssueOverrideRepositoryDeleteRemovesExistingRow(t *testing.T) {
 }
 
 func TestReviewIssueOverrideRepositoryListTreatsEmptySliceAsUnfiltered(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewReviewIssueOverrideRepository(db)

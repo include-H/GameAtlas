@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/hao/game/internal/domain"
-	"github.com/hao/game/internal/repositories"
 )
 
 // normalizeGameCoreInput trims aggregate-edit core fields before validation.
@@ -48,23 +47,13 @@ func validateAndTrimGameCreateInput(input domain.GameCreateInput) (domain.GameCr
 	return input, nil
 }
 
-func validateAndTrimGameAggregateCoreUpdateInput(input domain.GameAggregateCoreUpdateInput, tagsRepo *repositories.TagsRepository) (domain.GameAggregateCoreUpdateInput, error) {
+func validateAndTrimGameAggregateCoreUpdateInput(input domain.GameAggregateCoreUpdateInput) (domain.GameAggregateCoreUpdateInput, error) {
 	input.GameCoreInput = normalizeGameCoreInput(input.GameCoreInput)
 	if err := validateGameCoreInput(input.GameCoreInput); err != nil {
 		return domain.GameAggregateCoreUpdateInput{}, err
 	}
 	input.DeveloperIDs = uniqueIDs(input.DeveloperIDs)
 	input.PublisherIDs = uniqueIDs(input.PublisherIDs)
-	input.TagIDs = uniqueIDs(input.TagIDs)
-	if input.TagIDs == nil {
-		input.TagIDs = []int64{}
-	}
-
-	tagIDs, err := tagsRepo.ValidateTagSelection(input.TagIDs)
-	if err != nil {
-		return domain.GameAggregateCoreUpdateInput{}, ErrValidation
-	}
-	input.TagIDs = tagIDs
 
 	return input, nil
 }

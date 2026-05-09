@@ -6,7 +6,6 @@ import {
   type EditGameForm,
 } from '@/composables/edit-game-form'
 import { seriesService } from '@/services/series.service'
-import tagsService from '@/services/tags.service'
 import { developersService } from '@/services/developers.service'
 import { publishersService } from '@/services/publishers.service'
 import type {
@@ -15,20 +14,15 @@ import type {
   Publisher,
   ScreenshotItem,
   Series,
-  Tag,
-  TagGroup,
   VideoAssetItem,
 } from '@/services/types'
 
 interface UseEditGameFormBootstrapOptions {
   form: Ref<EditGameForm>
   seriesOptions: Ref<Series[]>
-  tagGroups: Ref<TagGroup[]>
-  tagOptions: Ref<Tag[]>
   developerOptions: Ref<Developer[]>
   publisherOptions: Ref<Publisher[]>
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
-  resetTagSelectionState: () => void
   createEditableScreenshot: (asset: ScreenshotItem | string, index: number) => EditGameEditableScreenshot
   createEditableVideo: (asset: VideoAssetItem | string) => EditGameEditableVideo
 }
@@ -64,7 +58,6 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
       publisher_ids: game.publishers.map((item) => item.id),
       release_date: game.release_date || undefined,
       series_id: game.series?.id ?? null,
-      tag_ids: game.tags.map((item) => item.id),
       summary: game.summary || '',
       cover_image: game.cover_image || '',
       banner_image: game.banner_image || '',
@@ -76,7 +69,6 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
       ),
       file_paths: filePaths,
     }
-    options.resetTagSelectionState()
   }
 
   const resetSeriesOptionsForGame = (game?: AdminGameDetail | null) => {
@@ -89,23 +81,6 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
 
   const resetPublisherOptionsForGame = (game?: AdminGameDetail | null) => {
     options.publisherOptions.value = game?.publishers ? [...game.publishers] : []
-  }
-
-  const resetTagOptionsForGame = (game?: AdminGameDetail | null) => {
-    options.tagGroups.value = game?.tag_groups
-      ? game.tag_groups.map((group, index) => ({
-        id: group.id,
-        key: group.key,
-        name: group.name,
-        description: null,
-        sort_order: index,
-        allow_multiple: group.allow_multiple,
-        is_filterable: group.is_filterable,
-        created_at: '',
-        updated_at: '',
-      }))
-      : []
-    options.tagOptions.value = game?.tags ? [...game.tags] : []
   }
 
   const initializeOptions = async (currentGame?: AdminGameDetail | null) => {
@@ -156,24 +131,6 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
     } catch (error) {
       resetPublisherOptionsForGame(currentGame)
       handleInitializeOptionsError('发行商', error)
-    }
-
-    try {
-      const [loadedGroups, loadedTags] = await Promise.all([
-        tagsService.getTagGroups(),
-        tagsService.getTags({ active: true }),
-      ])
-      options.tagGroups.value = loadedGroups
-      const currentGameTags = currentGame?.tags || []
-      options.tagOptions.value = [...loadedTags]
-      for (const tag of currentGameTags) {
-        if (!options.tagOptions.value.find((item) => item.id === tag.id)) {
-          options.tagOptions.value.push(tag)
-        }
-      }
-    } catch (error) {
-      resetTagOptionsForGame(currentGame)
-      handleInitializeOptionsError('标签', error)
     }
   }
 

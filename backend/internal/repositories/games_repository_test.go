@@ -9,7 +9,7 @@ import (
 )
 
 func TestGamesRepositoryUpdateAggregateReplacesRelationsAndSeries(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
@@ -26,17 +26,12 @@ func TestGamesRepositoryUpdateAggregateReplacesRelationsAndSeries(t *testing.T) 
 	publisherID := insertRepositoryPublisher(t, db, "Repo Pub", "repo-pub")
 	linkRepositoryGamePublisher(t, db, gameID, publisherID, 0)
 
-	tagGroupID := insertRepositoryTagGroup(t, db, "repo-aggregate-preserve", "Repo Aggregate Preserve", true, true)
-	tagID := insertRepositoryTag(t, db, tagGroupID, "Repo Tag", "repo-tag", true)
-	linkRepositoryGameTag(t, db, gameID, tagID, 0)
-
 	if _, err := repo.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
 			GameCoreInput: domain.GameCoreInput{Title: "Repo Aggregate Preserve Updated"},
 			SeriesID:      nil,
 			DeveloperIDs:  []int64{},
 			PublisherIDs:  []int64{},
-			TagIDs:        []int64{},
 		},
 	}); err != nil {
 		t.Fatalf("UpdateAggregate returned error: %v", err)
@@ -65,18 +60,10 @@ func TestGamesRepositoryUpdateAggregateReplacesRelationsAndSeries(t *testing.T) 
 	if len(publishers) != 0 {
 		t.Fatalf("publishers = %#v, want cleared publishers", publishers)
 	}
-
-	tags, err := NewTagsRepository(db).ListByGameID(gameID)
-	if err != nil {
-		t.Fatalf("ListByGameID returned error: %v", err)
-	}
-	if len(tags) != 0 {
-		t.Fatalf("tags = %#v, want cleared tags", tags)
-	}
 }
 
 func TestGamesRepositoryUpdateAggregateClearsPresentRelationsAndSeries(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
@@ -96,7 +83,6 @@ func TestGamesRepositoryUpdateAggregateClearsPresentRelationsAndSeries(t *testin
 			SeriesID:      nil,
 			DeveloperIDs:  []int64{},
 			PublisherIDs:  []int64{},
-			TagIDs:        []int64{},
 		},
 	}); err != nil {
 		t.Fatalf("UpdateAggregate returned error: %v", err)
@@ -120,7 +106,7 @@ func TestGamesRepositoryUpdateAggregateClearsPresentRelationsAndSeries(t *testin
 }
 
 func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
@@ -208,7 +194,7 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 }
 
 func TestGamesRepositoryStatsIncludesPrivateFavoritesForAdmin(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
@@ -235,7 +221,7 @@ func TestGamesRepositoryStatsIncludesPrivateFavoritesForAdmin(t *testing.T) {
 }
 
 func TestGameCatalogRepositoryListFiltersFavoritesAndExposesFavoriteState(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
@@ -303,48 +289,8 @@ func TestGameCatalogRepositoryListFiltersFavoritesAndExposesFavoriteState(t *tes
 	}
 }
 
-func TestGameCatalogRepositoryListAppliesGroupedTagFilters(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	repo := NewGamesRepository(db)
-	catalogRepo := NewGameCatalogRepository(repo)
-	genreGroupID := insertRepositoryTagGroup(t, db, "repo-genre", "Repo Genre", true, true)
-	themeGroupID := insertRepositoryTagGroup(t, db, "repo-theme", "Repo Theme", true, true)
-	actionID := insertRepositoryTag(t, db, genreGroupID, "Action", "action", true)
-	scifiID := insertRepositoryTag(t, db, themeGroupID, "Sci-Fi", "scifi", true)
-
-	matchingID := insertRepositoryGame(t, db, "list-match", "List Match", "public")
-	nonMatchingThemeID := insertRepositoryGame(t, db, "list-theme", "List Theme", "public")
-	privateMatchingID := insertRepositoryGame(t, db, "list-private", "List Private", "private")
-
-	linkRepositoryGameTag(t, db, matchingID, actionID, 0)
-	linkRepositoryGameTag(t, db, matchingID, scifiID, 1)
-	linkRepositoryGameTag(t, db, nonMatchingThemeID, actionID, 0)
-	linkRepositoryGameTag(t, db, privateMatchingID, actionID, 0)
-	linkRepositoryGameTag(t, db, privateMatchingID, scifiID, 1)
-
-	games, total, err := catalogRepo.List(domain.GamesListParams{
-		Page:   1,
-		Limit:  10,
-		TagIDs: []int64{scifiID, actionID},
-		Sort:   "updated_at",
-		Order:  "desc",
-	})
-	if err != nil {
-		t.Fatalf("List returned error: %v", err)
-	}
-
-	if total != 1 {
-		t.Fatalf("total = %d, want 1", total)
-	}
-	if len(games) != 1 || games[0].ID != matchingID {
-		t.Fatalf("games = %+v, want only matching public game", games)
-	}
-}
-
 func TestGameCatalogRepositoryListPendingOnlyFiltersResolvedAndIgnoredIssues(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
@@ -454,7 +400,7 @@ func TestGameCatalogRepositoryListPendingOnlyFiltersResolvedAndIgnoredIssues(t *
 }
 
 func TestGameCatalogRepositoryListPendingOnlySupportsNativeSortAndFilters(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
@@ -503,7 +449,7 @@ func TestGameCatalogRepositoryListPendingOnlySupportsNativeSortAndFilters(t *tes
 }
 
 func TestGameCatalogRepositoryCountPendingGroupsUsesQueueFiltersButIgnoresIssueSelector(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
@@ -546,7 +492,7 @@ func TestGameCatalogRepositoryCountPendingGroupsUsesQueueFiltersButIgnoresIssueS
 }
 
 func TestGamesRepositoryListTimelineAppliesVisibilityAndCursor(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
@@ -746,17 +692,6 @@ func linkRepositoryGamePublisher(t *testing.T, db *sqlx.DB, gameID int64, publis
 		VALUES (?, ?, ?)
 	`, gameID, publisherID, sortOrder); err != nil {
 		t.Fatalf("link repository game publisher: %v", err)
-	}
-}
-
-func linkRepositoryGameTag(t *testing.T, db *sqlx.DB, gameID int64, tagID int64, sortOrder int) {
-	t.Helper()
-
-	if _, err := db.Exec(`
-		INSERT INTO game_tags (game_id, tag_id, sort_order)
-		VALUES (?, ?, ?)
-	`, gameID, tagID, sortOrder); err != nil {
-		t.Fatalf("link repository game tag: %v", err)
 	}
 }
 

@@ -88,6 +88,25 @@ func TestSteamServiceSearchMergesLocalesAndDedupesResults(t *testing.T) {
 	}
 }
 
+func TestSteamServiceSearchReturnsErrorWhenAllLocalesFail(t *testing.T) {
+	service := &SteamService{
+		client: &http.Client{Transport: steamRoundTripper(func(req *http.Request) (*http.Response, error) {
+			return steamTextResponse(http.StatusBadGateway, ""), nil
+		})},
+	}
+
+	results, err := service.Search("portal", "")
+	if err == nil {
+		t.Fatalf("Search error = nil, want failure")
+	}
+	if results != nil {
+		t.Fatalf("results = %#v, want nil on total failure", results)
+	}
+	if err.Error() != "steam search failed" {
+		t.Fatalf("error = %q, want steam search failed", err.Error())
+	}
+}
+
 func TestSteamServicePreviewAssetsMergesFallbackDataAndStorePageContent(t *testing.T) {
 	service := &SteamService{
 		client: &http.Client{Transport: steamRoundTripper(func(req *http.Request) (*http.Response, error) {
@@ -179,25 +198,6 @@ func TestSteamServicePreviewAssetsUsesEnglishFallbackWhenPrimaryMissing(t *testi
 	}
 	if len(preview.ScreenshotURLs) != 1 || preview.ScreenshotURLs[0] != "https://cdn.example.com/fallback-shot.jpg" {
 		t.Fatalf("ScreenshotURLs = %#v, want english fallback screenshot", preview.ScreenshotURLs)
-	}
-}
-
-func TestSteamServiceSearchReturnsErrorWhenAllLocalesFail(t *testing.T) {
-	service := &SteamService{
-		client: &http.Client{Transport: steamRoundTripper(func(req *http.Request) (*http.Response, error) {
-			return steamTextResponse(http.StatusBadGateway, ""), nil
-		})},
-	}
-
-	results, err := service.Search("portal", "")
-	if err == nil {
-		t.Fatalf("Search error = nil, want failure")
-	}
-	if results != nil {
-		t.Fatalf("results = %#v, want nil on total failure", results)
-	}
-	if err.Error() != "steam search failed" {
-		t.Fatalf("error = %q, want steam search failed", err.Error())
 	}
 }
 

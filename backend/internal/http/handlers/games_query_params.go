@@ -32,10 +32,6 @@ func decodeGamesListParams(c *gin.Context) (domain.GamesListParams, bool) {
 	if !ok {
 		return domain.GamesListParams{}, false
 	}
-	tagIDs, ok := parseGamesListInt64List(c, "tag")
-	if !ok {
-		return domain.GamesListParams{}, false
-	}
 	pendingRecentDays, ok := parseGamesListIntQuery(c, "pending_recent_days", 0)
 	if !ok {
 		return domain.GamesListParams{}, false
@@ -50,7 +46,6 @@ func decodeGamesListParams(c *gin.Context) (domain.GamesListParams, bool) {
 		Limit:             limit,
 		Search:            c.Query("search"),
 		SeriesID:          seriesID,
-		TagIDs:            tagIDs,
 		PendingIssue:      strings.TrimSpace(c.Query("pending_issue")),
 		PendingRecentDays: pendingRecentDays,
 		Sort:              strings.TrimSpace(c.Query("sort")),
@@ -169,24 +164,6 @@ func writeGamesTimelineQueryError(c *gin.Context, key string) {
 		// 2026-05-09: 统一为中文错误信息
 		"error":   "无效的时间线查询参数: " + key,
 	})
-}
-
-func parseGamesListInt64List(c *gin.Context, key string) ([]int64, bool) {
-	values := c.QueryArray(key)
-	if len(values) == 0 {
-		return []int64{}, true
-	}
-
-	result := make([]int64, 0, len(values))
-	for _, raw := range values {
-		value, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || value <= 0 {
-			writeGamesListQueryError(c, key)
-			return nil, false
-		}
-		result = append(result, value)
-	}
-	return result, true
 }
 
 func parseGamesListIntQuery(c *gin.Context, key string, fallback int) (int, bool) {

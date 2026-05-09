@@ -70,4 +70,40 @@ describe('proxySteamAssetUrl', () => {
     expect(result).not.toHaveProperty('libraryHero')
     expect(result).not.toHaveProperty('background')
   })
+
+  it('handles null screenshot_urls, developers, and publishers from store-page fallback', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.com/base/')
+    getMock.mockResolvedValue({
+      data: {
+        name: 'Store Only Game',
+        description: 'scraped desc',
+        release_date: '',
+        developers: null,
+        publishers: null,
+        cover_url: null,
+        banner_url: null,
+        screenshot_urls: null,
+      },
+    })
+
+    const steamService = (await import('./steam.service')).default
+    const result = await steamService.getGameDetails('696360')
+
+    expect(result.name).toBe('Store Only Game')
+    expect(result.screenshots).toEqual([])
+    expect(result.developers).toEqual([])
+    expect(result.publishers).toEqual([])
+    expect(result.coverImage).toBe('')
+    expect(result.bannerImage).toBeUndefined()
+  })
+
+  it('sends search query to the search endpoint', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.com/base/')
+    getMock.mockResolvedValue({ data: [] })
+
+    const steamService = (await import('./steam.service')).default
+    await steamService.searchGames('test')
+
+    expect(getMock).toHaveBeenCalledWith('/steam/search', { params: { q: 'test' } })
+  })
 })

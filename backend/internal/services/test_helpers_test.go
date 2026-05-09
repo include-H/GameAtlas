@@ -66,74 +66,6 @@ func insertServicesGameAsset(t *testing.T, db *sqlx.DB, gameID int64, assetUID s
 	return id
 }
 
-func insertServicesTagGroup(t *testing.T, db *sqlx.DB, key string, name string) int64 {
-	t.Helper()
-
-	result, err := db.Exec(`
-		INSERT INTO tag_groups (key, name)
-		VALUES (?, ?)
-	`, key, name)
-	if err != nil {
-		t.Fatalf("insert test tag group: %v", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		t.Fatalf("LastInsertId returned error: %v", err)
-	}
-
-	return id
-}
-
-func insertServicesTagGroupWithOptions(t *testing.T, db *sqlx.DB, key string, name string, allowMultiple bool, isFilterable bool) int64 {
-	t.Helper()
-
-	result, err := db.Exec(`
-		INSERT INTO tag_groups (key, name, allow_multiple, is_filterable)
-		VALUES (?, ?, ?, ?)
-	`, key, name, allowMultiple, isFilterable)
-	if err != nil {
-		t.Fatalf("insert test tag group with options: %v", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		t.Fatalf("LastInsertId returned error: %v", err)
-	}
-
-	return id
-}
-
-func insertServicesTag(t *testing.T, db *sqlx.DB, groupID int64, name string, slug string) int64 {
-	t.Helper()
-
-	result, err := db.Exec(`
-		INSERT INTO tags (group_id, name, slug)
-		VALUES (?, ?, ?)
-	`, groupID, name, slug)
-	if err != nil {
-		t.Fatalf("insert test tag: %v", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		t.Fatalf("LastInsertId returned error: %v", err)
-	}
-
-	return id
-}
-
-func linkServicesGameTag(t *testing.T, db *sqlx.DB, gameID int64, tagID int64, sortOrder int) {
-	t.Helper()
-
-	if _, err := db.Exec(`
-		INSERT INTO game_tags (game_id, tag_id, sort_order)
-		VALUES (?, ?, ?)
-	`, gameID, tagID, sortOrder); err != nil {
-		t.Fatalf("link test game tag: %v", err)
-	}
-}
-
 func insertServicesGameFile(t *testing.T, db *sqlx.DB, gameID int64, path string, sortOrder int) int64 {
 	t.Helper()
 
@@ -174,7 +106,6 @@ func newServicesDetailService(db *sqlx.DB) *GameDetailService {
 	return NewGameDetailService(
 		repositories.NewGameDetailRepository(gamesRepo),
 		repositories.NewGameFilesRepository(db),
-		repositories.NewTagsRepository(db),
 		repositories.NewReviewIssueOverrideRepository(db),
 	)
 }
@@ -185,7 +116,6 @@ func newServicesAggregateService(db *sqlx.DB, cfg config.Config) *GameAggregateS
 		cfg,
 		gamesRepo,
 		repositories.NewMetadataRepository(db),
-		repositories.NewTagsRepository(db),
 	)
 }
 

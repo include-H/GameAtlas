@@ -25,41 +25,6 @@ func emptyMetadata(items []domain.MetadataItem) []domain.MetadataItem {
 	return items
 }
 
-func emptyTags(items []domain.Tag) []domain.Tag {
-	if items == nil {
-		return []domain.Tag{}
-	}
-	return items
-}
-
-func groupGameTags(tags []domain.Tag) []domain.GameTagGroup {
-	if len(tags) == 0 {
-		return []domain.GameTagGroup{}
-	}
-
-	groups := make([]domain.GameTagGroup, 0)
-	indexByGroupID := map[int64]int{}
-
-	for _, tag := range tags {
-		index, ok := indexByGroupID[tag.GroupID]
-		if !ok {
-			groups = append(groups, domain.GameTagGroup{
-				ID:            tag.GroupID,
-				Key:           tag.GroupKey,
-				Name:          tag.GroupName,
-				AllowMultiple: tag.GroupAllowMultiple,
-				IsFilterable:  tag.GroupIsFilterable,
-				Tags:          []domain.Tag{},
-			})
-			index = len(groups) - 1
-			indexByGroupID[tag.GroupID] = index
-		}
-		groups[index].Tags = append(groups[index].Tags, tag)
-	}
-
-	return groups
-}
-
 func uniqueIDs(ids []int64) []int64 {
 	if len(ids) == 0 {
 		return []int64{}

@@ -88,11 +88,6 @@ function buildGamesQueryParams(params?: {
   if (typeof params?.query?.pending_recent_days === 'number' && params.query.pending_recent_days > 0) {
     queryParams.append('pending_recent_days', String(params.query.pending_recent_days))
   }
-  if (params?.query?.tag?.length) {
-    params.query.tag.forEach((tagId) => {
-      queryParams.append('tag', String(tagId))
-    })
-  }
   if (params?.sort) {
     if (typeof params.sort.field === 'string' && params.sort.field.length > 0) {
       queryParams.append('sort', params.sort.field)
@@ -145,8 +140,6 @@ function normalizeGameDetail(item: GameDetailDto): GameDetail {
     series: item.series,
     developers: item.developers,
     publishers: item.publishers,
-    tags: item.tags,
-    tag_groups: item.tag_groups,
   }
 }
 

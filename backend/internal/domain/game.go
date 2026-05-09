@@ -112,73 +112,11 @@ type MetadataWriteInput struct {
 	SortOrder *int
 }
 
-type TagGroup struct {
-	ID            int64   `db:"id"`
-	Key           string  `db:"key"`
-	Name          string  `db:"name"`
-	Description   *string `db:"description"`
-	SortOrder     int     `db:"sort_order"`
-	AllowMultiple bool    `db:"allow_multiple"`
-	IsFilterable  bool    `db:"is_filterable"`
-	CreatedAt     string  `db:"created_at"`
-	UpdatedAt     string  `db:"updated_at"`
-}
-
-type Tag struct {
-	ID                 int64  `db:"id"`
-	GroupID            int64  `db:"group_id"`
-	GroupKey           string `db:"group_key"`
-	GroupName          string `db:"group_name"`
-	GroupAllowMultiple bool   `db:"group_allow_multiple"`
-	GroupIsFilterable  bool   `db:"group_is_filterable"`
-	Name               string `db:"name"`
-	Slug               string `db:"slug"`
-	ParentID           *int64 `db:"parent_id"`
-	SortOrder          int    `db:"sort_order"`
-	IsActive           bool   `db:"is_active"`
-	CreatedAt          string `db:"created_at"`
-	UpdatedAt          string `db:"updated_at"`
-}
-
-type GameTagGroup struct {
-	ID            int64
-	Key           string
-	Name          string
-	AllowMultiple bool
-	IsFilterable  bool
-	Tags          []Tag
-}
-
-type TagGroupWriteInput struct {
-	Key           string
-	Name          string
-	Description   *string
-	SortOrder     *int
-	AllowMultiple *bool
-	IsFilterable  *bool
-}
-
-type TagWriteInput struct {
-	GroupID   int64
-	Name      string
-	Slug      *string
-	ParentID  *int64
-	SortOrder *int
-	IsActive  *bool
-}
-
-type TagsListParams struct {
-	GroupID  int64
-	GroupKey string
-	Active   *bool
-}
-
 type GamesListParams struct {
 	Page                  int
 	Limit                 int
 	Search                string
 	SeriesID              int64
-	TagIDs                []int64
 	PendingOnly           bool
 	PendingIncludeIgnored bool
 	PendingIssue          string
@@ -262,7 +200,6 @@ type GameAggregateCoreUpdateInput struct {
 	SeriesID     *int64
 	DeveloperIDs []int64
 	PublisherIDs []int64
-	TagIDs       []int64
 }
 
 type GameFileWriteInput struct {

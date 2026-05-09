@@ -1,6 +1,27 @@
 package repositories
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+
+	"github.com/hao/game/internal/db"
+	"github.com/jmoiron/sqlx"
+)
+
+func openRepositoryTestDB(t *testing.T) *sqlx.DB {
+	t.Helper()
+
+	testDB, err := db.OpenSQLite(filepath.Join(t.TempDir(), "app.db"))
+	if err != nil {
+		t.Fatalf("OpenSQLite returned error: %v", err)
+	}
+	if err := db.RunMigrations(testDB); err != nil {
+		_ = testDB.Close()
+		t.Fatalf("RunMigrations returned error: %v", err)
+	}
+
+	return testDB
+}
 
 func TestBuildTitleSortKey(t *testing.T) {
 	alt := "塞尔达传说"

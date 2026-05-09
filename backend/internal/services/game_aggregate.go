@@ -13,7 +13,6 @@ import (
 type GameAggregateService struct {
 	gamesRepo             *repositories.GamesRepository
 	metadataRepo          *repositories.MetadataRepository
-	tagsRepo              *repositories.TagsRepository
 	assetCleanupTasksRepo *repositories.AssetCleanupTasksRepository
 	fileGuard             *files.Guard
 	assetStore            *files.AssetStore
@@ -26,12 +25,10 @@ func NewGameAggregateService(
 	cfg config.Config,
 	gamesRepo *repositories.GamesRepository,
 	metadataRepo *repositories.MetadataRepository,
-	tagsRepo *repositories.TagsRepository,
 ) *GameAggregateService {
 	return &GameAggregateService{
 		gamesRepo:             gamesRepo,
 		metadataRepo:          metadataRepo,
-		tagsRepo:              tagsRepo,
 		assetCleanupTasksRepo: repositories.NewAssetCleanupTasksRepository(gamesRepo.DB()),
 		fileGuard:             files.NewGuard(cfg.PrimaryROMRoot),
 		assetStore:            files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
@@ -58,7 +55,7 @@ func (s *GameAggregateService) Create(input domain.GameCreateInput) (*domain.Gam
 
 // Update applies aggregate changes, then performs follow-up metadata and asset cleanup work.
 func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdateInput) (*domain.Game, []string, error) {
-	trimmedInput, err := validateAndTrimGameAggregateCoreUpdateInput(input.Game, s.tagsRepo)
+	trimmedInput, err := validateAndTrimGameAggregateCoreUpdateInput(input.Game)
 	if err != nil {
 		return nil, nil, err
 	}

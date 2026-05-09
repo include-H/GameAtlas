@@ -154,8 +154,6 @@ func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDe
 		Series:        series,
 		Developers:    toMetadataResponses(detail.Developers),
 		Publishers:    toMetadataResponses(detail.Publishers),
-		Tags:          toTagResponses(detail.Tags),
-		TagGroups:     toGameTagGroupResponses(detail.TagGroups),
 		Files:         toGameFileResponses(detail.Files, includePaths),
 		IsFavorite:    detail.Game.IsFavorite,
 		PendingIssues: toPendingIssueEvaluationResponse(detail.PendingIssues),
@@ -207,52 +205,6 @@ func toGameFileResponses(items []domain.GameFile, includePaths bool) []gameFileR
 		result = append(result, response)
 	}
 	return result
-}
-
-func toTagResponses(items []domain.Tag) []tagResponse {
-	result := make([]tagResponse, 0, len(items))
-	for _, item := range items {
-		result = append(result, toTagResponse(item))
-	}
-	return result
-}
-
-func toTagResponse(item domain.Tag) tagResponse {
-	return tagResponse{
-		ID:        item.ID,
-		GroupID:   item.GroupID,
-		GroupKey:  item.GroupKey,
-		GroupName: item.GroupName,
-		Name:      item.Name,
-		Slug:      item.Slug,
-		ParentID:  item.ParentID,
-		SortOrder: item.SortOrder,
-		IsActive:  item.IsActive,
-		CreatedAt: item.CreatedAt,
-		UpdatedAt: item.UpdatedAt,
-	}
-}
-
-func toTagGroupResponses(items []domain.TagGroup) []tagGroupResponse {
-	result := make([]tagGroupResponse, 0, len(items))
-	for _, item := range items {
-		result = append(result, toTagGroupResponse(item))
-	}
-	return result
-}
-
-func toTagGroupResponse(item domain.TagGroup) tagGroupResponse {
-	return tagGroupResponse{
-		ID:            item.ID,
-		Key:           item.Key,
-		Name:          item.Name,
-		Description:   item.Description,
-		SortOrder:     item.SortOrder,
-		AllowMultiple: item.AllowMultiple,
-		IsFilterable:  item.IsFilterable,
-		CreatedAt:     item.CreatedAt,
-		UpdatedAt:     item.UpdatedAt,
-	}
 }
 
 func toReviewIssueOverrideResponses(items []domain.ReviewIssueOverride) []reviewIssueOverrideResponse {
@@ -389,17 +341,3 @@ func toPendingIssueCountSummaryResponse(item *domain.PendingIssueCountSummary) *
 	}
 }
 
-func toGameTagGroupResponses(items []domain.GameTagGroup) []gameTagGroupResponse {
-	result := make([]gameTagGroupResponse, 0, len(items))
-	for _, item := range items {
-		result = append(result, gameTagGroupResponse{
-			ID:            item.ID,
-			Key:           item.Key,
-			Name:          item.Name,
-			AllowMultiple: item.AllowMultiple,
-			IsFilterable:  item.IsFilterable,
-			Tags:          toTagResponses(item.Tags),
-		})
-	}
-	return result
-}

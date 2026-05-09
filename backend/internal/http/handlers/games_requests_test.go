@@ -10,8 +10,7 @@ func TestGameAggregateUpdateRequestToInputNormalizesOmittedReplacementSlices(t *
 		"game": {
 			"title": "Aggregate Test",
 			"series_id": null,
-			"developer_ids": [],
-			"tag_ids": [3, 3, 9]
+			"developer_ids": []
 		},
 		"assets": {}
 	}`)
@@ -31,9 +30,6 @@ func TestGameAggregateUpdateRequestToInputNormalizesOmittedReplacementSlices(t *
 	}
 	if got := len(input.Game.DeveloperIDs); got != 0 {
 		t.Fatalf("developer_ids len = %d, want 0 for explicit clear", got)
-	}
-	if got := len(input.Game.TagIDs); got != 3 {
-		t.Fatalf("tag_ids len = %d, want decode to stay transport-only before service normalization", got)
 	}
 	if input.Game.PublisherIDs == nil || len(input.Game.PublisherIDs) != 0 {
 		t.Fatalf("publisher_ids = %#v, want empty slice when field is omitted under aggregate replace semantics", input.Game.PublisherIDs)

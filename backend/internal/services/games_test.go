@@ -21,11 +21,6 @@ func TestGamesServiceGetDetailUsesFirstSortedVideoAndGroupsTags(t *testing.T) {
 	insertServicesGameAsset(t, db, gameID, "video-a", "video", "/assets/detail-game/video-a.mp4", 0)
 	insertServicesGameAsset(t, db, gameID, "video-b", "video", "/assets/detail-game/video-b.mp4", 1)
 	insertServicesGameAsset(t, db, gameID, "screen-a", "screenshot", "/assets/detail-game/screen-a.png", 0)
-	groupID := insertServicesTagGroup(t, db, "detail-custom", "Detail Custom")
-	actionID := insertServicesTag(t, db, groupID, "Action", "action")
-	puzzleID := insertServicesTag(t, db, groupID, "Puzzle", "puzzle")
-	linkServicesGameTag(t, db, gameID, actionID, 0)
-	linkServicesGameTag(t, db, gameID, puzzleID, 1)
 	insertServicesGameFile(t, db, gameID, "/roms/detail-game.rom", 0)
 
 	service := newServicesDetailService(db)
@@ -45,68 +40,6 @@ func TestGamesServiceGetDetailUsesFirstSortedVideoAndGroupsTags(t *testing.T) {
 	}
 	if len(detail.Files) != 1 {
 		t.Fatalf("len(Files) = %d, want 1", len(detail.Files))
-	}
-	if len(detail.TagGroups) != 1 {
-		t.Fatalf("len(TagGroups) = %d, want 1", len(detail.TagGroups))
-	}
-	if detail.TagGroups[0].ID != groupID || len(detail.TagGroups[0].Tags) != 2 {
-		t.Fatalf("TagGroups[0] = %#v, want grouped tags", detail.TagGroups[0])
-	}
-	if !detail.TagGroups[0].AllowMultiple {
-		t.Fatalf("TagGroups[0].AllowMultiple = %v, want true", detail.TagGroups[0].AllowMultiple)
-	}
-	if !detail.TagGroups[0].IsFilterable {
-		t.Fatalf("TagGroups[0].IsFilterable = %v, want true", detail.TagGroups[0].IsFilterable)
-	}
-}
-
-func TestGamesServiceGetDetailPreservesTagGroupCapabilities(t *testing.T) {
-	db := openServicesTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	gameID := insertServicesTestGame(t, db, "detail-tag-capabilities", "Detail Tag Capabilities", domain.GameVisibilityPublic)
-	singleSelectGroupID := insertServicesTagGroupWithOptions(t, db, "mode", "Mode", false, true)
-	internalGroupID := insertServicesTagGroupWithOptions(t, db, "internal", "Internal", true, false)
-	storyID := insertServicesTag(t, db, singleSelectGroupID, "Story", "story")
-	curatedID := insertServicesTag(t, db, internalGroupID, "Curated", "curated")
-	linkServicesGameTag(t, db, gameID, storyID, 0)
-	linkServicesGameTag(t, db, gameID, curatedID, 1)
-
-	service := newServicesDetailService(db)
-	detail, err := service.Get(gameID, true)
-	if err != nil {
-		t.Fatalf("GetDetail returned error: %v", err)
-	}
-
-	if len(detail.TagGroups) != 2 {
-		t.Fatalf("len(TagGroups) = %d, want 2", len(detail.TagGroups))
-	}
-
-	groupByID := make(map[int64]domain.GameTagGroup, len(detail.TagGroups))
-	for _, group := range detail.TagGroups {
-		groupByID[group.ID] = group
-	}
-
-	singleSelectGroup, ok := groupByID[singleSelectGroupID]
-	if !ok {
-		t.Fatalf("single-select group %d missing from %#v", singleSelectGroupID, detail.TagGroups)
-	}
-	if singleSelectGroup.AllowMultiple {
-		t.Fatalf("singleSelectGroup.AllowMultiple = %v, want false", singleSelectGroup.AllowMultiple)
-	}
-	if !singleSelectGroup.IsFilterable {
-		t.Fatalf("singleSelectGroup.IsFilterable = %v, want true", singleSelectGroup.IsFilterable)
-	}
-
-	internalGroup, ok := groupByID[internalGroupID]
-	if !ok {
-		t.Fatalf("internal group %d missing from %#v", internalGroupID, detail.TagGroups)
-	}
-	if !internalGroup.AllowMultiple {
-		t.Fatalf("internalGroup.AllowMultiple = %v, want true", internalGroup.AllowMultiple)
-	}
-	if internalGroup.IsFilterable {
-		t.Fatalf("internalGroup.IsFilterable = %v, want false", internalGroup.IsFilterable)
 	}
 }
 
@@ -375,10 +308,6 @@ func TestValidateAndTrimGameCreateInputNormalizesQuickCreateFields(t *testing.T)
 }
 
 func TestValidateAndTrimGameAggregateCoreUpdateInputNormalizesSharedCoreFields(t *testing.T) {
-	db := openServicesTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	tagsRepo := repositories.NewTagsRepository(db)
 	titleAlt := " Alt Patch "
 	summary := "   "
 
@@ -391,8 +320,7 @@ func TestValidateAndTrimGameAggregateCoreUpdateInputNormalizesSharedCoreFields(t
 		},
 		DeveloperIDs: []int64{6, 6},
 		PublisherIDs: []int64{9, 4, 9},
-		TagIDs:       nil,
-	}, tagsRepo)
+	})
 	if err != nil {
 		t.Fatalf("validateAndTrimGameAggregateCoreUpdateInput returned error: %v", err)
 	}
@@ -414,9 +342,6 @@ func TestValidateAndTrimGameAggregateCoreUpdateInputNormalizesSharedCoreFields(t
 	}
 	if len(trimmed.PublisherIDs) != 2 || trimmed.PublisherIDs[0] != 9 || trimmed.PublisherIDs[1] != 4 {
 		t.Fatalf("PublisherIDs = %#v, want deduped [9 4]", trimmed.PublisherIDs)
-	}
-	if len(trimmed.TagIDs) != 0 {
-		t.Fatalf("TagIDs = %#v, want empty slice", trimmed.TagIDs)
 	}
 }
 
@@ -751,13 +676,9 @@ func TestGamesServiceUpdateAggregateReplacesRelationsAndSeries(t *testing.T) {
 		t.Fatalf("link game publisher: %v", err)
 	}
 
-	tagGroupID := insertServicesTagGroup(t, db, "aggregate-preserve", "Aggregate Preserve")
-	tagID := insertServicesTag(t, db, tagGroupID, "RPG", "rpg")
-	linkServicesGameTag(t, db, gameID, tagID, 0)
 	_ = seriesID
 	_ = developerID
 	_ = publisherID
-	_ = tagID
 
 	service := newServicesAggregateService(db, config.Config{})
 
@@ -767,7 +688,6 @@ func TestGamesServiceUpdateAggregateReplacesRelationsAndSeries(t *testing.T) {
 			SeriesID:      nil,
 			DeveloperIDs:  []int64{},
 			PublisherIDs:  []int64{},
-			TagIDs:        []int64{},
 		},
 	})
 	if err != nil {
@@ -799,14 +719,6 @@ func TestGamesServiceUpdateAggregateReplacesRelationsAndSeries(t *testing.T) {
 	}
 	if len(publishers) != 0 {
 		t.Fatalf("publishers = %#v, want cleared publishers", publishers)
-	}
-
-	tags, err := repositories.NewTagsRepository(db).ListByGameID(gameID)
-	if err != nil {
-		t.Fatalf("ListByGameID(tags) returned error: %v", err)
-	}
-	if len(tags) != 0 {
-		t.Fatalf("tags = %#v, want cleared tags", tags)
 	}
 }
 
@@ -848,7 +760,6 @@ func TestGamesServiceUpdateAggregateClearsRelationsAndSeries(t *testing.T) {
 			SeriesID:      nil,
 			DeveloperIDs:  []int64{},
 			PublisherIDs:  []int64{},
-			TagIDs:        []int64{},
 		},
 	})
 	if err != nil {

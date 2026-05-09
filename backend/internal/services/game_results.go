@@ -33,7 +33,5 @@ type GameDetail struct {
 	Series        *domain.MetadataItem
 	Developers    []domain.MetadataItem
 	Publishers    []domain.MetadataItem
-	Tags          []domain.Tag
-	TagGroups     []domain.GameTagGroup
 	Files         []domain.GameFile
 }

@@ -143,17 +143,6 @@
         </a-col>
       </a-row>
 
-      <game-tag-section
-        :tag-groups="tagGroups"
-        :tag-field-values-by-group="tagFieldValuesByGroup"
-        :pending-tag-options-by-group="pendingTagOptionsByGroup"
-        :tag-options-by-group="tagOptionsByGroup"
-        :wiki-content-available="hasParsableWikiContent"
-        :is-preparing-wiki-tag-candidates="isPreparingWikiTagCandidates"
-        @parse-wiki-tags="handleParseWikiTags"
-        @tag-selection-change="handleTagSectionSelectionChange"
-      />
-
       <a-form-item>
         <template #label>
           <div class="summary-label">
@@ -333,15 +322,6 @@
       @remove-video="removePreviewVideo"
     />
 
-    <edit-game-wiki-tag-picker-modal
-      :visible="wikiTagPickerVisible"
-      :candidates="wikiTagCandidates"
-      :is-applying-wiki-tags="isApplyingWikiTags"
-      @update:visible="wikiTagPickerVisible = $event"
-      @group-change="handleWikiTagCandidateGroupChange($event.key, $event.value)"
-      @apply="applySelectedWikiTags"
-    />
-
     <edit-game-wiki-metadata-picker-modal
       :visible="wikiMetadataPickerVisible"
       :candidates="wikiMetadataCandidates"
@@ -358,12 +338,10 @@ import { ref } from 'vue'
 import { useUiStore } from '@/stores/ui'
 import type { AdminGameDetail } from '@/services/types'
 import FileBrowserModal from '@/components/FileBrowserModal.vue'
-import GameTagSection from '@/components/edit-game/GameTagSection.vue'
 import GameFilePathsSection from '@/components/edit-game/GameFilePathsSection.vue'
 import GameMediaSection from '@/components/edit-game/GameMediaSection.vue'
 import EditGameAssetImportModals from '@/components/edit-game/EditGameAssetImportModals.vue'
 import EditGameVideoModal from '@/components/edit-game/EditGameVideoModal.vue'
-import EditGameWikiTagPickerModal from '@/components/edit-game/EditGameWikiTagPickerModal.vue'
 import EditGameWikiMetadataPickerModal from '@/components/edit-game/EditGameWikiMetadataPickerModal.vue'
 import { useEditGameModal } from '@/composables/useEditGameModal'
 
@@ -387,7 +365,6 @@ const isSubmitting = ref(false)
 const {
   addFilePath,
   applySelectedWikiMetadata,
-  applySelectedWikiTags,
   backToBannerGameSearch,
   backToCoverGameSearch,
   backToScreenshotGameSearch,
@@ -422,7 +399,6 @@ const {
   handleDeveloperSearch,
   handleFilePathItemUpdate,
   handleFileSelect,
-  handleParseWikiTags,
   handlePublisherSearch,
   handleScreenshotDragEnd,
   handleScreenshotDragEnter,
@@ -434,21 +410,16 @@ const {
   handleSeriesSearch,
   handleSubmit,
   handleSummarySearchClear,
-  handleTagSectionSelectionChange,
   handleVideoFileChange,
   handleWikiMetadataCandidateSelectionChange,
-  handleWikiTagCandidateGroupChange,
-  hasParsableWikiContent,
   importMetadataFromWiki,
   initialPath,
   isApplyingWikiMetadata,
-  isApplyingWikiTags,
   isDownloadingBanner,
   isDownloadingCover,
   isDownloadingScreenshot,
   isDownloadingSteamScreenshots,
   isPreparingWikiMetadataCandidates,
-  isPreparingWikiTagCandidates,
   isSearchingDevelopers,
   isSearchingPublishers,
   isSearchingSeries,
@@ -463,7 +434,6 @@ const {
   modalWidth,
   openFileBrowser,
   openVideoSelector,
-  pendingTagOptionsByGroup,
   previewVideoSources,
   primaryPreviewVideo,
   releaseDate,
@@ -511,9 +481,6 @@ const {
   steamSummaryPreview,
   steamSummarySearchQuery,
   steamSummarySearchResults,
-  tagGroups,
-  tagOptionsByGroup,
-  tagFieldValuesByGroup,
   toggleSteamScreenshot,
   uploadAction,
   uploadData,
@@ -523,8 +490,6 @@ const {
   visible,
   wikiMetadataCandidates,
   wikiMetadataPickerVisible,
-  wikiTagCandidates,
-  wikiTagPickerVisible,
 } = useEditGameModal({
   props,
   emit,

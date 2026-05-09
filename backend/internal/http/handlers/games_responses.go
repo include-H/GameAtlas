@@ -151,39 +151,11 @@ type gameDetailResponse struct {
 	Series        *metadataItemResponse           `json:"series"`
 	Developers    []metadataItemResponse          `json:"developers"`
 	Publishers    []metadataItemResponse          `json:"publishers"`
-	Tags          []tagResponse                   `json:"tags"`
-	TagGroups     []gameTagGroupResponse          `json:"tag_groups"`
 	Files         []gameFileResponse              `json:"files"`
 	IsFavorite    bool                            `json:"is_favorite"`
 	PendingIssues *pendingIssueEvaluationResponse `json:"pending_issues,omitempty"`
 	CreatedAt     string                          `json:"created_at"`
 	UpdatedAt     string                          `json:"updated_at"`
-}
-
-type tagResponse struct {
-	ID        int64  `json:"id"`
-	GroupID   int64  `json:"group_id"`
-	GroupKey  string `json:"group_key"`
-	GroupName string `json:"group_name"`
-	Name      string `json:"name"`
-	Slug      string `json:"slug"`
-	ParentID  *int64 `json:"parent_id"`
-	SortOrder int    `json:"sort_order"`
-	IsActive  bool   `json:"is_active"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-}
-
-type tagGroupResponse struct {
-	ID            int64   `json:"id"`
-	Key           string  `json:"key"`
-	Name          string  `json:"name"`
-	Description   *string `json:"description"`
-	SortOrder     int     `json:"sort_order"`
-	AllowMultiple bool    `json:"allow_multiple"`
-	IsFilterable  bool    `json:"is_filterable"`
-	CreatedAt     string  `json:"created_at"`
-	UpdatedAt     string  `json:"updated_at"`
 }
 
 type reviewIssueOverrideResponse struct {
@@ -265,11 +237,3 @@ type pendingIssueCatalogResponse struct {
 	Details []pendingIssueDetailDefinitionResponse `json:"details"`
 }
 
-type gameTagGroupResponse struct {
-	ID            int64         `json:"id"`
-	Key           string        `json:"key"`
-	Name          string        `json:"name"`
-	AllowMultiple bool          `json:"allow_multiple"`
-	IsFilterable  bool          `json:"is_filterable"`
-	Tags          []tagResponse `json:"tags"`
-}

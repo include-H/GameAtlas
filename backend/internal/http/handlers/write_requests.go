@@ -8,24 +8,6 @@ type metadataWriteRequest struct {
 	SortOrder *int    `json:"sort_order"`
 }
 
-type tagGroupWriteRequest struct {
-	Key           string  `json:"key"`
-	Name          string  `json:"name"`
-	Description   *string `json:"description"`
-	SortOrder     *int    `json:"sort_order"`
-	AllowMultiple *bool   `json:"allow_multiple"`
-	IsFilterable  *bool   `json:"is_filterable"`
-}
-
-type tagWriteRequest struct {
-	GroupID   int64   `json:"group_id"`
-	Name      string  `json:"name"`
-	Slug      *string `json:"slug"`
-	ParentID  *int64  `json:"parent_id"`
-	SortOrder *int    `json:"sort_order"`
-	IsActive  *bool   `json:"is_active"`
-}
-
 type wikiWriteRequest struct {
 	Content       string  `json:"content"`
 	ChangeSummary *string `json:"change_summary"`
@@ -36,28 +18,6 @@ func (request metadataWriteRequest) toInput() domain.MetadataWriteInput {
 		Name:      request.Name,
 		Slug:      request.Slug,
 		SortOrder: request.SortOrder,
-	}
-}
-
-func (request tagGroupWriteRequest) toInput() domain.TagGroupWriteInput {
-	return domain.TagGroupWriteInput{
-		Key:           request.Key,
-		Name:          request.Name,
-		Description:   request.Description,
-		SortOrder:     request.SortOrder,
-		AllowMultiple: request.AllowMultiple,
-		IsFilterable:  request.IsFilterable,
-	}
-}
-
-func (request tagWriteRequest) toInput() domain.TagWriteInput {
-	return domain.TagWriteInput{
-		GroupID:   request.GroupID,
-		Name:      request.Name,
-		Slug:      request.Slug,
-		ParentID:  request.ParentID,
-		SortOrder: request.SortOrder,
-		IsActive:  request.IsActive,
 	}
 }
 

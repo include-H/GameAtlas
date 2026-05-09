@@ -25,7 +25,6 @@ type gameAggregateCoreUpdateRequest struct {
 	SeriesID     *int64  `json:"series_id"`
 	DeveloperIDs []int64 `json:"developer_ids"`
 	PublisherIDs []int64 `json:"publisher_ids"`
-	TagIDs       []int64 `json:"tag_ids"`
 }
 
 type gameAggregateAssetsRequest struct {
@@ -67,7 +66,6 @@ func (request gameAggregateUpdateRequest) toInput() domain.GameAggregateUpdateIn
 			SeriesID:      request.Game.SeriesID,
 			DeveloperIDs:  emptyInt64Slice(request.Game.DeveloperIDs),
 			PublisherIDs:  emptyInt64Slice(request.Game.PublisherIDs),
-			TagIDs:        emptyInt64Slice(request.Game.TagIDs),
 		},
 		Assets: request.Assets.toDomain(),
 	}
@@ -116,7 +114,7 @@ func (request gameAggregateAssetsRequest) toDomain() domain.GameAggregateAssetsI
 
 func emptyInt64Slice(values []int64) []int64 {
 	// 2026-05-01: normalize omitted JSON arrays to empty slices for aggregate replace semantics.
-	// Missing developer_ids/publisher_ids/tag_ids means "clear this collection" on this endpoint,
+	// Missing developer_ids/publisher_ids means "clear this collection" on this endpoint,
 	// because aggregate updates rewrite the full editable relationship set in one request.
 	if values == nil {
 		return []int64{}

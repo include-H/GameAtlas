@@ -3,7 +3,7 @@ package repositories
 import "testing"
 
 func TestGameFilesRepositoryListByGameIDOrdersBySortOrderThenID(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	gameID := insertRepositoryGame(t, db, "repo-files-order", "Repo Files Order", "public")

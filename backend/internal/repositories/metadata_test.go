@@ -5,7 +5,7 @@ import (
 )
 
 func TestMetadataRepositoryListSeriesGamesBySeriesIDsInitializesEmptyAndFiltersVisibility(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	if _, err := db.Exec(`
@@ -60,7 +60,7 @@ func TestMetadataRepositoryListSeriesGamesBySeriesIDsInitializesEmptyAndFiltersV
 }
 
 func TestMetadataRepositoryDeleteUnusedRemovesOrphansOnly(t *testing.T) {
-	db := openRepositoryTagsTestDB(t)
+	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	if _, err := db.Exec(`

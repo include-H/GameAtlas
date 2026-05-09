@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -172,16 +171,6 @@ func (r *GamesRepository) buildGamesListWhere(params domain.GamesListParams, exc
 		where = append(where, "g.series_id = :series_id")
 		args["series_id"] = params.SeriesID
 	}
-	if len(params.TagIDs) > 0 {
-		tagFilters, tagArgs, err := r.buildTagFilters(params.TagIDs)
-		if err != nil {
-			return nil, nil, fmt.Errorf("build tag filters: %w", err)
-		}
-		where = append(where, tagFilters...)
-		for key, value := range tagArgs {
-			args[key] = value
-		}
-	}
 	if params.FavoriteOnly {
 		// 2026-05-01: FavoriteOnly is intentionally one-way. Transport/service code must
 		// reject favorite=false before reaching the repository; do not reinterpret false
@@ -190,66 +179,6 @@ func (r *GamesRepository) buildGamesListWhere(params domain.GamesListParams, exc
 	}
 
 	return where, args, nil
-}
-
-func (r *GamesRepository) buildTagFilters(tagIDs []int64) ([]string, map[string]any, error) {
-	normalized := uniquePositiveIDs(tagIDs)
-	if len(normalized) == 0 {
-		return nil, map[string]any{}, nil
-	}
-
-	query, queryArgs, err := sqlx.In(`
-		SELECT id, group_id
-		FROM tags
-		WHERE is_active = 1 AND id IN (?)
-	`, normalized)
-	if err != nil {
-		return nil, nil, fmt.Errorf("build tag grouping query: %w", err)
-	}
-	query = r.db.Rebind(query)
-
-	type row struct {
-		ID      int64 `db:"id"`
-		GroupID int64 `db:"group_id"`
-	}
-
-	var rows []row
-	if err := r.db.Select(&rows, query, queryArgs...); err != nil {
-		return nil, nil, fmt.Errorf("load tag groups: %w", err)
-	}
-	if len(rows) != len(normalized) {
-		return []string{"1 = 0"}, map[string]any{}, nil
-	}
-
-	grouped := map[int64][]int64{}
-	for _, item := range rows {
-		grouped[item.GroupID] = append(grouped[item.GroupID], item.ID)
-	}
-
-	groupIDs := make([]int64, 0, len(grouped))
-	for groupID := range grouped {
-		groupIDs = append(groupIDs, groupID)
-	}
-	sort.Slice(groupIDs, func(i, j int) bool {
-		return groupIDs[i] < groupIDs[j]
-	})
-
-	filters := make([]string, 0, len(groupIDs))
-	args := map[string]any{}
-	for groupIndex, groupID := range groupIDs {
-		placeholders := make([]string, 0, len(grouped[groupID]))
-		for tagIndex, tagID := range grouped[groupID] {
-			argKey := fmt.Sprintf("tag_%d_%d", groupIndex, tagIndex)
-			args[argKey] = tagID
-			placeholders = append(placeholders, ":"+argKey)
-		}
-		filters = append(filters, fmt.Sprintf(
-			"EXISTS (SELECT 1 FROM game_tags gt WHERE gt.game_id = g.id AND gt.tag_id IN (%s))",
-			strings.Join(placeholders, ", "),
-		))
-	}
-
-	return filters, args, nil
 }
 
 func replaceRelationRows(tx *sqlx.Tx, table, column string, gameID int64, ids []int64) error {

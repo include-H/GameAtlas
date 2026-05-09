@@ -80,7 +80,6 @@ describe('games service', () => {
         search: 'halo',
         series: 12,
         pending: false,
-        tag: [3, 7],
       },
       sort: {
         field: 'updated_at',
@@ -102,7 +101,6 @@ describe('games service', () => {
     expect(params.get('series')).toBe('12')
     expect(params.get('pending')).toBe('false')
     expect(params.get('favorite')).toBeNull()
-    expect(params.getAll('tag')).toEqual(['3', '7'])
     expect(params.get('sort')).toBe('updated_at')
     expect(params.get('order')).toBe('desc')
     expect(params.get('seed')).toBe('9')
@@ -337,8 +335,6 @@ describe('games service', () => {
         series: null,
         developers: [],
         publishers: [],
-        tags: [],
-        tag_groups: [],
         files: [],
       },
     })
@@ -357,8 +353,6 @@ describe('games service', () => {
         series: null,
         developers: [],
         publishers: [],
-        tags: [],
-        tag_groups: [],
         files: [],
       },
     })
@@ -377,8 +371,6 @@ describe('games service', () => {
         series: null,
         developers: [],
         publishers: [],
-        tags: [],
-        tag_groups: [],
         files: [
           {
             id: 10,
@@ -411,8 +403,6 @@ describe('games service', () => {
         series: null,
         developers: [],
         publishers: [],
-        tags: [],
-        tag_groups: [],
         files: [
           {
             id: 10,
@@ -494,7 +484,6 @@ describe('games service', () => {
         series_id: null,
         developer_ids: [],
         publisher_ids: [],
-        tag_ids: [],
       },
       assets: {
         files: [],
@@ -518,7 +507,6 @@ describe('games service', () => {
         series_id: null,
         developer_ids: [],
         publisher_ids: [],
-        tag_ids: [],
       },
       assets: {
         files: [],

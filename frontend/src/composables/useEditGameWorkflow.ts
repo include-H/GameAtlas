@@ -31,7 +31,6 @@ interface UseEditGameWorkflowOptions {
   developerOptions: Ref<Developer[]>
   publisherOptions: Ref<Publisher[]>
   validateForm: () => Promise<boolean>
-  resolveTagSelections: () => Promise<number[]>
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
   emitSuccess: () => void
   closeModal: () => void
@@ -142,7 +141,6 @@ const createUpdatePayload = (params: {
   seriesId: number | null | undefined
   developerIds: number[]
   publisherIds: number[]
-  tagIds: number[]
 }): GameAggregateGameUpdateRequest => {
   return {
     title: params.form.title,
@@ -152,7 +150,6 @@ const createUpdatePayload = (params: {
     series_id: params.seriesId ?? null,
     developer_ids: params.developerIds,
     publisher_ids: params.publisherIds,
-    tag_ids: params.tagIds,
     summary: toNullableFormText(params.form.summary),
     cover_image: toNullableFormText(params.form.cover_image),
     banner_image: toNullableFormText(params.form.banner_image),
@@ -217,15 +214,6 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       const publisherIds = publisherResult.ids
       options.form.value.publisher_ids = [...publisherIds]
 
-      let tagIds: number[] = []
-      try {
-        tagIds = await options.resolveTagSelections()
-        options.form.value.tag_ids = [...tagIds]
-      } catch (error) {
-        console.error('Failed to process tags:', options.form.value.tag_ids, error)
-        throw createWorkflowStepError('标签处理失败', error)
-      }
-
       const orderedScreenshotUids = options.form.value.screenshots
         .map((item) => item.asset_uid)
         .filter((assetUid): assetUid is string => Boolean(assetUid))
@@ -241,7 +229,6 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
           seriesId,
           developerIds,
           publisherIds,
-          tagIds,
         }),
         assets: {
           files: options.form.value.file_paths

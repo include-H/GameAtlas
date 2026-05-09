@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -79,20 +80,24 @@ func NewSteamService(cfg config.Config, assetsService *AssetsService) *SteamServ
 	}
 }
 
+type steamSearchLocale struct {
+	CC   string
+	Lang string
+}
+
+var steamSearchLocales = []steamSearchLocale{
+	{CC: "CN", Lang: "schinese"},
+	{CC: "US", Lang: "english"},
+}
+
 func (s *SteamService) Search(query string, proxyOverride string) ([]domain.SteamSearchResult, error) {
-	payloads := make([]steamStoreSearchResponse, 0, 2)
-	for _, locale := range []struct {
-		lang string
-		cc   string
-	}{
-		{lang: "schinese", cc: "CN"},
-		{lang: "english", cc: "US"},
-	} {
+	payloads := make([]steamStoreSearchResponse, 0, len(steamSearchLocales))
+	for _, loc := range steamSearchLocales {
 		endpoint := fmt.Sprintf(
 			"https://store.steampowered.com/api/storesearch/?term=%s&l=%s&cc=%s",
 			url.QueryEscape(query),
-			locale.lang,
-			locale.cc,
+			loc.Lang,
+			loc.CC,
 		)
 		var payload steamStoreSearchResponse
 		if err := s.fetchJSON(endpoint, &payload, proxyOverride); err == nil {
@@ -149,7 +154,10 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 				namedError{name: "english appdetails", err: fallbackErr},
 			)
 		}
-		return nil, ErrNotFound
+		// Both locales returned success:false — the app exists on Steam but has no
+		// appdetails data (known Steam behavior for some store-only pages like 696360).
+		// Fall back to scraping the store page directly.
+		return s.previewAssetsFromStorePage(appID, proxyOverride)
 	}
 
 	name := fmt.Sprintf("Steam App %d", appID)
@@ -233,4 +241,68 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 		BannerURL:      bannerURL,
 		ScreenshotURLs: screenshotURLs,
 	}, nil
+}
+
+// previewAssetsFromStorePage is the fallback when appdetails returns success:false
+// for all locales but the store page itself still exists (known Steam behavior for
+// some store-only listings). It scrapes the store page directly for whatever data
+// is available.
+func (s *SteamService) previewAssetsFromStorePage(appID int64, proxyOverride string) (*domain.SteamAssetsPreview, error) {
+	storePageURL := fmt.Sprintf("https://store.steampowered.com/app/%d/?l=schinese", appID)
+	pageHTML, err := s.fetchText(storePageURL, proxyOverride)
+	if err != nil || pageHTML == "" {
+		// Store page doesn't exist either — truly not found.
+		return nil, ErrNotFound
+	}
+
+	name := extractStorePageName(pageHTML, appID)
+	description := s.fetchDescriptionFromStorePage(appID, proxyOverride)
+	screenshotURLs := s.fetchScreenshotURLsFromStorePage(appID, proxyOverride)
+
+	// Try CDN asset URLs — these exist independently of appdetails.
+	coverURL := s.resolveSteamAssetURL(appID, proxyOverride,
+		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_600x900_2x.jpg",
+		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_600x900.jpg",
+	)
+	bannerURL := s.resolveSteamAssetURL(appID, proxyOverride,
+		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_hero_2x.jpg",
+		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_hero.jpg",
+	)
+
+	// If no library-style banner, try the header image that the store page uses.
+	if bannerURL == nil {
+		bannerURL = s.resolveSteamAssetURL(appID, proxyOverride,
+			"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/%d/header_schinese.jpg",
+			"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/%d/header.jpg",
+		)
+	}
+
+	return &domain.SteamAssetsPreview{
+		AppID:          appID,
+		Name:           name,
+		Description:    description,
+		ReleaseDate:    "",
+		Developers:     []string{},
+		Publishers:     []string{},
+		CoverURL:       coverURL,
+		BannerURL:      bannerURL,
+		ScreenshotURLs: screenshotURLs,
+	}, nil
+}
+
+var storePageTitlePattern = regexp.MustCompile(`(?i)<title>(.*?)</title>`)
+
+func extractStorePageName(pageHTML string, appID int64) string {
+	match := storePageTitlePattern.FindStringSubmatch(pageHTML)
+	if len(match) >= 2 {
+		raw := strings.TrimSpace(match[1])
+		// Steam titles end with " on Steam" or " on Steam" variants.
+		raw = strings.TrimSuffix(raw, " on Steam")
+		raw = strings.TrimSuffix(raw, " on steam")
+		raw = strings.TrimSpace(raw)
+		if raw != "" {
+			return raw
+		}
+	}
+	return fmt.Sprintf("Steam App %d", appID)
 }

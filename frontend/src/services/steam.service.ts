@@ -14,11 +14,11 @@ interface SteamAssetsApiItem {
   name: string
   description: string
   release_date: string
-  developers: string[]
-  publishers: string[]
+  developers: string[] | null
+  publishers: string[] | null
   cover_url: string | null
   banner_url: string | null
-  screenshot_urls: string[]
+  screenshot_urls: string[] | null
 }
 
 function mapSearchResult(item: SteamSearchApiItem): SteamGameSearchResult {
@@ -59,11 +59,8 @@ const steamService = {
     // 2026-04-09: keep blank-query short-circuit in the UI request layer so the picker
     // does not fire meaningless admin search requests before the backend transport contract applies.
     if (!query || query.trim().length === 0) return []
-    const response = await get<ApiEnvelope<SteamSearchApiItem[]>>('/steam/search', {
-      params: {
-        q: query.trim(),
-      },
-    })
+    const params: Record<string, string> = { q: query.trim() }
+    const response = await get<ApiEnvelope<SteamSearchApiItem[]>>('/steam/search', { params })
     return response.data.map(mapSearchResult)
   },
 
@@ -74,12 +71,12 @@ const steamService = {
       name: data.name,
       description: data.description || '',
       releaseDate: data.release_date || '',
-      developers: data.developers,
-      publishers: data.publishers,
+      developers: data.developers ?? [],
+      publishers: data.publishers ?? [],
       previewVideos: [],
       genres: [],
       tags: [],
-      screenshots: data.screenshot_urls.map((url) => proxySteamAssetUrl(url)),
+      screenshots: (data.screenshot_urls ?? []).map((url) => proxySteamAssetUrl(url)),
       // 2026-04-06: keep Steam asset semantics aligned with the backend preview contract.
       // Impact: the frontend only carries cover/banner/screenshots here and does not invent
       // extra asset aliases from the same banner url.

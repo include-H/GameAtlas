@@ -82,40 +82,6 @@ export interface Publisher {
   created_at: string
 }
 
-export interface Tag {
-  id: number
-  group_id: number
-  group_key: string
-  group_name: string
-  name: string
-  slug: string
-  parent_id?: number | null
-  sort_order: number
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface TagGroup {
-  id: number
-  key: string
-  name: string
-  description?: string | null
-  sort_order: number
-  allow_multiple: boolean
-  is_filterable: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface GameTagGroup {
-  id: number
-  key: string
-  name: string
-  allow_multiple: boolean
-  is_filterable: boolean
-  tags: Tag[]
-}
 
 export interface PublicGameFileEntry {
   id: number
@@ -179,8 +145,6 @@ export interface GameDetailDtoBase<TFile extends GameFileEntry = GameFileEntry> 
   series: Series | null
   developers: Developer[]
   publishers: Publisher[]
-  tags: Tag[]
-  tag_groups: GameTagGroup[]
   files: TFile[]
 }
 
@@ -217,7 +181,6 @@ export interface GameAggregateGameUpdateRequest extends GameAggregateCoreRequest
   series_id: number | null
   developer_ids: number[]
   publisher_ids: number[]
-  tag_ids: number[]
 }
 
 export interface GameAggregateFileRequest {
@@ -249,7 +212,6 @@ export interface GameListQuery {
   limit?: number
   search?: string
   series?: number
-  tag?: number[]
   pending?: boolean
   pending_issue?: string
   pending_include_ignored?: boolean

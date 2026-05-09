@@ -8,7 +8,6 @@ import (
 type GameDetailService struct {
 	detailRepo               *repositories.GameDetailRepository
 	gameFilesRepo            *repositories.GameFilesRepository
-	tagsRepo                 *repositories.TagsRepository
 	reviewIssueOverridesRepo *repositories.ReviewIssueOverrideRepository
 }
 
@@ -16,13 +15,11 @@ type GameDetailService struct {
 func NewGameDetailService(
 	detailRepo *repositories.GameDetailRepository,
 	gameFilesRepo *repositories.GameFilesRepository,
-	tagsRepo *repositories.TagsRepository,
 	reviewIssueOverridesRepo *repositories.ReviewIssueOverrideRepository,
 ) *GameDetailService {
 	return &GameDetailService{
 		detailRepo:               detailRepo,
 		gameFilesRepo:            gameFilesRepo,
-		tagsRepo:                 tagsRepo,
 		reviewIssueOverridesRepo: reviewIssueOverridesRepo,
 	}
 }
@@ -67,10 +64,6 @@ func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) 
 	if err != nil {
 		return nil, err
 	}
-	tags, err := s.tagsRepo.ListByGameID(id)
-	if err != nil {
-		return nil, err
-	}
 	files, err := s.gameFilesRepo.ListByGameID(id)
 	if err != nil {
 		return nil, err
@@ -89,8 +82,6 @@ func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) 
 		Series:        primarySeries,
 		Developers:    emptyMetadata(developers),
 		Publishers:    emptyMetadata(publishers),
-		Tags:          emptyTags(tags),
-		TagGroups:     groupGameTags(tags),
 		Files:         emptyFiles(files),
 	}, nil
 }

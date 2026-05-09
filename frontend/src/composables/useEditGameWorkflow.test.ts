@@ -76,8 +76,6 @@ const buildOptions = () => {
         series: null,
         developers: [],
         publishers: [],
-        tags: [],
-        tag_groups: [],
         files: [],
         created_at: '2026-03-25T00:00:00Z',
         updated_at: '2026-03-25T00:00:00Z',
@@ -91,7 +89,6 @@ const buildOptions = () => {
         publisher_ids: [2],
         release_date: undefined,
         series_id: null,
-        tag_ids: [4],
         summary: '',
         cover_image: '',
         banner_image: '',
@@ -104,7 +101,6 @@ const buildOptions = () => {
       developerOptions: ref([]),
       publisherOptions: ref([]),
       validateForm: vi.fn().mockResolvedValue(true),
-      resolveTagSelections: vi.fn().mockResolvedValue([4]),
       addAlert,
       emitSuccess,
       closeModal,
@@ -146,22 +142,6 @@ describe('useEditGameWorkflow', () => {
 
     expect(updateGameAggregateMock).not.toHaveBeenCalled()
     expect(addAlert).toHaveBeenCalledWith('系列 "Broken Series" 处理失败', 'error')
-    expect(emitSuccess).not.toHaveBeenCalled()
-    expect(closeModal).not.toHaveBeenCalled()
-    expect(options.isSubmitting.value).toBe(false)
-    consoleErrorSpy.mockRestore()
-  })
-
-  it('aborts submit when tag resolution fails', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const { options, addAlert, emitSuccess, closeModal } = buildOptions()
-    options.resolveTagSelections = vi.fn().mockRejectedValue(new Error('tag boom'))
-
-    const workflow = useEditGameWorkflow(options)
-    await workflow.handleSubmit()
-
-    expect(updateGameAggregateMock).not.toHaveBeenCalled()
-    expect(addAlert).toHaveBeenCalledWith('标签处理失败', 'error')
     expect(emitSuccess).not.toHaveBeenCalled()
     expect(closeModal).not.toHaveBeenCalled()
     expect(options.isSubmitting.value).toBe(false)

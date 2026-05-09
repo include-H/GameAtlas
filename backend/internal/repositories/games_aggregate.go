@@ -202,9 +202,6 @@ func (r *GamesRepository) replaceRelationsTx(tx *sqlx.Tx, gameID int64, input do
 	if err := replaceRelationRows(tx, "game_publishers", "publisher_id", gameID, input.PublisherIDs); err != nil {
 		return err
 	}
-	if err := replaceRelationRows(tx, "game_tags", "tag_id", gameID, input.TagIDs); err != nil {
-		return err
-	}
 	return nil
 }
 
