@@ -28,8 +28,8 @@ func TestTagsHandlerListRejectsInvalidActiveQuery(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid tag query parameter: active"`) {
-		t.Fatalf("body = %s, want invalid active query error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的标签查询参数: active"`) {
+		t.Fatalf("body = %s, want 无效的标签查询参数: active", recorder.Body.String())
 	}
 }
 
@@ -49,8 +49,8 @@ func TestTagsHandlerListRejectsInvalidGroupIDQuery(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid tag query parameter: group_id"`) {
-		t.Fatalf("body = %s, want invalid group_id query error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的标签查询参数: group_id"`) {
+		t.Fatalf("body = %s, want 无效的标签查询参数: group_id", recorder.Body.String())
 	}
 }
 
@@ -72,8 +72,8 @@ func TestTagsHandlerCreateGroupRejectsUnknownJSONFields(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid tag group payload"`) {
-		t.Fatalf("body = %s, want invalid tag group payload", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的标签组请求"`) {
+		t.Fatalf("body = %s, want 无效的标签组请求", recorder.Body.String())
 	}
 }
 
@@ -98,8 +98,8 @@ func TestMetadataHandlerCreateRejectsUnknownJSONFields(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid metadata payload"`) {
-		t.Fatalf("body = %s, want invalid metadata payload", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的元数据请求"`) {
+		t.Fatalf("body = %s, want 无效的元数据请求", recorder.Body.String())
 	}
 }
 
@@ -122,8 +122,8 @@ func TestMetadataHandlerListRejectsInvalidLimitQuery(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid metadata query parameter: limit"`) {
-		t.Fatalf("body = %s, want invalid metadata limit query error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的元数据查询参数: limit"`) {
+		t.Fatalf("body = %s, want 无效的元数据查询参数: limit", recorder.Body.String())
 	}
 }
 
@@ -146,7 +146,7 @@ func TestMetadataHandlerListRejectsInvalidSortQuery(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid metadata query parameter: sort"`) {
-		t.Fatalf("body = %s, want invalid metadata sort query error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的元数据查询参数: sort"`) {
+		t.Fatalf("body = %s, want 无效的元数据查询参数: sort", recorder.Body.String())
 	}
 }

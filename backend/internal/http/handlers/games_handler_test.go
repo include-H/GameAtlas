@@ -39,8 +39,8 @@ func TestGamesHandlerListTimelineRejectsInvalidCursor(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if response.Error != "invalid timeline cursor" {
-		t.Fatalf("error = %q, want invalid timeline cursor", response.Error)
+	if response.Error != "无效的时间线游标" {
+		t.Fatalf("error = %q, want 无效的时间线游标", response.Error)
 	}
 }
 
@@ -64,8 +64,8 @@ func TestGamesHandlerListTimelineRejectsInvalidYears(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if response.Error != "invalid timeline query parameter: years" {
-		t.Fatalf("error = %q, want invalid timeline query parameter: years", response.Error)
+	if response.Error != "无效的时间线查询参数: years" {
+		t.Fatalf("error = %q, want 无效的时间线查询参数: years", response.Error)
 	}
 }
 
@@ -89,8 +89,8 @@ func TestGamesHandlerListTimelineRejectsInvalidLimit(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if response.Error != "invalid timeline query parameter: limit" {
-		t.Fatalf("error = %q, want invalid timeline query parameter: limit", response.Error)
+	if response.Error != "无效的时间线查询参数: limit" {
+		t.Fatalf("error = %q, want 无效的时间线查询参数: limit", response.Error)
 	}
 }
 
@@ -501,8 +501,8 @@ func TestGamesHandlerListReturnsInternalServerErrorWhenPendingOverridesLookupFai
 	if response.Success {
 		t.Fatalf("expected success=false")
 	}
-	if response.Error != "internal server error" {
-		t.Fatalf("error = %q, want internal server error", response.Error)
+	if response.Error != "服务器内部错误" {
+		t.Fatalf("error = %q, want 服务器内部错误", response.Error)
 	}
 }
 
@@ -523,8 +523,8 @@ func TestGamesHandlerListRejectsInvalidPageQuery(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: page"`) {
-		t.Fatalf("body = %s, want invalid page query error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的游戏查询参数: page"`) {
+		t.Fatalf("body = %s, want 无效的游戏查询参数: page", recorder.Body.String())
 	}
 }
 
@@ -545,8 +545,8 @@ func TestGamesHandlerListRejectsInvalidPendingQueryBoolean(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: pending"`) {
-		t.Fatalf("body = %s, want invalid pending query error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的游戏查询参数: pending"`) {
+		t.Fatalf("body = %s, want 无效的游戏查询参数: pending", recorder.Body.String())
 	}
 }
 
@@ -567,8 +567,8 @@ func TestGamesHandlerListRejectsFavoriteFalseQuery(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: favorite"`) {
-		t.Fatalf("body = %s, want invalid favorite query error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的游戏查询参数: favorite"`) {
+		t.Fatalf("body = %s, want 无效的游戏查询参数: favorite", recorder.Body.String())
 	}
 }
 
@@ -591,8 +591,8 @@ func TestGamesHandlerListRejectsRandomSortWithoutSeed(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: seed"`) {
-		t.Fatalf("body = %s, want invalid seed query error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的游戏查询参数: seed"`) {
+		t.Fatalf("body = %s, want 无效的游戏查询参数: seed", recorder.Body.String())
 	}
 }
 
@@ -613,8 +613,8 @@ func TestGamesHandlerListRejectsInvalidTagQueryValue(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: tag"`) {
-		t.Fatalf("body = %s, want invalid tag query error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的游戏查询参数: tag"`) {
+		t.Fatalf("body = %s, want 无效的游戏查询参数: tag", recorder.Body.String())
 	}
 }
 
@@ -637,8 +637,8 @@ func TestGamesHandlerCreateReturnsBadRequestWhenTitleMissing(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"title is required"`) {
-		t.Fatalf("body = %s, want title is required error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"标题为必填项"`) {
+		t.Fatalf("body = %s, want 标题为必填项", recorder.Body.String())
 	}
 }
 
@@ -661,8 +661,8 @@ func TestGamesHandlerCreateRejectsInvalidJSON(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid game payload"`) {
-		t.Fatalf("body = %s, want invalid game payload", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的游戏请求"`) {
+		t.Fatalf("body = %s, want 无效的游戏请求", recorder.Body.String())
 	}
 }
 
@@ -685,8 +685,8 @@ func TestGamesHandlerCreateRejectsUnknownFields(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid game payload"`) {
-		t.Fatalf("body = %s, want invalid game payload", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的游戏请求"`) {
+		t.Fatalf("body = %s, want 无效的游戏请求", recorder.Body.String())
 	}
 }
 
@@ -835,8 +835,8 @@ func TestGamesHandlerDeleteReturnsNotFoundForMissingGame(t *testing.T) {
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusNotFound, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"resource not found"`) {
-		t.Fatalf("body = %s, want resource not found error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"资源不存在"`) {
+		t.Fatalf("body = %s, want 资源不存在", recorder.Body.String())
 	}
 }
 
@@ -950,8 +950,8 @@ func TestGamesHandlerUpdateAggregateReturnsBadRequestForInvalidDeleteAssetType(t
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"title is required"`) {
-		t.Fatalf("body = %s, want current validation mapping", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"标题为必填项"`) {
+		t.Fatalf("body = %s, want 标题为必填项", recorder.Body.String())
 	}
 }
 
@@ -976,8 +976,8 @@ func TestGamesHandlerUpdateAggregateRejectsInvalidJSONAfterResolvingGame(t *test
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid game payload"`) {
-		t.Fatalf("body = %s, want invalid game payload", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的游戏请求"`) {
+		t.Fatalf("body = %s, want 无效的游戏请求", recorder.Body.String())
 	}
 }
 
@@ -1002,8 +1002,8 @@ func TestGamesHandlerUpdateAggregateRejectsLegacyUnknownFields(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid game payload"`) {
-		t.Fatalf("body = %s, want invalid game payload", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的游戏请求"`) {
+		t.Fatalf("body = %s, want 无效的游戏请求", recorder.Body.String())
 	}
 }
 
@@ -1027,8 +1027,8 @@ func TestGamesHandlerUpdateAggregateReturnsNotFoundForMissingGame(t *testing.T) 
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusNotFound, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"resource not found"`) {
-		t.Fatalf("body = %s, want resource not found error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"资源不存在"`) {
+		t.Fatalf("body = %s, want 资源不存在", recorder.Body.String())
 	}
 }
 
@@ -1086,8 +1086,8 @@ func TestGamesHandlerUpdateAggregateReturnsNotFoundForMissingScreenshotReorderUI
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusNotFound, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"resource not found"`) {
-		t.Fatalf("body = %s, want resource not found error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"资源不存在"`) {
+		t.Fatalf("body = %s, want 资源不存在", recorder.Body.String())
 	}
 }
 
@@ -1119,8 +1119,8 @@ func TestGamesHandlerUpdateAggregateReturnsNotFoundForMissingVideoReorderUID(t *
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusNotFound, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"resource not found"`) {
-		t.Fatalf("body = %s, want resource not found error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"资源不存在"`) {
+		t.Fatalf("body = %s, want 资源不存在", recorder.Body.String())
 	}
 }
 
@@ -1152,8 +1152,8 @@ func TestGamesHandlerUpdateAggregateReturnsForbiddenForFileOutsidePrimaryROMRoot
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusForbidden, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"file path is outside PRIMARY_ROM_ROOT"`) {
-		t.Fatalf("body = %s, want forbidden path error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"文件路径超出允许范围"`) {
+		t.Fatalf("body = %s, want 文件路径超出允许范围", recorder.Body.String())
 	}
 }
 
@@ -1174,8 +1174,8 @@ func TestGamesHandlerListRejectsInvalidSortQuery(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: sort"`) {
-		t.Fatalf("body = %s, want invalid sort query error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的游戏查询参数: sort"`) {
+		t.Fatalf("body = %s, want 无效的游戏查询参数: sort", recorder.Body.String())
 	}
 }
 
@@ -1196,8 +1196,8 @@ func TestGamesHandlerListRejectsInvalidOrderQuery(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: order"`) {
-		t.Fatalf("body = %s, want invalid order query error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的游戏查询参数: order"`) {
+		t.Fatalf("body = %s, want 无效的游戏查询参数: order", recorder.Body.String())
 	}
 }
 
@@ -1277,8 +1277,8 @@ func TestGamesHandlerListRejectsInvalidPendingIssueQuery(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid games query parameter: pending_issue"`) {
-		t.Fatalf("body = %s, want invalid pending_issue query error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的游戏查询参数: pending_issue"`) {
+		t.Fatalf("body = %s, want 无效的游戏查询参数: pending_issue", recorder.Body.String())
 	}
 }
 

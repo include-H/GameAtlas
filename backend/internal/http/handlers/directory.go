@@ -23,7 +23,8 @@ func (h *DirectoryHandler) Default(c *gin.Context) {
 	}
 	path, err := h.service.Default()
 	if err != nil {
-		writeServiceError(c, err, "directory roots are not configured")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "目录根路径未配置")
 		return
 	}
 
@@ -42,7 +43,8 @@ func (h *DirectoryHandler) List(c *gin.Context) {
 	path := strings.TrimSpace(c.Query("path"))
 	result, err := h.service.List(path)
 	if err != nil {
-		writeServiceError(c, err, "invalid directory path")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的目录路径")
 		return
 	}
 

@@ -24,7 +24,8 @@ func (h *GameFilesHandler) List(c *gin.Context) {
 
 	files, err := h.service.List(gameID, isAdminRequest(c))
 	if err != nil {
-		writeServiceError(c, err, "file_path is required")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的文件列表请求")
 		return
 	}
 

@@ -27,7 +27,7 @@
     </div>
 
     <!-- Search and Filters -->
-    <a-card class="mb-4 search-card glass-panel" :bordered="false">
+    <a-card class="mb-4 search-card app-glass-surface" :bordered="false">
       <a-row :gutter="[12, 12]" class="games-filters-row">
         <!-- Search -->
         <a-col :xs="24" :sm="12" :md="6" :lg="6" :xl="6" :xxl="5" class="games-filters-col games-filters-col--search">

@@ -151,8 +151,8 @@ func TestAssetsHandlerUploadRejectsInvalidSortOrder(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"valid sort_order is required"`) {
-		t.Fatalf("body = %s, want sort_order validation error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"需要有效的排序值"`) {
+		t.Fatalf("body = %s, want 需要有效的排序值", recorder.Body.String())
 	}
 }
 
@@ -180,8 +180,8 @@ func TestAssetsHandlerUploadReturnsBadRequestWhenFileMissing(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"file is required"`) {
-		t.Fatalf("body = %s, want file is required error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"需要上传文件"`) {
+		t.Fatalf("body = %s, want 需要上传文件", recorder.Body.String())
 	}
 }
 
@@ -229,8 +229,8 @@ func TestAssetsHandlerUploadReturnsBadRequestWhenContentTypeInvalid(t *testing.T
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid asset upload"`) {
-		t.Fatalf("body = %s, want invalid asset upload error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的资源上传"`) {
+		t.Fatalf("body = %s, want 无效的资源上传", recorder.Body.String())
 	}
 }
 
@@ -277,8 +277,8 @@ func TestAssetsHandlerUploadReturnsNotFoundWhenGameMissing(t *testing.T) {
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusNotFound, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"resource not found"`) {
-		t.Fatalf("body = %s, want resource not found error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"资源不存在"`) {
+		t.Fatalf("body = %s, want 资源不存在", recorder.Body.String())
 	}
 }
 

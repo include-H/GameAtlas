@@ -16,6 +16,11 @@ import (
 	"github.com/hao/game/internal/repositories"
 )
 
+// 2026-05-09: AuthCookieName is defined here rather than in the handler package
+// because the session creation and validation logic in AuthService implicitly
+// depends on this name being consistent. Both the handler and the router consume
+// this constant; keeping it in the service avoids a circular dependency between
+// handler and route packages.
 const AuthCookieName = "gameatlas_admin"
 
 var ErrAuthDisabled = errors.New("authentication is not configured")
@@ -215,7 +220,7 @@ func (s *AuthService) Logout(session string) error {
 	return s.deleteSession(session)
 }
 
-func (s *AuthService) SessionMaxAgeSeconds() int {
+func (s *AuthService) SessionTTLSeconds() int {
 	return int(s.sessionTTL.Seconds())
 }
 

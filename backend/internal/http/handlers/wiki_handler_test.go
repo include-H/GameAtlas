@@ -100,8 +100,8 @@ func TestWikiHandlerGetReturnsNotFoundForUnknownGame(t *testing.T) {
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNotFound)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"resource not found"`) {
-		t.Fatalf("body = %s, want resource not found error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"资源不存在"`) {
+		t.Fatalf("body = %s, want 资源不存在", recorder.Body.String())
 	}
 }
 
@@ -135,8 +135,8 @@ func TestWikiHandlerUpdateRejectsInvalidJSONAfterResolvingGame(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid wiki payload"`) {
-		t.Fatalf("body = %s, want invalid wiki payload error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的 Wiki 请求"`) {
+		t.Fatalf("body = %s, want 无效的 Wiki 请求", recorder.Body.String())
 	}
 }
 
@@ -167,7 +167,7 @@ func TestWikiHandlerUpdateRejectsUnknownJSONFields(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid wiki payload"`) {
-		t.Fatalf("body = %s, want invalid wiki payload error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的 Wiki 请求"`) {
+		t.Fatalf("body = %s, want 无效的 Wiki 请求", recorder.Body.String())
 	}
 }

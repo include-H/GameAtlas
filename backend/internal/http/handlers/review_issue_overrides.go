@@ -35,7 +35,8 @@ func (h *ReviewIssueOverrideHandler) Ignore(c *gin.Context) {
 		if err := decodeJSONStrict(c, &payload); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error":   "invalid review override payload",
+				// 2026-05-09: 统一为中文错误信息
+		"error":   "无效的审查覆盖请求",
 			})
 			return
 		}
@@ -43,7 +44,8 @@ func (h *ReviewIssueOverrideHandler) Ignore(c *gin.Context) {
 
 	item, err := h.service.Ignore(gameID, issueKey, payload.Reason)
 	if err != nil {
-		writeServiceError(c, err, "invalid review override payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的审查覆盖请求")
 		return
 	}
 
@@ -63,7 +65,8 @@ func (h *ReviewIssueOverrideHandler) Delete(c *gin.Context) {
 	}
 
 	if err := h.service.Delete(gameID, c.Param("issueKey")); err != nil {
-		writeServiceError(c, err, "invalid review override payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的审查覆盖请求")
 		return
 	}
 

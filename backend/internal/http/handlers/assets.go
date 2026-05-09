@@ -24,13 +24,15 @@ func (h *AssetsHandler) Upload(assetType string) gin.HandlerFunc {
 		}
 		gameID, err := strconv.ParseInt(c.PostForm("game_id"), 10, 64)
 		if err != nil || gameID <= 0 {
-			writeJSONError(c, http.StatusBadRequest, "valid game_id is required")
+			// 2026-05-09: 统一为中文错误信息
+			writeJSONError(c, http.StatusBadRequest, "需要有效的 game_id")
 			return
 		}
 
 		file, err := c.FormFile("file")
 		if err != nil {
-			writeJSONError(c, http.StatusBadRequest, "file is required")
+			// 2026-05-09: 统一为中文错误信息
+			writeJSONError(c, http.StatusBadRequest, "需要上传文件")
 			return
 		}
 
@@ -41,7 +43,8 @@ func (h *AssetsHandler) Upload(assetType string) gin.HandlerFunc {
 
 		result, err := h.service.Upload(gameID, assetType, file, sortOrder)
 		if err != nil {
-			writeServiceError(c, err, "invalid asset upload")
+			// 2026-05-09: 统一为中文错误信息
+			writeServiceError(c, err, "无效的资源上传")
 			return
 		}
 
@@ -67,7 +70,8 @@ func parseAssetUploadSortOrder(c *gin.Context) (int, bool) {
 
 	value, err := strconv.Atoi(raw)
 	if err != nil || value < 0 {
-		writeJSONError(c, http.StatusBadRequest, "valid sort_order is required")
+		// 2026-05-09: 统一为中文错误信息
+		writeJSONError(c, http.StatusBadRequest, "需要有效的排序值")
 		return 0, false
 	}
 

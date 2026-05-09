@@ -30,7 +30,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	// 2026-04-06: auth transport now rejects unknown fields and trailing JSON.
 	// Impact: login payload semantics stay aligned with the stricter write handlers.
 	if err := decodeJSONStrict(c, &payload); err != nil {
-		writeJSONError(c, http.StatusBadRequest, "invalid auth payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeJSONError(c, http.StatusBadRequest, "无效的认证请求")
 		return
 	}
 
@@ -63,15 +64,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie(services.AuthCookieName, session, h.service.SessionMaxAgeSeconds(), "/", "", requestUsesHTTPS(c.Request), true)
+	c.SetCookie(services.AuthCookieName, session, h.service.SessionTTLSeconds(), "/", "", requestUsesHTTPS(c.Request), true)
 	writeJSONSuccess(c, http.StatusOK, authSessionResponse{IsAdmin: true})
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
 	session, _ := c.Cookie(services.AuthCookieName)
-	if h.service != nil {
-		_ = h.service.Logout(session)
-	}
+	_ = h.service.Logout(session)
 	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie(services.AuthCookieName, "", -1, "/", "", requestUsesHTTPS(c.Request), true)
 	writeJSONSuccess(c, http.StatusOK, authLogoutResponse{LoggedOut: true})
@@ -110,7 +109,8 @@ func requireAdmin(c *gin.Context) bool {
 	if isAdminRequest(c) {
 		return true
 	}
-	writeJSONError(c, http.StatusUnauthorized, "admin login required")
+	// 2026-05-09: 统一为中文错误信息
+	writeJSONError(c, http.StatusUnauthorized, "需要管理员登录")
 	return false
 }
 

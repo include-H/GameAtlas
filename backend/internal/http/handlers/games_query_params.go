@@ -145,7 +145,8 @@ func decodeGamesTimelineRequest(c *gin.Context) (int, string, string, string, in
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":   "invalid timeline cursor",
+			// 2026-05-09: 统一为中文错误信息
+		"error":   "无效的时间线游标",
 		})
 		return 0, "", "", "", 0, false
 	}
@@ -169,7 +170,8 @@ func parseGamesTimelineIntQuery(c *gin.Context, key string, fallback int) (int, 
 func writeGamesTimelineQueryError(c *gin.Context, key string) {
 	c.JSON(http.StatusBadRequest, gin.H{
 		"success": false,
-		"error":   "invalid timeline query parameter: " + key,
+		// 2026-05-09: 统一为中文错误信息
+		"error":   "无效的时间线查询参数: " + key,
 	})
 }
 
@@ -229,6 +231,7 @@ func parseGamesListBoolQuery(c *gin.Context, key string) (bool, bool) {
 func writeGamesListQueryError(c *gin.Context, key string) {
 	c.JSON(http.StatusBadRequest, gin.H{
 		"success": false,
-		"error":   "invalid games query parameter: " + key,
+		// 2026-05-09: 统一为中文错误信息
+		"error":   "无效的游戏查询参数: " + key,
 	})
 }

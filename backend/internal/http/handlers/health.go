@@ -8,6 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// 2026-05-09: HealthHandler 直接依赖 *sqlx.DB 而非 repository 层。Health check 是基础设施端点，仅需 Ping 数据库连接，穿透分层是合理的设计选择。
 type HealthHandler struct {
 	db *sqlx.DB
 }

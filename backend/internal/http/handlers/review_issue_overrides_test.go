@@ -36,8 +36,8 @@ func TestReviewIssueOverrideHandlerIgnoreRejectsInvalidJSON(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid review override payload"`) {
-		t.Fatalf("body = %s, want invalid review override payload error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的审查覆盖请求"`) {
+		t.Fatalf("body = %s, want 无效的审查覆盖请求", recorder.Body.String())
 	}
 }
 
@@ -64,8 +64,8 @@ func TestReviewIssueOverrideHandlerIgnoreRejectsUnknownJSONFields(t *testing.T) 
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid review override payload"`) {
-		t.Fatalf("body = %s, want invalid review override payload error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的审查覆盖请求"`) {
+		t.Fatalf("body = %s, want 无效的审查覆盖请求", recorder.Body.String())
 	}
 }
 

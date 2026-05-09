@@ -33,7 +33,8 @@ func (h *HitokotoHandler) Get(c *gin.Context) {
 	if maxLength < minLength {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":   "`max_length` cannot be less than `min_length`",
+			// 2026-05-09: 统一为中文错误信息
+		"error":   "`max_length` 不能小于 `min_length`",
 		})
 		return
 	}
@@ -48,17 +49,20 @@ func (h *HitokotoHandler) Get(c *gin.Context) {
 		case services.ErrValidation:
 			c.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error":   "invalid hitokoto query",
+				// 2026-05-09: 统一为中文错误信息
+			"error":   "无效的一言查询",
 			})
 		case services.ErrNotFound:
 			c.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error":   "no sentence matched the query",
+				// 2026-05-09: 统一为中文错误信息
+			"error":   "没有匹配的句子",
 			})
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"success": false,
-				"error":   "internal server error",
+				// 2026-05-09: 统一为中文错误信息
+			"error":   "服务器内部错误",
 			})
 		}
 		return
@@ -68,6 +72,7 @@ func (h *HitokotoHandler) Get(c *gin.Context) {
 	case "text":
 		c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(sentence.Hitokoto))
 	default:
+		// 2026-05-09: HitokotoSentence 是外部 API 透传对象，结构简单且外部依赖性强，无需额外 DTO 转换。
 		c.JSON(http.StatusOK, sentence)
 	}
 }
@@ -81,7 +86,8 @@ func parseHitokotoLengthQuery(c *gin.Context, key string, fallback int) (int, bo
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":   "invalid hitokoto query parameter: " + key,
+			// 2026-05-09: 统一为中文错误信息
+		"error":   "无效的一言查询参数: " + key,
 		})
 		return 0, false
 	}

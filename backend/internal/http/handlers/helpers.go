@@ -41,7 +41,8 @@ func writeJSONErrorWithData[T any](c *gin.Context, status int, message string, d
 func parseIDParam(c *gin.Context, name string) (int64, bool) {
 	value, err := strconv.ParseInt(c.Param(name), 10, 64)
 	if err != nil || value <= 0 {
-		writeJSONError(c, http.StatusBadRequest, "invalid id parameter")
+		// 2026-05-09: 统一为中文错误信息
+		writeJSONError(c, http.StatusBadRequest, "无效的 ID 参数")
 		return 0, false
 	}
 	return value, true
@@ -50,7 +51,8 @@ func parseIDParam(c *gin.Context, name string) (int64, bool) {
 func parseGamePublicIDParam(c *gin.Context, name string, resolver func(publicID string) (int64, error)) (int64, bool) {
 	publicID := strings.TrimSpace(c.Param(name))
 	if publicID == "" {
-		writeJSONError(c, http.StatusBadRequest, "invalid public_id parameter")
+		// 2026-05-09: 统一为中文错误信息
+		writeJSONError(c, http.StatusBadRequest, "无效的公开 ID 参数")
 		return 0, false
 	}
 
@@ -59,22 +61,27 @@ func parseGamePublicIDParam(c *gin.Context, name string, resolver func(publicID 
 		return id, true
 	}
 	if errors.Is(err, services.ErrNotFound) {
-		writeJSONError(c, http.StatusNotFound, "resource not found")
+		// 2026-05-09: 统一为中文错误信息
+		writeJSONError(c, http.StatusNotFound, "资源不存在")
 		return 0, false
 	}
 
-	writeJSONError(c, http.StatusBadRequest, "invalid public_id parameter")
+	// 2026-05-09: 统一为中文错误信息
+	writeJSONError(c, http.StatusBadRequest, "无效的公开 ID 参数")
 	return 0, false
 }
 
 func writeServiceError(c *gin.Context, err error, validationMessage string) {
 	switch {
 	case errors.Is(err, services.ErrNotFound):
-		writeJSONError(c, http.StatusNotFound, "resource not found")
+		// 2026-05-09: 统一为中文错误信息
+		writeJSONError(c, http.StatusNotFound, "资源不存在")
 	case errors.Is(err, services.ErrForbiddenPath):
-		writeJSONError(c, http.StatusForbidden, "file path is outside PRIMARY_ROM_ROOT")
+		// 2026-05-09: 统一为中文错误信息
+		writeJSONError(c, http.StatusForbidden, "文件路径超出允许范围")
 	case errors.Is(err, services.ErrMissingFile), errors.Is(err, services.ErrInvalidFile):
-		writeJSONError(c, http.StatusBadRequest, "registered file is unavailable")
+		// 2026-05-09: 统一为中文错误信息
+		writeJSONError(c, http.StatusBadRequest, "注册文件不可用")
 	case errors.Is(err, services.ErrValidation):
 		writeJSONError(c, http.StatusBadRequest, validationMessage)
 	case errors.Is(err, services.ErrUpstream):
@@ -82,7 +89,8 @@ func writeServiceError(c *gin.Context, err error, validationMessage string) {
 	case errors.Is(err, services.ErrMissingConfig):
 		writeJSONError(c, http.StatusBadRequest, err.Error())
 	default:
-		writeJSONError(c, http.StatusInternalServerError, "internal server error")
+		// 2026-05-09: 统一为中文错误信息 (internal server error)
+		writeJSONError(c, http.StatusInternalServerError, "服务器内部错误")
 	}
 }
 

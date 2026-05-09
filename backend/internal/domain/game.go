@@ -1,5 +1,7 @@
 package domain
 
+import "strings"
+
 type Game struct {
 	ID                int64   `db:"id"`
 	PublicID          string  `db:"public_id"`
@@ -46,6 +48,7 @@ type GameListItem struct {
 	UpdatedAt         string `db:"updated_at"`
 }
 
+// 2026-05-09: SeriesGameSummary 是系列摘要视图，保留 WikiContent 用于摘要展示，省略聚合计数字段（ScreenshotCount 等）因为系列视图不需要这些数据。
 type SeriesGameSummary struct {
 	ID                int64   `db:"id"`
 	PublicID          string  `db:"public_id"`
@@ -185,6 +188,7 @@ type GamesListParams struct {
 	SortSeed              int64
 }
 
+// 2026-05-09: allowedGamesListSorts 定义允许的排序 key 白名单，负责校验合法性。SQL 列映射在 repository 层的 allowedGameSortFields 中，两层职责有意分离。
 var allowedGamesListSorts = map[string]struct{}{
 	"title":               {},
 	"created_at":          {},
@@ -329,3 +333,17 @@ const (
 	GameVisibilityPublic  = "public"
 	GameVisibilityPrivate = "private"
 )
+
+// 2026-05-09: DefaultVisibility returns the effective visibility for list queries.
+// When the caller does not specify a value and is not requesting all games,
+// public visibility is the default.
+func DefaultVisibility(explicit string, includeAll bool) string {
+	if includeAll {
+		return ""
+	}
+	trimmed := strings.TrimSpace(explicit)
+	if trimmed == "" {
+		return GameVisibilityPublic
+	}
+	return trimmed
+}

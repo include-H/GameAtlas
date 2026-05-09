@@ -3,7 +3,6 @@ package repositories
 import (
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"github.com/hao/game/internal/domain"
 )
@@ -65,14 +64,10 @@ func (r *FavoriteGamesRepository) Count(includeAll bool, visibility string) (int
 	`
 	args := []any{}
 	if !includeAll {
-		resolvedVisibility := strings.TrimSpace(visibility)
-		if resolvedVisibility == "" {
-			resolvedVisibility = domain.GameVisibilityPublic
-		}
 		query += `
 		WHERE g.visibility = ?
 	`
-		args = append(args, resolvedVisibility)
+		args = append(args, domain.DefaultVisibility(visibility, includeAll))
 	}
 
 	if err := r.db.Get(&count, query, args...); err != nil {

@@ -14,6 +14,7 @@ import (
 	"github.com/hao/game/internal/domain"
 )
 
+// 2026-05-09: allowedGameSortFields 将排序 key 映射到 SQL 列表达式。合法性校验在 domain 层的 allowedGamesListSorts 中完成，此处仅负责 SQL 映射。
 var allowedGameSortFields = map[string]string{
 	"title":        "g.title_sort_key",
 	"created_at":   "g.created_at",
@@ -351,6 +352,8 @@ func pendingVisibleIssueCondition(condition string, issueKey string) string {
 	return fmt.Sprintf("(%s AND %s)", condition, pendingIssueNotIgnoredCondition(issueKey))
 }
 
+// 2026-05-09: the 'ignored' status string matches domain.ReviewIssueStatusIgnored.
+// Keep the literal here because SQL parameters cannot reference Go constants directly.
 func pendingIssueNotIgnoredCondition(issueKey string) string {
 	return fmt.Sprintf(
 		"NOT EXISTS (SELECT 1 FROM game_review_issue_overrides gio WHERE gio.game_id = g.id AND gio.issue_key = '%s' AND gio.status = 'ignored')",

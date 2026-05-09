@@ -30,7 +30,8 @@ func (h *MetadataHandler) List(c *gin.Context) {
 
 	items, err := h.service.List(h.resource, isAdminRequest(c), options)
 	if err != nil {
-		writeServiceError(c, err, "invalid metadata payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的元数据请求")
 		return
 	}
 
@@ -88,15 +89,21 @@ func parseMetadataListSort(c *gin.Context) (string, bool) {
 func writeMetadataQueryError(c *gin.Context, key string) {
 	c.JSON(http.StatusBadRequest, gin.H{
 		"success": false,
-		"error":   "invalid metadata query parameter: " + key,
+		// 2026-05-09: 统一为中文错误信息
+		"error":   "无效的元数据查询参数: " + key,
 	})
 }
 
 func (h *MetadataHandler) Get(c *gin.Context) {
+	// 2026-05-09: only series resources support detail queries today. This guard
+	// belongs here rather than in the service because it is a routing-level
+	// constraint: the Get endpoint was wired for series specifically, not as a
+	// generic metadata detail action.
 	if h.resource.Table != "series" {
 		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
-			"error":   "resource not found",
+			// 2026-05-09: 统一为中文错误信息
+		"error":   "资源不存在",
 		})
 		return
 	}
@@ -108,7 +115,8 @@ func (h *MetadataHandler) Get(c *gin.Context) {
 
 	detail, err := h.service.GetSeriesDetail(id, isAdminRequest(c))
 	if err != nil {
-		writeServiceError(c, err, "invalid metadata payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的元数据请求")
 		return
 	}
 
@@ -131,7 +139,8 @@ func (h *MetadataHandler) Create(c *gin.Context) {
 	if err := decodeJSONStrict(c, &request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":   "invalid metadata payload",
+			// 2026-05-09: 统一为中文错误信息
+		"error":   "无效的元数据请求",
 		})
 		return
 	}
@@ -139,7 +148,8 @@ func (h *MetadataHandler) Create(c *gin.Context) {
 	input := request.toInput()
 	item, err := h.service.Create(h.resource, input)
 	if err != nil {
-		writeServiceError(c, err, "name is required")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "名称为必填项")
 		return
 	}
 

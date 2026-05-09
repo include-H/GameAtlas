@@ -141,12 +141,8 @@ func (r *GameCatalogRepository) Stats(params domain.GamesListParams) (*domain.Ga
 	args := map[string]any{}
 
 	if !params.IncludeAll {
-		visibility := strings.TrimSpace(params.Visibility)
-		if visibility == "" {
-			visibility = domain.GameVisibilityPublic
-		}
 		where = append(where, "g.visibility = :visibility")
-		args["visibility"] = visibility
+		args["visibility"] = domain.DefaultVisibility(params.Visibility, params.IncludeAll)
 	}
 
 	baseWhere := strings.Join(where, " AND ")

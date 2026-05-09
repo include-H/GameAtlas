@@ -24,7 +24,8 @@ func (h *WikiHandler) Get(c *gin.Context) {
 
 	document, err := h.service.Get(gameID, isAdminRequest(c))
 	if err != nil {
-		writeServiceError(c, err, "invalid wiki payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的 Wiki 请求")
 		return
 	}
 
@@ -50,14 +51,16 @@ func (h *WikiHandler) Update(c *gin.Context) {
 	// 2026-04-06: wiki writes keep a strict transport boundary so request-only
 	// fields cannot silently leak into this persisted document contract.
 	if err := decodeJSONStrict(c, &request); err != nil {
-		writeJSONError(c, http.StatusBadRequest, "invalid wiki payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeJSONError(c, http.StatusBadRequest, "无效的 Wiki 请求")
 		return
 	}
 
 	input := request.toInput()
 	document, err := h.service.Update(gameID, input)
 	if err != nil {
-		writeServiceError(c, err, "invalid wiki payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的 Wiki 请求")
 		return
 	}
 
@@ -81,7 +84,8 @@ func (h *WikiHandler) History(c *gin.Context) {
 
 	items, err := h.service.History(gameID, isAdminRequest(c))
 	if err != nil {
-		writeServiceError(c, err, "invalid wiki payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的 Wiki 请求")
 		return
 	}
 

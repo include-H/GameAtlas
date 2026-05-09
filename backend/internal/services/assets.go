@@ -43,6 +43,11 @@ func NewAssetsService(cfg config.Config, gamesRepo assetGameRepository, assetsRe
 	}
 }
 
+// 2026-05-09: Upload accepts *multipart.FileHeader rather than io.Reader because
+// the caller (the single HTTP handler) always has one, and the method needs both
+// the stream and the content-type from the header. For a single-process app with
+// one upload entrypoint, extracting an io.Reader interface adds indirection
+// without practical testability gain.
 func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart.FileHeader, sortOrder int) (*UploadResult, error) {
 	game, err := s.gamesRepo.GetByID(gameID)
 	if err != nil {
@@ -168,15 +173,6 @@ func newAssetUID() string {
 	)
 }
 
-func newAssetToken(assetType string) string {
-	switch assetType {
-	case "cover", "banner":
-		return newAssetUID()
-	default:
-		return newAssetUID()
-	}
-}
-
 func allocateAssetIdentity(assetType string) (string, string) {
 	switch assetType {
 	case "screenshot":
@@ -186,9 +182,9 @@ func allocateAssetIdentity(assetType string) (string, string) {
 		uid := newAssetUID()
 		return uid, uid
 	case "cover", "banner":
-		return "", newAssetToken(assetType)
+		return "", newAssetUID()
 	default:
-		return "", newAssetToken(assetType)
+		return "", newAssetUID()
 	}
 }
 

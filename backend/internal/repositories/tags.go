@@ -97,6 +97,10 @@ func (r *TagsRepository) ListTags(params domain.TagsListParams) ([]domain.Tag, e
 	return tags, nil
 }
 
+// 2026-05-09: CreateTag uses empty placeholders in the RETURNING clause because
+// SQLite INSERT cannot JOIN tag_groups in the same statement. The method
+// immediately re-queries via ListTags to return the complete object. The first
+// return from db.Get is intentionally discarded when the re-query succeeds.
 func (r *TagsRepository) CreateTag(input domain.TagWriteInput, slug string, sortOrder int, isActive bool) (*domain.Tag, error) {
 	var tag domain.Tag
 	if err := r.db.Get(&tag, `
@@ -239,49 +243,6 @@ func (r *TagsRepository) ValidateTagSelection(tagIDs []int64) ([]int64, error) {
 	}
 
 	return normalized, nil
-}
-
-func (r *TagsRepository) GroupTagIDs(tagIDs []int64) (map[int64][]int64, error) {
-	normalized := uniquePositiveIDs(tagIDs)
-	if len(normalized) == 0 {
-		return map[int64][]int64{}, nil
-	}
-
-	query, args, err := sqlx.In(`
-		SELECT id, group_id
-		FROM tags
-		WHERE is_active = 1 AND id IN (?)
-	`, normalized)
-	if err != nil {
-		return nil, fmt.Errorf("build grouped tags query: %w", err)
-	}
-	query = r.db.Rebind(query)
-
-	type row struct {
-		ID      int64 `db:"id"`
-		GroupID int64 `db:"group_id"`
-	}
-
-	var rows []row
-	if err := r.db.Select(&rows, query, args...); err != nil {
-		return nil, fmt.Errorf("group tags: %w", err)
-	}
-	if len(rows) != len(normalized) {
-		return nil, fmt.Errorf("missing tag ids")
-	}
-
-	grouped := make(map[int64][]int64, len(rows))
-	for _, item := range rows {
-		grouped[item.GroupID] = append(grouped[item.GroupID], item.ID)
-	}
-
-	for groupID := range grouped {
-		sort.Slice(grouped[groupID], func(i, j int) bool {
-			return grouped[groupID][i] < grouped[groupID][j]
-		})
-	}
-
-	return grouped, nil
 }
 
 func (r *TagsRepository) ListByGameID(gameID int64) ([]domain.Tag, error) {

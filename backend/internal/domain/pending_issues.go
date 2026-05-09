@@ -3,6 +3,12 @@ package domain
 type PendingIssueKey string
 type PendingIssueDetailKey string
 
+// 2026-05-09: ReviewIssueStatusIgnored is the override status value stored in
+// game_review_issue_overrides. Keeping it as a domain constant ensures that
+// the canonical value is defined once, even though the SQL repository layer
+// must still use the literal string in queries.
+const ReviewIssueStatusIgnored = "ignored"
+
 const (
 	PendingIssueMissingAssets   PendingIssueKey = "missing-assets"
 	PendingIssueMissingWiki     PendingIssueKey = "missing-wiki"

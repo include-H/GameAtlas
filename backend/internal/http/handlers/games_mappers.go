@@ -55,6 +55,11 @@ func toGameListItemResponses(games []domain.GameListItem) []gameListItemResponse
 	return result
 }
 
+// 2026-05-09: toGameSummaryResponse intentionally reuses gameListItemResponse
+// but only populates core fields. Aggregate counts (screenshot_count,
+// file_count, etc.) are zero-valued because create/update responses return the
+// base game row, not the full catalog read model. Callers must not rely on
+// aggregate fields from this response.
 func toGameSummaryResponse(game domain.Game) gameListItemResponse {
 	return gameListItemResponse{
 		ID:          game.ID,
@@ -74,6 +79,10 @@ func toGameSummaryResponse(game domain.Game) gameListItemResponse {
 	}
 }
 
+// 2026-05-09: toSeriesGameSummaryResponses maps series-scoped game summaries
+// into the shared gameListItemResponse type. Aggregate count fields are omitted
+// because series views do not need them and the SeriesGameSummary domain struct
+// does not carry those values.
 func toSeriesGameSummaryResponses(games []domain.SeriesGameSummary) []gameListItemResponse {
 	result := make([]gameListItemResponse, 0, len(games))
 	for _, game := range games {

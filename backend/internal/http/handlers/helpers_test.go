@@ -86,13 +86,13 @@ func TestWriteServiceError(t *testing.T) {
 		status int
 		msg    string
 	}{
-		{name: "not found", err: services.ErrNotFound, status: http.StatusNotFound, msg: "resource not found"},
-		{name: "forbidden path", err: services.ErrForbiddenPath, status: http.StatusForbidden, msg: "file path is outside PRIMARY_ROM_ROOT"},
-		{name: "missing file", err: services.ErrMissingFile, status: http.StatusBadRequest, msg: "registered file is unavailable"},
+		{name: "not found", err: services.ErrNotFound, status: http.StatusNotFound, msg: "资源不存在"},
+		{name: "forbidden path", err: services.ErrForbiddenPath, status: http.StatusForbidden, msg: "文件路径超出允许范围"},
+		{name: "missing file", err: services.ErrMissingFile, status: http.StatusBadRequest, msg: "注册文件不可用"},
 		{name: "validation", err: services.ErrValidation, status: http.StatusBadRequest, msg: "bad payload"},
 		{name: "upstream", err: services.ErrUpstream, status: http.StatusBadGateway, msg: services.ErrUpstream.Error()},
 		{name: "missing config", err: services.ErrMissingConfig, status: http.StatusBadRequest, msg: services.ErrMissingConfig.Error()},
-		{name: "internal", err: errors.New("boom"), status: http.StatusInternalServerError, msg: "internal server error"},
+		{name: "internal", err: errors.New("boom"), status: http.StatusInternalServerError, msg: "服务器内部错误"},
 	}
 
 	for _, tt := range tests {

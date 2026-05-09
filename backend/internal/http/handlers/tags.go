@@ -21,7 +21,8 @@ func NewTagsHandler(service *services.TagsService) *TagsHandler {
 func (h *TagsHandler) ListGroups(c *gin.Context) {
 	items, err := h.service.ListGroups()
 	if err != nil {
-		writeServiceError(c, err, "invalid tag group payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的标签组请求")
 		return
 	}
 
@@ -42,7 +43,8 @@ func (h *TagsHandler) CreateGroup(c *gin.Context) {
 	if err := decodeJSONStrict(c, &request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":   "invalid tag group payload",
+			// 2026-05-09: 统一为中文错误信息
+		"error":   "无效的标签组请求",
 		})
 		return
 	}
@@ -50,7 +52,8 @@ func (h *TagsHandler) CreateGroup(c *gin.Context) {
 	input := request.toInput()
 	item, err := h.service.CreateGroup(input)
 	if err != nil {
-		writeServiceError(c, err, "key and name are required")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "标识和名称为必填项")
 		return
 	}
 
@@ -77,7 +80,8 @@ func (h *TagsHandler) ListTags(c *gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error":   "invalid tag query parameter: active",
+				// 2026-05-09: 统一为中文错误信息
+		"error":   "无效的标签查询参数: active",
 			})
 			return
 		}
@@ -86,7 +90,8 @@ func (h *TagsHandler) ListTags(c *gin.Context) {
 
 	items, err := h.service.ListTags(params)
 	if err != nil {
-		writeServiceError(c, err, "invalid tag payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的标签请求")
 		return
 	}
 
@@ -105,7 +110,8 @@ func parseTagsListInt64Query(c *gin.Context, key string, fallback int64) (int64,
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":   "invalid tag query parameter: " + key,
+			// 2026-05-09: 统一为中文错误信息
+		"error":   "无效的标签查询参数: " + key,
 		})
 		return 0, false
 	}
@@ -121,7 +127,8 @@ func (h *TagsHandler) CreateTag(c *gin.Context) {
 	if err := decodeJSONStrict(c, &request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":   "invalid tag payload",
+			// 2026-05-09: 统一为中文错误信息
+		"error":   "无效的标签请求",
 		})
 		return
 	}
@@ -129,7 +136,8 @@ func (h *TagsHandler) CreateTag(c *gin.Context) {
 	input := request.toInput()
 	item, err := h.service.CreateTag(input)
 	if err != nil {
-		writeServiceError(c, err, "group_id and name are required")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "所属标签组 ID 和名称为必填项")
 		return
 	}
 

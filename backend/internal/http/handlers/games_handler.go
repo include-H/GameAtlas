@@ -49,7 +49,8 @@ func (h *GamesHandler) List(c *gin.Context) {
 
 	result, err := h.catalog.List(params)
 	if err != nil {
-		writeServiceError(c, err, "invalid game payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的游戏请求")
 		return
 	}
 
@@ -87,7 +88,8 @@ func (h *GamesHandler) ListTimeline(c *gin.Context) {
 	if strings.TrimSpace(toDate) == "" {
 		latestReleaseDate, ok, err := h.timeline.LatestReleaseDate(isAdminRequest(c))
 		if err != nil {
-			writeServiceError(c, err, "invalid timeline params")
+			// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的时间线参数")
 			return
 		}
 		if ok {
@@ -118,7 +120,8 @@ func (h *GamesHandler) ListTimeline(c *gin.Context) {
 
 	result, err := h.timeline.List(params)
 	if err != nil {
-		writeServiceError(c, err, "invalid timeline params")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的时间线参数")
 		return
 	}
 
@@ -154,7 +157,8 @@ func (h *GamesHandler) Stats(c *gin.Context) {
 
 	stats, err := h.catalog.Stats(params)
 	if err != nil {
-		writeServiceError(c, err, "invalid game payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的游戏请求")
 		return
 	}
 
@@ -180,7 +184,8 @@ func (h *GamesHandler) Get(c *gin.Context) {
 
 	detail, err := h.detail.Get(id, isAdminRequest(c))
 	if err != nil {
-		writeServiceError(c, err, "invalid game payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的游戏请求")
 		return
 	}
 
@@ -198,7 +203,8 @@ func (h *GamesHandler) Create(c *gin.Context) {
 	if err := decodeJSONStrict(c, &request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":   "invalid game payload",
+			// 2026-05-09: 统一为中文错误信息
+		"error":   "无效的游戏请求",
 		})
 		return
 	}
@@ -206,7 +212,8 @@ func (h *GamesHandler) Create(c *gin.Context) {
 	input := request.toInput()
 	game, err := h.aggregate.Create(input)
 	if err != nil {
-		writeServiceError(c, err, "title is required")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "标题为必填项")
 		return
 	}
 
@@ -229,14 +236,16 @@ func (h *GamesHandler) UpdateAggregate(c *gin.Context) {
 	if err := decodeJSONStrict(c, &request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":   "invalid game payload",
+			// 2026-05-09: 统一为中文错误信息
+		"error":   "无效的游戏请求",
 		})
 		return
 	}
 
 	game, deleteWarnings, err := h.aggregate.Update(id, request.toInput())
 	if err != nil {
-		writeServiceError(c, err, "title is required")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "标题为必填项")
 		return
 	}
 
@@ -266,7 +275,8 @@ func (h *GamesHandler) Delete(c *gin.Context) {
 
 	result, err := h.aggregate.Delete(id)
 	if err != nil {
-		writeServiceError(c, err, "invalid game payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的游戏请求")
 		return
 	}
 
@@ -288,7 +298,8 @@ func (h *GamesHandler) Favorite(c *gin.Context) {
 
 	isFavorite, err := h.favorites.Set(id, true)
 	if err != nil {
-		writeServiceError(c, err, "invalid game payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的游戏请求")
 		return
 	}
 
@@ -308,7 +319,8 @@ func (h *GamesHandler) Unfavorite(c *gin.Context) {
 
 	isFavorite, err := h.favorites.Set(id, false)
 	if err != nil {
-		writeServiceError(c, err, "invalid game payload")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的游戏请求")
 		return
 	}
 

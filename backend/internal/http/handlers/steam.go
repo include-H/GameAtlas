@@ -28,12 +28,17 @@ func (h *SteamHandler) Search(c *gin.Context) {
 		return
 	}
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "search query is required"})
+		// 2026-05-09: 统一为中文错误信息
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "搜索关键词为必填项"})
 		return
 	}
 	results, err := h.service.Search(query, proxy)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": err.Error()})
+		// 2026-05-09: upstream Steam errors surface as 502 Bad Gateway rather than
+		// 500 because the failure originates from an external dependency, not from
+		// this server. Use writeJSONError to preserve the status code.
+		// 2026-05-09: 统一为中文错误信息
+		writeJSONError(c, http.StatusBadGateway, "Steam 搜索失败")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamSearchResultResponses(results)})
@@ -53,7 +58,8 @@ func (h *SteamHandler) Preview(c *gin.Context) {
 	}
 	preview, err := h.service.PreviewAssets(appID, proxy)
 	if err != nil {
-		writeServiceError(c, err, "invalid steam request")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的 Steam 请求")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamAssetsPreviewResponse(preview)})
@@ -69,13 +75,15 @@ func (h *SteamHandler) Proxy(c *gin.Context) {
 		return
 	}
 	if rawURL == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "url is required"})
+		// 2026-05-09: 统一为中文错误信息
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "URL 为必填项"})
 		return
 	}
 
 	contentType, payload, err := h.service.ProxyAsset(rawURL, proxy)
 	if err != nil {
-		writeServiceError(c, err, "invalid steam proxy request")
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的 Steam 代理请求")
 		return
 	}
 
@@ -98,11 +106,13 @@ func parseSteamProxyQuery(c *gin.Context) (string, bool) {
 	// the service default/environment proxy path.
 	parsed, err := url.Parse(proxy)
 	if err != nil || parsed == nil || parsed.Scheme == "" || parsed.Host == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "valid steam proxy is required"})
+		// 2026-05-09: 统一为中文错误信息
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "需要有效的 Steam 代理地址"})
 		return "", false
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "valid steam proxy is required"})
+		// 2026-05-09: 统一为中文错误信息
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "需要有效的 Steam 代理地址"})
 		return "", false
 	}
 

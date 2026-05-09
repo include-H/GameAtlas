@@ -92,8 +92,8 @@ func TestHitokotoHandlerGetRejectsInvalidMinLengthQuery(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid hitokoto query parameter: min_length"`) {
-		t.Fatalf("body = %s, want invalid min_length query error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的一言查询参数: min_length"`) {
+		t.Fatalf("body = %s, want 无效的一言查询参数: min_length", recorder.Body.String())
 	}
 }
 
@@ -110,7 +110,7 @@ func TestHitokotoHandlerGetRejectsInvalidMaxLengthQuery(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid hitokoto query parameter: max_length"`) {
-		t.Fatalf("body = %s, want invalid max_length query error", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的一言查询参数: max_length"`) {
+		t.Fatalf("body = %s, want 无效的一言查询参数: max_length", recorder.Body.String())
 	}
 }

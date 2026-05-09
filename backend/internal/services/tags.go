@@ -112,6 +112,12 @@ func (s *TagsService) CreateTag(input domain.TagWriteInput) (*domain.Tag, error)
 	}, slugValue, sortOrder, isActive)
 }
 
+// 2026-05-09: __new_tag__: is a legacy inline-creation convention from earlier
+// frontend versions that allowed creating a tag by sending a specially formatted
+// name. The current frontend no longer uses this prefix, but the stripping logic
+// is kept as a defensive measure for any cached or bookmarked form state that
+// might still contain it. Safe to remove once all known clients are on the
+// current frontend version.
 func normalizeTagName(value string) string {
 	name := strings.TrimSpace(value)
 

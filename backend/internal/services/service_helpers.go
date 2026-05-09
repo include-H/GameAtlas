@@ -12,7 +12,7 @@ var ErrNotFound = errors.New("resource not found")
 var ErrValidation = errors.New("validation error")
 
 func normalizeRepoError(err error) error {
-	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, sqlxErrNotFound()) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
 	}
 	return err
@@ -97,8 +97,4 @@ func trimStringPtr(value *string) *string {
 		return nil
 	}
 	return &trimmed
-}
-
-func sqlxErrNotFound() error {
-	return sql.ErrNoRows
 }

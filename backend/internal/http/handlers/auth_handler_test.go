@@ -47,8 +47,8 @@ func TestAuthHandlerLoginRejectsUnknownJSONFields(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"invalid auth payload"`) {
-		t.Fatalf("body = %s, want invalid auth payload", recorder.Body.String())
+	if !strings.Contains(recorder.Body.String(), `"error":"无效的认证请求"`) {
+		t.Fatalf("body = %s, want 无效的认证请求", recorder.Body.String())
 	}
 }
 
