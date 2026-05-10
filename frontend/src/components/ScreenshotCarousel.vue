@@ -547,7 +547,7 @@ const handleImageError = (url: string) => {
 
 /* Filmstrip (Thumbnail Navigation) - Steam Style */
 .screenshot-carousel__filmstrip {
-  padding: 10px 0;
+  padding: 10px 0 0;
   background: var(--app-card-surface);
   border-radius: 16px;
   border: 1px solid var(--app-card-border);
@@ -562,7 +562,7 @@ const handleImageError = (url: string) => {
   gap: 8px;
   justify-content: flex-start;
   overflow-x: auto;
-  padding: 0 10px;
+  padding: 0 10px 6px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }

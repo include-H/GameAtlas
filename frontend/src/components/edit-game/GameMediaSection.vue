@@ -439,14 +439,10 @@ defineProps<{
   justify-content: center;
 }
 
-.media-frame--cover {
+.media-frame--cover,
+.media-frame--screenshots {
   height: var(--media-frame-height);
   min-height: var(--media-frame-height);
-}
-
-.media-frame--screenshots {
-  min-height: var(--media-frame-height);
-  overflow: visible;
 }
 
 .media-frame--video {
