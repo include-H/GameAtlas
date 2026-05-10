@@ -102,7 +102,7 @@ func (r *GamesRepository) IncrementDownloads(id int64) error {
 func (r *GamesRepository) listAssetsByType(gameID int64, assetType string) ([]domain.GameAsset, error) {
 	var assets []domain.GameAsset
 	err := r.db.Select(&assets, `
-		SELECT id, game_id, asset_uid, asset_type, path, sort_order, created_at
+		SELECT id, game_id, asset_uid, asset_type, path, sort_order, position_x, position_y, width_pct, created_at
 		FROM game_assets
 		WHERE game_id = ? AND asset_type = ?
 		ORDER BY sort_order ASC, id ASC

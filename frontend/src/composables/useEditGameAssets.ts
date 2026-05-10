@@ -20,7 +20,7 @@ interface UploadResponseLike {
 }
 
 interface UseEditGameAssetsOptions {
-  form: Ref<Pick<EditGameForm, 'covers' | 'logos' | 'banner_image' | 'screenshots' | 'preview_videos'>>
+  form: Ref<Pick<EditGameForm, 'covers' | 'logo' | 'banner_image' | 'screenshots' | 'preview_videos'>>
   gameId: Ref<number | undefined>
   showCoverSelector: Ref<boolean>
   showBannerSelector: Ref<boolean>
@@ -68,7 +68,11 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
   const handleLogoUploadSuccess = (fileItem: FileItem) => {
     const response = fileItem.response as UploadResponseLike | undefined
     if (response?.success && response.data) {
-      options.form.value.logos.push(options.createEditableLogo(response.data))
+      const oldLogo = options.form.value.logo
+      if (oldLogo) {
+        options.queueAssetDeletion('logo', oldLogo.path, oldLogo.id, oldLogo.asset_uid)
+      }
+      options.form.value.logo = options.createEditableLogo(response.data)
       void options.onAssetPersisted?.()
       options.showLogoSelector.value = false
       options.addAlert('Logo 上传成功', 'success')
@@ -167,19 +171,19 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     options.form.value.covers = covers
   }
 
-  const removeLogo = (index: number) => {
-    const logo = options.form.value.logos[index]
+  const removeLogo = () => {
+    const logo = options.form.value.logo
     if (!logo) return
     options.queueAssetDeletion('logo', logo.path, logo.id, logo.asset_uid)
-    options.form.value.logos = options.form.value.logos.filter((_, i) => i !== index)
+    options.form.value.logo = null
   }
 
-  const handleLogoPositionConfirm = (payload: { positionX: number; positionY: number; widthPct: number }) => {
-    const logo = options.form.value.logos[0]
+  const handleLogoPositionConfirm = (payload: { position_x: number; position_y: number; width_pct: number }) => {
+    const logo = options.form.value.logo
     if (!logo) return
-    logo.positionX = payload.positionX
-    logo.positionY = payload.positionY
-    logo.widthPct = payload.widthPct
+    logo.position_x = payload.position_x
+    logo.position_y = payload.position_y
+    logo.width_pct = payload.width_pct
   }
 
   const removeBanner = () => {

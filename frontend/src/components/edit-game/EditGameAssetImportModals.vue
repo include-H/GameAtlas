@@ -429,25 +429,22 @@
               v-for="(image, index) in steamLogoImages"
               :key="index"
               class="steam-image-item"
-              :class="{ 'steam-image-selected': selectedLogos.has(index) }"
-              @click="emit('toggle-logo-selection', index)"
+              :class="{ 'steam-image-selected': selectedLogoImage === image }"
+              @click="emit('update:selected-logo-image', image)"
             >
               <img :src="image" />
-              <div v-if="selectedLogos.has(index)" class="steam-screenshot-check">
-                <icon-check />
-              </div>
             </div>
           </div>
 
           <a-button
-            v-if="selectedLogos.size > 0"
+            v-if="selectedLogoImage"
             type="primary"
             long
             :loading="isDownloadingSteamLogos"
             html-type="button"
-            @click="emit('download-selected-steam-logos')"
+            @click="emit('download-selected-steam-logo')"
           >
-            下载选中的 {{ selectedLogos.size }} 个 Logo
+            使用此图片
           </a-button>
         </div>
 
@@ -627,7 +624,7 @@ const props = defineProps<{
   logoSearchResults: SteamGameSearchResult[]
   selectedSteamLogoGame: SteamGameSearchResult | null
   steamLogoImages: string[]
-  selectedLogos: Set<number>
+  selectedLogoImage: string
   isDownloadingSteamLogos: boolean
   logoUploadAction: string
   logoUploadData: Record<string, string>
@@ -703,14 +700,14 @@ const emit = defineEmits<{
   'clear-logo': []
   'select-logo-game': [game: SteamGameSearchResult]
   'back-logo-game-search': []
-  'toggle-logo-selection': [index: number]
-  'download-selected-steam-logos': []
+  'update:selected-logo-image': [value: string]
+  'download-selected-steam-logo': []
   'logo-upload-success': [fileItem: FileItem]
   'logo-upload-error': []
   'update:logo-search-url': [value: string]
   'load-logo-from-url': []
   'confirm-logo-selection': []
-  'confirm-logo-position': [payload: { positionX: number; positionY: number; widthPct: number }]
+  'confirm-logo-position': [payload: { position_x: number; position_y: number; width_pct: number }]
 }>()
 
 // Logo position editor state
@@ -766,9 +763,9 @@ const handleLogoPosMouseDown = (e: MouseEvent) => {
 
 const handleLogoPosConfirm = () => {
   emit('confirm-logo-position', {
-    positionX: logoPosX.value,
-    positionY: logoPosY.value,
-    widthPct: logoPosWidth.value,
+    position_x: logoPosX.value,
+    position_y: logoPosY.value,
+    width_pct: logoPosWidth.value,
   })
   emit('update:show-logo-selector', false)
 }

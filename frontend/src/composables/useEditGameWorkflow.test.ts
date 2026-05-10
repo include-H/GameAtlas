@@ -94,7 +94,7 @@ const buildOptions = () => {
         summary: '',
         banner_image: '',
         covers: [],
-        logos: [],
+        logo: null,
         preview_videos: [],
         screenshots: [],
         file_paths: [],

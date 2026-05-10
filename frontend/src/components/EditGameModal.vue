@@ -176,7 +176,7 @@
             :screenshots="form.screenshots"
             :dragged-screenshot-key="draggedScreenshotKey"
             :drag-over-screenshot-key="dragOverScreenshotKey"
-            :logos="form.logos"
+            :logo-image="form.logo?.path || ''"
             @open-cover-selector="showCoverSelector = true"
             @remove-cover="removeCover"
             @set-primary-cover="setPrimaryCover"
@@ -191,7 +191,6 @@
             @screenshot-drop="handleScreenshotDrop"
             @screenshot-drag-end="handleScreenshotDragEnd"
             @open-logo-selector="showLogoSelector = true"
-            @open-logo-position-editor="showLogoSelector = true"
             @remove-logo="removeLogo"
           />
         </a-tab-pane>
@@ -270,7 +269,7 @@
       :logo-search-results="logoSearchResults"
       :selected-steam-logo-game="selectedSteamLogoGame"
       :steam-logo-images="steamLogoImages"
-      :selected-logos="selectedLogos"
+      :selected-logo-image="selectedLogoImage"
       :is-downloading-steam-logos="isDownloadingSteamLogos"
       :logo-upload-action="logoUploadAction"
       :logo-upload-data="logoUploadData"
@@ -279,9 +278,9 @@
       :is-downloading-logo="isDownloadingLogo"
       :logo-banner-src="logoBannerSrc"
       :logo-path="logoPath"
-      :logo-position-x="primaryLogo?.positionX ?? null"
-      :logo-position-y="primaryLogo?.positionY ?? null"
-      :logo-width-pct="primaryLogo?.widthPct ?? null"
+      :logo-position-x="primaryLogo?.position_x ?? null"
+      :logo-position-y="primaryLogo?.position_y ?? null"
+      :logo-width-pct="primaryLogo?.width_pct ?? null"
       @update:show-summary-selector="showSummarySelector = $event"
       @update:steam-summary-search-query="steamSummarySearchQuery = $event"
       @search-summary="searchSteamForSummary"
@@ -339,8 +338,8 @@
       @clear-logo="handleLogoSearchClear"
       @select-logo-game="selectSteamLogoGame"
       @back-logo-game-search="backToLogoGameSearch"
-      @toggle-logo-selection="toggleLogoSelection"
-      @download-selected-steam-logos="downloadSelectedSteamLogos"
+      @update:selected-logo-image="selectedLogoImage = $event"
+      @download-selected-steam-logo="downloadSelectedSteamLogo"
       @logo-upload-success="handleLogoUploadSuccess"
       @logo-upload-error="handleLogoUploadError"
       @update:logo-search-url="logoSearchUrl = $event"
@@ -426,7 +425,7 @@ const {
   downloadSelectedSteamCover,
   downloadSelectedSteamCovers,
   downloadSelectedSteamScreenshots,
-  downloadSelectedSteamLogos,
+  downloadSelectedSteamLogo,
   draggedScreenshotKey,
   dragOverScreenshotKey,
   filteredDeveloperOptions,
@@ -526,7 +525,7 @@ const {
   selectedBannerImage,
   selectedCoverImage,
   selectedCovers,
-  selectedLogos,
+  selectedLogoImage,
   selectedSteamBannerGame,
   selectedSteamGame,
   selectedSteamLogoGame,
@@ -555,7 +554,6 @@ const {
   steamSummarySearchQuery,
   steamSummarySearchResults,
   toggleCoverSelection,
-  toggleLogoSelection,
   toggleSteamScreenshot,
   uploadAction,
   uploadData,

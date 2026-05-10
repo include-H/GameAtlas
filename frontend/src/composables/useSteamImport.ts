@@ -34,7 +34,7 @@ interface SteamScreenshotsData {
 }
 
 interface UseSteamImportOptions {
-  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'developer_ids' | 'publisher_ids' | 'covers' | 'logos' | 'banner_image' | 'screenshots'>>
+  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'developer_ids' | 'publisher_ids' | 'covers' | 'logo' | 'banner_image' | 'screenshots'>>
   gameId: Ref<number | undefined>
   getWikiContent: () => string
   uploadAssetFromUrl: (
@@ -92,7 +92,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const logoPreviewUrl = ref('')
   const isDownloadingLogo = ref(false)
   const steamLogoImages = ref<string[]>([])
-  const selectedLogos = ref<Set<number>>(new Set())
+  const selectedLogoImage = ref('')
   const isDownloadingSteamLogos = ref(false)
 
   // Data source toggle: 'steam' | 'steamgriddb'
@@ -197,7 +197,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       const logos = await steamGridDBService.getLogosBySteamAppId(game.id)
       const images = logos.map((g) => g.url)
       steamLogoImages.value = images
-      selectedLogos.value = new Set()
+      selectedLogoImage.value = ''
       return images
     },
     onError: (message) => {
@@ -588,12 +588,12 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const handleLogoSearchClear = () => {
     logoSteamPicker.clear()
     steamLogoImages.value = []
-    selectedLogos.value = new Set()
+    selectedLogoImage.value = ''
   }
 
   const searchSteamForLogo = async () => {
     steamLogoImages.value = []
-    selectedLogos.value = new Set()
+    selectedLogoImage.value = ''
     await logoSteamPicker.search()
   }
 
@@ -604,36 +604,26 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const backToLogoGameSearch = () => {
     logoSteamPicker.back()
     steamLogoImages.value = []
-    selectedLogos.value = new Set()
+    selectedLogoImage.value = ''
   }
 
-  const toggleLogoSelection = (index: number) => {
-    if (selectedLogos.value.has(index)) {
-      selectedLogos.value.delete(index)
-    } else {
-      selectedLogos.value.add(index)
-    }
-  }
-
-  const downloadSelectedSteamLogos = async () => {
-    if (!steamLogoImages.value.length || !options.gameId.value) return
-
-    const indices = Array.from(selectedLogos.value).sort((a, b) => a - b)
-    if (indices.length === 0) return
+  const downloadSelectedSteamLogo = async () => {
+    if (!selectedLogoImage.value || !options.gameId.value) return
 
     isDownloadingSteamLogos.value = true
     try {
-      for (const index of indices) {
-        const logoUrl = steamLogoImages.value[index]
-        const uploaded = await options.uploadAssetFromUrl(logoUrl, 'logo')
-        options.form.value.logos.push(options.createEditableLogo(uploaded))
+      const uploaded = await options.uploadAssetFromUrl(selectedLogoImage.value, 'logo')
+      const oldLogo = options.form.value.logo
+      if (oldLogo) {
+        options.queueAssetDeletion('logo', oldLogo.path, oldLogo.id, oldLogo.asset_uid)
       }
+      options.form.value.logo = options.createEditableLogo(uploaded)
       await options.onAssetPersisted?.()
       showLogoSelector.value = false
       backToLogoGameSearch()
       steamLogoSearchQuery.value = ''
       logoSearchResults.value = []
-      options.addAlert(`成功添加 ${indices.length} 个 Logo`, 'success')
+      options.addAlert('Logo 下载成功', 'success')
     } catch (error) {
       options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
     } finally {
@@ -641,18 +631,17 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     }
   }
 
-  const loadLogoFromUrl = () => {
-    if (logoSearchUrl.value.trim()) {
-      logoPreviewUrl.value = proxySteamAssetUrl(logoSearchUrl.value.trim())
-    }
-  }
+  const loadLogoFromUrl = async () => {
+    if (!logoSearchUrl.value.trim()) return
 
-  const confirmLogoSelection = async () => {
-    if (!logoPreviewUrl.value) return
     isDownloadingLogo.value = true
     try {
-      const uploaded = await options.uploadAssetFromUrl(logoPreviewUrl.value, 'logo')
-      options.form.value.logos.push(options.createEditableLogo(uploaded))
+      const uploaded = await options.uploadAssetFromUrl(logoSearchUrl.value, 'logo')
+      const oldLogo = options.form.value.logo
+      if (oldLogo) {
+        options.queueAssetDeletion('logo', oldLogo.path, oldLogo.id, oldLogo.asset_uid)
+      }
+      options.form.value.logo = options.createEditableLogo(uploaded)
       await options.onAssetPersisted?.()
       showLogoSelector.value = false
       logoSearchUrl.value = ''
@@ -662,6 +651,12 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       options.addAlert('Logo 下载失败：' + getHttpErrorMessage(error), 'error')
     } finally {
       isDownloadingLogo.value = false
+    }
+  }
+
+  const confirmLogoSelection = async () => {
+    if (logoSearchUrl.value) {
+      await loadLogoFromUrl()
     }
   }
 
@@ -778,7 +773,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     logoSearchResults.value = []
     selectedSteamLogoGame.value = null
     steamLogoImages.value = []
-    selectedLogos.value = new Set()
+    selectedLogoImage.value = ''
     logoSearchUrl.value = ''
     logoPreviewUrl.value = ''
   }
@@ -832,7 +827,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     logoPreviewUrl,
     isDownloadingLogo,
     steamLogoImages,
-    selectedLogos,
+    selectedLogoImage,
     isDownloadingSteamLogos,
     steamLogoSearchQuery,
     logoSearchResults,
@@ -877,8 +872,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     searchSteamForLogo,
     selectSteamLogoGame,
     backToLogoGameSearch,
-    toggleLogoSelection,
-    downloadSelectedSteamLogos,
+    downloadSelectedSteamLogo,
     loadLogoFromUrl,
     confirmLogoSelection,
     resetSteamImportState,

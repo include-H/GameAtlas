@@ -85,11 +85,11 @@ export const useEditGameModal = ({
   })
 
   const primaryLogo = computed(() => {
-    return form.value.logos[0] || null
+    return form.value.logo || null
   })
 
   const logoBannerSrc = computed(() => form.value.banner_image || form.value.covers[0]?.path || '')
-  const logoPath = computed(() => form.value.logos[0]?.path || '')
+  const logoPath = computed(() => form.value.logo?.path || '')
 
   const primaryPreviewVideo = computed(() => {
     return form.value.preview_videos[0] || null
@@ -243,7 +243,7 @@ export const useEditGameModal = ({
 
   const logoUploadData = computed(() => ({
     game_id: String(props.game?.id || ''),
-    sort_order: String(form.value.logos.length),
+    sort_order: '0',
   }))
 
   const uploadHeaders = computed(() => ({}))
@@ -306,16 +306,16 @@ export const useEditGameModal = ({
 
   const createEditableLogo = (asset: LogoItem | UploadedAssetResult | string): EditGameEditableLogo => {
     if (typeof asset === 'string') {
-      return { path: asset, positionX: null, positionY: null, widthPct: null }
+      return { path: asset, position_x: null, position_y: null, width_pct: null }
     }
     const isLogoItem = 'sort_order' in asset
     return {
       id: 'id' in asset ? asset.id : ('asset_id' in asset ? asset.asset_id : undefined),
       asset_uid: asset.asset_uid,
       path: asset.path,
-      positionX: isLogoItem ? (asset as LogoItem).position_x ?? null : null,
-      positionY: isLogoItem ? (asset as LogoItem).position_y ?? null : null,
-      widthPct: isLogoItem ? (asset as LogoItem).width_pct ?? null : null,
+      position_x: isLogoItem ? (asset as LogoItem).position_x ?? null : null,
+      position_y: isLogoItem ? (asset as LogoItem).position_y ?? null : null,
+      width_pct: isLogoItem ? (asset as LogoItem).width_pct ?? null : null,
     }
   }
 
@@ -466,7 +466,7 @@ export const useEditGameModal = ({
     logoPreviewUrl,
     isDownloadingLogo,
     steamLogoImages,
-    selectedLogos,
+    selectedLogoImage,
     isDownloadingSteamLogos,
     steamLogoSearchQuery,
     logoSearchResults,
@@ -511,8 +511,7 @@ export const useEditGameModal = ({
     searchSteamForLogo,
     selectSteamLogoGame,
     backToLogoGameSearch,
-    toggleLogoSelection,
-    downloadSelectedSteamLogos,
+    downloadSelectedSteamLogo,
     loadLogoFromUrl,
     confirmLogoSelection,
     resetSteamImportState,
@@ -622,7 +621,7 @@ export const useEditGameModal = ({
     downloadSelectedSteamBanner,
     downloadSelectedSteamCover,
     downloadSelectedSteamCovers,
-    downloadSelectedSteamLogos,
+    downloadSelectedSteamLogo,
     downloadSelectedSteamScreenshots,
     confirmLogoSelection,
     draggedScreenshotKey,
@@ -688,7 +687,7 @@ export const useEditGameModal = ({
     logoSearchResults,
     steamLogoImages,
     steamLogoSearchQuery,
-    selectedLogos,
+    selectedLogoImage,
     selectedSteamLogoGame,
     modalWidth,
     openFileBrowser,
@@ -754,7 +753,6 @@ export const useEditGameModal = ({
     steamSummarySearchResults,
     toggleCoverSelection,
     toggleSteamScreenshot,
-    toggleLogoSelection,
     uploadAction,
     uploadData,
     uploadHeaders,

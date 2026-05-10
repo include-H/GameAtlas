@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import type { EditGameForm, EditGameEditableLogo } from '@/composables/edit-game-form'
+import type { EditGameForm } from '@/composables/edit-game-form'
 import type { AdminGameDetail } from '@/services/types'
 import { useEditGameFormBootstrap } from './useEditGameFormBootstrap'
 import { seriesService } from '@/services/series.service'
@@ -38,7 +38,7 @@ describe('useEditGameFormBootstrap', () => {
       summary: '',
       banner_image: '',
       covers: [] as Array<{ asset_uid?: string; path: string }>,
-      logos: [] as EditGameEditableLogo[],
+      logo: null,
       preview_videos: [] as Array<{ asset_uid?: string; path: string }>,
       screenshots: [] as Array<{ client_key: string; path: string }>,
       file_paths: [{ path: '', label: '' }],
@@ -57,9 +57,9 @@ describe('useEditGameFormBootstrap', () => {
       createEditableLogo: (asset) => ({
         asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
         path: typeof asset === 'string' ? asset : asset.path,
-        positionX: null,
-        positionY: null,
-        widthPct: null,
+        position_x: null,
+        position_y: null,
+        width_pct: null,
       }),
       createEditableScreenshot: (asset, index) => ({
         path: typeof asset === 'string' ? asset : asset.path,
@@ -124,7 +124,7 @@ describe('useEditGameFormBootstrap', () => {
       summary: '',
       banner_image: '',
       covers: [] as Array<{ asset_uid?: string; path: string }>,
-      logos: [] as EditGameEditableLogo[],
+      logo: null,
       preview_videos: [] as Array<{ asset_uid?: string; path: string }>,
       screenshots: [] as Array<{ client_key: string; path: string }>,
       file_paths: [{ path: '', label: '' }],
@@ -143,9 +143,9 @@ describe('useEditGameFormBootstrap', () => {
       createEditableLogo: (asset) => ({
         asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
         path: typeof asset === 'string' ? asset : asset.path,
-        positionX: null,
-        positionY: null,
-        widthPct: null,
+        position_x: null,
+        position_y: null,
+        width_pct: null,
       }),
       createEditableScreenshot: (asset, index) => ({
         path: typeof asset === 'string' ? asset : asset.path,
@@ -231,7 +231,7 @@ describe('useEditGameFormBootstrap', () => {
         summary: '',
         banner_image: '',
         covers: [],
-        logos: [],
+        logo: null,
         preview_videos: [],
         screenshots: [],
         file_paths: [{ path: '', label: '' }],
@@ -247,9 +247,9 @@ describe('useEditGameFormBootstrap', () => {
       createEditableLogo: (asset) => ({
         asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
         path: typeof asset === 'string' ? asset : asset.path,
-        positionX: null,
-        positionY: null,
-        widthPct: null,
+        position_x: null,
+        position_y: null,
+        width_pct: null,
       }),
       createEditableScreenshot: (asset, index) => ({
         path: typeof asset === 'string' ? asset : asset.path,

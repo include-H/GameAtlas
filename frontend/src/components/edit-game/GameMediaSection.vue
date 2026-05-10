@@ -135,7 +135,7 @@
       <section class="media-block media-block--logo">
         <div class="media-block__title">Logo</div>
         <div
-          v-if="logos.length === 0"
+          v-if="!logoImage"
           class="media-frame media-frame--logo"
         >
           <div
@@ -151,7 +151,7 @@
         </div>
         <div v-else class="media-frame media-frame--logo logo-frame">
           <a-image
-            :src="logos[0].path"
+            :src="logoImage"
             width="100%"
             height="100%"
             fit="contain"
@@ -165,8 +165,8 @@
                 shape="circle"
                 size="small"
                 html-type="button"
-                title="调整位置"
-                @click.stop="emit('open-logo-position-editor')"
+                title="更换 Logo"
+                @click.stop="emit('open-logo-selector')"
               >
                 <icon-settings />
               </a-button>
@@ -177,7 +177,7 @@
                 shape="circle"
                 size="small"
                 html-type="button"
-                @click.stop="emit('remove-logo', 0)"
+                @click.stop="emit('remove-logo')"
               >
                 <icon-delete />
               </a-button>
@@ -327,14 +327,6 @@ interface EditableVideo {
   path: string
 }
 
-interface EditableLogo {
-  asset_uid?: string
-  path: string
-  positionX: number | null
-  positionY: number | null
-  widthPct: number | null
-}
-
 const emit = defineEmits<{
   'open-cover-selector': []
   'remove-cover': [index: number]
@@ -350,8 +342,7 @@ const emit = defineEmits<{
   'screenshot-drop': [clientKey: string]
   'screenshot-drag-end': []
   'open-logo-selector': []
-  'remove-logo': [index: number]
-  'open-logo-position-editor': []
+  'remove-logo': []
 }>()
 
 defineProps<{
@@ -363,7 +354,7 @@ defineProps<{
   screenshots: EditableScreenshot[]
   draggedScreenshotKey: string | null
   dragOverScreenshotKey: string | null
-  logos: EditableLogo[]
+  logoImage: string
 }>()
 
 </script>
@@ -437,6 +428,7 @@ defineProps<{
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
 }
 
 .media-frame--cover,

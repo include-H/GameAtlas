@@ -223,17 +223,14 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       const orderedCoverUids = options.form.value.covers
         .map((item) => item.asset_uid)
         .filter((assetUid): assetUid is string => Boolean(assetUid))
-      const orderedLogoUids = options.form.value.logos
-        .map((item) => item.asset_uid)
-        .filter((assetUid): assetUid is string => Boolean(assetUid))
-      const logoPositions = options.form.value.logos
-        .filter((item): item is typeof item & { asset_uid: string } => Boolean(item.asset_uid))
-        .map((item) => ({
-          asset_uid: item.asset_uid,
-          position_x: item.positionX ?? null,
-          position_y: item.positionY ?? null,
-          width_pct: item.widthPct ?? null,
-        }))
+      const logo = options.form.value.logo
+      const orderedLogoUids = logo?.asset_uid ? [logo.asset_uid] : []
+      const logoPositions = logo?.asset_uid ? [{
+        asset_uid: logo.asset_uid,
+        position_x: logo.position_x ?? null,
+        position_y: logo.position_y ?? null,
+        width_pct: logo.width_pct ?? null,
+      }] : []
       if (!game.public_id) {
         throw new Error('missing game public_id')
       }
