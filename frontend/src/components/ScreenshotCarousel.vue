@@ -138,7 +138,6 @@ interface Props {
   previewVideos?: string[]
   videoPoster?: string | null
   alt?: string
-  height?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -146,7 +145,6 @@ const props = withDefaults(defineProps<Props>(), {
   previewVideos: () => [],
   videoPoster: null,
   alt: 'Game screenshot',
-  height: undefined,
 })
 
 interface MediaItem {

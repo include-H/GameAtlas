@@ -40,10 +40,6 @@ const formatGameDetailSize = (bytes: number) => {
   return `${size.toFixed(1)} ${units[unitIndex]}`
 }
 
-const shouldSpanGameMetadataRow = (items?: { length: number } | null) => {
-  return (items?.length || 0) > 2
-}
-
 interface StartVersionDownloadOptions {
   gameId: string
   versionId: string
@@ -340,7 +336,6 @@ export const useGameDetailView = ({
     openEditModal,
     openWikiEditor,
     publisherNames,
-    shouldSpanMetadataRow: shouldSpanGameMetadataRow,
     showEditModal,
     topSectionRef,
     versions,
