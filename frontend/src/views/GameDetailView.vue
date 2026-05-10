@@ -60,7 +60,6 @@
               :video-poster="game.banner_image || game.cover_image || null"
               :screenshots="game.screenshots.map((item) => item.path)"
               :alt="game.title"
-              :height="carouselHeight"
             />
           </div>
         </div>
@@ -83,6 +82,13 @@
               <div v-else class="sidebar-header-image__placeholder">
                 {{ game.title?.charAt(0) || '?' }}
               </div>
+              <img
+                v-if="primaryLogo"
+                :src="primaryLogo.path"
+                :alt="game.title"
+                class="sidebar-logo-overlay"
+                :style="logoOverlayStyle"
+              />
             </div>
 
             <div v-if="game.summary" class="sidebar-summary">
@@ -230,7 +236,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
@@ -258,7 +264,6 @@ const MarkdownRenderer = defineAsyncComponent(() => import('@/components/Markdow
 
 const {
   canEdit,
-  carouselHeight,
   developerNames,
   editableGame,
   formatDate,
@@ -284,6 +289,19 @@ const {
   gamesStore,
   uiStore,
   isAdmin,
+})
+
+const primaryLogo = computed(() => game.value?.logos?.[0] || null)
+
+const logoOverlayStyle = computed(() => {
+  const logo = game.value?.logos?.[0]
+  if (!logo) return {}
+  return {
+    left: `${logo.position_x ?? 50}%`,
+    top: `${logo.position_y ?? 50}%`,
+    width: `${logo.width_pct ?? 30}%`,
+    transform: 'translate(-50%, -50%)',
+  }
 })
 </script>
 <style scoped src="./GameDetailView.css"></style>

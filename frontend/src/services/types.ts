@@ -123,6 +123,16 @@ export interface CoverItem {
   sort_order: number
 }
 
+export interface LogoItem {
+  id: number
+  asset_uid: string
+  path: string
+  sort_order: number
+  position_x: number | null
+  position_y: number | null
+  width_pct: number | null
+}
+
 export interface GameListItemDto {
   id: number
   public_id: string
@@ -150,6 +160,7 @@ export interface GameDetailDtoBase<TFile extends GameFileEntry = GameFileEntry> 
   preview_videos: VideoAssetItem[]
   screenshots: ScreenshotItem[]
   covers: CoverItem[]
+  logos: LogoItem[]
   series: Series | null
   developers: Developer[]
   publishers: Publisher[]
@@ -199,7 +210,7 @@ export interface GameAggregateFileRequest {
 }
 
 export interface GameAggregateDeleteAssetRequest {
-  asset_type: 'cover' | 'banner' | 'screenshot' | 'video'
+  asset_type: 'cover' | 'banner' | 'screenshot' | 'video' | 'logo'
   path: string
   asset_id?: number
   asset_uid?: string
@@ -213,7 +224,16 @@ export interface GameAggregateUpdateRequest {
     screenshot_order_asset_uids: string[]
     video_order_asset_uids: string[]
     cover_order_asset_uids: string[]
+    logo_order_asset_uids: string[]
+    logo_positions: LogoPosition[]
   }
+}
+
+export interface LogoPosition {
+  asset_uid: string
+  position_x: number | null
+  position_y: number | null
+  width_pct: number | null
 }
 
 export interface GameListQuery {

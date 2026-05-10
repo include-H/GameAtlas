@@ -231,6 +231,7 @@
   justify-content: center;
   flex-shrink: 0;
   background: transparent;
+  position: relative;
 }
 
 .sidebar-header-image__img {
@@ -242,6 +243,13 @@
 
 .sidebar-header-image__img--contain {
   object-fit: contain;
+}
+
+.sidebar-logo-overlay {
+  position: absolute;
+  object-fit: contain;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .sidebar-header-image__placeholder {
@@ -528,11 +536,11 @@
   }
 
   .game-detail__main > :deep(.screenshot-carousel__viewport) {
-    min-height: 320px;
+    min-height: 0;
   }
 
   .game-detail__main > :deep(.screenshot-carousel__main) {
-    min-height: 320px;
+    min-height: 0;
   }
 
   .sidebar-header-image {

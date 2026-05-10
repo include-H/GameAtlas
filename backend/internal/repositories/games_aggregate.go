@@ -81,6 +81,12 @@ func (r *GamesRepository) UpdateAggregate(id int64, input domain.GameAggregateUp
 	if err := r.reorderAssetsTx(tx, id, "cover", input.Assets.CoverOrderAssetUIDs); err != nil {
 		return nil, err
 	}
+	if err := r.reorderAssetsTx(tx, id, "logo", input.Assets.LogoOrderAssetUIDs); err != nil {
+		return nil, err
+	}
+	if err := r.updateLogoPositionsTx(tx, id, input.Assets.LogoPositions); err != nil {
+		return nil, err
+	}
 	if err := r.syncPrimaryCoverTx(tx, id); err != nil {
 		return nil, err
 	}
@@ -303,6 +309,14 @@ func (r *GamesRepository) deleteAssetsTx(tx *sqlx.Tx, gameID int64, deleteAssets
 			if deleted {
 				assetPaths = append(assetPaths, deletedPath)
 			}
+		case "logo":
+			deletedPath, _, deleted, err := r.deleteSingleAssetTx(tx, gameID, "logo", item)
+			if err != nil {
+				return nil, err
+			}
+			if deleted {
+				assetPaths = append(assetPaths, deletedPath)
+			}
 		default:
 			return nil, fmt.Errorf("invalid asset type: %s", strings.TrimSpace(item.AssetType))
 		}
@@ -403,6 +417,23 @@ func (r *GamesRepository) reorderAssetsTx(tx *sqlx.Tx, gameID int64, assetType s
 		}
 	}
 
+	return nil
+}
+
+func (r *GamesRepository) updateLogoPositionsTx(tx *sqlx.Tx, gameID int64, positions []domain.LogoPositionInput) error {
+	for _, lp := range positions {
+		trimmedUID := strings.TrimSpace(lp.AssetUID)
+		if trimmedUID == "" {
+			continue
+		}
+		if _, err := tx.Exec(`
+			UPDATE game_assets
+			SET position_x = ?, position_y = ?, width_pct = ?
+			WHERE game_id = ? AND asset_type = 'logo' AND asset_uid = ?
+		`, lp.PositionX, lp.PositionY, lp.WidthPct, gameID, trimmedUID); err != nil {
+			return fmt.Errorf("update logo position for %s: %w", trimmedUID, err)
+		}
+	}
 	return nil
 }
 

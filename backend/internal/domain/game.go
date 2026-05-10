@@ -72,13 +72,16 @@ type SeriesGameSummary struct {
 }
 
 type GameAsset struct {
-	ID        int64  `db:"id"`
-	GameID    int64  `db:"game_id"`
-	AssetUID  string `db:"asset_uid"`
-	AssetType string `db:"asset_type"`
-	Path      string `db:"path"`
-	SortOrder int    `db:"sort_order"`
-	CreatedAt string `db:"created_at"`
+	ID        int64    `db:"id"`
+	GameID    int64    `db:"game_id"`
+	AssetUID  string   `db:"asset_uid"`
+	AssetType string   `db:"asset_type"`
+	Path      string   `db:"path"`
+	SortOrder int      `db:"sort_order"`
+	PositionX *float64 `db:"position_x"`
+	PositionY *float64 `db:"position_y"`
+	WidthPct  *float64 `db:"width_pct"`
+	CreatedAt string   `db:"created_at"`
 }
 
 type GameFile struct {
@@ -229,12 +232,21 @@ type GameAggregateUpdateInput struct {
 	Assets GameAggregateAssetsInput
 }
 
+type LogoPositionInput struct {
+	AssetUID  string   `json:"asset_uid"`
+	PositionX *float64 `json:"position_x"`
+	PositionY *float64 `json:"position_y"`
+	WidthPct  *float64 `json:"width_pct"`
+}
+
 type GameAggregateAssetsInput struct {
 	Files                    []GameFileUpsertInput
 	DeleteAssets             []GameAssetDeleteInput
 	ScreenshotOrderAssetUIDs []string
 	VideoOrderAssetUIDs      []string
 	CoverOrderAssetUIDs      []string
+	LogoOrderAssetUIDs       []string
+	LogoPositions            []LogoPositionInput
 }
 
 type WikiWriteInput struct {

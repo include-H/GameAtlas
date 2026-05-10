@@ -1,6 +1,7 @@
 import { type Ref } from 'vue'
 import type {
   EditGameEditableCover,
+  EditGameEditableLogo,
   EditGameEditableScreenshot,
   EditGameEditableVideo,
   EditGameForm,
@@ -10,7 +11,7 @@ import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
 import { getHttpErrorMessage } from '@/utils/http-error'
 
 type AlertType = 'success' | 'warning' | 'error'
-type AssetType = 'cover' | 'banner' | 'screenshot' | 'video'
+type AssetType = 'cover' | 'banner' | 'screenshot' | 'video' | 'logo'
 
 interface UploadResponseLike {
   success?: boolean
@@ -19,17 +20,19 @@ interface UploadResponseLike {
 }
 
 interface UseEditGameAssetsOptions {
-  form: Ref<Pick<EditGameForm, 'covers' | 'banner_image' | 'screenshots' | 'preview_videos'>>
+  form: Ref<Pick<EditGameForm, 'covers' | 'logos' | 'banner_image' | 'screenshots' | 'preview_videos'>>
   gameId: Ref<number | undefined>
   showCoverSelector: Ref<boolean>
   showBannerSelector: Ref<boolean>
   showScreenshotSelector: Ref<boolean>
   showVideoSelector: Ref<boolean>
+  showLogoSelector: Ref<boolean>
   isUploadingVideo: Ref<boolean>
   videoUploadProgress: Ref<number>
   videoUploadFileName: Ref<string>
   queueAssetDeletion: (type: AssetType, path: string, assetId?: number, assetUid?: string) => void
   createEditableCover: (asset: UploadedAssetResult) => EditGameEditableCover
+  createEditableLogo: (asset: UploadedAssetResult) => EditGameEditableLogo
   createEditableScreenshot: (asset: UploadedAssetResult, index: number) => EditGameEditableScreenshot
   createEditableVideo: (asset: UploadedAssetResult) => EditGameEditableVideo
   addAlert: (message: string, type: AlertType) => void
@@ -60,6 +63,23 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
 
   const handleCoverUploadError = () => {
     options.addAlert('封面上传失败', 'error')
+  }
+
+  const handleLogoUploadSuccess = (fileItem: FileItem) => {
+    const response = fileItem.response as UploadResponseLike | undefined
+    if (response?.success && response.data) {
+      options.form.value.logos.push(options.createEditableLogo(response.data))
+      void options.onAssetPersisted?.()
+      options.showLogoSelector.value = false
+      options.addAlert('Logo 上传成功', 'success')
+      return
+    }
+
+    options.addAlert('上传失败：' + readUploadError(response), 'error')
+  }
+
+  const handleLogoUploadError = () => {
+    options.addAlert('Logo 上传失败', 'error')
   }
 
   const handleBannerUploadSuccess = (fileItem: FileItem) => {
@@ -147,6 +167,21 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     options.form.value.covers = covers
   }
 
+  const removeLogo = (index: number) => {
+    const logo = options.form.value.logos[index]
+    if (!logo) return
+    options.queueAssetDeletion('logo', logo.path, logo.id, logo.asset_uid)
+    options.form.value.logos = options.form.value.logos.filter((_, i) => i !== index)
+  }
+
+  const handleLogoPositionConfirm = (payload: { positionX: number; positionY: number; widthPct: number }) => {
+    const logo = options.form.value.logos[0]
+    if (!logo) return
+    logo.positionX = payload.positionX
+    logo.positionY = payload.positionY
+    logo.widthPct = payload.widthPct
+  }
+
   const removeBanner = () => {
     const bannerUrl = options.form.value.banner_image
     if (!bannerUrl) return
@@ -178,6 +213,8 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
   return {
     handleCoverUploadSuccess,
     handleCoverUploadError,
+    handleLogoUploadSuccess,
+    handleLogoUploadError,
     handleBannerUploadSuccess,
     handleBannerUploadError,
     handleScreenshotUploadSuccess,
@@ -185,10 +222,12 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     openVideoSelector,
     handleVideoFileChange,
     removeCover,
+    removeLogo,
     removeBanner,
     removeScreenshot,
     removePreviewVideo,
     setPrimaryCover,
+    handleLogoPositionConfirm,
     resetVideoUploadState,
   }
 }

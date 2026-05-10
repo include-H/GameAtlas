@@ -132,6 +132,8 @@ func (s *AssetsService) persistAssetPath(gameID int64, assetType string, assetUI
 	switch assetType {
 	case "cover":
 		return s.assetsRepo.AddCover(gameID, assetUID, path, sortOrder)
+	case "logo":
+		return s.assetsRepo.AddLogo(gameID, assetUID, path, sortOrder)
 	case "banner":
 		return nil, s.assetsRepo.UpdateGameImage(gameID, "banner_image", &path)
 	case "screenshot":
@@ -175,7 +177,7 @@ func newAssetUID() string {
 
 func allocateAssetIdentity(assetType string) (string, string) {
 	switch assetType {
-	case "screenshot", "video", "cover":
+	case "screenshot", "video", "cover", "logo":
 		uid := newAssetUID()
 		return uid, uid
 	case "banner":

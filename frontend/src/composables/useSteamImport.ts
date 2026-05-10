@@ -1,6 +1,7 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import type {
   EditGameEditableCover,
+  EditGameEditableLogo,
   EditGameEditableScreenshot,
   EditGameForm,
 } from '@/composables/edit-game-form'
@@ -15,7 +16,7 @@ export type { WikiMetadataCandidateSelection } from '@/composables/useSteamImpor
 export type ImportSource = 'steam' | 'steamgriddb'
 
 type AlertType = 'success' | 'warning' | 'error'
-type AssetType = 'cover' | 'banner' | 'screenshot' | 'video'
+type AssetType = 'cover' | 'banner' | 'screenshot' | 'video' | 'logo'
 
 interface UploadedAssetLike {
   id?: number
@@ -33,12 +34,12 @@ interface SteamScreenshotsData {
 }
 
 interface UseSteamImportOptions {
-  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'developer_ids' | 'publisher_ids' | 'covers' | 'banner_image' | 'screenshots'>>
+  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'developer_ids' | 'publisher_ids' | 'covers' | 'logos' | 'banner_image' | 'screenshots'>>
   gameId: Ref<number | undefined>
   getWikiContent: () => string
   uploadAssetFromUrl: (
     url: string,
-    assetType: 'cover' | 'banner' | 'screenshot',
+    assetType: 'cover' | 'banner' | 'screenshot' | 'logo',
     sortOrder?: number,
   ) => Promise<UploadedAssetLike>
   queueAssetDeletion: (
@@ -50,6 +51,9 @@ interface UseSteamImportOptions {
   createEditableCover: (
     asset: UploadedAssetLike | string,
   ) => EditGameEditableCover
+  createEditableLogo: (
+    asset: UploadedAssetLike | string,
+  ) => EditGameEditableLogo
   createEditableScreenshot: (
     asset: UploadedAssetLike | string,
     index: number,
@@ -82,6 +86,14 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const steamScreenshotsData = ref<SteamScreenshotsData | null>(null)
   const selectedSteamScreenshots = ref<Set<number>>(new Set())
   const isDownloadingSteamScreenshots = ref(false)
+
+  const showLogoSelector = ref(false)
+  const logoSearchUrl = ref('')
+  const logoPreviewUrl = ref('')
+  const isDownloadingLogo = ref(false)
+  const steamLogoImages = ref<string[]>([])
+  const selectedLogos = ref<Set<number>>(new Set())
+  const isDownloadingSteamLogos = ref(false)
 
   // Data source toggle: 'steam' | 'steamgriddb'
   const coverSource = ref<ImportSource>('steam')
@@ -180,6 +192,19 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     },
   })
 
+  const logoSteamPicker = useSteamPicker<string[]>({
+    onSelect: async (game) => {
+      const logos = await steamGridDBService.getLogosBySteamAppId(game.id)
+      const images = logos.map((g) => g.url)
+      steamLogoImages.value = images
+      selectedLogos.value = new Set()
+      return images
+    },
+    onError: (message) => {
+      options.addAlert('Logo 处理失败：' + message, 'error')
+    },
+  })
+
   const steamCoverSearchQuery = coverSteamPicker.query
   const steamCoverSearchResults = coverSteamPicker.results
   const selectedSteamGame = coverSteamPicker.selectedGame
@@ -194,6 +219,11 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const steamScreenshotSearchResults = screenshotSteamPicker.results
   const selectedSteamScreenshotGame = screenshotSteamPicker.selectedGame
   const isSearchingSteamScreenshots = screenshotSteamPicker.isSearching
+
+  const steamLogoSearchQuery = logoSteamPicker.query
+  const logoSearchResults = logoSteamPicker.results
+  const selectedSteamLogoGame = logoSteamPicker.selectedGame
+  const isSearchingLogo = logoSteamPicker.isSearching
 
   // SteamGridDB search helpers — maps results to SteamGameSearchResult shape for UI reuse
   const sgdbSearchResults = ref<SteamGameSearchResult[]>([])
@@ -555,6 +585,86 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     }
   }
 
+  const handleLogoSearchClear = () => {
+    logoSteamPicker.clear()
+    steamLogoImages.value = []
+    selectedLogos.value = new Set()
+  }
+
+  const searchSteamForLogo = async () => {
+    steamLogoImages.value = []
+    selectedLogos.value = new Set()
+    await logoSteamPicker.search()
+  }
+
+  const selectSteamLogoGame = async (game: SteamGameSearchResult) => {
+    await logoSteamPicker.select(game)
+  }
+
+  const backToLogoGameSearch = () => {
+    logoSteamPicker.back()
+    steamLogoImages.value = []
+    selectedLogos.value = new Set()
+  }
+
+  const toggleLogoSelection = (index: number) => {
+    if (selectedLogos.value.has(index)) {
+      selectedLogos.value.delete(index)
+    } else {
+      selectedLogos.value.add(index)
+    }
+  }
+
+  const downloadSelectedSteamLogos = async () => {
+    if (!steamLogoImages.value.length || !options.gameId.value) return
+
+    const indices = Array.from(selectedLogos.value).sort((a, b) => a - b)
+    if (indices.length === 0) return
+
+    isDownloadingSteamLogos.value = true
+    try {
+      for (const index of indices) {
+        const logoUrl = steamLogoImages.value[index]
+        const uploaded = await options.uploadAssetFromUrl(logoUrl, 'logo')
+        options.form.value.logos.push(options.createEditableLogo(uploaded))
+      }
+      await options.onAssetPersisted?.()
+      showLogoSelector.value = false
+      backToLogoGameSearch()
+      steamLogoSearchQuery.value = ''
+      logoSearchResults.value = []
+      options.addAlert(`成功添加 ${indices.length} 个 Logo`, 'success')
+    } catch (error) {
+      options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
+    } finally {
+      isDownloadingSteamLogos.value = false
+    }
+  }
+
+  const loadLogoFromUrl = () => {
+    if (logoSearchUrl.value.trim()) {
+      logoPreviewUrl.value = proxySteamAssetUrl(logoSearchUrl.value.trim())
+    }
+  }
+
+  const confirmLogoSelection = async () => {
+    if (!logoPreviewUrl.value) return
+    isDownloadingLogo.value = true
+    try {
+      const uploaded = await options.uploadAssetFromUrl(logoPreviewUrl.value, 'logo')
+      options.form.value.logos.push(options.createEditableLogo(uploaded))
+      await options.onAssetPersisted?.()
+      showLogoSelector.value = false
+      logoSearchUrl.value = ''
+      logoPreviewUrl.value = ''
+      options.addAlert('Logo 下载成功', 'success')
+    } catch (error) {
+      options.addAlert('Logo 下载失败：' + getHttpErrorMessage(error), 'error')
+    } finally {
+      isDownloadingLogo.value = false
+    }
+  }
+
   watch(showCoverSelector, (isOpen) => {
     if (!isOpen) return
     const query = pickSteamSearchQuery()
@@ -577,6 +687,14 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     if (!query) return
     steamScreenshotSearchQuery.value = query
     searchSteamForScreenshots()
+  })
+
+  watch(showLogoSelector, (isOpen) => {
+    if (!isOpen) return
+    const query = pickSteamSearchQuery()
+    if (!query) return
+    steamLogoSearchQuery.value = query
+    searchSteamForLogo()
   })
 
   watch(coverSource, () => {
@@ -624,6 +742,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     showCoverSelector.value = false
     showBannerSelector.value = false
     showScreenshotSelector.value = false
+    showLogoSelector.value = false
 
     resetMetadataImportState()
 
@@ -654,6 +773,14 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     selectedSteamScreenshots.value = new Set()
     screenshotSearchUrl.value = ''
     screenshotPreviewUrl.value = ''
+
+    steamLogoSearchQuery.value = ''
+    logoSearchResults.value = []
+    selectedSteamLogoGame.value = null
+    steamLogoImages.value = []
+    selectedLogos.value = new Set()
+    logoSearchUrl.value = ''
+    logoPreviewUrl.value = ''
   }
 
   return {
@@ -700,6 +827,17 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     screenshotSearchResults,
     selectedSteamScreenshotGame,
     isSearchingScreenshots,
+    showLogoSelector,
+    logoSearchUrl,
+    logoPreviewUrl,
+    isDownloadingLogo,
+    steamLogoImages,
+    selectedLogos,
+    isDownloadingSteamLogos,
+    steamLogoSearchQuery,
+    logoSearchResults,
+    selectedSteamLogoGame,
+    isSearchingLogo,
     coverSource,
     bannerSource,
     sgdbAvailable,
@@ -735,6 +873,14 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     loadScreenshotPreview,
     confirmScreenshotSelection,
     downloadSelectedSteamScreenshots,
+    handleLogoSearchClear,
+    searchSteamForLogo,
+    selectSteamLogoGame,
+    backToLogoGameSearch,
+    toggleLogoSelection,
+    downloadSelectedSteamLogos,
+    loadLogoFromUrl,
+    confirmLogoSelection,
     resetSteamImportState,
   }
 }

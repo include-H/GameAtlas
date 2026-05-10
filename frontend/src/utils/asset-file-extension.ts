@@ -12,7 +12,7 @@ const MIME_EXTENSION_MAP: Record<string, string> = {
 
 export function getAssetFileExtension(
   mimeType: string | undefined,
-  assetType: 'cover' | 'banner' | 'screenshot' | 'video',
+  assetType: 'cover' | 'banner' | 'screenshot' | 'video' | 'logo',
 ): string {
   const normalized = (mimeType || '').trim().toLowerCase().split(';')[0]?.trim() || ''
   if (normalized && MIME_EXTENSION_MAP[normalized]) {

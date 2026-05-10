@@ -491,6 +491,8 @@ describe('games service', () => {
         screenshot_order_asset_uids: [],
         video_order_asset_uids: [],
         cover_order_asset_uids: [],
+        logo_order_asset_uids: [],
+        logo_positions: [],
       },
     })
 
@@ -515,6 +517,8 @@ describe('games service', () => {
         screenshot_order_asset_uids: [],
         video_order_asset_uids: [],
         cover_order_asset_uids: [],
+        logo_order_asset_uids: [],
+        logo_positions: [],
       },
     })
   })

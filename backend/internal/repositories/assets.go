@@ -42,6 +42,22 @@ func (r *AssetsRepository) AddCover(gameID int64, assetUID string, path string, 
 	return r.addAsset(gameID, assetUID, "cover", path, sortOrder)
 }
 
+func (r *AssetsRepository) AddLogo(gameID int64, assetUID string, path string, sortOrder int) (*domain.GameAsset, error) {
+	return r.addAsset(gameID, assetUID, "logo", path, sortOrder)
+}
+
+func (r *AssetsRepository) UpdateLogoPosition(gameID int64, assetUID string, posX, posY, widthPct *float64) error {
+	_, err := r.db.Exec(`
+		UPDATE game_assets
+		SET position_x = ?, position_y = ?, width_pct = ?
+		WHERE game_id = ? AND asset_type = 'logo' AND asset_uid = ?
+	`, posX, posY, widthPct, gameID, assetUID)
+	if err != nil {
+		return fmt.Errorf("update logo position: %w", err)
+	}
+	return nil
+}
+
 func (r *AssetsRepository) UpdateGameImage(gameID int64, column string, path *string) error {
 	query := fmt.Sprintf("UPDATE games SET %s = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", column)
 	result, err := r.db.Exec(query, path, gameID)

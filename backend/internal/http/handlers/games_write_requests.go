@@ -33,6 +33,15 @@ type gameAggregateAssetsRequest struct {
 	ScreenshotOrderAssetUIDs []string                          `json:"screenshot_order_asset_uids"`
 	VideoOrderAssetUIDs      []string                          `json:"video_order_asset_uids"`
 	CoverOrderAssetUIDs      []string                          `json:"cover_order_asset_uids"`
+	LogoOrderAssetUIDs       []string                          `json:"logo_order_asset_uids"`
+	LogoPositions            []logoPositionRequest             `json:"logo_positions"`
+}
+
+type logoPositionRequest struct {
+	AssetUID  string   `json:"asset_uid"`
+	PositionX *float64 `json:"position_x"`
+	PositionY *float64 `json:"position_y"`
+	WidthPct  *float64 `json:"width_pct"`
 }
 
 type gameAggregateFileRequest struct {
@@ -105,12 +114,24 @@ func (request gameAggregateAssetsRequest) toDomain() domain.GameAggregateAssetsI
 		})
 	}
 
+	logoPositions := make([]domain.LogoPositionInput, 0, len(request.LogoPositions))
+	for _, lp := range request.LogoPositions {
+		logoPositions = append(logoPositions, domain.LogoPositionInput{
+			AssetUID:  lp.AssetUID,
+			PositionX: lp.PositionX,
+			PositionY: lp.PositionY,
+			WidthPct:  lp.WidthPct,
+		})
+	}
+
 	return domain.GameAggregateAssetsInput{
 		Files:                    files,
 		DeleteAssets:             deleteAssets,
 		ScreenshotOrderAssetUIDs: emptyStringSlice(request.ScreenshotOrderAssetUIDs),
 		VideoOrderAssetUIDs:      emptyStringSlice(request.VideoOrderAssetUIDs),
 		CoverOrderAssetUIDs:      emptyStringSlice(request.CoverOrderAssetUIDs),
+		LogoOrderAssetUIDs:       emptyStringSlice(request.LogoOrderAssetUIDs),
+		LogoPositions:            logoPositions,
 	}
 }
 

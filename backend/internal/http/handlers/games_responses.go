@@ -102,10 +102,13 @@ type timelineGameItemResponse struct {
 }
 
 type gameAssetResponse struct {
-	ID        int64  `json:"id"`
-	AssetUID  string `json:"asset_uid"`
-	Path      string `json:"path"`
-	SortOrder int    `json:"sort_order"`
+	ID        int64   `json:"id"`
+	AssetUID  string  `json:"asset_uid"`
+	Path      string  `json:"path"`
+	SortOrder int     `json:"sort_order"`
+	PositionX *float64 `json:"position_x,omitempty"`
+	PositionY *float64 `json:"position_y,omitempty"`
+	WidthPct  *float64 `json:"width_pct,omitempty"`
 }
 
 type metadataItemResponse struct {
@@ -149,6 +152,7 @@ type gameDetailResponse struct {
 	PreviewVideos []gameAssetResponse             `json:"preview_videos"`
 	Screenshots   []gameAssetResponse             `json:"screenshots"`
 	Covers        []gameAssetResponse             `json:"covers"`
+	Logos         []gameAssetResponse             `json:"logos"`
 	Series        *metadataItemResponse           `json:"series"`
 	Developers    []metadataItemResponse          `json:"developers"`
 	Publishers    []metadataItemResponse          `json:"publishers"`

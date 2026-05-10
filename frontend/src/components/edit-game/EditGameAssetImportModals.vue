@@ -397,10 +397,163 @@
       </div>
     </div>
   </a-modal>
+
+  <a-modal
+    :visible="showLogoSelector"
+    title="Logo"
+    :width="700"
+    :footer="false"
+    @update:visible="emit('update:show-logo-selector', $event)"
+  >
+    <a-tabs v-model:active-key="logoTabKey" type="rounded" size="small">
+      <a-tab-pane key="import" title="更换">
+        <div class="cover-selector-content">
+      <steam-search-panel
+        :query="steamLogoSearchQuery"
+        placeholder="搜索 Steam 游戏..."
+        :loading="isSearchingLogo"
+        :results="logoSearchResults"
+        :selected-game="selectedSteamLogoGame"
+        @update:query="emit('update:steam-logo-search-query', $event)"
+        @search="emit('search-logo')"
+        @clear="emit('clear-logo')"
+        @select="emit('select-logo-game', $event)"
+      >
+        <div v-if="selectedSteamLogoGame && steamLogoImages.length > 0" class="steam-images-section">
+          <div class="steam-search-title">
+            {{ selectedSteamLogoGame.name }} 的 Logo
+            <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('back-logo-game-search')">返回</a-button>
+          </div>
+          <div class="steam-images-grid">
+            <div
+              v-for="(image, index) in steamLogoImages"
+              :key="index"
+              class="steam-image-item"
+              :class="{ 'steam-image-selected': selectedLogos.has(index) }"
+              @click="emit('toggle-logo-selection', index)"
+            >
+              <img :src="image" />
+              <div v-if="selectedLogos.has(index)" class="steam-screenshot-check">
+                <icon-check />
+              </div>
+            </div>
+          </div>
+
+          <a-button
+            v-if="selectedLogos.size > 0"
+            type="primary"
+            long
+            :loading="isDownloadingSteamLogos"
+            html-type="button"
+            @click="emit('download-selected-steam-logos')"
+          >
+            下载选中的 {{ selectedLogos.size }} 个 Logo
+          </a-button>
+        </div>
+
+        <a-empty
+          v-else-if="selectedSteamLogoGame && steamLogoImages.length === 0 && !isSearchingLogo"
+          description="未找到可用 Logo"
+          class="steam-screenshots-empty"
+        />
+      </steam-search-panel>
+
+      <a-divider>本地上传</a-divider>
+      <a-upload
+        :action="logoUploadAction"
+        :data="logoUploadData"
+        :headers="uploadHeaders"
+        :show-file-list="false"
+        accept="image/*"
+        @success="emit('logo-upload-success', $event)"
+        @error="emit('logo-upload-error')"
+      >
+        <a-button class="app-text-action-btn" type="text" long html-type="button">
+          <template #icon>
+            <icon-upload />
+          </template>
+          本地上传
+        </a-button>
+      </a-upload>
+
+      <a-divider>或从 URL 加载</a-divider>
+      <div class="url-input-section">
+        <div class="url-input-row">
+          <a-input
+            :model-value="logoSearchUrl"
+            class="url-input-row__field"
+            placeholder="输入图片 URL..."
+            @update:model-value="emit('update:logo-search-url', String($event ?? ''))"
+            @press-enter="emit('load-logo-from-url')"
+          />
+          <a-button class="app-text-action-btn url-input-row__action" type="text" html-type="button" @click="emit('load-logo-from-url')">
+            加载
+          </a-button>
+        </div>
+
+        <div v-if="logoPreviewUrl" class="cover-preview-section">
+          <img :src="logoPreviewUrl" class="cover-preview-img" />
+        </div>
+      </div>
+
+      <div class="cover-selector-actions">
+        <a-button class="app-text-action-btn" type="text" html-type="button" @click="emit('update:show-logo-selector', false)">取消</a-button>
+        <a-button
+          type="primary"
+          html-type="button"
+          :disabled="!logoPreviewUrl"
+          :loading="isDownloadingLogo"
+          @click="emit('confirm-logo-selection')"
+        >
+          确定
+        </a-button>
+      </div>
+        </div>
+      </a-tab-pane>
+      <a-tab-pane key="position" title="位置">
+        <div class="logo-pos-editor">
+          <div
+            ref="logoPosEditorRef"
+            class="logo-pos-editor__canvas"
+            @mousedown="handleLogoPosMouseDown"
+          >
+            <img
+              v-if="logoBannerSrc"
+              :src="logoBannerSrc"
+              class="logo-pos-editor__banner"
+              draggable="false"
+            />
+            <div v-else class="logo-pos-editor__banner-empty">
+              <icon-image />
+              <span>无横幅图</span>
+            </div>
+            <img
+              v-if="logoPath"
+              :src="logoPath"
+              class="logo-pos-editor__logo"
+              :style="logoPosLogoStyle"
+              draggable="false"
+            />
+            <div class="logo-pos-editor__hint">拖拽移动 · 滑块缩放</div>
+          </div>
+          <div class="logo-pos-editor__controls">
+            <span class="logo-pos-editor__label">大小</span>
+            <a-slider v-model="logoPosWidth" :min="10" :max="80" :step="1" :style="{ flex: 1 }" />
+            <span class="logo-pos-editor__value">{{ logoPosWidth }}%</span>
+          </div>
+          <div class="cover-selector-actions">
+            <a-button class="app-text-action-btn" type="text" html-type="button" @click="emit('update:show-logo-selector', false)">取消</a-button>
+            <a-button type="primary" html-type="button" @click="handleLogoPosConfirm">确定</a-button>
+          </div>
+        </div>
+      </a-tab-pane>
+    </a-tabs>
+  </a-modal>
 </template>
 
 <script setup lang="ts">
-import { IconCheck, IconUpload } from '@arco-design/web-vue/es/icon'
+import { computed, ref, watch } from 'vue'
+import { IconCheck, IconImage, IconUpload } from '@arco-design/web-vue/es/icon'
 import SteamSearchPanel from '@/components/SteamSearchPanel.vue'
 import type { SteamGameSearchResult } from '@/services/types'
 import type { ImportSource } from '@/composables/useSteamImport'
@@ -414,7 +567,7 @@ interface SteamScreenshotsData {
   usedFallbackAssets: boolean
 }
 
-defineProps<{
+const props = defineProps<{
   showSummarySelector: boolean
   steamSummarySearchQuery: string
   isSearchingSteamSummary: boolean
@@ -467,6 +620,25 @@ defineProps<{
   screenshotSearchUrl: string
   screenshotPreviewUrl: string
   isDownloadingScreenshot: boolean
+
+  showLogoSelector: boolean
+  steamLogoSearchQuery: string
+  isSearchingLogo: boolean
+  logoSearchResults: SteamGameSearchResult[]
+  selectedSteamLogoGame: SteamGameSearchResult | null
+  steamLogoImages: string[]
+  selectedLogos: Set<number>
+  isDownloadingSteamLogos: boolean
+  logoUploadAction: string
+  logoUploadData: Record<string, string>
+  logoSearchUrl: string
+  logoPreviewUrl: string
+  isDownloadingLogo: boolean
+  logoBannerSrc: string
+  logoPath: string
+  logoPositionX: number | null
+  logoPositionY: number | null
+  logoWidthPct: number | null
 }>()
 
 const emit = defineEmits<{
@@ -524,7 +696,82 @@ const emit = defineEmits<{
   'update:screenshot-search-url': [value: string]
   'load-screenshot-preview': []
   'confirm-screenshot-selection': []
+
+  'update:show-logo-selector': [value: boolean]
+  'update:steam-logo-search-query': [value: string]
+  'search-logo': []
+  'clear-logo': []
+  'select-logo-game': [game: SteamGameSearchResult]
+  'back-logo-game-search': []
+  'toggle-logo-selection': [index: number]
+  'download-selected-steam-logos': []
+  'logo-upload-success': [fileItem: FileItem]
+  'logo-upload-error': []
+  'update:logo-search-url': [value: string]
+  'load-logo-from-url': []
+  'confirm-logo-selection': []
+  'confirm-logo-position': [payload: { positionX: number; positionY: number; widthPct: number }]
 }>()
+
+// Logo position editor state
+const logoTabKey = ref('import')
+const logoPosEditorRef = ref<HTMLElement | null>(null)
+const logoPosWidth = ref(30)
+const logoPosX = ref(50)
+const logoPosY = ref(50)
+
+watch(() => props.showLogoSelector, (v) => {
+  if (v) {
+    logoPosX.value = props.logoPositionX ?? 50
+    logoPosY.value = props.logoPositionY ?? 50
+    logoPosWidth.value = props.logoWidthPct ?? 30
+    logoTabKey.value = 'import'
+  }
+})
+
+const logoPosLogoStyle = computed(() => ({
+  left: `${logoPosX.value}%`,
+  top: `${logoPosY.value}%`,
+  width: `${logoPosWidth.value}%`,
+  transform: 'translate(-50%, -50%)',
+}))
+
+const handleLogoPosMouseDown = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (!target.classList.contains('logo-pos-editor__logo')) return
+  e.preventDefault()
+  const editor = logoPosEditorRef.value
+  if (!editor) return
+
+  const startMouseX = e.clientX
+  const startMouseY = e.clientY
+  const startPosX = logoPosX.value
+  const startPosY = logoPosY.value
+  const rect = editor.getBoundingClientRect()
+
+  const onMove = (ev: MouseEvent) => {
+    const dx = ev.clientX - startMouseX
+    const dy = ev.clientY - startMouseY
+    logoPosX.value = Math.round(Math.min(95, Math.max(5, startPosX + (dx / rect.width) * 100)) * 10) / 10
+    logoPosY.value = Math.round(Math.min(95, Math.max(5, startPosY + (dy / rect.height) * 100)) * 10) / 10
+  }
+
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
+
+const handleLogoPosConfirm = () => {
+  emit('confirm-logo-position', {
+    positionX: logoPosX.value,
+    positionY: logoPosY.value,
+    widthPct: logoPosWidth.value,
+  })
+  emit('update:show-logo-selector', false)
+}
 </script>
 
 <style scoped>
@@ -744,5 +991,92 @@ const emit = defineEmits<{
   font-size: 14px;
   color: var(--color-text-2);
   flex-shrink: 0;
+}
+
+/* Logo position editor */
+.logo-pos-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.logo-pos-editor__canvas {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 460 / 215;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--app-card-border);
+  background: color-mix(in srgb, var(--app-card-surface) 86%, transparent);
+  user-select: none;
+}
+
+.logo-pos-editor__banner {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.logo-pos-editor__banner-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 2rem;
+  color: var(--color-text-4);
+}
+
+.logo-pos-editor__banner-empty span {
+  font-size: 12px;
+}
+
+.logo-pos-editor__logo {
+  position: absolute;
+  object-fit: contain;
+  pointer-events: auto;
+  cursor: grab;
+  z-index: 2;
+}
+
+.logo-pos-editor__logo:active {
+  cursor: grabbing;
+}
+
+.logo-pos-editor__hint {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(0, 0, 0, 0.4);
+  padding: 2px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 3;
+}
+
+.logo-pos-editor__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo-pos-editor__label {
+  font-size: 13px;
+  color: var(--color-text-3);
+  white-space: nowrap;
+}
+
+.logo-pos-editor__value {
+  font-size: 13px;
+  color: var(--color-text-2);
+  min-width: 36px;
+  text-align: right;
 }
 </style>

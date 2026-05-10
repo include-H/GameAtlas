@@ -1,206 +1,204 @@
 <template>
-  <!--
-    重构说明（2026-03）：
-    1) 已将提交流程下沉到 useEditGameWorkflow（元数据解析、文件路径持久化、资产删除队列、排序提交）。
-    2) 已将资产上传/删除与视频上传状态下沉到 useEditGameAssets。
-    3) 已将表单初始化与回填下沉到 useEditGameFormBootstrap。
-    4) 已将截图拖拽与视频排序交互下沉到 useEditGameMediaState。
-    5) 已将“资产导入弹窗 / 预告片弹窗 / Wiki 标签弹窗”拆为独立子组件。
-    当前 EditGameModal 仅承担外观层职责：UI 编排、状态注入、事件绑定。
-  -->
   <a-modal
     v-model:visible="visible"
     class="edit-game-modal"
-    title="编辑游戏信息"
+    title="编辑游戏"
     :width="modalWidth"
     :footer="false"
     :align-center="false"
     @cancel="handleCancel"
   >
     <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" @submit="handleSubmit">
-      <a-row :gutter="16">
-        <a-col :xs="24" :sm="12">
-          <a-form-item field="title">
+      <a-tabs default-active-key="info" class="edit-modal-tabs">
+        <a-tab-pane key="info" title="游戏信息">
+          <a-row :gutter="12">
+            <a-col :span="12">
+              <a-form-item field="title">
+                <template #label>
+                  <div class="field-label-action">
+                    <span>游戏名称</span>
+                    <a-button
+                      class="app-text-action-btn"
+                      type="text"
+                      size="mini"
+                      html-type="button"
+                      :disabled="!hasParsableWikiContent"
+                      :loading="isPreparingWikiMetadataCandidates"
+                      @click="importMetadataFromWiki"
+                    >
+                      从 Wiki 提取
+                    </a-button>
+                  </div>
+                </template>
+                <a-input v-model="form.title" placeholder="请输入游戏名称" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="别名/英文名">
+                <a-input v-model="form.title_alt" placeholder="请输入别名" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <a-row :gutter="12">
+            <a-col :span="12">
+              <a-form-item label="开发商">
+                <a-select
+                  v-model="form.developer_ids"
+                  placeholder="选择开发商（可多选）"
+                  multiple
+                  allow-clear
+                  allow-search
+                  allow-create
+                  :remote-search="true"
+                  :on-search="handleDeveloperSearch"
+                >
+                  <a-option
+                    v-for="d in filteredDeveloperOptions"
+                    :key="d.id"
+                    :value="d.id"
+                    :label="d.name"
+                  >
+                    {{ d.name }}
+                  </a-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="发行商">
+                <a-select
+                  v-model="form.publisher_ids"
+                  placeholder="选择发行商（可多选）"
+                  multiple
+                  allow-clear
+                  allow-search
+                  allow-create
+                  :remote-search="true"
+                  :on-search="handlePublisherSearch"
+                >
+                  <a-option
+                    v-for="p in filteredPublisherOptions"
+                    :key="p.id"
+                    :value="p.id"
+                    :label="p.name"
+                  >
+                    {{ p.name }}
+                  </a-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <a-row :gutter="12">
+            <a-col :span="8">
+              <a-form-item label="系列">
+                <a-select
+                  v-model="form.series_id"
+                  placeholder="选择系列"
+                  allow-clear
+                  allow-search
+                  allow-create
+                  :loading="isSearchingSeries"
+                  :remote-search="true"
+                  :on-search="handleSeriesSearch"
+                >
+                  <a-option
+                    v-for="s in filteredSeriesOptions"
+                    :key="s.id"
+                    :value="s.id"
+                    :label="s.name"
+                  >
+                    {{ s.name }}
+                  </a-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="发行日期">
+                <a-date-picker
+                  v-model="releaseDate"
+                  :min-year="1950"
+                  :max-year="2100"
+                  placeholder="选择发行日期"
+                  class="w-full"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="可见性">
+                <a-radio-group v-model="form.visibility" type="button">
+                  <a-radio value="public">公开</a-radio>
+                  <a-radio value="private">私有</a-radio>
+                </a-radio-group>
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <a-form-item>
             <template #label>
-              <div class="field-label-action">
-                <span>游戏名称</span>
+              <div class="summary-label">
+                <span>简介</span>
                 <a-button
                   class="app-text-action-btn"
                   type="text"
                   size="mini"
                   html-type="button"
-                  :disabled="!hasParsableWikiContent"
-                  :loading="isPreparingWikiMetadataCandidates"
-                  @click="importMetadataFromWiki"
+                  @click="showSummarySelector = true"
                 >
-                  从 Wiki 提取
+                  从 Steam 导入
                 </a-button>
               </div>
             </template>
-            <a-input v-model="form.title" placeholder="请输入游戏名称" />
-          </a-form-item>
-        </a-col>
-        <a-col :xs="24" :sm="12">
-          <a-form-item label="别名/英文名">
-            <a-input v-model="form.title_alt" placeholder="请输入别名" />
-          </a-form-item>
-        </a-col>
-      </a-row>
-
-      <a-row :gutter="16">
-        <a-col :xs="24" :sm="12">
-          <a-form-item label="开发商">
-            <a-select
-              v-model="form.developer_ids"
-              placeholder="选择开发商（可多选）"
-              multiple
-              allow-clear
-              allow-search
-              allow-create
-              :loading="isSearchingDevelopers"
-              :remote-search="true"
-              :on-search="handleDeveloperSearch"
-            >
-              <a-option
-                v-for="d in filteredDeveloperOptions"
-                :key="d.id"
-                :value="d.id"
-                :label="d.name"
-              >
-                {{ d.name }}
-              </a-option>
-            </a-select>
-          </a-form-item>
-        </a-col>
-        <a-col :xs="24" :sm="12">
-          <a-form-item label="发行商">
-            <a-select
-              v-model="form.publisher_ids"
-              placeholder="选择发行商（可多选）"
-              multiple
-              allow-clear
-              allow-search
-              allow-create
-              :loading="isSearchingPublishers"
-              :remote-search="true"
-              :on-search="handlePublisherSearch"
-            >
-              <a-option
-                v-for="p in filteredPublisherOptions"
-                :key="p.id"
-                :value="p.id"
-                :label="p.name"
-              >
-                {{ p.name }}
-              </a-option>
-            </a-select>
-          </a-form-item>
-        </a-col>
-      </a-row>
-
-      <a-row :gutter="16">
-        <a-col :xs="24" :sm="9">
-          <a-form-item label="系列">
-            <a-select
-              v-model="form.series_id"
-              placeholder="选择系列"
-              allow-clear
-              allow-search
-              allow-create
-              :loading="isSearchingSeries"
-              :remote-search="true"
-              :on-search="handleSeriesSearch"
-            >
-              <a-option
-                v-for="s in filteredSeriesOptions"
-                :key="s.id"
-                :value="s.id"
-                :label="s.name"
-              >
-                {{ s.name }}
-              </a-option>
-            </a-select>
-          </a-form-item>
-        </a-col>
-        <a-col :xs="24" :sm="6" class="visibility-col">
-          <a-form-item label="可见性" class="visibility-form-item">
-            <a-radio-group v-model="form.visibility" type="button">
-              <a-radio value="public">公开</a-radio>
-              <a-radio value="private">私有</a-radio>
-            </a-radio-group>
-          </a-form-item>
-        </a-col>
-        <a-col :xs="24" :sm="9">
-          <a-form-item label="发行日期">
-            <a-date-picker
-              v-model="releaseDate"
-              :min-year="1950"
-              :max-year="2100"
-              placeholder="选择发行日期"
-              class="w-full"
+            <a-textarea
+              v-model="form.summary"
+              placeholder="简短描述..."
+              :auto-size="{ minRows: 3, maxRows: 6 }"
+              show-word-limit
             />
           </a-form-item>
-        </a-col>
-      </a-row>
+
+          <game-file-paths-section
+            :file-paths="form.file_paths"
+            @update-item="handleFilePathItemUpdate"
+            @add="addFilePath"
+            @remove="removeFilePath"
+            @browse="openFileBrowser"
+          />
+        </a-tab-pane>
+
+        <a-tab-pane key="media" title="游戏素材">
+          <game-media-section
+            :title="form.title"
+            :covers="form.covers"
+            :banner-image="form.banner_image"
+            :primary-preview-video="primaryPreviewVideo"
+            :preview-video-sources="previewVideoSources"
+            :screenshots="form.screenshots"
+            :dragged-screenshot-key="draggedScreenshotKey"
+            :drag-over-screenshot-key="dragOverScreenshotKey"
+            :logos="form.logos"
+            @open-cover-selector="showCoverSelector = true"
+            @remove-cover="removeCover"
+            @set-primary-cover="setPrimaryCover"
+            @reorder-cover="reorderEditableCovers($event.key, $event.direction)"
+            @open-banner-selector="showBannerSelector = true"
+            @remove-banner="removeBanner"
+            @open-video-selector="openVideoSelector"
+            @open-screenshot-selector="showScreenshotSelector = true"
+            @remove-screenshot="removeScreenshot"
+            @screenshot-drag-start="handleScreenshotDragStart"
+            @screenshot-drag-enter="handleScreenshotDragEnter"
+            @screenshot-drop="handleScreenshotDrop"
+            @screenshot-drag-end="handleScreenshotDragEnd"
+            @open-logo-selector="showLogoSelector = true"
+            @open-logo-position-editor="showLogoSelector = true"
+            @remove-logo="removeLogo"
+          />
+        </a-tab-pane>
+      </a-tabs>
 
       <a-form-item>
-        <template #label>
-          <div class="summary-label">
-            <span>简介</span>
-            <a-button
-              class="app-text-action-btn"
-              type="text"
-              size="mini"
-              html-type="button"
-              @click="showSummarySelector = true"
-            >
-              从 Steam 导入
-            </a-button>
-          </div>
-        </template>
-        <a-textarea
-          v-model="form.summary"
-          placeholder="简短描述..."
-          :auto-size="{ minRows: 2, maxRows: 4 }"
-          show-word-limit
-        />
-      </a-form-item>
-
-      <game-file-paths-section
-        :file-paths="form.file_paths"
-        @update-item="handleFilePathItemUpdate"
-        @add="addFilePath"
-        @remove="removeFilePath"
-        @browse="openFileBrowser"
-      />
-
-
-      <game-media-section
-        :title="form.title"
-        :covers="form.covers"
-        :banner-image="form.banner_image"
-        :primary-preview-video="primaryPreviewVideo"
-        :preview-video-sources="previewVideoSources"
-        :screenshots="form.screenshots"
-        :dragged-screenshot-key="draggedScreenshotKey"
-        :drag-over-screenshot-key="dragOverScreenshotKey"
-        @open-cover-selector="showCoverSelector = true"
-        @remove-cover="removeCover"
-        @set-primary-cover="setPrimaryCover"
-        @reorder-cover="reorderEditableCovers($event.key, $event.direction)"
-        @open-banner-selector="showBannerSelector = true"
-        @remove-banner="removeBanner"
-        @open-video-selector="openVideoSelector"
-        @open-screenshot-selector="showScreenshotSelector = true"
-        @remove-screenshot="removeScreenshot"
-        @screenshot-drag-start="handleScreenshotDragStart"
-        @screenshot-drag-enter="handleScreenshotDragEnter"
-        @screenshot-drop="handleScreenshotDrop"
-        @screenshot-drag-end="handleScreenshotDragEnd"
-      />
-
-		      <a-form-item>
-	        <a-space style="justify-content: flex-end; width: 100%">
+        <a-space style="justify-content: flex-end; width: 100%">
           <a-button class="app-text-action-btn" type="text" html-type="button" @click="handleCancel">取消</a-button>
           <a-button type="primary" html-type="submit" :loading="isSubmitting">
             保存
@@ -266,6 +264,24 @@
       :screenshot-search-url="screenshotSearchUrl"
       :screenshot-preview-url="screenshotPreviewUrl"
       :is-downloading-screenshot="isDownloadingScreenshot"
+      :show-logo-selector="showLogoSelector"
+      :steam-logo-search-query="steamLogoSearchQuery"
+      :is-searching-logo="isSearchingLogo"
+      :logo-search-results="logoSearchResults"
+      :selected-steam-logo-game="selectedSteamLogoGame"
+      :steam-logo-images="steamLogoImages"
+      :selected-logos="selectedLogos"
+      :is-downloading-steam-logos="isDownloadingSteamLogos"
+      :logo-upload-action="logoUploadAction"
+      :logo-upload-data="logoUploadData"
+      :logo-search-url="logoSearchUrl"
+      :logo-preview-url="logoPreviewUrl"
+      :is-downloading-logo="isDownloadingLogo"
+      :logo-banner-src="logoBannerSrc"
+      :logo-path="logoPath"
+      :logo-position-x="primaryLogo?.positionX ?? null"
+      :logo-position-y="primaryLogo?.positionY ?? null"
+      :logo-width-pct="primaryLogo?.widthPct ?? null"
       @update:show-summary-selector="showSummarySelector = $event"
       @update:steam-summary-search-query="steamSummarySearchQuery = $event"
       @search-summary="searchSteamForSummary"
@@ -317,6 +333,20 @@
       @update:screenshot-search-url="screenshotSearchUrl = $event"
       @load-screenshot-preview="loadScreenshotPreview"
       @confirm-screenshot-selection="confirmScreenshotSelection"
+      @update:show-logo-selector="showLogoSelector = $event"
+      @update:steam-logo-search-query="steamLogoSearchQuery = $event"
+      @search-logo="searchSteamForLogo"
+      @clear-logo="handleLogoSearchClear"
+      @select-logo-game="selectSteamLogoGame"
+      @back-logo-game-search="backToLogoGameSearch"
+      @toggle-logo-selection="toggleLogoSelection"
+      @download-selected-steam-logos="downloadSelectedSteamLogos"
+      @logo-upload-success="handleLogoUploadSuccess"
+      @logo-upload-error="handleLogoUploadError"
+      @update:logo-search-url="logoSearchUrl = $event"
+      @load-logo-from-url="loadLogoFromUrl"
+      @confirm-logo-selection="confirmLogoSelection"
+      @confirm-logo-position="handleLogoPositionConfirm"
     />
 
     <edit-game-video-modal
@@ -380,12 +410,14 @@ const {
   backToCoverGameSearch,
   backToScreenshotGameSearch,
   backToSummarySearch,
+  backToLogoGameSearch,
   bannerPreviewUrl,
   bannerSearchUrl,
   bannerUploadAction,
   bannerUploadData,
   confirmBannerSelection,
   confirmCoverSelection,
+  confirmLogoSelection,
   confirmScreenshotSelection,
   confirmSummaryImport,
   coverPreviewUrl,
@@ -394,6 +426,7 @@ const {
   downloadSelectedSteamCover,
   downloadSelectedSteamCovers,
   downloadSelectedSteamScreenshots,
+  downloadSelectedSteamLogos,
   draggedScreenshotKey,
   dragOverScreenshotKey,
   filteredDeveloperOptions,
@@ -403,6 +436,10 @@ const {
   handleBannerSearchClear,
   handleBannerUploadError,
   handleBannerUploadSuccess,
+  handleLogoSearchClear,
+  handleLogoPositionConfirm,
+  handleLogoUploadError,
+  handleLogoUploadSuccess,
   handleCancel,
   hasParsableWikiContent,
   handleCoverError,
@@ -430,31 +467,42 @@ const {
   isApplyingWikiMetadata,
   isDownloadingBanner,
   isDownloadingCover,
+  isDownloadingLogo,
   isDownloadingScreenshot,
   isDownloadingSteamCovers,
+  isDownloadingSteamLogos,
   isDownloadingSteamScreenshots,
   isPreparingWikiMetadataCandidates,
-  isSearchingDevelopers,
-  isSearchingPublishers,
   isSearchingSeries,
   isSearchingBanner,
   isSearchingCover,
+  isSearchingLogo,
   isSearchingScreenshots,
   isSearchingSteamSummary,
   isUploadingVideo,
   loadBannerFromUrl,
   loadCoverFromUrl,
+  loadLogoFromUrl,
   loadScreenshotPreview,
+  logoPreviewUrl,
+  logoSearchResults,
+  logoSearchUrl,
+  logoUploadAction,
+  logoUploadData,
+  logoBannerSrc,
+  logoPath,
   modalWidth,
   openFileBrowser,
   openVideoSelector,
   previewVideoSources,
   primaryCover,
+  primaryLogo,
   primaryPreviewVideo,
   releaseDate,
   removeBanner,
   removeCover,
   removeFilePath,
+  removeLogo,
   removePreviewVideo,
   removeScreenshot,
   reorderEditableCovers,
@@ -467,23 +515,28 @@ const {
   screenshotUploadData,
   searchSteamForBanner,
   searchSteamForCover,
+  searchSteamForLogo,
   searchSteamForScreenshots,
   searchSteamForSummary,
   selectSteamBannerGame,
   selectSteamCoverGame,
+  selectSteamLogoGame,
   selectSteamScreenshotGame,
   selectSteamSummaryGame,
   selectedBannerImage,
   selectedCoverImage,
   selectedCovers,
+  selectedLogos,
   selectedSteamBannerGame,
   selectedSteamGame,
+  selectedSteamLogoGame,
   selectedSteamScreenshotGame,
   selectedSteamScreenshots,
   selectedSteamSummaryGame,
   showBannerSelector,
   showCoverSelector,
   showFileBrowser,
+  showLogoSelector,
   showScreenshotSelector,
   showSummarySelector,
   showVideoSelector,
@@ -493,6 +546,8 @@ const {
   steamCoverImages,
   steamCoverSearchQuery,
   coverSearchResults,
+  steamLogoImages,
+  steamLogoSearchQuery,
   steamScreenshotSearchQuery,
   screenshotSearchResults,
   steamScreenshotsData,
@@ -500,6 +555,7 @@ const {
   steamSummarySearchQuery,
   steamSummarySearchResults,
   toggleCoverSelection,
+  toggleLogoSelection,
   toggleSteamScreenshot,
   uploadAction,
   uploadData,

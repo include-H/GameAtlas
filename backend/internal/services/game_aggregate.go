@@ -93,7 +93,7 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 
 	for _, item := range input.Assets.DeleteAssets {
 		switch strings.TrimSpace(item.AssetType) {
-		case "cover", "banner", "screenshot", "video":
+		case "cover", "banner", "screenshot", "video", "logo":
 		default:
 			return nil, nil, ErrValidation
 		}
@@ -107,6 +107,8 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 			ScreenshotOrderAssetUIDs: input.Assets.ScreenshotOrderAssetUIDs,
 			VideoOrderAssetUIDs:      input.Assets.VideoOrderAssetUIDs,
 			CoverOrderAssetUIDs:      input.Assets.CoverOrderAssetUIDs,
+			LogoOrderAssetUIDs:       input.Assets.LogoOrderAssetUIDs,
+			LogoPositions:            input.Assets.LogoPositions,
 		},
 	})
 	if err != nil {

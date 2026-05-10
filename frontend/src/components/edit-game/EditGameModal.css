@@ -930,3 +930,17 @@
   max-height: 80vh;
   object-fit: contain;
 }
+
+/* Edit modal tabs */
+.edit-modal-tabs :deep(.arco-tabs-nav) {
+  margin-bottom: 10px;
+}
+
+.edit-modal-tabs :deep(.arco-tabs-content) {
+  padding: 0;
+}
+
+.edit-modal-tabs :deep(.arco-tabs-pane) {
+  padding-top: 4px;
+}
+

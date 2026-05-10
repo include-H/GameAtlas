@@ -136,6 +136,19 @@ func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDe
 		})
 	}
 
+	logos := make([]gameAssetResponse, 0, len(detail.Logos))
+	for _, asset := range detail.Logos {
+		logos = append(logos, gameAssetResponse{
+			ID:        asset.ID,
+			AssetUID:  asset.AssetUID,
+			Path:      asset.Path,
+			SortOrder: asset.SortOrder,
+			PositionX: asset.PositionX,
+			PositionY: asset.PositionY,
+			WidthPct:  asset.WidthPct,
+		})
+	}
+
 	var series *metadataItemResponse
 	if detail.Series != nil {
 		series = &metadataItemResponse{
@@ -162,6 +175,7 @@ func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDe
 		PreviewVideos: previewVideos,
 		Screenshots:   screenshots,
 		Covers:        covers,
+		Logos:         logos,
 		Series:        series,
 		Developers:    toMetadataResponses(detail.Developers),
 		Publishers:    toMetadataResponses(detail.Publishers),

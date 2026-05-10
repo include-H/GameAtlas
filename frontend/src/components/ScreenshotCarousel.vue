@@ -204,39 +204,19 @@ const currentMedia = computed(() => {
 })
 
 const placeholderImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450"%3E%3Crect fill="%231a1a1a" width="800" height="450"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23666" font-size="24"%3E暂无截图%3C/text%3E%3C/svg%3E'
-const filmstripHeight = computed(() => (mediaItems.value.length > 1 ? 80 : 0))
 
 const viewportStyle = computed(() => {
-  if (props.height) {
-    const viewportHeight = Math.max(props.height - filmstripHeight.value, 240)
-    return { height: `${viewportHeight}px` }
+  if (viewportWidth.value > 0) {
+    const ratio = currentMedia.value?.type === 'video' ? 16 / 9 : (viewportAspect.value === '16 / 9' ? 16 / 9 : 4 / 3)
+    const height = Math.round(viewportWidth.value / ratio)
+    return { height: `${height}px`, minHeight: '0' }
   }
   if (currentMedia.value?.type === 'video') {
-    return { aspectRatio: '16 / 9' }
+    return { aspectRatio: '16 / 9', minHeight: '0' }
   }
-  if (viewportWidth.value > 0) {
-    const ratio = viewportAspect.value === '16 / 9' ? 16 / 9 : 4 / 3
-    const height = Math.round(viewportWidth.value / ratio)
-    return { height: `${height}px` }
-  }
-  return { aspectRatio: viewportAspect.value }
+  return { aspectRatio: viewportAspect.value, minHeight: '0' }
 })
 
-// 应用高度的函数
-const applyHeight = (height: number | undefined) => {
-  if (carouselRef.value) {
-    if (height) {
-      carouselRef.value.style.height = `${height}px`
-    } else {
-      carouselRef.value.style.height = ''
-    }
-  }
-}
-
-// 监听高度变化
-watch(() => props.height, (newHeight) => {
-  applyHeight(newHeight)
-}, { immediate: true })
 
 watch(() => [props.screenshots, props.previewVideos], () => {
   brokenImages.value = []
@@ -299,7 +279,7 @@ onBeforeUnmount(() => {
 
 const onImageLoad = (event: Event) => {
   imageLoaded.value = true
-  if (aspectResolved.value || props.height) return
+  if (aspectResolved.value) return
 
   const img = event.target as HTMLImageElement | null
   if (!img || !img.naturalWidth || !img.naturalHeight) return
@@ -427,7 +407,7 @@ const handleImageError = (url: string) => {
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 420px;
+  min-height: 0;
   overflow: hidden;
   z-index: 1;
 }
@@ -452,8 +432,8 @@ const handleImageError = (url: string) => {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
-  background: transparent;
+  object-fit: contain;
+  background: #000;
   object-position: center center;
   opacity: 0;
   transform: scale(1.02);

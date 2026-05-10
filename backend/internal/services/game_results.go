@@ -31,6 +31,7 @@ type GameDetail struct {
 	PreviewVideos []domain.GameAsset
 	Screenshots   []domain.GameAsset
 	Covers        []domain.GameAsset
+	Logos         []domain.GameAsset
 	Series        *domain.MetadataItem
 	Developers    []domain.MetadataItem
 	Publishers    []domain.MetadataItem

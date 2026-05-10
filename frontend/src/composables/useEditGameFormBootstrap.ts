@@ -2,6 +2,7 @@ import { type Ref } from 'vue'
 import {
   createEmptyEditGameForm,
   type EditGameEditableCover,
+  type EditGameEditableLogo,
   type EditGameEditableScreenshot,
   type EditGameEditableVideo,
   type EditGameForm,
@@ -13,6 +14,7 @@ import type {
   AdminGameDetail,
   CoverItem,
   Developer,
+  LogoItem,
   Publisher,
   ScreenshotItem,
   Series,
@@ -26,6 +28,7 @@ interface UseEditGameFormBootstrapOptions {
   publisherOptions: Ref<Publisher[]>
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
   createEditableCover: (asset: CoverItem | string) => EditGameEditableCover
+  createEditableLogo: (asset: LogoItem | string) => EditGameEditableLogo
   createEditableScreenshot: (asset: ScreenshotItem | string, index: number) => EditGameEditableScreenshot
   createEditableVideo: (asset: VideoAssetItem | string) => EditGameEditableVideo
 }
@@ -65,6 +68,9 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
       banner_image: game.banner_image || '',
       covers: game.covers.map((asset) =>
         options.createEditableCover(asset),
+      ),
+      logos: game.logos.map((asset) =>
+        options.createEditableLogo(asset),
       ),
       preview_videos: game.preview_videos.map((asset) =>
         options.createEditableVideo(asset),

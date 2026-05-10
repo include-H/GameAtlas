@@ -14,7 +14,7 @@ import type {
   Series,
 } from '@/services/types'
 
-type AssetType = 'cover' | 'banner' | 'screenshot' | 'video'
+type AssetType = 'cover' | 'banner' | 'screenshot' | 'video' | 'logo'
 
 interface PendingDeleteAsset {
   type: AssetType
@@ -223,6 +223,17 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       const orderedCoverUids = options.form.value.covers
         .map((item) => item.asset_uid)
         .filter((assetUid): assetUid is string => Boolean(assetUid))
+      const orderedLogoUids = options.form.value.logos
+        .map((item) => item.asset_uid)
+        .filter((assetUid): assetUid is string => Boolean(assetUid))
+      const logoPositions = options.form.value.logos
+        .filter((item): item is typeof item & { asset_uid: string } => Boolean(item.asset_uid))
+        .map((item) => ({
+          asset_uid: item.asset_uid,
+          position_x: item.positionX ?? null,
+          position_y: item.positionY ?? null,
+          width_pct: item.widthPct ?? null,
+        }))
       if (!game.public_id) {
         throw new Error('missing game public_id')
       }
@@ -252,6 +263,8 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
           screenshot_order_asset_uids: orderedScreenshotUids,
           video_order_asset_uids: orderedVideoUids,
           cover_order_asset_uids: orderedCoverUids,
+          logo_order_asset_uids: orderedLogoUids,
+          logo_positions: logoPositions,
         },
       })
       pendingDeleteAssets.value = []

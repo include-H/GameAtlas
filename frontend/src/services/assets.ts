@@ -8,7 +8,7 @@ export interface UploadedAssetResult {
 }
 
 export async function uploadAsset(
-  assetType: 'cover' | 'banner' | 'screenshot' | 'video',
+  assetType: 'cover' | 'banner' | 'screenshot' | 'video' | 'logo',
   gameId: number,
   file: File,
   sortOrder = 0,

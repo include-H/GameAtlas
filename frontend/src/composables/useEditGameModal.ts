@@ -4,6 +4,7 @@ import {
   formatEditGameReleaseDate,
   parseEditGameReleaseDate,
   type EditGameEditableCover,
+  type EditGameEditableLogo,
   type EditGameEditableScreenshot,
   type EditGameEditableVideo,
   type EditGameForm,
@@ -31,6 +32,7 @@ import type {
   AdminGameDetail,
   CoverItem,
   Developer,
+  LogoItem,
   Publisher,
   ScreenshotItem,
   Series,
@@ -81,6 +83,13 @@ export const useEditGameModal = ({
   const primaryCover = computed(() => {
     return form.value.covers[0] || null
   })
+
+  const primaryLogo = computed(() => {
+    return form.value.logos[0] || null
+  })
+
+  const logoBannerSrc = computed(() => form.value.banner_image || form.value.covers[0]?.path || '')
+  const logoPath = computed(() => form.value.logos[0]?.path || '')
 
   const primaryPreviewVideo = computed(() => {
     return form.value.preview_videos[0] || null
@@ -228,6 +237,15 @@ export const useEditGameModal = ({
     sort_order: String(form.value.screenshots.length),
   }))
 
+  const logoUploadAction = computed(() => {
+    return buildAssetUploadUrl('logo')
+  })
+
+  const logoUploadData = computed(() => ({
+    game_id: String(props.game?.id || ''),
+    sort_order: String(form.value.logos.length),
+  }))
+
   const uploadHeaders = computed(() => ({}))
 
   const createScreenshotKey = (
@@ -286,6 +304,21 @@ export const useEditGameModal = ({
     }
   }
 
+  const createEditableLogo = (asset: LogoItem | UploadedAssetResult | string): EditGameEditableLogo => {
+    if (typeof asset === 'string') {
+      return { path: asset, positionX: null, positionY: null, widthPct: null }
+    }
+    const isLogoItem = 'sort_order' in asset
+    return {
+      id: 'id' in asset ? asset.id : ('asset_id' in asset ? asset.asset_id : undefined),
+      asset_uid: asset.asset_uid,
+      path: asset.path,
+      positionX: isLogoItem ? (asset as LogoItem).position_x ?? null : null,
+      positionY: isLogoItem ? (asset as LogoItem).position_y ?? null : null,
+      widthPct: isLogoItem ? (asset as LogoItem).width_pct ?? null : null,
+    }
+  }
+
   const {
     draggedScreenshotKey,
     dragOverScreenshotKey,
@@ -328,6 +361,7 @@ export const useEditGameModal = ({
     publisherOptions,
     addAlert,
     createEditableCover,
+    createEditableLogo,
     createEditableScreenshot,
     createEditableVideo,
   })
@@ -362,7 +396,7 @@ export const useEditGameModal = ({
 
   const uploadAssetFromUrl = async (
     url: string,
-    assetType: 'cover' | 'banner' | 'screenshot' | 'video',
+    assetType: 'cover' | 'banner' | 'screenshot' | 'video' | 'logo',
     sortOrder = 0,
   ) => {
     if (!props.game?.id) {
@@ -427,6 +461,17 @@ export const useEditGameModal = ({
     screenshotSearchResults,
     selectedSteamScreenshotGame,
     isSearchingScreenshots,
+    showLogoSelector,
+    logoSearchUrl,
+    logoPreviewUrl,
+    isDownloadingLogo,
+    steamLogoImages,
+    selectedLogos,
+    isDownloadingSteamLogos,
+    steamLogoSearchQuery,
+    logoSearchResults,
+    selectedSteamLogoGame,
+    isSearchingLogo,
     coverSource,
     bannerSource,
     sgdbAvailable,
@@ -462,6 +507,14 @@ export const useEditGameModal = ({
     loadScreenshotPreview,
     confirmScreenshotSelection,
     downloadSelectedSteamScreenshots,
+    handleLogoSearchClear,
+    searchSteamForLogo,
+    selectSteamLogoGame,
+    backToLogoGameSearch,
+    toggleLogoSelection,
+    downloadSelectedSteamLogos,
+    loadLogoFromUrl,
+    confirmLogoSelection,
     resetSteamImportState,
   } = useSteamImport({
     form,
@@ -470,6 +523,7 @@ export const useEditGameModal = ({
     uploadAssetFromUrl,
     queueAssetDeletion,
     createEditableCover,
+    createEditableLogo,
     createEditableScreenshot,
     addAlert,
     onAssetPersisted: emitAssetSync,
@@ -483,6 +537,8 @@ export const useEditGameModal = ({
   const {
     handleCoverUploadSuccess,
     handleCoverUploadError,
+    handleLogoUploadSuccess,
+    handleLogoUploadError,
     handleBannerUploadSuccess,
     handleBannerUploadError,
     handleScreenshotUploadSuccess,
@@ -490,10 +546,12 @@ export const useEditGameModal = ({
     openVideoSelector,
     handleVideoFileChange,
     removeCover,
+    removeLogo,
     removeBanner,
     removeScreenshot,
     removePreviewVideo,
     setPrimaryCover,
+    handleLogoPositionConfirm,
     resetVideoUploadState,
   } = useEditGameAssets({
     form,
@@ -502,11 +560,13 @@ export const useEditGameModal = ({
     showBannerSelector,
     showScreenshotSelector,
     showVideoSelector,
+    showLogoSelector,
     isUploadingVideo,
     videoUploadProgress,
     videoUploadFileName,
     queueAssetDeletion,
     createEditableCover,
+    createEditableLogo,
     createEditableScreenshot,
     createEditableVideo,
     addAlert,
@@ -550,6 +610,7 @@ export const useEditGameModal = ({
     bannerSearchUrl,
     backToBannerGameSearch,
     backToCoverGameSearch,
+    backToLogoGameSearch,
     backToScreenshotGameSearch,
     backToSummarySearch,
     confirmBannerSelection,
@@ -561,7 +622,9 @@ export const useEditGameModal = ({
     downloadSelectedSteamBanner,
     downloadSelectedSteamCover,
     downloadSelectedSteamCovers,
+    downloadSelectedSteamLogos,
     downloadSelectedSteamScreenshots,
+    confirmLogoSelection,
     draggedScreenshotKey,
     dragOverScreenshotKey,
     filteredDeveloperOptions,
@@ -577,6 +640,9 @@ export const useEditGameModal = ({
     handleCoverSearchClear,
     handleCoverUploadError,
     handleCoverUploadSuccess,
+    handleLogoUploadSuccess,
+    handleLogoUploadError,
+    handleLogoSearchClear,
     handleDeveloperSearch,
     handleFilePathItemUpdate,
     handleFileSelect,
@@ -601,6 +667,9 @@ export const useEditGameModal = ({
     isDownloadingScreenshot,
     isDownloadingSteamCovers,
     isDownloadingSteamScreenshots,
+    isDownloadingSteamLogos,
+    isDownloadingLogo,
+    isSearchingLogo,
     isPreparingWikiMetadataCandidates,
     isSearchingDevelopers,
     isSearchingPublishers,
@@ -612,22 +681,37 @@ export const useEditGameModal = ({
     isUploadingVideo,
     loadBannerFromUrl,
     loadCoverFromUrl,
+    loadLogoFromUrl,
     loadScreenshotPreview,
+    logoUploadAction,
+    logoUploadData,
+    logoSearchUrl,
+    logoPreviewUrl,
+    logoSearchResults,
+    steamLogoImages,
+    steamLogoSearchQuery,
+    selectedLogos,
+    selectedSteamLogoGame,
     modalWidth,
     openFileBrowser,
     openVideoSelector,
     previewVideoSources,
     primaryCover,
+    primaryLogo,
+    logoBannerSrc,
+    logoPath,
     primaryPreviewVideo,
     releaseDate,
     removeBanner,
     removeCover,
+    removeLogo,
     removeFilePath,
     removePreviewVideo,
     removeScreenshot,
     reorderEditableCovers,
     reorderEditableVideos,
     setPrimaryCover,
+    handleLogoPositionConfirm,
     rules,
     screenshotPreviewUrl,
     screenshotSearchUrl,
@@ -635,10 +719,12 @@ export const useEditGameModal = ({
     screenshotUploadData,
     searchSteamForBanner,
     searchSteamForCover,
+    searchSteamForLogo,
     searchSteamForScreenshots,
     searchSteamForSummary,
     selectSteamBannerGame,
     selectSteamCoverGame,
+    selectSteamLogoGame,
     selectSteamScreenshotGame,
     selectSteamSummaryGame,
     selectedBannerImage,
@@ -656,6 +742,7 @@ export const useEditGameModal = ({
     showScreenshotSelector,
     showSummarySelector,
     showVideoSelector,
+    showLogoSelector,
     steamBannerImages,
     steamBannerSearchQuery,
     bannerSearchResults,
@@ -670,6 +757,7 @@ export const useEditGameModal = ({
     steamSummarySearchResults,
     toggleCoverSelection,
     toggleSteamScreenshot,
+    toggleLogoSelection,
     uploadAction,
     uploadData,
     uploadHeaders,

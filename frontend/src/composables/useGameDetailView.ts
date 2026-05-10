@@ -210,12 +210,6 @@ export const useGameDetailView = ({
     showEditModal.value = true
   }
 
-  const carouselHeight = computed(() => {
-    if (!isDesktopTopLayout.value) return undefined
-    if (!topSectionHeight.value) return undefined
-    return Math.max(Math.round(topSectionHeight.value), 420)
-  })
-
   const disconnectTopSectionObserver = () => {
     if (topSectionObserver) {
       topSectionObserver.disconnect()
@@ -330,7 +324,6 @@ export const useGameDetailView = ({
 
   return {
     canEdit,
-    carouselHeight,
     developerNames,
     editableGame,
     formatDate: formatGameDetailDate,

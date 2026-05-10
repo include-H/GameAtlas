@@ -1,87 +1,87 @@
 <template>
-  <a-row :gutter="16">
-    <a-col :xs="24" :sm="8">
-      <a-form-item label="封面图">
-        <div class="media-section media-section--covers">
+  <div class="media-section-list">
+      <section class="media-block media-block--cover">
+        <div class="media-block__title">封面图</div>
+        <div
+          v-if="covers.length === 0"
+          class="media-frame media-frame--cover"
+        >
           <div
-            v-if="covers.length === 0"
-            class="media-frame media-frame--cover"
+            class="media-empty-action"
+            role="button"
+            tabindex="0"
+            @click="emit('open-cover-selector')"
           >
-            <div
-              class="media-empty-action"
-              role="button"
-              tabindex="0"
-              @click="emit('open-cover-selector')"
-            >
-              <icon-image class="media-empty-icon" />
-              <span class="media-empty-title">未设置封面</span>
-              <span class="media-empty-subtitle">点击选择图片</span>
-            </div>
-          </div>
-          <div v-else class="media-frame media-frame--cover covers-frame">
-            <div class="covers-scroll">
-              <a-image-preview-group infinite>
-                <div class="covers-grid">
-                  <div
-                    v-for="(cover, index) in covers"
-                    :key="cover.asset_uid || cover.path"
-                    class="cover-thumb"
-                    :class="{ 'is-primary': index === 0 }"
-                  >
-                    <a-image
-                      :src="cover.path"
-                      width="100%"
-                      height="100%"
-                      fit="cover"
-                      hide-footer
-                    />
-                    <div v-if="index === 0" class="cover-primary-badge">主封面</div>
-                    <div class="cover-overlay">
-                      <div class="cover-overlay-actions">
-                        <a-button
-                          v-if="index !== 0"
-                          class="app-text-action-btn media-action-button"
-                          type="text"
-                          shape="circle"
-                          size="small"
-                          html-type="button"
-                          title="设为主封面"
-                          @click.stop="emit('set-primary-cover', index)"
-                        >
-                          <icon-star />
-                        </a-button>
-                        <a-button
-                          class="app-text-action-btn media-action-button media-action-button--danger"
-                          type="text"
-                          status="danger"
-                          shape="circle"
-                          size="small"
-                          html-type="button"
-                          @click.stop="emit('remove-cover', index)"
-                        >
-                          <icon-delete />
-                        </a-button>
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    class="cover-add-tile"
-                    role="button"
-                    tabindex="0"
-                    @click="emit('open-cover-selector')"
-                  >
-                    <span class="cover-add-tile__label">添加封面</span>
-                  </div>
-                </div>
-              </a-image-preview-group>
-            </div>
+            <icon-image class="media-empty-icon" />
+            <span class="media-empty-title">未设置封面</span>
+            <span class="media-empty-subtitle">点击选择图片</span>
           </div>
         </div>
-      </a-form-item>
-    </a-col>
+        <div v-else class="media-frame media-frame--cover covers-frame">
+          <div class="covers-scroll">
+            <a-image-preview-group infinite>
+              <div class="covers-grid">
+                <div
+                  v-for="(cover, index) in covers"
+                  :key="cover.asset_uid || cover.path"
+                  class="cover-thumb"
+                  :class="{ 'is-primary': index === 0 }"
+                >
+                  <a-image
+                    :src="cover.path"
+                    width="100%"
+                    height="100%"
+                    fit="contain"
+                    hide-footer
+                  />
+                  <div v-if="index === 0" class="cover-primary-badge">主封面</div>
+                  <div class="cover-overlay">
+                    <div class="cover-overlay-actions">
+                      <a-button
+                        class="app-text-action-btn media-action-button"
+                        type="text"
+                        shape="circle"
+                        size="small"
+                        html-type="button"
+                        title="管理封面"
+                        @click.stop="emit('open-cover-selector')"
+                      >
+                        <icon-settings />
+                      </a-button>
+                      <a-button
+                        v-if="index !== 0"
+                        class="app-text-action-btn media-action-button"
+                        type="text"
+                        shape="circle"
+                        size="small"
+                        html-type="button"
+                        title="设为主封面"
+                        @click.stop="emit('set-primary-cover', index)"
+                      >
+                        <icon-star />
+                      </a-button>
+                      <a-button
+                        class="app-text-action-btn media-action-button media-action-button--danger"
+                        type="text"
+                        status="danger"
+                        shape="circle"
+                        size="small"
+                        html-type="button"
+                        @click.stop="emit('remove-cover', index)"
+                      >
+                        <icon-delete />
+                      </a-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </a-image-preview-group>
+          </div>
+        </div>
+      </section>
 
-    <a-col :xs="24" :sm="8">
-      <a-form-item label="横幅图">
+      <section class="media-block media-block--banner">
+        <div class="media-block__title">横幅图</div>
         <div class="media-frame media-frame--banner">
           <template v-if="bannerImage">
             <a-image
@@ -89,7 +89,7 @@
               :alt="title"
               width="100%"
               height="100%"
-              fit="cover"
+              fit="contain"
               hide-footer
             />
             <div class="media-overlay">
@@ -130,9 +130,153 @@
             <span class="media-empty-subtitle">点击选择图片</span>
           </div>
         </div>
-      </a-form-item>
+      </section>
 
-      <a-form-item label="预告片" class="media-subitem">
+      <section class="media-block media-block--logo">
+        <div class="media-block__title">Logo</div>
+        <div
+          v-if="logos.length === 0"
+          class="media-frame media-frame--logo"
+        >
+          <div
+            class="media-empty-action"
+            role="button"
+            tabindex="0"
+            @click="emit('open-logo-selector')"
+          >
+            <icon-image class="media-empty-icon" />
+            <span class="media-empty-title">未设置 Logo</span>
+            <span class="media-empty-subtitle">点击选择图片</span>
+          </div>
+        </div>
+        <div v-else class="media-frame media-frame--logo logo-frame">
+          <a-image
+            :src="logos[0].path"
+            width="100%"
+            height="100%"
+            fit="contain"
+            hide-footer
+          />
+          <div class="media-overlay">
+            <div class="media-overlay-actions">
+              <a-button
+                class="app-text-action-btn media-action-button"
+                type="text"
+                shape="circle"
+                size="small"
+                html-type="button"
+                title="调整位置"
+                @click.stop="emit('open-logo-position-editor')"
+              >
+                <icon-settings />
+              </a-button>
+              <a-button
+                class="app-text-action-btn media-action-button media-action-button--danger"
+                type="text"
+                status="danger"
+                shape="circle"
+                size="small"
+                html-type="button"
+                @click.stop="emit('remove-logo', 0)"
+              >
+                <icon-delete />
+              </a-button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="media-block media-block--screenshots">
+        <div class="media-block__title">游戏截图</div>
+        <div
+          v-if="screenshots.length === 0"
+          class="media-frame media-frame--screenshots"
+        >
+          <div
+            class="media-empty-action"
+            role="button"
+            tabindex="0"
+            @click="emit('open-screenshot-selector')"
+          >
+            <icon-image class="media-empty-icon" />
+            <span class="media-empty-title">未设置截图</span>
+            <span class="media-empty-subtitle">点击添加截图</span>
+          </div>
+        </div>
+        <div v-else class="media-frame media-frame--screenshots screenshots-frame">
+          <div class="screenshots-scroll">
+            <a-image-preview-group infinite>
+              <div class="screenshots-grid">
+                <div
+                  v-for="screenshot in screenshots"
+                  :key="screenshot.asset_uid || screenshot.client_key"
+                  class="screenshot-thumb"
+                  :class="{
+                    'is-dragging': draggedScreenshotKey === screenshot.client_key,
+                    'is-drop-target': dragOverScreenshotKey === screenshot.client_key,
+                  }"
+                  draggable="true"
+                  @dragstart="emit('screenshot-drag-start', screenshot.client_key)"
+                  @dragenter.prevent="emit('screenshot-drag-enter', screenshot.client_key)"
+                  @dragover.prevent
+                  @drop.prevent="emit('screenshot-drop', screenshot.client_key)"
+                  @dragend="emit('screenshot-drag-end')"
+                >
+                  <a-image
+                    :src="screenshot.path"
+                    width="100%"
+                    height="100%"
+                    fit="contain"
+                    hide-footer
+                  />
+                  <div class="screenshot-overlay">
+                    <div class="screenshot-overlay-actions">
+                      <a-button
+                        class="app-text-action-btn media-action-button"
+                        type="text"
+                        shape="circle"
+                        size="small"
+                        html-type="button"
+                        title="管理截图"
+                        @click.stop="emit('open-screenshot-selector')"
+                      >
+                        <icon-settings />
+                      </a-button>
+                      <a-button
+                        class="app-text-action-btn media-action-button media-action-button--danger"
+                        type="text"
+                        status="danger"
+                        shape="circle"
+                        size="small"
+                        html-type="button"
+                        @click.stop="emit('remove-screenshot', screenshot.client_key)"
+                      >
+                        <icon-delete />
+                      </a-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </a-image-preview-group>
+          </div>
+        </div>
+      </section>
+
+      <section class="media-block media-block--video">
+        <div class="media-block__title-row">
+          <span class="media-block__title">预告片</span>
+          <a-button
+            v-if="primaryPreviewVideo"
+            class="app-text-action-btn"
+            type="text"
+            size="mini"
+            html-type="button"
+            @click.stop="emit('open-video-selector')"
+          >
+            <template #icon><icon-settings /></template>
+            管理预告片
+          </a-button>
+        </div>
         <div class="media-frame media-frame--video">
           <template v-if="primaryPreviewVideo">
             <video
@@ -147,20 +291,6 @@
                 :src="src"
               />
             </video>
-            <div class="media-overlay media-overlay--top-right">
-              <div class="media-overlay-actions">
-                <a-button
-                  class="app-text-action-btn media-action-button"
-                  type="text"
-                  shape="circle"
-                  size="small"
-                  html-type="button"
-                  @click.stop="emit('open-video-selector')"
-                >
-                  <icon-settings />
-                </a-button>
-              </div>
-            </div>
           </template>
           <div
             v-else
@@ -174,83 +304,8 @@
             <span class="media-empty-subtitle">点击上传本地视频</span>
           </div>
         </div>
-      </a-form-item>
-    </a-col>
-
-    <a-col :xs="24" :sm="8">
-      <a-form-item label="截图">
-        <div class="media-section media-section--screenshots">
-          <div
-            v-if="screenshots.length === 0"
-            class="media-frame media-frame--cover"
-          >
-            <div
-              class="media-empty-action"
-              role="button"
-              tabindex="0"
-              @click="emit('open-screenshot-selector')"
-            >
-              <icon-image class="media-empty-icon" />
-              <span class="media-empty-title">未设置截图</span>
-              <span class="media-empty-subtitle">点击添加截图</span>
-            </div>
-          </div>
-          <div v-else class="media-frame media-frame--cover screenshots-frame">
-            <div class="screenshots-scroll">
-              <a-image-preview-group infinite>
-                <div class="screenshots-grid">
-                  <div
-                    v-for="screenshot in screenshots"
-                    :key="screenshot.asset_uid || screenshot.client_key"
-                    class="screenshot-thumb"
-                    :class="{
-                      'is-dragging': draggedScreenshotKey === screenshot.client_key,
-                      'is-drop-target': dragOverScreenshotKey === screenshot.client_key,
-                    }"
-                    draggable="true"
-                    @dragstart="emit('screenshot-drag-start', screenshot.client_key)"
-                    @dragenter.prevent="emit('screenshot-drag-enter', screenshot.client_key)"
-                    @dragover.prevent
-                    @drop.prevent="emit('screenshot-drop', screenshot.client_key)"
-                    @dragend="emit('screenshot-drag-end')"
-                  >
-                    <a-image
-                      :src="screenshot.path"
-                      width="100%"
-                      height="100%"
-                      fit="cover"
-                      hide-footer
-                    />
-                    <div class="screenshot-overlay">
-                      <a-button
-                        class="app-text-action-btn media-action-button media-action-button--danger"
-                        type="text"
-                        status="danger"
-                        shape="circle"
-                        size="small"
-                        html-type="button"
-                        @click.stop="emit('remove-screenshot', screenshot.client_key)"
-                      >
-                        <icon-delete />
-                      </a-button>
-                    </div>
-                  </div>
-                  <div
-                    class="screenshot-add-tile"
-                    role="button"
-                    tabindex="0"
-                    @click="emit('open-screenshot-selector')"
-                  >
-                    <span class="screenshot-add-tile__label">添加截图</span>
-                  </div>
-                </div>
-              </a-image-preview-group>
-            </div>
-          </div>
-        </div>
-      </a-form-item>
-    </a-col>
-  </a-row>
+      </section>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -272,16 +327,13 @@ interface EditableVideo {
   path: string
 }
 
-defineProps<{
-  title: string
-  covers: EditableCover[]
-  bannerImage: string
-  primaryPreviewVideo: EditableVideo | null
-  previewVideoSources: string[]
-  screenshots: EditableScreenshot[]
-  draggedScreenshotKey: string | null
-  dragOverScreenshotKey: string | null
-}>()
+interface EditableLogo {
+  asset_uid?: string
+  path: string
+  positionX: number | null
+  positionY: number | null
+  widthPct: number | null
+}
 
 const emit = defineEmits<{
   'open-cover-selector': []
@@ -297,50 +349,121 @@ const emit = defineEmits<{
   'screenshot-drag-enter': [clientKey: string]
   'screenshot-drop': [clientKey: string]
   'screenshot-drag-end': []
+  'open-logo-selector': []
+  'remove-logo': [index: number]
+  'open-logo-position-editor': []
 }>()
+
+defineProps<{
+  title: string
+  covers: EditableCover[]
+  bannerImage: string
+  primaryPreviewVideo: EditableVideo | null
+  previewVideoSources: string[]
+  screenshots: EditableScreenshot[]
+  draggedScreenshotKey: string | null
+  dragOverScreenshotKey: string | null
+  logos: EditableLogo[]
+}>()
+
 </script>
 
 <style scoped>
-.media-section {
+.media-section-list {
+  --media-gap: 22px;
+  --media-panel-radius: 14px;
+  --media-panel-padding: 14px;
+  --media-frame-height: clamp(220px, 24vw, 300px);
+  --media-video-height: clamp(300px, 36vw, 420px);
+  --media-banner-height: clamp(200px, 22vw, 280px);
+
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  grid-template-areas:
+    "cover cover cover cover cover screenshots screenshots screenshots screenshots screenshots"
+    "logo logo logo banner banner banner banner banner banner banner"
+    "video video video video video video video video video video";
+  gap: 10px;
+}
+
+.media-block {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  width: 100%;
+  gap: 10px;
+  min-width: 0;
 }
 
-.media-section--covers {
-  max-width: 88%;
-  margin: 0 auto;
+.media-block--cover {
+  grid-area: cover;
 }
 
-.media-section--screenshots {
-  max-width: 88%;
-  margin: 0 auto;
+.media-block--banner {
+  grid-area: banner;
 }
 
-.media-subitem {
-  margin-top: 8px;
+.media-block--logo {
+  grid-area: logo;
+}
+
+.media-block--screenshots {
+  grid-area: screenshots;
+}
+
+.media-block--video {
+  grid-area: video;
+}
+
+.media-block__title {
+  padding-left: 2px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-2);
+}
+
+.media-block__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .media-frame {
   position: relative;
   width: 100%;
+  min-width: 0;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: var(--media-panel-radius);
   border: 1px solid var(--app-card-border);
-  background: color-mix(in srgb, var(--app-card-surface) 90%, transparent);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.media-frame--cover,
+.media-frame--screenshots {
+  height: var(--media-frame-height);
+  min-height: var(--media-frame-height);
+}
+
+.media-frame--video {
+  height: var(--media-video-height);
+  min-height: var(--media-video-height);
+}
+
+.media-frame--banner {
+  width: 100%;
+  height: 270px;
+}
+
+.media-frame--logo {
+  height: 270px;
 }
 
 .media-empty-action {
   width: 100%;
   height: 100%;
   border: 1px dashed rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  border-radius: calc(var(--media-panel-radius) - 2px);
   background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
   backdrop-filter: blur(var(--app-card-backdrop-blur));
   -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
@@ -350,6 +473,8 @@ const emit = defineEmits<{
   align-items: center;
   justify-content: center;
   gap: 10px;
+  padding: 24px;
+  box-sizing: border-box;
   cursor: pointer;
   transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
@@ -376,10 +501,7 @@ const emit = defineEmits<{
 
 .media-overlay {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -395,10 +517,12 @@ const emit = defineEmits<{
   padding: 14px;
 }
 
-.media-overlay-actions {
+.media-overlay-actions,
+.cover-overlay-actions,
+.screenshot-overlay-actions {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   pointer-events: auto;
 }
 
@@ -417,22 +541,18 @@ const emit = defineEmits<{
   transform: scale(1.06);
 }
 
+.cover-overlay-actions .media-action-button,
+.screenshot-overlay-actions .media-action-button {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  font-size: 12px;
+}
+
 .media-frame:hover .media-overlay,
-.screenshot-thumb:hover .screenshot-overlay,
-.cover-thumb:hover .cover-overlay {
+.cover-thumb:hover .cover-overlay,
+.screenshot-thumb:hover .screenshot-overlay {
   opacity: 1;
-}
-
-.media-frame--cover {
-  aspect-ratio: 2 / 3;
-}
-
-.media-frame--banner {
-  aspect-ratio: 16 / 9;
-}
-
-.media-frame--video {
-  aspect-ratio: 16 / 9;
 }
 
 .media-video {
@@ -440,40 +560,74 @@ const emit = defineEmits<{
   height: 100%;
   display: block;
   background: #000;
+  object-fit: contain;
 }
 
-/* Cover grid — mirrors screenshot grid but with 2:3 aspect ratio */
-.covers-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+
+.media-frame :deep(.arco-image),
+.cover-thumb :deep(.arco-image),
+.logo-frame :deep(.arco-image),
+.screenshot-thumb :deep(.arco-image) {
+  display: flex;
+  width: 100%;
+  height: 100%;
 }
 
-.covers-frame {
+.media-frame :deep(.arco-image-img),
+.cover-thumb :deep(.arco-image-img),
+.logo-frame :deep(.arco-image-img),
+.screenshot-thumb :deep(.arco-image-img) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.covers-frame,
+.screenshots-frame {
   align-items: stretch;
   justify-content: stretch;
+  padding: var(--media-panel-padding);
+  box-sizing: border-box;
 }
 
-.covers-scroll {
+.covers-scroll,
+.screenshots-scroll {
   width: 100%;
   height: 100%;
   min-height: 0;
-  padding: 10px;
-  box-sizing: border-box;
   overflow-x: hidden;
   overflow-y: auto;
 }
 
-.covers-scroll :deep(.arco-image-preview-group) {
+.covers-scroll :deep(.arco-image-preview-group),
+.screenshots-scroll :deep(.arco-image-preview-group) {
   display: block;
   width: 100%;
 }
 
+.covers-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+.screenshots-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
 .cover-thumb {
-  aspect-ratio: 2/3;
-  border-radius: 6px;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: 10px;
   overflow: hidden;
-  background: color-mix(in srgb, var(--app-card-surface) 86%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    color-mix(in srgb, var(--app-card-surface) 90%, transparent);
   position: relative;
   border: 1px solid var(--app-card-border);
   transition: border-color 0.18s ease, box-shadow 0.18s ease;
@@ -498,12 +652,10 @@ const emit = defineEmits<{
   z-index: 1;
 }
 
-.cover-overlay {
+.cover-overlay,
+.screenshot-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -512,82 +664,20 @@ const emit = defineEmits<{
   transition: opacity 0.2s ease;
 }
 
-.cover-overlay-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  pointer-events: auto;
-}
-
-.cover-overlay-actions .media-action-button {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  font-size: 12px;
-}
-
-.cover-add-tile {
-  width: 100%;
-  aspect-ratio: 2 / 3;
-  border-radius: 6px;
-  overflow: hidden;
-  position: relative;
-  border: 1px dashed rgba(255, 255, 255, 0.1);
-  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
-  color: var(--color-text-3);
+.logo-frame {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 10px;
-  box-sizing: border-box;
-  cursor: pointer;
-  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
-}
-
-.cover-add-tile__label {
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.cover-add-tile:hover {
-  border-color: rgb(var(--primary-6));
-  color: rgb(var(--primary-6));
-  background: rgba(var(--primary-6), 0.06);
-}
-
-.screenshots-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.screenshots-frame {
-  align-items: stretch;
-  justify-content: stretch;
-}
-
-.screenshots-scroll {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  padding: 10px;
-  box-sizing: border-box;
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-
-.screenshots-scroll :deep(.arco-image-preview-group) {
-  display: block;
-  width: 100%;
 }
 
 .screenshot-thumb {
-  aspect-ratio: 16/9;
-  border-radius: 6px;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
   overflow: hidden;
-  background: color-mix(in srgb, var(--app-card-surface) 86%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    color-mix(in srgb, var(--app-card-surface) 90%, transparent);
   cursor: grab;
   position: relative;
   border: 1px solid var(--app-card-border);
@@ -605,62 +695,45 @@ const emit = defineEmits<{
   box-shadow: 0 0 0 1px rgba(var(--primary-6), 0.35);
 }
 
-.screenshot-add-tile {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border-radius: 6px;
-  overflow: hidden;
-  position: relative;
-  border: 1px dashed rgba(255, 255, 255, 0.1);
-  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
-  color: var(--color-text-3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px;
-  box-sizing: border-box;
-  cursor: pointer;
-  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
-}
+@media (max-width: 768px) {
+  .media-section-list {
+    --media-gap: 16px;
+    --media-frame-height: 220px;
+    --media-banner-height: 220px;
+    --media-logo-height: 170px;
+  }
 
-.screenshot-add-tile__label {
-  font-size: 12px;
-  font-weight: 700;
-}
+  .media-board {
+    padding: 18px;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "cover"
+      "screenshots"
+      "logo"
+      "banner"
+      "video";
+  }
 
-.screenshot-add-tile:hover {
-  border-color: rgb(var(--primary-6));
-  color: rgb(var(--primary-6));
-  background: rgba(var(--primary-6), 0.06);
-}
+  .media-block--logo {
+    width: 100%;
+  }
 
-.screenshot-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(8, 10, 16, 0.5);
-  opacity: 0;
-  transition: opacity 0.2s ease;
+  .covers-grid,
+  .screenshots-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 576px) {
-  .media-section--covers {
-    max-width: min(220px, 100%);
+  .media-section-list {
+    --media-frame-height: 190px;
+    --media-banner-height: 190px;
+    --media-logo-height: 150px;
+    --media-panel-padding: 10px;
   }
 
-  .media-subitem {
-    margin-top: 12px;
-  }
-
-  .screenshots-frame {
-    max-height: 280px;
+  .media-frame--banner {
+    aspect-ratio: 16 / 9;
   }
 }
 </style>

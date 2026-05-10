@@ -19,6 +19,15 @@ export interface EditGameEditableCover {
   path: string
 }
 
+export interface EditGameEditableLogo {
+  id?: number
+  asset_uid?: string
+  path: string
+  positionX: number | null
+  positionY: number | null
+  widthPct: number | null
+}
+
 export interface EditGameForm {
   title: string
   title_alt: string
@@ -33,6 +42,8 @@ export interface EditGameForm {
   banner_image: string
   // The first item is always the primary cover.
   covers: EditGameEditableCover[]
+  // The first item is always the primary logo.
+  logos: EditGameEditableLogo[]
   // The first item is always the canonical preview video.
   preview_videos: EditGameEditableVideo[]
   screenshots: EditGameEditableScreenshot[]
@@ -50,6 +61,7 @@ export const createEmptyEditGameForm = (): EditGameForm => ({
   summary: '',
   banner_image: '',
   covers: [],
+  logos: [],
   preview_videos: [],
   screenshots: [],
   file_paths: [{ path: '', label: '' }],
