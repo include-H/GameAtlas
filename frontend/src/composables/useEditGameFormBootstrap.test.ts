@@ -36,8 +36,8 @@ describe('useEditGameFormBootstrap', () => {
       release_date: undefined as string | undefined,
       series_id: null as string | number | null,
       summary: '',
-      cover_image: '',
       banner_image: '',
+      covers: [] as Array<{ asset_uid?: string; path: string }>,
       preview_videos: [] as Array<{ asset_uid?: string; path: string }>,
       screenshots: [] as Array<{ client_key: string; path: string }>,
       file_paths: [{ path: '', label: '' }],
@@ -49,6 +49,10 @@ describe('useEditGameFormBootstrap', () => {
       developerOptions: ref([]),
       publisherOptions: ref([]),
       addAlert: vi.fn(),
+      createEditableCover: (asset) => ({
+        asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
+        path: typeof asset === 'string' ? asset : asset.path,
+      }),
       createEditableScreenshot: (asset, index) => ({
         path: typeof asset === 'string' ? asset : asset.path,
         client_key: `screenshot-${index}`,
@@ -69,6 +73,7 @@ describe('useEditGameFormBootstrap', () => {
       release_date: null,
       cover_image: null,
       banner_image: null,
+      covers: [],
       wiki_content: null,
       downloads: 0,
       preview_videos: [
@@ -108,8 +113,8 @@ describe('useEditGameFormBootstrap', () => {
       release_date: undefined as string | undefined,
       series_id: null as string | number | null,
       summary: '',
-      cover_image: '',
       banner_image: '',
+      covers: [] as Array<{ asset_uid?: string; path: string }>,
       preview_videos: [] as Array<{ asset_uid?: string; path: string }>,
       screenshots: [] as Array<{ client_key: string; path: string }>,
       file_paths: [{ path: '', label: '' }],
@@ -121,6 +126,10 @@ describe('useEditGameFormBootstrap', () => {
       developerOptions: ref([]),
       publisherOptions: ref([]),
       addAlert: vi.fn(),
+      createEditableCover: (asset) => ({
+        asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
+        path: typeof asset === 'string' ? asset : asset.path,
+      }),
       createEditableScreenshot: (asset, index) => ({
         path: typeof asset === 'string' ? asset : asset.path,
         client_key: `screenshot-${index}`,
@@ -141,6 +150,7 @@ describe('useEditGameFormBootstrap', () => {
       release_date: null,
       cover_image: null,
       banner_image: null,
+      covers: [],
       wiki_content: null,
       downloads: 0,
       preview_videos: [],
@@ -201,8 +211,8 @@ describe('useEditGameFormBootstrap', () => {
         release_date: undefined,
         series_id: null,
         summary: '',
-        cover_image: '',
         banner_image: '',
+        covers: [],
         preview_videos: [],
         screenshots: [],
         file_paths: [{ path: '', label: '' }],
@@ -211,6 +221,10 @@ describe('useEditGameFormBootstrap', () => {
       developerOptions: ref([]),
       publisherOptions: ref([]),
       addAlert,
+      createEditableCover: (asset) => ({
+        asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
+        path: typeof asset === 'string' ? asset : asset.path,
+      }),
       createEditableScreenshot: (asset, index) => ({
         path: typeof asset === 'string' ? asset : asset.path,
         client_key: `screenshot-${index}`,

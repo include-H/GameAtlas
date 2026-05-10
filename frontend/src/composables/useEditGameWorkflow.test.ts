@@ -69,6 +69,7 @@ const buildOptions = () => {
         release_date: null,
         cover_image: null,
         banner_image: null,
+        covers: [],
         wiki_content: null,
         downloads: 0,
         preview_videos: [],
@@ -90,8 +91,8 @@ const buildOptions = () => {
         release_date: undefined,
         series_id: null,
         summary: '',
-        cover_image: '',
         banner_image: '',
+        covers: [],
         preview_videos: [],
         screenshots: [],
         file_paths: [],
@@ -180,7 +181,6 @@ describe('useEditGameWorkflow', () => {
     const { options } = buildOptions()
     options.form.value.title_alt = '   '
     options.form.value.summary = '  '
-    options.form.value.cover_image = ''
     options.form.value.banner_image = '   '
 
     const workflow = useEditGameWorkflow(options)

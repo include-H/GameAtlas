@@ -394,6 +394,7 @@ func TestGamesServiceUpdateAggregateReturnsDeleteWarningsWhenAssetRemovalFails(t
 	defer func() { _ = db.Close() }()
 
 	gameID := insertServicesTestGame(t, db, "aggregate-warning", "Aggregate Warning", domain.GameVisibilityPublic)
+	insertServicesGameAsset(t, db, gameID, "bad-cover", "cover", "/assets/../bad-cover.png", 0)
 	service := newServicesAggregateService(db, config.Config{AssetsDir: t.TempDir()})
 
 	game, warnings, err := service.Update(gameID, domain.GameAggregateUpdateInput{
@@ -402,7 +403,7 @@ func TestGamesServiceUpdateAggregateReturnsDeleteWarningsWhenAssetRemovalFails(t
 		},
 		Assets: domain.GameAggregateAssetsInput{
 			DeleteAssets: []domain.GameAssetDeleteInput{
-				{AssetType: "cover", Path: "/assets/../bad-cover.png"},
+				{AssetType: "cover", AssetUID: "bad-cover", Path: "/assets/../bad-cover.png"},
 			},
 		},
 	})

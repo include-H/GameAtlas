@@ -106,6 +106,7 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 			DeleteAssets:             input.Assets.DeleteAssets,
 			ScreenshotOrderAssetUIDs: input.Assets.ScreenshotOrderAssetUIDs,
 			VideoOrderAssetUIDs:      input.Assets.VideoOrderAssetUIDs,
+			CoverOrderAssetUIDs:      input.Assets.CoverOrderAssetUIDs,
 		},
 	})
 	if err != nil {

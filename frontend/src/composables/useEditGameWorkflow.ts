@@ -151,7 +151,7 @@ const createUpdatePayload = (params: {
     developer_ids: params.developerIds,
     publisher_ids: params.publisherIds,
     summary: toNullableFormText(params.form.summary),
-    cover_image: toNullableFormText(params.form.cover_image),
+    cover_image: null,
     banner_image: toNullableFormText(params.form.banner_image),
   }
 }
@@ -220,6 +220,9 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       const orderedVideoUids = options.form.value.preview_videos
         .map((item) => item.asset_uid)
         .filter((assetUid): assetUid is string => Boolean(assetUid))
+      const orderedCoverUids = options.form.value.covers
+        .map((item) => item.asset_uid)
+        .filter((assetUid): assetUid is string => Boolean(assetUid))
       if (!game.public_id) {
         throw new Error('missing game public_id')
       }
@@ -248,6 +251,7 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
           })),
           screenshot_order_asset_uids: orderedScreenshotUids,
           video_order_asset_uids: orderedVideoUids,
+          cover_order_asset_uids: orderedCoverUids,
         },
       })
       pendingDeleteAssets.value = []

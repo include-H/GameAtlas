@@ -32,6 +32,7 @@ type gameAggregateAssetsRequest struct {
 	DeleteAssets             []gameAggregateDeleteAssetRequest `json:"delete_assets"`
 	ScreenshotOrderAssetUIDs []string                          `json:"screenshot_order_asset_uids"`
 	VideoOrderAssetUIDs      []string                          `json:"video_order_asset_uids"`
+	CoverOrderAssetUIDs      []string                          `json:"cover_order_asset_uids"`
 }
 
 type gameAggregateFileRequest struct {
@@ -109,6 +110,7 @@ func (request gameAggregateAssetsRequest) toDomain() domain.GameAggregateAssetsI
 		DeleteAssets:             deleteAssets,
 		ScreenshotOrderAssetUIDs: emptyStringSlice(request.ScreenshotOrderAssetUIDs),
 		VideoOrderAssetUIDs:      emptyStringSlice(request.VideoOrderAssetUIDs),
+		CoverOrderAssetUIDs:      emptyStringSlice(request.CoverOrderAssetUIDs),
 	}
 }
 

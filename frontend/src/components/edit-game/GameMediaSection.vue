@@ -2,46 +2,12 @@
   <a-row :gutter="16">
     <a-col :xs="24" :sm="8">
       <a-form-item label="封面图">
-        <div class="media-section media-section--cover">
-          <div class="media-frame media-frame--cover">
-            <template v-if="coverImage">
-              <a-image
-                :key="coverImage"
-                :src="coverImage"
-                :alt="title"
-                width="100%"
-                height="100%"
-                fit="cover"
-                hide-footer
-              />
-              <div class="media-overlay">
-                <div class="media-overlay-actions">
-                  <a-button
-                    class="app-text-action-btn media-action-button"
-                    type="text"
-                    shape="circle"
-                    size="small"
-                    html-type="button"
-                    @click.stop="emit('open-cover-selector')"
-                  >
-                    <icon-settings />
-                  </a-button>
-                  <a-button
-                    class="app-text-action-btn media-action-button media-action-button--danger"
-                    type="text"
-                    status="danger"
-                    shape="circle"
-                    size="small"
-                    html-type="button"
-                    @click.stop="emit('remove-cover')"
-                  >
-                    <icon-delete />
-                  </a-button>
-                </div>
-              </div>
-            </template>
+        <div class="media-section media-section--covers">
+          <div
+            v-if="covers.length === 0"
+            class="media-frame media-frame--cover"
+          >
             <div
-              v-else
               class="media-empty-action"
               role="button"
               tabindex="0"
@@ -50,6 +16,64 @@
               <icon-image class="media-empty-icon" />
               <span class="media-empty-title">未设置封面</span>
               <span class="media-empty-subtitle">点击选择图片</span>
+            </div>
+          </div>
+          <div v-else class="media-frame media-frame--cover covers-frame">
+            <div class="covers-scroll">
+              <a-image-preview-group infinite>
+                <div class="covers-grid">
+                  <div
+                    v-for="(cover, index) in covers"
+                    :key="cover.asset_uid || cover.path"
+                    class="cover-thumb"
+                    :class="{ 'is-primary': index === 0 }"
+                  >
+                    <a-image
+                      :src="cover.path"
+                      width="100%"
+                      height="100%"
+                      fit="cover"
+                      hide-footer
+                    />
+                    <div v-if="index === 0" class="cover-primary-badge">主封面</div>
+                    <div class="cover-overlay">
+                      <div class="cover-overlay-actions">
+                        <a-button
+                          v-if="index !== 0"
+                          class="app-text-action-btn media-action-button"
+                          type="text"
+                          shape="circle"
+                          size="small"
+                          html-type="button"
+                          title="设为主封面"
+                          @click.stop="emit('set-primary-cover', index)"
+                        >
+                          <icon-star />
+                        </a-button>
+                        <a-button
+                          class="app-text-action-btn media-action-button media-action-button--danger"
+                          type="text"
+                          status="danger"
+                          shape="circle"
+                          size="small"
+                          html-type="button"
+                          @click.stop="emit('remove-cover', index)"
+                        >
+                          <icon-delete />
+                        </a-button>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    class="cover-add-tile"
+                    role="button"
+                    tabindex="0"
+                    @click="emit('open-cover-selector')"
+                  >
+                    <span class="cover-add-tile__label">添加封面</span>
+                  </div>
+                </div>
+              </a-image-preview-group>
             </div>
           </div>
         </div>
@@ -230,7 +254,12 @@
 </template>
 
 <script setup lang="ts">
-import { IconDelete, IconImage, IconSettings, IconUpload } from '@arco-design/web-vue/es/icon'
+import { IconDelete, IconImage, IconSettings, IconStar, IconUpload } from '@arco-design/web-vue/es/icon'
+
+interface EditableCover {
+  asset_uid?: string
+  path: string
+}
 
 interface EditableScreenshot {
   asset_uid?: string
@@ -245,7 +274,7 @@ interface EditableVideo {
 
 defineProps<{
   title: string
-  coverImage: string
+  covers: EditableCover[]
   bannerImage: string
   primaryPreviewVideo: EditableVideo | null
   previewVideoSources: string[]
@@ -256,7 +285,9 @@ defineProps<{
 
 const emit = defineEmits<{
   'open-cover-selector': []
-  'remove-cover': []
+  'remove-cover': [index: number]
+  'set-primary-cover': [index: number]
+  'reorder-cover': [payload: { key: string; direction: -1 | 1 }]
   'open-banner-selector': []
   'remove-banner': []
   'open-video-selector': []
@@ -277,7 +308,7 @@ const emit = defineEmits<{
   width: 100%;
 }
 
-.media-section--cover {
+.media-section--covers {
   max-width: 88%;
   margin: 0 auto;
 }
@@ -387,7 +418,8 @@ const emit = defineEmits<{
 }
 
 .media-frame:hover .media-overlay,
-.screenshot-thumb:hover .screenshot-overlay {
+.screenshot-thumb:hover .screenshot-overlay,
+.cover-thumb:hover .cover-overlay {
   opacity: 1;
 }
 
@@ -408,6 +440,121 @@ const emit = defineEmits<{
   height: 100%;
   display: block;
   background: #000;
+}
+
+/* Cover grid — mirrors screenshot grid but with 2:3 aspect ratio */
+.covers-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.covers-frame {
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.covers-scroll {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 10px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.covers-scroll :deep(.arco-image-preview-group) {
+  display: block;
+  width: 100%;
+}
+
+.cover-thumb {
+  aspect-ratio: 2/3;
+  border-radius: 6px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--app-card-surface) 86%, transparent);
+  position: relative;
+  border: 1px solid var(--app-card-border);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.cover-thumb.is-primary {
+  border-color: rgb(var(--primary-6));
+  box-shadow: 0 0 0 1px rgba(var(--primary-6), 0.35);
+}
+
+.cover-primary-badge {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  background: rgb(var(--primary-6));
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  line-height: 1.3;
+  z-index: 1;
+}
+
+.cover-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 10, 16, 0.5);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.cover-overlay-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.cover-overlay-actions .media-action-button {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  font-size: 12px;
+}
+
+.cover-add-tile {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  color: var(--color-text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.cover-add-tile__label {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cover-add-tile:hover {
+  border-color: rgb(var(--primary-6));
+  color: rgb(var(--primary-6));
+  background: rgba(var(--primary-6), 0.06);
 }
 
 .screenshots-grid {
@@ -504,7 +651,7 @@ const emit = defineEmits<{
 }
 
 @media (max-width: 576px) {
-  .media-section--cover {
+  .media-section--covers {
     max-width: min(220px, 100%);
   }
 

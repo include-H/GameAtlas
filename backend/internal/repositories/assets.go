@@ -38,6 +38,10 @@ func (r *AssetsRepository) AddVideo(gameID int64, assetUID string, path string, 
 	return r.addAsset(gameID, assetUID, "video", path, sortOrder)
 }
 
+func (r *AssetsRepository) AddCover(gameID int64, assetUID string, path string, sortOrder int) (*domain.GameAsset, error) {
+	return r.addAsset(gameID, assetUID, "cover", path, sortOrder)
+}
+
 func (r *AssetsRepository) UpdateGameImage(gameID int64, column string, path *string) error {
 	query := fmt.Sprintf("UPDATE games SET %s = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", column)
 	result, err := r.db.Exec(query, path, gameID)

@@ -78,6 +78,12 @@ func (r *GamesRepository) UpdateAggregate(id int64, input domain.GameAggregateUp
 	if err := r.reorderAssetsTx(tx, id, "video", input.Assets.VideoOrderAssetUIDs); err != nil {
 		return nil, err
 	}
+	if err := r.reorderAssetsTx(tx, id, "cover", input.Assets.CoverOrderAssetUIDs); err != nil {
+		return nil, err
+	}
+	if err := r.syncPrimaryCoverTx(tx, id); err != nil {
+		return nil, err
+	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("commit aggregate update tx: %w", err)
@@ -267,7 +273,15 @@ func (r *GamesRepository) deleteAssetsTx(tx *sqlx.Tx, gameID int64, deleteAssets
 
 	for _, item := range deleteAssets {
 		switch strings.TrimSpace(item.AssetType) {
-		case "cover", "banner":
+		case "cover":
+			deletedPath, _, deleted, err := r.deleteSingleAssetTx(tx, gameID, "cover", item)
+			if err != nil {
+				return nil, err
+			}
+			if deleted {
+				assetPaths = append(assetPaths, deletedPath)
+			}
+		case "banner":
 			// Only collect the old path for file cleanup. The column value was already
 			// set correctly by updateGameRowTx earlier in this transaction (either a
 			// new path for replacement, or NULL for explicit removal), so we must not
@@ -389,6 +403,25 @@ func (r *GamesRepository) reorderAssetsTx(tx *sqlx.Tx, gameID int64, assetType s
 		}
 	}
 
+	return nil
+}
+
+func (r *GamesRepository) syncPrimaryCoverTx(tx *sqlx.Tx, gameID int64) error {
+	var primaryPath sql.NullString
+	if err := tx.Get(&primaryPath, `
+		SELECT path FROM game_assets
+		WHERE game_id = ? AND asset_type = 'cover'
+		ORDER BY sort_order ASC, id ASC
+		LIMIT 1
+	`, gameID); err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("query primary cover: %w", err)
+	}
+
+	if _, err := tx.Exec(`
+		UPDATE games SET cover_image = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+	`, primaryPath, gameID); err != nil {
+		return fmt.Errorf("sync primary cover: %w", err)
+	}
 	return nil
 }
 

@@ -30,6 +30,7 @@ type GameDetail struct {
 	PendingIssues *domain.PendingIssueEvaluation
 	PreviewVideos []domain.GameAsset
 	Screenshots   []domain.GameAsset
+	Covers        []domain.GameAsset
 	Series        *domain.MetadataItem
 	Developers    []domain.MetadataItem
 	Publishers    []domain.MetadataItem

@@ -542,13 +542,11 @@ func TestGamesRepositoryUpdateAggregateReplaceCoverPreservesNewPath(t *testing.T
 	repo := NewGamesRepository(db)
 	gameID := insertRepositoryGame(t, db, "replace-cover", "Replace Cover", "public")
 
-	// Seed an existing cover image.
-	if _, err := db.Exec(`UPDATE games SET cover_image = ? WHERE id = ?`, "/assets/replace-cover/old-cover.jpg", gameID); err != nil {
-		t.Fatalf("seed cover image: %v", err)
-	}
+	// Seed an existing cover in game_assets and sync to games.cover_image.
+	insertRepositoryAsset(t, db, gameID, "old-cover", "cover", "/assets/replace-cover/old-cover.jpg", 0)
 
-	// Simulate the frontend "replace cover" flow: the aggregate update sends
-	// the new cover_image in the game payload AND the old path in delete_assets.
+	// Simulate the frontend "replace cover" flow: add a new cover asset, delete the old one.
+	insertRepositoryAsset(t, db, gameID, "new-cover", "cover", "/assets/replace-cover/new-cover.jpg", 1)
 	if _, err := repo.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
 			GameCoreInput: domain.GameCoreInput{
@@ -559,14 +557,15 @@ func TestGamesRepositoryUpdateAggregateReplaceCoverPreservesNewPath(t *testing.T
 		},
 		Assets: domain.GameAggregateAssetsInput{
 			DeleteAssets: []domain.GameAssetDeleteInput{
-				{AssetType: "cover", Path: "/assets/replace-cover/old-cover.jpg"},
+				{AssetType: "cover", AssetUID: "old-cover", Path: "/assets/replace-cover/old-cover.jpg"},
 			},
+			CoverOrderAssetUIDs: []string{"new-cover"},
 		},
 	}); err != nil {
 		t.Fatalf("UpdateAggregate returned error: %v", err)
 	}
 
-	// The new cover path must be preserved, not NULLed by the delete step.
+	// The new cover path must be preserved via syncPrimaryCoverTx.
 	game, err := repo.GetByID(gameID)
 	if err != nil {
 		t.Fatalf("GetByID returned error: %v", err)
@@ -583,13 +582,10 @@ func TestGamesRepositoryUpdateAggregateRemoveCoverSetsNull(t *testing.T) {
 	repo := NewGamesRepository(db)
 	gameID := insertRepositoryGame(t, db, "remove-cover", "Remove Cover", "public")
 
-	// Seed an existing cover image.
-	if _, err := db.Exec(`UPDATE games SET cover_image = ? WHERE id = ?`, "/assets/remove-cover/old-cover.jpg", gameID); err != nil {
-		t.Fatalf("seed cover image: %v", err)
-	}
+	// Seed an existing cover in game_assets and sync to games.cover_image.
+	insertRepositoryAsset(t, db, gameID, "old-cover", "cover", "/assets/remove-cover/old-cover.jpg", 0)
 
-	// Simulate the frontend "remove cover" flow: cover_image is null/empty
-	// and the old path is in delete_assets.
+	// Simulate the frontend "remove cover" flow: delete the only cover asset.
 	if _, err := repo.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
 			GameCoreInput: domain.GameCoreInput{
@@ -600,7 +596,7 @@ func TestGamesRepositoryUpdateAggregateRemoveCoverSetsNull(t *testing.T) {
 		},
 		Assets: domain.GameAggregateAssetsInput{
 			DeleteAssets: []domain.GameAssetDeleteInput{
-				{AssetType: "cover", Path: "/assets/remove-cover/old-cover.jpg"},
+				{AssetType: "cover", AssetUID: "old-cover", Path: "/assets/remove-cover/old-cover.jpg"},
 			},
 		},
 	}); err != nil {

@@ -122,6 +122,10 @@ func (r *GamesRepository) ListVideos(gameID int64) ([]domain.GameAsset, error) {
 	return r.listAssetsByType(gameID, "video")
 }
 
+func (r *GamesRepository) ListCovers(gameID int64) ([]domain.GameAsset, error) {
+	return r.listAssetsByType(gameID, "cover")
+}
+
 func (r *GamesRepository) GetSeriesMetadata(gameID int64) (*domain.MetadataItem, error) {
 	const query = `
 		SELECT s.id, s.name, s.slug, s.sort_order, s.created_at

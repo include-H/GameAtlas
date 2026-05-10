@@ -1,8 +1,12 @@
 import { ref, type Ref } from 'vue'
-import type { EditGameForm, EditGameEditableVideo } from '@/composables/edit-game-form'
+import type { EditGameForm, EditGameEditableCover, EditGameEditableVideo } from '@/composables/edit-game-form'
 
 interface UseEditGameMediaStateOptions {
-  form: Ref<Pick<EditGameForm, 'screenshots' | 'preview_videos'>>
+  form: Ref<Pick<EditGameForm, 'screenshots' | 'preview_videos' | 'covers'>>
+}
+
+const getEditableCoverKey = (cover: EditGameEditableCover) => {
+  return cover.asset_uid || cover.path
 }
 
 const getEditableVideoKey = (video: EditGameEditableVideo) => {
@@ -12,6 +16,19 @@ const getEditableVideoKey = (video: EditGameEditableVideo) => {
 export const useEditGameMediaState = (options: UseEditGameMediaStateOptions) => {
   const draggedScreenshotKey = ref<string | null>(null)
   const dragOverScreenshotKey = ref<string | null>(null)
+
+  const reorderEditableCovers = (targetKey: string, direction: -1 | 1) => {
+    const covers = [...options.form.value.covers]
+    const index = covers.findIndex((item) => getEditableCoverKey(item) === targetKey)
+    if (index === -1) return
+
+    const nextIndex = index + direction
+    if (nextIndex < 0 || nextIndex >= covers.length) return
+
+    const [moved] = covers.splice(index, 1)
+    covers.splice(nextIndex, 0, moved)
+    options.form.value.covers = covers
+  }
 
   const reorderEditableVideos = (targetKey: string, direction: -1 | 1) => {
     const videos = [...options.form.value.preview_videos]
@@ -62,6 +79,7 @@ export const useEditGameMediaState = (options: UseEditGameMediaStateOptions) => 
   return {
     draggedScreenshotKey,
     dragOverScreenshotKey,
+    reorderEditableCovers,
     reorderEditableVideos,
     handleScreenshotDragStart,
     handleScreenshotDragEnter,

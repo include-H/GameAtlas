@@ -1,5 +1,6 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import type {
+  EditGameEditableCover,
   EditGameEditableScreenshot,
   EditGameForm,
 } from '@/composables/edit-game-form'
@@ -32,7 +33,7 @@ interface SteamScreenshotsData {
 }
 
 interface UseSteamImportOptions {
-  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'developer_ids' | 'publisher_ids' | 'cover_image' | 'banner_image' | 'screenshots'>>
+  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'developer_ids' | 'publisher_ids' | 'covers' | 'banner_image' | 'screenshots'>>
   gameId: Ref<number | undefined>
   getWikiContent: () => string
   uploadAssetFromUrl: (
@@ -46,6 +47,9 @@ interface UseSteamImportOptions {
     assetId?: number,
     assetUid?: string,
   ) => void
+  createEditableCover: (
+    asset: UploadedAssetLike | string,
+  ) => EditGameEditableCover
   createEditableScreenshot: (
     asset: UploadedAssetLike | string,
     index: number,
@@ -61,6 +65,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const isDownloadingCover = ref(false)
   const steamCoverImages = ref<string[]>([])
   const selectedCoverImage = ref('')
+  const selectedCovers = ref<Set<number>>(new Set())
+  const isDownloadingSteamCovers = ref(false)
 
   const showBannerSelector = ref(false)
   const bannerSearchUrl = ref('')
@@ -123,6 +129,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       )
       steamCoverImages.value = images
       selectedCoverImage.value = ''
+      selectedCovers.value = new Set()
       return images
     },
     onError: (message) => {
@@ -191,26 +198,45 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   // SteamGridDB search helpers — maps results to SteamGameSearchResult shape for UI reuse
   const sgdbSearchResults = ref<SteamGameSearchResult[]>([])
   const sgdbSearching = ref(false)
+  const sgdbThumbs = ref<Record<string, string>>({})
 
   const searchSGDB = async (query: string): Promise<SteamGameSearchResult[]> => {
     const games = await steamGridDBService.search(query)
-    return games.map((g) => ({
+    const results: SteamGameSearchResult[] = games.map((g) => ({
       id: String(g.id),
       name: g.name,
       releaseDate: g.release_date ? new Date(g.release_date * 1000).getFullYear().toString() : undefined,
     }))
+    // SGDB search API doesn't return thumbnails — fetch the first grid for each result in background
+    sgdbThumbs.value = {}
+    void Promise.allSettled(
+      results.map(async (r) => {
+        try {
+          const grids = await steamGridDBService.getGridsByGameId(Number(r.id))
+          if (grids.length > 0) {
+            sgdbThumbs.value = { ...sgdbThumbs.value, [r.id]: grids[0].thumb }
+          }
+        } catch {
+          // thumbnail is cosmetic — ignore failures
+        }
+      }),
+    )
+    return results
   }
 
   const handleCoverSearchClear = () => {
     coverSteamPicker.clear()
     sgdbSearchResults.value = []
+    sgdbThumbs.value = {}
     steamCoverImages.value = []
     selectedCoverImage.value = ''
+    selectedCovers.value = new Set()
   }
 
   const searchSteamForCover = async () => {
     steamCoverImages.value = []
     selectedCoverImage.value = ''
+    selectedCovers.value = new Set()
     if (coverSource.value === 'steamgriddb') {
       sgdbSearching.value = true
       try {
@@ -237,6 +263,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
         const images = grids.map((g) => g.url)
         steamCoverImages.value = images
         selectedCoverImage.value = ''
+        selectedCovers.value = new Set()
       } catch (e) {
         options.addAlert('SteamGridDB 获取封面失败：' + getHttpErrorMessage(e), 'error')
         coverSteamPicker.selectedGame.value = null
@@ -252,6 +279,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     coverSteamPicker.back()
     steamCoverImages.value = []
     selectedCoverImage.value = ''
+    selectedCovers.value = new Set()
   }
 
   const loadCoverFromUrl = () => {
@@ -265,10 +293,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     isDownloadingCover.value = true
     try {
       const uploaded = await options.uploadAssetFromUrl(coverPreviewUrl.value, 'cover')
-      if (options.form.value.cover_image) {
-        options.queueAssetDeletion('cover', options.form.value.cover_image)
-      }
-      options.form.value.cover_image = uploaded.path
+      options.form.value.covers.push(options.createEditableCover(uploaded))
       await options.onAssetPersisted?.()
       showCoverSelector.value = false
       coverSearchUrl.value = ''
@@ -287,10 +312,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     isSearchingSteamCover.value = true
     try {
       const uploaded = await options.uploadAssetFromUrl(selectedCoverImage.value, 'cover')
-      if (options.form.value.cover_image) {
-        options.queueAssetDeletion('cover', options.form.value.cover_image)
-      }
-      options.form.value.cover_image = uploaded.path
+      options.form.value.covers.push(options.createEditableCover(uploaded))
       await options.onAssetPersisted?.()
       showCoverSelector.value = false
       backToCoverGameSearch()
@@ -304,9 +326,36 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     }
   }
 
+  const downloadSelectedSteamCovers = async () => {
+    if (!steamCoverImages.value.length || !options.gameId.value) return
+
+    const indices = Array.from(selectedCovers.value).sort((a, b) => a - b)
+    if (indices.length === 0) return
+
+    isDownloadingSteamCovers.value = true
+    try {
+      for (const index of indices) {
+        const coverUrl = steamCoverImages.value[index]
+        const uploaded = await options.uploadAssetFromUrl(coverUrl, 'cover')
+        options.form.value.covers.push(options.createEditableCover(uploaded))
+      }
+      await options.onAssetPersisted?.()
+      showCoverSelector.value = false
+      backToCoverGameSearch()
+      steamCoverSearchQuery.value = ''
+      steamCoverSearchResults.value = []
+      options.addAlert(`成功添加 ${indices.length} 张封面`, 'success')
+    } catch (error) {
+      options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
+    } finally {
+      isDownloadingSteamCovers.value = false
+    }
+  }
+
   const handleBannerSearchClear = () => {
     bannerSteamPicker.clear()
     sgdbSearchResults.value = []
+    sgdbThumbs.value = {}
     steamBannerImages.value = []
     selectedBannerImage.value = ''
   }
@@ -439,6 +488,14 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     }
   }
 
+  const toggleCoverSelection = (index: number) => {
+    if (selectedCovers.value.has(index)) {
+      selectedCovers.value.delete(index)
+    } else {
+      selectedCovers.value.add(index)
+    }
+  }
+
   const loadScreenshotPreview = () => {
     if (screenshotSearchUrl.value.trim()) {
       screenshotPreviewUrl.value = proxySteamAssetUrl(screenshotSearchUrl.value.trim())
@@ -536,15 +593,25 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     searchSteamForBanner()
   })
 
+  // Merge SGDB thumbnails into search results reactively
+  const mergeSGDBThumbs = (results: SteamGameSearchResult[]): SteamGameSearchResult[] => {
+    const thumbs = sgdbThumbs.value
+    return results.map((r) => (thumbs[r.id] ? { ...r, tinyImage: thumbs[r.id] } : r))
+  }
+
   // Computed search results/loading — switches between Steam and SteamGridDB based on source
   const coverSearchResults = computed(() =>
-    coverSource.value === 'steamgriddb' ? sgdbSearchResults.value : steamCoverSearchResults.value,
+    coverSource.value === 'steamgriddb'
+      ? mergeSGDBThumbs(sgdbSearchResults.value)
+      : steamCoverSearchResults.value,
   )
   const isSearchingCover = computed(() =>
     coverSource.value === 'steamgriddb' ? sgdbSearching.value : isSearchingSteamCover.value,
   )
   const bannerSearchResults = computed(() =>
-    bannerSource.value === 'steamgriddb' ? sgdbSearchResults.value : steamBannerSearchResults.value,
+    bannerSource.value === 'steamgriddb'
+      ? mergeSGDBThumbs(sgdbSearchResults.value)
+      : steamBannerSearchResults.value,
   )
   const isSearchingBanner = computed(() =>
     bannerSource.value === 'steamgriddb' ? sgdbSearching.value : isSearchingSteamBanner.value,
@@ -560,11 +627,15 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
 
     resetMetadataImportState()
 
+    sgdbSearchResults.value = []
+    sgdbThumbs.value = {}
+
     steamCoverSearchQuery.value = ''
     steamCoverSearchResults.value = []
     selectedSteamGame.value = null
     steamCoverImages.value = []
     selectedCoverImage.value = ''
+    selectedCovers.value = new Set()
     coverSearchUrl.value = ''
     coverPreviewUrl.value = ''
 
@@ -598,6 +669,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     isDownloadingCover,
     steamCoverImages,
     selectedCoverImage,
+    selectedCovers,
+    isDownloadingSteamCovers,
     showBannerSelector,
     bannerSearchUrl,
     bannerPreviewUrl,
@@ -645,6 +718,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     loadCoverFromUrl,
     confirmCoverSelection,
     downloadSelectedSteamCover,
+    downloadSelectedSteamCovers,
+    toggleCoverSelection,
     handleBannerSearchClear,
     searchSteamForBanner,
     selectSteamBannerGame,

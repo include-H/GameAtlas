@@ -148,6 +148,7 @@ type gameDetailResponse struct {
 	Downloads     int64                           `json:"downloads"`
 	PreviewVideos []gameAssetResponse             `json:"preview_videos"`
 	Screenshots   []gameAssetResponse             `json:"screenshots"`
+	Covers        []gameAssetResponse             `json:"covers"`
 	Series        *metadataItemResponse           `json:"series"`
 	Developers    []metadataItemResponse          `json:"developers"`
 	Publishers    []metadataItemResponse          `json:"publishers"`

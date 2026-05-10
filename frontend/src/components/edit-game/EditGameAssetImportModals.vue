@@ -95,21 +95,24 @@
               v-for="(image, index) in steamCoverImages"
               :key="index"
               class="steam-image-item"
-              :class="{ 'steam-image-selected': selectedCoverImage === image }"
-              @click="emit('update:selected-cover-image', image)"
+              :class="{ 'steam-image-selected': selectedCovers.has(index) }"
+              @click="emit('toggle-cover-selection', index)"
             >
               <img :src="image" />
+              <div v-if="selectedCovers.has(index)" class="steam-screenshot-check">
+                <icon-check />
+              </div>
             </div>
           </div>
           <a-button
-            v-if="selectedCoverImage"
+            v-if="selectedCovers.size > 0"
             type="primary"
             long
-            :loading="isSearchingCover"
+            :loading="isDownloadingSteamCovers"
             html-type="button"
-            @click="emit('download-selected-steam-cover')"
+            @click="emit('download-selected-steam-covers')"
           >
-            下载选中的封面
+            下载选中的 {{ selectedCovers.size }} 张封面
           </a-button>
         </div>
       </steam-search-panel>
@@ -428,6 +431,8 @@ defineProps<{
   selectedSteamGame: SteamGameSearchResult | null
   steamCoverImages: string[]
   selectedCoverImage: string
+  selectedCovers: Set<number>
+  isDownloadingSteamCovers: boolean
   uploadAction: string
   uploadData: Record<string, string>
   uploadHeaders: Record<string, string>
@@ -482,6 +487,8 @@ const emit = defineEmits<{
   'back-cover-game-search': []
   'update:selected-cover-image': [value: string]
   'download-selected-steam-cover': []
+  'toggle-cover-selection': [index: number]
+  'download-selected-steam-covers': []
   'cover-upload-success': [fileItem: FileItem]
   'cover-upload-error': []
   'update:cover-search-url': [value: string]

@@ -702,11 +702,14 @@ func TestGamesHandlerUpdateAggregateIncludesAssetDeleteWarnings(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	gameID := insertGamesHandlerTestGame(t, db, "aggregate-warning", "Aggregate Warning", "public", "")
+	if _, err := db.Exec(`INSERT INTO game_assets (game_id, asset_uid, asset_type, path, sort_order) VALUES (?, ?, 'cover', ?, 0)`, gameID, "bad-cover", "/assets/../bad-cover.png"); err != nil {
+		t.Fatalf("insert cover asset: %v", err)
+	}
 	handler := newSplitGamesHandlerForTest(config.Config{AssetsDir: t.TempDir()}, db)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-warning/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Warning","visibility":"public"},"assets":{"delete_assets":[{"asset_type":"cover","path":"/assets/../bad-cover.png"}]}}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-warning/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Warning","visibility":"public"},"assets":{"delete_assets":[{"asset_type":"cover","asset_uid":"bad-cover","path":"/assets/../bad-cover.png"}]}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-warning"}}
 	context.Set("is_admin", true)

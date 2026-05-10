@@ -234,6 +234,7 @@ type GameAggregateAssetsInput struct {
 	DeleteAssets             []GameAssetDeleteInput
 	ScreenshotOrderAssetUIDs []string
 	VideoOrderAssetUIDs      []string
+	CoverOrderAssetUIDs      []string
 }
 
 type WikiWriteInput struct {

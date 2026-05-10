@@ -490,6 +490,7 @@ describe('games service', () => {
         delete_assets: [],
         screenshot_order_asset_uids: [],
         video_order_asset_uids: [],
+        cover_order_asset_uids: [],
       },
     })
 
@@ -513,6 +514,7 @@ describe('games service', () => {
         delete_assets: [],
         screenshot_order_asset_uids: [],
         video_order_asset_uids: [],
+        cover_order_asset_uids: [],
       },
     })
   })

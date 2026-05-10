@@ -177,7 +177,7 @@
 
       <game-media-section
         :title="form.title"
-        :cover-image="form.cover_image"
+        :covers="form.covers"
         :banner-image="form.banner_image"
         :primary-preview-video="primaryPreviewVideo"
         :preview-video-sources="previewVideoSources"
@@ -186,6 +186,8 @@
         :drag-over-screenshot-key="dragOverScreenshotKey"
         @open-cover-selector="showCoverSelector = true"
         @remove-cover="removeCover"
+        @set-primary-cover="setPrimaryCover"
+        @reorder-cover="reorderEditableCovers($event.key, $event.direction)"
         @open-banner-selector="showBannerSelector = true"
         @remove-banner="removeBanner"
         @open-video-selector="openVideoSelector"
@@ -230,6 +232,8 @@
       :selected-steam-game="selectedSteamGame"
       :steam-cover-images="steamCoverImages"
       :selected-cover-image="selectedCoverImage"
+      :selected-covers="selectedCovers"
+      :is-downloading-steam-covers="isDownloadingSteamCovers"
       :upload-action="uploadAction"
       :upload-data="uploadData"
       :upload-headers="uploadHeaders"
@@ -278,6 +282,8 @@
       @back-cover-game-search="backToCoverGameSearch"
       @update:selected-cover-image="selectedCoverImage = $event"
       @download-selected-steam-cover="downloadSelectedSteamCover"
+      @toggle-cover-selection="toggleCoverSelection"
+      @download-selected-steam-covers="downloadSelectedSteamCovers"
       @cover-upload-success="handleCoverUploadSuccess"
       @cover-upload-error="handleCoverUploadError"
       @update:cover-search-url="coverSearchUrl = $event"
@@ -320,7 +326,7 @@
       :video-upload-file-name="videoUploadFileName"
       :preview-videos="form.preview_videos"
       :banner-image="form.banner_image"
-      :cover-image="form.cover_image"
+      :cover-image="primaryCover?.path || ''"
       @update:visible="showVideoSelector = $event"
       @video-file-change="handleVideoFileChange"
       @reorder-video="reorderEditableVideos($event.key, $event.direction)"
@@ -386,6 +392,7 @@ const {
   coverSearchUrl,
   downloadSelectedSteamBanner,
   downloadSelectedSteamCover,
+  downloadSelectedSteamCovers,
   downloadSelectedSteamScreenshots,
   draggedScreenshotKey,
   dragOverScreenshotKey,
@@ -424,6 +431,7 @@ const {
   isDownloadingBanner,
   isDownloadingCover,
   isDownloadingScreenshot,
+  isDownloadingSteamCovers,
   isDownloadingSteamScreenshots,
   isPreparingWikiMetadataCandidates,
   isSearchingDevelopers,
@@ -441,6 +449,7 @@ const {
   openFileBrowser,
   openVideoSelector,
   previewVideoSources,
+  primaryCover,
   primaryPreviewVideo,
   releaseDate,
   removeBanner,
@@ -448,7 +457,9 @@ const {
   removeFilePath,
   removePreviewVideo,
   removeScreenshot,
+  reorderEditableCovers,
   reorderEditableVideos,
+  setPrimaryCover,
   rules,
   screenshotPreviewUrl,
   screenshotSearchUrl,
@@ -464,6 +475,7 @@ const {
   selectSteamSummaryGame,
   selectedBannerImage,
   selectedCoverImage,
+  selectedCovers,
   selectedSteamBannerGame,
   selectedSteamGame,
   selectedSteamScreenshotGame,
@@ -487,6 +499,7 @@ const {
   steamSummaryPreview,
   steamSummarySearchQuery,
   steamSummarySearchResults,
+  toggleCoverSelection,
   toggleSteamScreenshot,
   uploadAction,
   uploadData,

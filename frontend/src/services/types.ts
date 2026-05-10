@@ -116,6 +116,13 @@ export interface VideoAssetItem {
   sort_order: number
 }
 
+export interface CoverItem {
+  id: number
+  asset_uid: string
+  path: string
+  sort_order: number
+}
+
 export interface GameListItemDto {
   id: number
   public_id: string
@@ -142,6 +149,7 @@ export interface GameListItemDto {
 export interface GameDetailDtoBase<TFile extends GameFileEntry = GameFileEntry> extends Omit<GameListItemDto, 'primary_screenshot' | 'screenshot_count' | 'file_count' | 'developer_count' | 'publisher_count'> {
   preview_videos: VideoAssetItem[]
   screenshots: ScreenshotItem[]
+  covers: CoverItem[]
   series: Series | null
   developers: Developer[]
   publishers: Publisher[]
@@ -204,6 +212,7 @@ export interface GameAggregateUpdateRequest {
     delete_assets: GameAggregateDeleteAssetRequest[]
     screenshot_order_asset_uids: string[]
     video_order_asset_uids: string[]
+    cover_order_asset_uids: string[]
   }
 }
 

@@ -131,7 +131,7 @@ func (s *AssetsService) cleanupPersistFailedAsset(path string, source string) er
 func (s *AssetsService) persistAssetPath(gameID int64, assetType string, assetUID string, path string, sortOrder int) (*domain.GameAsset, error) {
 	switch assetType {
 	case "cover":
-		return nil, s.assetsRepo.UpdateGameImage(gameID, "cover_image", &path)
+		return s.assetsRepo.AddCover(gameID, assetUID, path, sortOrder)
 	case "banner":
 		return nil, s.assetsRepo.UpdateGameImage(gameID, "banner_image", &path)
 	case "screenshot":
@@ -175,13 +175,10 @@ func newAssetUID() string {
 
 func allocateAssetIdentity(assetType string) (string, string) {
 	switch assetType {
-	case "screenshot":
+	case "screenshot", "video", "cover":
 		uid := newAssetUID()
 		return uid, uid
-	case "video":
-		uid := newAssetUID()
-		return uid, uid
-	case "cover", "banner":
+	case "banner":
 		return "", newAssetUID()
 	default:
 		return "", newAssetUID()

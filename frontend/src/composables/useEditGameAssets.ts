@@ -1,5 +1,6 @@
 import { type Ref } from 'vue'
 import type {
+  EditGameEditableCover,
   EditGameEditableScreenshot,
   EditGameEditableVideo,
   EditGameForm,
@@ -18,7 +19,7 @@ interface UploadResponseLike {
 }
 
 interface UseEditGameAssetsOptions {
-  form: Ref<Pick<EditGameForm, 'cover_image' | 'banner_image' | 'screenshots' | 'preview_videos'>>
+  form: Ref<Pick<EditGameForm, 'covers' | 'banner_image' | 'screenshots' | 'preview_videos'>>
   gameId: Ref<number | undefined>
   showCoverSelector: Ref<boolean>
   showBannerSelector: Ref<boolean>
@@ -28,6 +29,7 @@ interface UseEditGameAssetsOptions {
   videoUploadProgress: Ref<number>
   videoUploadFileName: Ref<string>
   queueAssetDeletion: (type: AssetType, path: string, assetId?: number, assetUid?: string) => void
+  createEditableCover: (asset: UploadedAssetResult) => EditGameEditableCover
   createEditableScreenshot: (asset: UploadedAssetResult, index: number) => EditGameEditableScreenshot
   createEditableVideo: (asset: UploadedAssetResult) => EditGameEditableVideo
   addAlert: (message: string, type: AlertType) => void
@@ -45,11 +47,8 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
 
   const handleCoverUploadSuccess = (fileItem: FileItem) => {
     const response = fileItem.response as UploadResponseLike | undefined
-    if (response?.success && response.data?.path) {
-      if (options.form.value.cover_image) {
-        options.queueAssetDeletion('cover', options.form.value.cover_image)
-      }
-      options.form.value.cover_image = response.data.path
+    if (response?.success && response.data) {
+      options.form.value.covers.push(options.createEditableCover(response.data))
       void options.onAssetPersisted?.()
       options.showCoverSelector.value = false
       options.addAlert('封面上传成功', 'success')
@@ -133,11 +132,19 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     }
   }
 
-  const removeCover = () => {
-    const coverUrl = options.form.value.cover_image
-    if (!coverUrl) return
-    options.queueAssetDeletion('cover', coverUrl)
-    options.form.value.cover_image = ''
+  const removeCover = (index: number) => {
+    const cover = options.form.value.covers[index]
+    if (!cover) return
+    options.queueAssetDeletion('cover', cover.path, cover.id, cover.asset_uid)
+    options.form.value.covers = options.form.value.covers.filter((_, i) => i !== index)
+  }
+
+  const setPrimaryCover = (index: number) => {
+    if (index <= 0 || index >= options.form.value.covers.length) return
+    const covers = [...options.form.value.covers]
+    const [moved] = covers.splice(index, 1)
+    covers.splice(0, 0, moved)
+    options.form.value.covers = covers
   }
 
   const removeBanner = () => {
@@ -181,6 +188,7 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     removeBanner,
     removeScreenshot,
     removePreviewVideo,
+    setPrimaryCover,
     resetVideoUploadState,
   }
 }

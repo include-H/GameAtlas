@@ -162,6 +162,24 @@ func (s *AssetReconcileService) reconcileGameMissingAssetsTx(gameID int64) (bool
 		changed = true
 	}
 
+	// Sync cover_image column with the primary cover from game_assets after cleanup.
+	if changed {
+		var primaryCover sql.NullString
+		if err := tx.Get(&primaryCover, `
+			SELECT path FROM game_assets
+			WHERE game_id = ? AND asset_type = 'cover'
+			ORDER BY sort_order ASC, id ASC
+			LIMIT 1
+		`, gameID); err != nil && err != sql.ErrNoRows {
+			return false, fmt.Errorf("query primary cover for sync: %w", err)
+		}
+		if _, err := tx.Exec(`
+			UPDATE games SET cover_image = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+		`, primaryCover, gameID); err != nil {
+			return false, fmt.Errorf("sync cover_image after reconcile: %w", err)
+		}
+	}
+
 	if !changed {
 		return false, nil
 	}

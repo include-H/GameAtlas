@@ -3,6 +3,7 @@ import {
   createEmptyEditGameForm,
   formatEditGameReleaseDate,
   parseEditGameReleaseDate,
+  type EditGameEditableCover,
   type EditGameEditableScreenshot,
   type EditGameEditableVideo,
   type EditGameForm,
@@ -28,6 +29,7 @@ import {
 } from '@/utils/creatable-select'
 import type {
   AdminGameDetail,
+  CoverItem,
   Developer,
   Publisher,
   ScreenshotItem,
@@ -75,6 +77,10 @@ export const useEditGameModal = ({
   }
 
   const form = ref<EditGameForm>(createEmptyEditGameForm())
+
+  const primaryCover = computed(() => {
+    return form.value.covers[0] || null
+  })
 
   const primaryPreviewVideo = computed(() => {
     return form.value.preview_videos[0] || null
@@ -269,9 +275,21 @@ export const useEditGameModal = ({
     }
   }
 
+  const createEditableCover = (asset: CoverItem | UploadedAssetResult | string): EditGameEditableCover => {
+    if (typeof asset === 'string') {
+      return { path: asset }
+    }
+    return {
+      id: 'id' in asset ? asset.id : ('asset_id' in asset ? asset.asset_id : undefined),
+      asset_uid: asset.asset_uid,
+      path: asset.path,
+    }
+  }
+
   const {
     draggedScreenshotKey,
     dragOverScreenshotKey,
+    reorderEditableCovers,
     reorderEditableVideos,
     handleScreenshotDragStart,
     handleScreenshotDragEnter,
@@ -309,6 +327,7 @@ export const useEditGameModal = ({
     developerOptions,
     publisherOptions,
     addAlert,
+    createEditableCover,
     createEditableScreenshot,
     createEditableVideo,
   })
@@ -377,6 +396,8 @@ export const useEditGameModal = ({
     isDownloadingCover,
     steamCoverImages,
     selectedCoverImage,
+    selectedCovers,
+    isDownloadingSteamCovers,
     showBannerSelector,
     bannerSearchUrl,
     bannerPreviewUrl,
@@ -424,6 +445,8 @@ export const useEditGameModal = ({
     loadCoverFromUrl,
     confirmCoverSelection,
     downloadSelectedSteamCover,
+    downloadSelectedSteamCovers,
+    toggleCoverSelection,
     handleBannerSearchClear,
     searchSteamForBanner,
     selectSteamBannerGame,
@@ -446,6 +469,7 @@ export const useEditGameModal = ({
     getWikiContent: () => props.game?.wiki_content || '',
     uploadAssetFromUrl,
     queueAssetDeletion,
+    createEditableCover,
     createEditableScreenshot,
     addAlert,
     onAssetPersisted: emitAssetSync,
@@ -469,6 +493,7 @@ export const useEditGameModal = ({
     removeBanner,
     removeScreenshot,
     removePreviewVideo,
+    setPrimaryCover,
     resetVideoUploadState,
   } = useEditGameAssets({
     form,
@@ -481,6 +506,7 @@ export const useEditGameModal = ({
     videoUploadProgress,
     videoUploadFileName,
     queueAssetDeletion,
+    createEditableCover,
     createEditableScreenshot,
     createEditableVideo,
     addAlert,
@@ -534,6 +560,7 @@ export const useEditGameModal = ({
     coverSearchUrl,
     downloadSelectedSteamBanner,
     downloadSelectedSteamCover,
+    downloadSelectedSteamCovers,
     downloadSelectedSteamScreenshots,
     draggedScreenshotKey,
     dragOverScreenshotKey,
@@ -572,6 +599,7 @@ export const useEditGameModal = ({
     isDownloadingBanner,
     isDownloadingCover,
     isDownloadingScreenshot,
+    isDownloadingSteamCovers,
     isDownloadingSteamScreenshots,
     isPreparingWikiMetadataCandidates,
     isSearchingDevelopers,
@@ -589,6 +617,7 @@ export const useEditGameModal = ({
     openFileBrowser,
     openVideoSelector,
     previewVideoSources,
+    primaryCover,
     primaryPreviewVideo,
     releaseDate,
     removeBanner,
@@ -596,7 +625,9 @@ export const useEditGameModal = ({
     removeFilePath,
     removePreviewVideo,
     removeScreenshot,
+    reorderEditableCovers,
     reorderEditableVideos,
+    setPrimaryCover,
     rules,
     screenshotPreviewUrl,
     screenshotSearchUrl,
@@ -612,6 +643,7 @@ export const useEditGameModal = ({
     selectSteamSummaryGame,
     selectedBannerImage,
     selectedCoverImage,
+    selectedCovers,
     selectedSteamBannerGame,
     selectedSteamGame,
     selectedSteamScreenshotGame,
@@ -636,6 +668,7 @@ export const useEditGameModal = ({
     steamSummaryPreview,
     steamSummarySearchQuery,
     steamSummarySearchResults,
+    toggleCoverSelection,
     toggleSteamScreenshot,
     uploadAction,
     uploadData,

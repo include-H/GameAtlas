@@ -1,6 +1,7 @@
 import { type Ref } from 'vue'
 import {
   createEmptyEditGameForm,
+  type EditGameEditableCover,
   type EditGameEditableScreenshot,
   type EditGameEditableVideo,
   type EditGameForm,
@@ -10,6 +11,7 @@ import { developersService } from '@/services/developers.service'
 import { publishersService } from '@/services/publishers.service'
 import type {
   AdminGameDetail,
+  CoverItem,
   Developer,
   Publisher,
   ScreenshotItem,
@@ -23,6 +25,7 @@ interface UseEditGameFormBootstrapOptions {
   developerOptions: Ref<Developer[]>
   publisherOptions: Ref<Publisher[]>
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
+  createEditableCover: (asset: CoverItem | string) => EditGameEditableCover
   createEditableScreenshot: (asset: ScreenshotItem | string, index: number) => EditGameEditableScreenshot
   createEditableVideo: (asset: VideoAssetItem | string) => EditGameEditableVideo
 }
@@ -59,8 +62,10 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
       release_date: game.release_date || undefined,
       series_id: game.series?.id ?? null,
       summary: game.summary || '',
-      cover_image: game.cover_image || '',
       banner_image: game.banner_image || '',
+      covers: game.covers.map((asset) =>
+        options.createEditableCover(asset),
+      ),
       preview_videos: game.preview_videos.map((asset) =>
         options.createEditableVideo(asset),
       ),
