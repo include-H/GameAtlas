@@ -106,6 +106,13 @@ func (s *MetadataService) Create(resource MetadataResource, input domain.Metadat
 		if existing != nil {
 			return existing, nil
 		}
+		existing, err = s.repo.FindSimpleBySlug(resource.Table, slugValue)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			return existing, nil
+		}
 		return s.repo.CreateSimple(resource.Table, cleanInput, slugValue, sortOrder)
 	default:
 		return nil, fmt.Errorf("unsupported metadata resource: %s", resource.Table)
@@ -145,20 +152,16 @@ func slugify(value string) string {
 	lastDash := false
 
 	for _, r := range value {
-		switch {
-		case unicode.IsLetter(r) || unicode.IsDigit(r):
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
 			builder.WriteRune(r)
 			lastDash = false
-		case r == '-' || r == '_' || unicode.IsSpace(r):
-			if builder.Len() > 0 && !lastDash {
-				builder.WriteRune('-')
-				lastDash = true
-			}
+		} else if builder.Len() > 0 && !lastDash {
+			builder.WriteRune('-')
+			lastDash = true
 		}
 	}
 
-	result := strings.Trim(builder.String(), "-")
-	return result
+	return strings.Trim(builder.String(), "-")
 }
 
 func filterMetadataItems(items []domain.MetadataItem, options MetadataListOptions) []domain.MetadataItem {

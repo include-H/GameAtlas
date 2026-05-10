@@ -66,6 +66,25 @@ func (r *MetadataRepository) FindSimpleByName(table string, name string) (*domai
 	return &item, nil
 }
 
+func (r *MetadataRepository) FindSimpleBySlug(table string, slug string) (*domain.MetadataItem, error) {
+	query := fmt.Sprintf(`
+		SELECT id, name, slug, sort_order, created_at
+		FROM %s
+		WHERE slug = ?
+		LIMIT 1
+	`, table)
+
+	var item domain.MetadataItem
+	if err := r.db.Get(&item, query, slug); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find metadata in %s by slug: %w", table, err)
+	}
+
+	return &item, nil
+}
+
 func (r *MetadataRepository) CreateSeries(input domain.MetadataWriteInput, slug string, sortOrder int) (*domain.MetadataItem, error) {
 	var item domain.MetadataItem
 	err := r.db.Get(&item, `

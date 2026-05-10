@@ -59,6 +59,39 @@ func TestMetadataRepositoryListSeriesGamesBySeriesIDsInitializesEmptyAndFiltersV
 	}
 }
 
+func TestMetadataRepositoryFindSimpleBySlugReturnsExistingItem(t *testing.T) {
+	db := openRepositoryTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	if _, err := db.Exec(`
+		INSERT INTO developers (name, slug, sort_order)
+		VALUES ('IO Interactive A/S', 'io-interactive-a-s', 0)
+	`); err != nil {
+		t.Fatalf("insert developer: %v", err)
+	}
+
+	repo := NewMetadataRepository(db)
+
+	found, err := repo.FindSimpleBySlug("developers", "io-interactive-a-s")
+	if err != nil {
+		t.Fatalf("FindSimpleBySlug returned error: %v", err)
+	}
+	if found == nil {
+		t.Fatal("FindSimpleBySlug returned nil, want existing item")
+	}
+	if found.Name != "IO Interactive A/S" {
+		t.Fatalf("FindSimpleBySlug name = %q, want %q", found.Name, "IO Interactive A/S")
+	}
+
+	notFound, err := repo.FindSimpleBySlug("developers", "nonexistent-slug")
+	if err != nil {
+		t.Fatalf("FindSimpleBySlug nonexistent returned error: %v", err)
+	}
+	if notFound != nil {
+		t.Fatalf("FindSimpleBySlug nonexistent returned %+v, want nil", notFound)
+	}
+}
+
 func TestMetadataRepositoryDeleteUnusedRemovesOrphansOnly(t *testing.T) {
 	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()

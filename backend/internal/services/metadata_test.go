@@ -10,10 +10,12 @@ import (
 
 func TestSlugify(t *testing.T) {
 	cases := map[string]string{
-		"  Mega Man X  ":   "mega-man-x",
-		"动作 Game 2":        "动作-game-2",
-		"Already__Slugged": "already-slugged",
-		"***":              "",
+		"  Mega Man X  ":       "mega-man-x",
+		"动作 Game 2":            "动作-game-2",
+		"Already__Slugged":     "already-slugged",
+		"***":                  "",
+		"Io-Interactive A/S":  "io-interactive-a-s",
+		"IO Interactive A/S":  "io-interactive-a-s",
 	}
 
 	for input, want := range cases {
@@ -133,6 +135,30 @@ func TestMetadataServiceListSeriesReturnsEnrichmentErrorInsteadOfSilentEmptyStat
 	}
 	if !strings.Contains(err.Error(), "list series games by ids") {
 		t.Fatalf("List error = %v, want series enrichment context", err)
+	}
+}
+
+func TestMetadataServiceCreateDeveloperReturnsExistingBySlugWhenNameDiffers(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	// Insert "IO Interactive A/S" with slug "io-interactive-a-s".
+	if _, err := db.Exec(`INSERT INTO developers (name, slug, sort_order) VALUES ('IO Interactive A/S', 'io-interactive-a-s', 0)`); err != nil {
+		t.Fatalf("insert developer: %v", err)
+	}
+
+	service := NewMetadataService(repositories.NewMetadataRepository(db))
+
+	// Try to create "Io-Interactive A/S" — name differs due to hyphen, but slug collides.
+	created, err := service.Create(
+		MetadataResource{Table: "developers", ResourceName: "developers"},
+		domain.MetadataWriteInput{Name: "Io-Interactive A/S"},
+	)
+	if err != nil {
+		t.Fatalf("Create returned error: %v", err)
+	}
+	if created.Name != "IO Interactive A/S" {
+		t.Fatalf("Create name = %q, want existing %q", created.Name, "IO Interactive A/S")
 	}
 }
 
