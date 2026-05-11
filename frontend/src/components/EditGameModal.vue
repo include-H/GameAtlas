@@ -183,7 +183,7 @@
             @reorder-cover="reorderEditableCovers($event.key, $event.direction)"
             @open-banner-selector="showBannerSelector = true"
             @remove-banner="removeBanner"
-            @set-primary-banner="setPrimaryBanner"
+            @set-primary-banner="handleSetPrimaryBanner"
             @open-video-selector="openVideoSelector"
             @open-screenshot-selector="showScreenshotSelector = true"
             @remove-screenshot="removeScreenshot"
@@ -373,6 +373,13 @@
       @selection-change="handleWikiMetadataCandidateSelectionChange($event.key, $event.selected)"
       @apply="applySelectedWikiMetadata"
     />
+
+    <banner-crop-modal
+      :visible="showBannerCropModal"
+      :image-src="bannerCropSrc"
+      @confirm="handleBannerCropConfirm"
+      @cancel="showBannerCropModal = false"
+    />
   </a-modal>
 </template>
 
@@ -386,7 +393,9 @@ import GameMediaSection from '@/components/edit-game/GameMediaSection.vue'
 import EditGameAssetImportModals from '@/components/edit-game/EditGameAssetImportModals.vue'
 import EditGameVideoModal from '@/components/edit-game/EditGameVideoModal.vue'
 import EditGameWikiMetadataPickerModal from '@/components/edit-game/EditGameWikiMetadataPickerModal.vue'
+import BannerCropModal from '@/components/edit-game/BannerCropModal.vue'
 import { useEditGameModal } from '@/composables/useEditGameModal'
+import { uploadAsset } from '@/services/assets'
 
 interface Props {
   visible: boolean
@@ -579,6 +588,45 @@ const {
   formRef,
   isSubmitting,
 })
+
+const showBannerCropModal = ref(false)
+const bannerCropSrc = ref('')
+
+const handleSetPrimaryBanner = (index: number) => {
+  const banner = form.value.banners[index]
+  if (!banner) return
+
+  const img = new Image()
+  img.src = banner.path
+  img.onload = () => {
+    if (img.naturalWidth / img.naturalHeight > 1.6) {
+      bannerCropSrc.value = banner.path
+      showBannerCropModal.value = true
+    } else {
+      setPrimaryBanner(index)
+    }
+  }
+  img.onerror = () => {
+    setPrimaryBanner(index)
+  }
+}
+
+const handleBannerCropConfirm = async (blob: Blob) => {
+  const gameId = props.game?.id
+  if (!gameId) return
+
+  showBannerCropModal.value = false
+  try {
+    const file = new File([blob], 'banner-crop.png', { type: 'image/png' })
+    const result = await uploadAsset('banner', gameId, file)
+    if (result) {
+      form.value.banners.unshift({ asset_uid: result.asset_uid, path: result.path })
+      form.value.banner_image = result.path
+    }
+  } catch (err) {
+    console.error('Banner crop upload failed:', err)
+  }
+}
 </script>
 
 <style scoped src="./edit-game/EditGameModal.css"></style>
