@@ -83,7 +83,7 @@
                 {{ game.title?.charAt(0) || '?' }}
               </div>
               <img
-                v-if="primaryLogo"
+                v-if="primaryLogo && game?.logo_visible !== false"
                 :src="primaryLogo.path"
                 :alt="game.title"
                 class="sidebar-logo-overlay"

@@ -72,6 +72,7 @@ func (r *GameCatalogRepository) List(params domain.GamesListParams) ([]domain.Ga
 		INNER JOIN games g ON g.id = pg.id
 		LEFT JOIN favorite_games fg ON fg.game_id = g.id
 		LEFT JOIN screenshot_stats ss ON ss.game_id = g.id
+		LEFT JOIN logo_stats ls ON ls.game_id = g.id
 		LEFT JOIN file_stats fs ON fs.game_id = g.id
 		LEFT JOIN developer_stats ds ON ds.game_id = g.id
 		LEFT JOIN publisher_stats ps ON ps.game_id = g.id
@@ -189,6 +190,7 @@ func (r *GameCatalogRepository) Stats(params domain.GamesListParams) (*domain.Ga
 			INNER JOIN games g ON g.id = sg.id
 			LEFT JOIN favorite_games fg ON fg.game_id = g.id
 			LEFT JOIN screenshot_stats ss ON ss.game_id = g.id
+			LEFT JOIN logo_stats ls ON ls.game_id = g.id
 			LEFT JOIN file_stats fs ON fs.game_id = g.id
 			LEFT JOIN developer_stats ds ON ds.game_id = g.id
 			LEFT JOIN publisher_stats ps ON ps.game_id = g.id

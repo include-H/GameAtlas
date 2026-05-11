@@ -283,6 +283,7 @@
       :logo-position-x="primaryLogo?.position_x ?? null"
       :logo-position-y="primaryLogo?.position_y ?? null"
       :logo-width-pct="primaryLogo?.width_pct ?? null"
+      :logo-visible="form.logo_visible ?? true"
       @update:show-summary-selector="showSummarySelector = $event"
       @update:steam-summary-search-query="steamSummarySearchQuery = $event"
       @search-summary="searchSteamForSummary"

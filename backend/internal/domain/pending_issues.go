@@ -20,6 +20,7 @@ const (
 	PendingIssueDetailMissingCover       PendingIssueDetailKey = "missing-cover"
 	PendingIssueDetailMissingBanner      PendingIssueDetailKey = "missing-banner"
 	PendingIssueDetailMissingScreenshots PendingIssueDetailKey = "missing-screenshots"
+	PendingIssueDetailMissingLogo        PendingIssueDetailKey = "missing-logo"
 	PendingIssueDetailMissingWikiContent PendingIssueDetailKey = "missing-wiki-content"
 	PendingIssueDetailMissingFilesList   PendingIssueDetailKey = "missing-files-list"
 	PendingIssueDetailMissingDeveloper   PendingIssueDetailKey = "missing-developer"
@@ -79,6 +80,7 @@ var pendingIssueDetailDefinitions = []PendingIssueDetailDefinition{
 	{Key: PendingIssueDetailMissingCover, Label: "缺封面", Group: PendingIssueMissingAssets},
 	{Key: PendingIssueDetailMissingBanner, Label: "缺横幅", Group: PendingIssueMissingAssets},
 	{Key: PendingIssueDetailMissingScreenshots, Label: "缺截图", Group: PendingIssueMissingAssets},
+	{Key: PendingIssueDetailMissingLogo, Label: "缺 Logo", Group: PendingIssueMissingAssets},
 	{Key: PendingIssueDetailMissingWikiContent, Label: "缺 Wiki 内容", Group: PendingIssueMissingWiki},
 	{Key: PendingIssueDetailMissingFilesList, Label: "缺下载文件", Group: PendingIssueMissingFiles},
 	{Key: PendingIssueDetailMissingDeveloper, Label: "缺开发商", Group: PendingIssueMissingMetadata},
@@ -216,6 +218,7 @@ type pendingIssueGameFields struct {
 	WikiContent       *string
 	PrimaryScreenshot *string
 	ScreenshotCount   int64
+	LogoCount         int64
 	FileCount         int64
 	DeveloperCount    int64
 	PublisherCount    int64
@@ -229,6 +232,7 @@ func EvaluatePendingIssues(game Game, ignoredReasons map[PendingIssueDetailKey]*
 		WikiContent:       game.WikiContent,
 		PrimaryScreenshot: game.PrimaryScreenshot,
 		ScreenshotCount:   game.ScreenshotCount,
+		LogoCount:         game.LogoCount,
 		FileCount:         game.FileCount,
 		DeveloperCount:    game.DeveloperCount,
 		PublisherCount:    game.PublisherCount,
@@ -243,6 +247,7 @@ func EvaluatePendingIssuesForListItem(game GameListItem, ignoredReasons map[Pend
 		WikiContent:       game.WikiContent,
 		PrimaryScreenshot: game.PrimaryScreenshot,
 		ScreenshotCount:   game.ScreenshotCount,
+		LogoCount:         game.LogoCount,
 		FileCount:         game.FileCount,
 		DeveloperCount:    game.DeveloperCount,
 		PublisherCount:    game.PublisherCount,
@@ -284,6 +289,9 @@ func evaluatePendingIssues(game pendingIssueGameFields, ignoredReasons map[Pendi
 	}
 	if game.ScreenshotCount <= 0 && (game.PrimaryScreenshot == nil || *game.PrimaryScreenshot == "") {
 		appendDetail(PendingIssueDetailMissingScreenshots)
+	}
+	if game.LogoCount <= 0 {
+		appendDetail(PendingIssueDetailMissingLogo)
 	}
 	if !hasMeaningfulWikiContent {
 		appendDetail(PendingIssueDetailMissingWikiContent)

@@ -20,7 +20,7 @@ interface UploadResponseLike {
 }
 
 interface UseEditGameAssetsOptions {
-  form: Ref<Pick<EditGameForm, 'covers' | 'logo' | 'banner_image' | 'banners' | 'screenshots' | 'preview_videos'>>
+  form: Ref<Pick<EditGameForm, 'covers' | 'logo' | 'logo_visible' | 'banner_image' | 'banners' | 'screenshots' | 'preview_videos'>>
   gameId: Ref<number | undefined>
   showCoverSelector: Ref<boolean>
   showBannerSelector: Ref<boolean>
@@ -170,12 +170,13 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     options.form.value.logo = null
   }
 
-  const handleLogoPositionConfirm = (payload: { position_x: number; position_y: number; width_pct: number }) => {
+  const handleLogoPositionConfirm = (payload: { position_x: number; position_y: number; width_pct: number; logo_visible: boolean }) => {
     const logo = options.form.value.logo
     if (!logo) return
     logo.position_x = payload.position_x
     logo.position_y = payload.position_y
     logo.width_pct = payload.width_pct
+    options.form.value.logo_visible = payload.logo_visible
   }
 
   const removeBanner = (index: number) => {

@@ -82,6 +82,7 @@ type gameListItemResponse struct {
 	Downloads         int64                           `json:"downloads"`
 	PrimaryScreenshot *string                         `json:"primary_screenshot"`
 	ScreenshotCount   int64                           `json:"screenshot_count"`
+	LogoVisible       bool                            `json:"logo_visible"`
 	FileCount         int64                           `json:"file_count"`
 	DeveloperCount    int64                           `json:"developer_count"`
 	PublisherCount    int64                           `json:"publisher_count"`
@@ -157,6 +158,7 @@ type gameDetailResponse struct {
 	Developers    []metadataItemResponse          `json:"developers"`
 	Publishers    []metadataItemResponse          `json:"publishers"`
 	Files         []gameFileResponse              `json:"files"`
+	LogoVisible   bool                            `json:"logo_visible"`
 	IsFavorite    bool                            `json:"is_favorite"`
 	PendingIssues *pendingIssueEvaluationResponse `json:"pending_issues,omitempty"`
 	CreatedAt     string                          `json:"created_at"`

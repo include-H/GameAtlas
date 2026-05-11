@@ -47,6 +47,7 @@ func TestEvaluatePendingIssuesUsesDomainSeverityRules(t *testing.T) {
 		Summary:           &ready,
 		PrimaryScreenshot: &ready,
 		ScreenshotCount:   1,
+		LogoCount:         1,
 		FileCount:         0,
 		DeveloperCount:    1,
 		PublisherCount:    1,

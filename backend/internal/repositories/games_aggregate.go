@@ -192,6 +192,10 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 		input.CoverImage,
 		input.BannerImage,
 	}
+	if input.LogoVisible != nil {
+		setClauses = append(setClauses, "logo_visible = ?")
+		args = append(args, *input.LogoVisible)
+	}
 	setClauses = append(setClauses, "series_id = ?")
 	args = append(args, input.SeriesID)
 	setClauses = append(setClauses, "updated_at = CURRENT_TIMESTAMP")

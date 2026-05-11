@@ -36,6 +36,7 @@ var pendingIssueConditionDefinitions = []pendingIssueConditionDefinition{
 	newPendingFieldIssue(domain.PendingIssueDetailMissingCover, "g.cover_image"),
 	newPendingFieldIssue(domain.PendingIssueDetailMissingBanner, "g.banner_image"),
 	newPendingRelationIssue(domain.PendingIssueDetailMissingScreenshots, "game_assets ga", "ga.game_id = g.id AND ga.asset_type = 'screenshot'"),
+	newPendingRelationIssue(domain.PendingIssueDetailMissingLogo, "game_assets gl", "gl.game_id = g.id AND gl.asset_type = 'logo'"),
 	newPendingWikiIssue(),
 	newPendingRelationIssue(domain.PendingIssueDetailMissingFilesList, "game_files gf", "gf.game_id = g.id"),
 	newPendingRelationIssue(domain.PendingIssueDetailMissingDeveloper, "game_developers gd", "gd.game_id = g.id"),
@@ -75,6 +76,8 @@ func gamesListItemSelectColumns() string {
 			g.downloads,
 			ss.primary_screenshot,
 			COALESCE(ss.screenshot_count, 0) AS screenshot_count,
+			COALESCE(ls.logo_count, 0) AS logo_count,
+			g.logo_visible,
 			COALESCE(fs.file_count, 0) AS file_count,
 			COALESCE(ds.developer_count, 0) AS developer_count,
 			COALESCE(ps.publisher_count, 0) AS publisher_count,
@@ -108,6 +111,13 @@ func gameListItemStatsCTEs(sourceTable string) string {
 			FROM ranked_screenshots rs
 			GROUP BY rs.game_id
 		),
+		logo_stats AS (
+			SELECT gl.game_id, COUNT(*) AS logo_count
+			FROM game_assets gl
+			INNER JOIN %s src ON src.id = gl.game_id
+			WHERE gl.asset_type = 'logo'
+			GROUP BY gl.game_id
+		),
 		file_stats AS (
 			SELECT gf.game_id, COUNT(*) AS file_count
 			FROM game_files gf
@@ -126,7 +136,7 @@ func gameListItemStatsCTEs(sourceTable string) string {
 			INNER JOIN %s src ON src.id = gp.game_id
 			GROUP BY gp.game_id
 		)
-	`, sourceTable, sourceTable, sourceTable, sourceTable)
+	`, sourceTable, sourceTable, sourceTable, sourceTable, sourceTable)
 }
 
 // buildGamesListWhere owns the common catalog filtering DSL used by list-like read models.

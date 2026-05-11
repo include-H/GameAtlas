@@ -135,6 +135,7 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 
 	insertRepositoryAsset(t, db, secondGameID, "screen-b2", "screenshot", "/assets/stats-b/second.png", 1)
 	insertRepositoryAsset(t, db, secondGameID, "screen-b1", "screenshot", "/assets/stats-b/first.png", 0)
+	insertRepositoryAsset(t, db, secondGameID, "logo-b", "logo", "/assets/stats-b/logo.png", 0)
 	insertRepositoryAsset(t, db, firstGameID, "screen-a1", "screenshot", "/assets/stats-a/only.png", 0)
 	insertRepositoryAsset(t, db, privateGameID, "screen-private", "screenshot", "/assets/stats-private/only.png", 0)
 	insertRepositoryGameFile(t, db, secondGameID, "/roms/stats-b.rom")
@@ -317,8 +318,10 @@ func TestGameCatalogRepositoryListPendingOnlyFiltersResolvedAndIgnoredIssues(t *
 	}
 
 	insertRepositoryAsset(t, db, resolvedID, "resolved-shot", "screenshot", "/assets/resolved/shot.png", 0)
+	insertRepositoryAsset(t, db, resolvedID, "resolved-logo", "logo", "/assets/resolved/logo.png", 0)
 	insertRepositoryGameFile(t, db, resolvedID, "/roms/resolved.rom")
 	insertRepositoryAsset(t, db, ignoredID, "ignored-shot", "screenshot", "/assets/ignored/shot.png", 0)
+	insertRepositoryAsset(t, db, ignoredID, "ignored-logo", "logo", "/assets/ignored/logo.png", 0)
 	insertRepositoryGameFile(t, db, ignoredID, "/roms/ignored.rom")
 
 	developerID := insertRepositoryDeveloper(t, db, "Pending Developer", "pending-developer")
@@ -466,6 +469,7 @@ func TestGameCatalogRepositoryCountPendingGroupsUsesQueueFiltersButIgnoresIssueS
 		t.Fatalf("seed wiki game: %v", err)
 	}
 	insertRepositoryAsset(t, db, wikiID, "wiki-shot", "screenshot", "/assets/wiki/shot.png", 0)
+	insertRepositoryAsset(t, db, wikiID, "wiki-logo", "logo", "/assets/wiki/logo.png", 0)
 	insertRepositoryGameFile(t, db, wikiID, "/roms/wiki.rom")
 	developerID := insertRepositoryDeveloper(t, db, "Wiki Developer", "wiki-developer")
 	publisherID := insertRepositoryPublisher(t, db, "Wiki Publisher", "wiki-publisher")
