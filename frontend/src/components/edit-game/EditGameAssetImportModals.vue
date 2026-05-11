@@ -541,6 +541,10 @@
             <a-slider v-model="logoPosWidth" :min="10" :max="80" :step="1" :style="{ flex: 1 }" />
             <span class="logo-pos-editor__value">{{ logoPosWidth }}%</span>
           </div>
+          <div class="logo-pos-editor__controls">
+            <span class="logo-pos-editor__label">显示 Logo</span>
+            <a-switch v-model="logoVisible" size="small" />
+          </div>
           <div class="cover-selector-actions">
             <a-button class="app-text-action-btn" type="text" html-type="button" @click="emit('update:show-logo-selector', false)">取消</a-button>
             <a-button type="primary" html-type="button" @click="handleLogoPosConfirm">确定</a-button>
@@ -640,6 +644,7 @@ const props = defineProps<{
   logoPositionX: number | null
   logoPositionY: number | null
   logoWidthPct: number | null
+  logoVisible: boolean
 }>()
 
 const emit = defineEmits<{
@@ -711,7 +716,7 @@ const emit = defineEmits<{
   'update:logo-search-url': [value: string]
   'load-logo-from-url': []
   'confirm-logo-selection': []
-  'confirm-logo-position': [payload: { position_x: number; position_y: number; width_pct: number }]
+  'confirm-logo-position': [payload: { position_x: number; position_y: number; width_pct: number; logo_visible: boolean }]
 }>()
 
 // Logo position editor state
@@ -720,12 +725,14 @@ const logoPosEditorRef = ref<HTMLElement | null>(null)
 const logoPosWidth = ref(30)
 const logoPosX = ref(50)
 const logoPosY = ref(50)
+const logoVisible = ref(true)
 
 watch(() => props.showLogoSelector, (v) => {
   if (v) {
     logoPosX.value = props.logoPositionX ?? 50
     logoPosY.value = props.logoPositionY ?? 50
     logoPosWidth.value = props.logoWidthPct ?? 30
+    logoVisible.value = props.logoVisible ?? true
     logoTabKey.value = 'import'
   }
 })
@@ -770,6 +777,7 @@ const handleLogoPosConfirm = () => {
     position_x: logoPosX.value,
     position_y: logoPosY.value,
     width_pct: logoPosWidth.value,
+    logo_visible: logoVisible.value,
   })
   emit('update:show-logo-selector', false)
 }

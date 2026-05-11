@@ -77,6 +77,7 @@ func gamesListItemSelectColumns() string {
 			ss.primary_screenshot,
 			COALESCE(ss.screenshot_count, 0) AS screenshot_count,
 			COALESCE(ls.logo_count, 0) AS logo_count,
+			g.logo_visible,
 			COALESCE(fs.file_count, 0) AS file_count,
 			COALESCE(ds.developer_count, 0) AS developer_count,
 			COALESCE(ps.publisher_count, 0) AS publisher_count,

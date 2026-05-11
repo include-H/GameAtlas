@@ -153,7 +153,7 @@ export interface GameListItemDto {
   wiki_content: string | null
   primary_screenshot: string | null
   screenshot_count: number
-  logo_count: number
+  logo_visible: boolean
   file_count: number
   developer_count: number
   publisher_count: number
@@ -201,6 +201,7 @@ export interface GameAggregateCoreRequest {
   summary: string | null
   release_date: string | null
   cover_image: string | null
+  logo_visible: boolean
 }
 
 // Aggregate update rewrites the editable game aggregate in one request.

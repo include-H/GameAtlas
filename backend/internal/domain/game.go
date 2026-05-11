@@ -22,6 +22,7 @@ type Game struct {
 	PrimaryScreenshot *string `db:"primary_screenshot"`
 	ScreenshotCount   int64   `db:"screenshot_count"`
 	LogoCount         int64   `db:"logo_count"`
+	LogoVisible       bool    `db:"logo_visible"`
 	FileCount         int64   `db:"file_count"`
 	DeveloperCount    int64   `db:"developer_count"`
 	PublisherCount    int64   `db:"publisher_count"`
@@ -45,6 +46,7 @@ type GameListItem struct {
 	PrimaryScreenshot *string `db:"primary_screenshot"`
 	ScreenshotCount   int64   `db:"screenshot_count"`
 	LogoCount         int64   `db:"logo_count"`
+	LogoVisible       bool    `db:"logo_visible"`
 	FileCount         int64   `db:"file_count"`
 	DeveloperCount    int64   `db:"developer_count"`
 	PublisherCount    int64   `db:"publisher_count"`
@@ -188,6 +190,7 @@ type GameCoreInput struct {
 	ReleaseDate *string
 	CoverImage  *string
 	BannerImage *string
+	LogoVisible *bool
 }
 
 // Create keeps the add-game flow intentionally narrow: it only creates the base game row.

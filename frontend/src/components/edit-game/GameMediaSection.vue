@@ -243,12 +243,9 @@
                     'is-dragging': draggedScreenshotKey === screenshot.client_key,
                     'is-drop-target': dragOverScreenshotKey === screenshot.client_key,
                   }"
-                  draggable="true"
-                  @dragstart="emit('screenshot-drag-start', screenshot.client_key)"
                   @dragenter.prevent="emit('screenshot-drag-enter', screenshot.client_key)"
                   @dragover.prevent
                   @drop.prevent="emit('screenshot-drop', screenshot.client_key)"
-                  @dragend="emit('screenshot-drag-end')"
                 >
                   <a-image
                     :src="screenshot.path"
@@ -259,6 +256,19 @@
                   />
                   <div class="screenshot-overlay">
                     <div class="screenshot-overlay-actions">
+                      <a-button
+                        class="app-text-action-btn media-action-button screenshot-drag-handle"
+                        type="text"
+                        shape="circle"
+                        size="small"
+                        html-type="button"
+                        title="拖拽排序"
+                        draggable="true"
+                        @dragstart="emit('screenshot-drag-start', screenshot.client_key)"
+                        @dragend="emit('screenshot-drag-end')"
+                      >
+                        <icon-drag-arrow />
+                      </a-button>
                       <a-button
                         class="app-text-action-btn media-action-button"
                         type="text"
@@ -337,7 +347,7 @@
 </template>
 
 <script setup lang="ts">
-import { IconDelete, IconImage, IconSettings, IconStar, IconUpload } from '@arco-design/web-vue/es/icon'
+import { IconDelete, IconDragArrow, IconImage, IconSettings, IconStar, IconUpload } from '@arco-design/web-vue/es/icon'
 
 interface EditableCover {
   asset_uid?: string
@@ -569,6 +579,14 @@ defineProps<{
   height: 28px;
   min-width: 28px;
   font-size: 12px;
+}
+
+.screenshot-drag-handle {
+  cursor: grab;
+}
+
+.screenshot-drag-handle:active {
+  cursor: grabbing;
 }
 
 .media-frame:hover .media-overlay,
