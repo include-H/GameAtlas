@@ -75,7 +75,6 @@ func TestAssetsHandlerUploadVideoPersistsAsset(t *testing.T) {
 		Success bool `json:"success"`
 		Data    struct {
 			Path     string `json:"path"`
-			AssetID  int64  `json:"asset_id"`
 			AssetUID string `json:"asset_uid"`
 		} `json:"data"`
 	}
@@ -85,9 +84,6 @@ func TestAssetsHandlerUploadVideoPersistsAsset(t *testing.T) {
 	if !response.Success {
 		t.Fatalf("expected success=true")
 	}
-	if response.Data.AssetID <= 0 {
-		t.Fatalf("asset_id = %d, want > 0", response.Data.AssetID)
-	}
 	if response.Data.AssetUID == "" {
 		t.Fatalf("asset_uid should not be empty")
 	}
@@ -95,12 +91,9 @@ func TestAssetsHandlerUploadVideoPersistsAsset(t *testing.T) {
 		t.Fatalf("path = %q, want upload-game mp4 path", response.Data.Path)
 	}
 
-	asset := mustLoadHandlerAssetByUID(t, db, response.Data.AssetUID)
-	if asset.SortOrder != 2 {
-		t.Fatalf("SortOrder = %d, want 2 from upload form", asset.SortOrder)
-	}
-	if _, err := os.Stat(filepath.Join(assetsDir, "upload-game", response.Data.AssetUID+".mp4")); err != nil {
-		t.Fatalf("expected uploaded file on disk, got err=%v", err)
+	// Upload writes to staging, not permanent location.
+	if _, err := os.Stat(filepath.Join(assetsDir, "_staging", response.Data.AssetUID+".mp4")); err != nil {
+		t.Fatalf("expected uploaded file in staging directory, got err=%v", err)
 	}
 }
 
@@ -292,17 +285,3 @@ func mustLoadHandlerGame(t *testing.T, db *sqlx.DB, gameID int64) *domain.Game {
 	return game
 }
 
-func mustLoadHandlerAssetByUID(t *testing.T, db *sqlx.DB, assetUID string) *domain.GameAsset {
-	t.Helper()
-
-	var asset domain.GameAsset
-	if err := db.Get(&asset, `
-		SELECT id, game_id, asset_uid, asset_type, path, sort_order, created_at
-		FROM game_assets
-		WHERE asset_uid = ?
-		LIMIT 1
-	`, assetUID); err != nil {
-		t.Fatalf("load asset by uid: %v", err)
-	}
-	return &asset
-}

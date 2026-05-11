@@ -36,6 +36,13 @@ type gameAggregateAssetsRequest struct {
 	LogoOrderAssetUIDs       []string                          `json:"logo_order_asset_uids"`
 	BannerOrderAssetUIDs     []string                          `json:"banner_order_asset_uids"`
 	LogoPositions            []logoPositionRequest             `json:"logo_positions"`
+	NewAssets                []newAssetEntryRequest            `json:"new_assets"`
+}
+
+type newAssetEntryRequest struct {
+	AssetUID  string `json:"asset_uid"`
+	AssetType string `json:"asset_type"`
+	Path      string `json:"path"`
 }
 
 type logoPositionRequest struct {
@@ -125,6 +132,15 @@ func (request gameAggregateAssetsRequest) toDomain() domain.GameAggregateAssetsI
 		})
 	}
 
+	newAssets := make([]domain.NewAssetEntry, 0, len(request.NewAssets))
+	for _, item := range request.NewAssets {
+		newAssets = append(newAssets, domain.NewAssetEntry{
+			AssetUID:  item.AssetUID,
+			AssetType: item.AssetType,
+			Path:      item.Path,
+		})
+	}
+
 	return domain.GameAggregateAssetsInput{
 		Files:                    files,
 		DeleteAssets:             deleteAssets,
@@ -134,6 +150,7 @@ func (request gameAggregateAssetsRequest) toDomain() domain.GameAggregateAssetsI
 		LogoOrderAssetUIDs:       emptyStringSlice(request.LogoOrderAssetUIDs),
 		BannerOrderAssetUIDs:     emptyStringSlice(request.BannerOrderAssetUIDs),
 		LogoPositions:            logoPositions,
+		NewAssets:                newAssets,
 	}
 }
 

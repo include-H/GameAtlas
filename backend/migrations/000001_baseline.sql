@@ -1,5 +1,5 @@
 -- GameAtlas baseline schema
--- Consolidated from migrations 000001–000005
+-- Consolidated from migrations 000001–000006
 
 CREATE TABLE IF NOT EXISTS games (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,6 +40,9 @@ CREATE TABLE IF NOT EXISTS game_assets (
     asset_type TEXT NOT NULL,
     path TEXT NOT NULL,
     sort_order INTEGER NOT NULL DEFAULT 0,
+    position_x REAL,
+    position_y REAL,
+    width_pct REAL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
 );
@@ -107,44 +110,6 @@ CREATE TABLE IF NOT EXISTS game_review_issue_overrides (
     UNIQUE (game_id, issue_key)
 );
 
-CREATE TABLE IF NOT EXISTS tag_groups (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    key TEXT NOT NULL UNIQUE,
-    name TEXT NOT NULL,
-    description TEXT,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    allow_multiple INTEGER NOT NULL DEFAULT 1,
-    is_filterable INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS tags (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    group_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    slug TEXT NOT NULL,
-    parent_id INTEGER,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    is_active INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(group_id, name),
-    UNIQUE(group_id, slug),
-    FOREIGN KEY (group_id) REFERENCES tag_groups(id) ON DELETE CASCADE,
-    FOREIGN KEY (parent_id) REFERENCES tags(id) ON DELETE SET NULL
-);
-
-CREATE TABLE IF NOT EXISTS game_tags (
-    game_id INTEGER NOT NULL,
-    tag_id INTEGER NOT NULL,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (game_id, tag_id),
-    FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
-    FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
-);
-
 CREATE TABLE IF NOT EXISTS auth_login_attempts (
     source_key TEXT PRIMARY KEY,
     fail_count INTEGER NOT NULL DEFAULT 0,
@@ -193,29 +158,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_games_public_id ON games (public_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_game_assets_game_type_path_unique ON game_assets (game_id, asset_type, path);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_game_assets_asset_uid_unique ON game_assets (asset_uid);
 CREATE INDEX IF NOT EXISTS idx_game_assets_game_type_sort_id ON game_assets (game_id, asset_type, sort_order, id);
-CREATE INDEX IF NOT EXISTS idx_tags_group_id ON tags (group_id);
-CREATE INDEX IF NOT EXISTS idx_tags_parent_id ON tags (parent_id);
-CREATE INDEX IF NOT EXISTS idx_tags_is_active ON tags (is_active);
-CREATE INDEX IF NOT EXISTS idx_game_tags_tag_id ON game_tags (tag_id);
 CREATE INDEX IF NOT EXISTS idx_auth_login_attempts_expires ON auth_login_attempts (expires_at_unix);
 CREATE INDEX IF NOT EXISTS idx_asset_cleanup_tasks_updated_at ON asset_cleanup_tasks (updated_at);
 CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires ON auth_sessions (expires_at_unix);
 CREATE INDEX IF NOT EXISTS idx_favorite_games_created_at ON favorite_games (created_at DESC);
-
--- Seed default tag groups
-
-INSERT INTO tag_groups (key, name, description, sort_order, allow_multiple, is_filterable)
-SELECT 'genre', '题材', '游戏的主要题材分类', 10, 1, 1
-WHERE NOT EXISTS (SELECT 1 FROM tag_groups WHERE key = 'genre');
-
-INSERT INTO tag_groups (key, name, description, sort_order, allow_multiple, is_filterable)
-SELECT 'subgenre', '子类型', '更细分的玩法或内容类型', 20, 1, 1
-WHERE NOT EXISTS (SELECT 1 FROM tag_groups WHERE key = 'subgenre');
-
-INSERT INTO tag_groups (key, name, description, sort_order, allow_multiple, is_filterable)
-SELECT 'perspective', '视角', '游戏视角或镜头表现方式', 30, 1, 1
-WHERE NOT EXISTS (SELECT 1 FROM tag_groups WHERE key = 'perspective');
-
-INSERT INTO tag_groups (key, name, description, sort_order, allow_multiple, is_filterable)
-SELECT 'theme', '内容属性', '内容题材或受众导向标签', 40, 1, 1
-WHERE NOT EXISTS (SELECT 1 FROM tag_groups WHERE key = 'theme');

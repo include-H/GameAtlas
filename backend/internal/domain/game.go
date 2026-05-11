@@ -248,6 +248,13 @@ type GameAggregateAssetsInput struct {
 	LogoOrderAssetUIDs       []string
 	BannerOrderAssetUIDs     []string
 	LogoPositions            []LogoPositionInput
+	NewAssets                []NewAssetEntry
+}
+
+type NewAssetEntry struct {
+	AssetUID  string
+	AssetType string
+	Path      string
 }
 
 type WikiWriteInput struct {

@@ -12,7 +12,6 @@ import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
 import { getHttpErrorMessage } from '@/utils/http-error'
 
 type AlertType = 'success' | 'warning' | 'error'
-type AssetType = 'cover' | 'banner' | 'screenshot' | 'video' | 'logo'
 
 interface UploadResponseLike {
   success?: boolean
@@ -31,8 +30,6 @@ interface UseEditGameAssetsOptions {
   isUploadingVideo: Ref<boolean>
   videoUploadProgress: Ref<number>
   videoUploadFileName: Ref<string>
-  queueAssetDeletion: (type: AssetType, path: string, assetId?: number, assetUid?: string) => void
-  deleteAsset?: (type: AssetType, gameId: number, assetUid: string) => Promise<void>
   createEditableCover: (asset: UploadedAssetResult) => EditGameEditableCover
   createEditableBanner: (asset: UploadedAssetResult) => EditGameEditableBanner
   createEditableLogo: (asset: UploadedAssetResult) => EditGameEditableLogo
@@ -71,10 +68,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
   const handleLogoUploadSuccess = (fileItem: FileItem) => {
     const response = fileItem.response as UploadResponseLike | undefined
     if (response?.success && response.data) {
-      const oldLogo = options.form.value.logo
-      if (oldLogo?.asset_uid && options.gameId.value && options.deleteAsset) {
-        void options.deleteAsset('logo', options.gameId.value, oldLogo.asset_uid)
-      }
       options.form.value.logo = options.createEditableLogo(response.data)
       void options.onAssetPersisted?.()
       options.showLogoSelector.value = false
@@ -160,7 +153,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
   const removeCover = (index: number) => {
     const cover = options.form.value.covers[index]
     if (!cover) return
-    options.queueAssetDeletion('cover', cover.path, cover.id, cover.asset_uid)
     options.form.value.covers = options.form.value.covers.filter((_, i) => i !== index)
   }
 
@@ -175,7 +167,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
   const removeLogo = () => {
     const logo = options.form.value.logo
     if (!logo) return
-    options.queueAssetDeletion('logo', logo.path, logo.id, logo.asset_uid)
     options.form.value.logo = null
   }
 
@@ -190,7 +181,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
   const removeBanner = (index: number) => {
     const banner = options.form.value.banners[index]
     if (!banner) return
-    options.queueAssetDeletion('banner', banner.path, banner.id, banner.asset_uid)
     options.form.value.banners = options.form.value.banners.filter((_, i) => i !== index)
     options.form.value.banner_image = options.form.value.banners[0]?.path || ''
   }
@@ -207,14 +197,12 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
   const removeScreenshot = (clientKey: string) => {
     const screenshot = options.form.value.screenshots.find((item) => item.client_key === clientKey)
     if (!screenshot) return
-    options.queueAssetDeletion('screenshot', screenshot.path, screenshot.id, screenshot.asset_uid)
     options.form.value.screenshots = options.form.value.screenshots.filter((item) => item.client_key !== clientKey)
   }
 
   const removePreviewVideo = (assetUid?: string) => {
     const target = options.form.value.preview_videos.find((item) => item.asset_uid === assetUid)
     if (!target) return
-    options.queueAssetDeletion('video', target.path, target.id, target.asset_uid)
     options.form.value.preview_videos = options.form.value.preview_videos.filter((item) => item.asset_uid !== assetUid)
   }
 

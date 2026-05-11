@@ -1,9 +1,8 @@
-import api, { del } from './api'
+import api from './api'
 import type { ApiEnvelope } from './types'
 
 export interface UploadedAssetResult {
   path: string
-  asset_id?: number
   asset_uid?: string
 }
 
@@ -30,12 +29,4 @@ export async function uploadAsset(
   })
 
   return data.data
-}
-
-export async function deleteAsset(
-  assetType: AssetType,
-  gameId: number,
-  assetUid: string,
-): Promise<void> {
-  await del(`/assets/${assetType}?game_id=${gameId}&asset_uid=${encodeURIComponent(assetUid)}`)
 }

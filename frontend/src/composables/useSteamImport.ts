@@ -17,11 +17,9 @@ export type { WikiMetadataCandidateSelection } from '@/composables/useSteamImpor
 export type ImportSource = 'steam' | 'steamgriddb'
 
 type AlertType = 'success' | 'warning' | 'error'
-type AssetType = 'cover' | 'banner' | 'screenshot' | 'video' | 'logo'
 
 interface UploadedAssetLike {
   id?: number
-  asset_id?: number
   asset_uid?: string
   path: string
 }
@@ -43,13 +41,6 @@ interface UseSteamImportOptions {
     assetType: 'cover' | 'banner' | 'screenshot' | 'logo',
     sortOrder?: number,
   ) => Promise<UploadedAssetLike>
-  queueAssetDeletion: (
-    type: AssetType,
-    path: string,
-    assetId?: number,
-    assetUid?: string,
-  ) => void
-  deleteAsset?: (type: AssetType, gameId: number, assetUid: string) => Promise<void>
   createEditableCover: (
     asset: UploadedAssetLike | string,
   ) => EditGameEditableCover
@@ -630,10 +621,6 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     isDownloadingSteamLogos.value = true
     try {
       const uploaded = await options.uploadAssetFromUrl(selectedLogoImage.value, 'logo')
-      const oldLogo = options.form.value.logo
-      if (oldLogo?.asset_uid && options.deleteAsset) {
-        void options.deleteAsset('logo', options.gameId.value, oldLogo.asset_uid)
-      }
       options.form.value.logo = options.createEditableLogo(uploaded)
       await options.onAssetPersisted?.()
       showLogoSelector.value = false
@@ -654,10 +641,6 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     isDownloadingLogo.value = true
     try {
       const uploaded = await options.uploadAssetFromUrl(logoSearchUrl.value, 'logo')
-      const oldLogo = options.form.value.logo
-      if (oldLogo?.asset_uid && options.deleteAsset) {
-        void options.deleteAsset('logo', options.gameId.value!, oldLogo.asset_uid)
-      }
       options.form.value.logo = options.createEditableLogo(uploaded)
       await options.onAssetPersisted?.()
       showLogoSelector.value = false

@@ -10,7 +10,7 @@ import {
   type EditGameEditableVideo,
   type EditGameForm,
 } from '@/composables/edit-game-form'
-import { uploadAsset, deleteAsset, type UploadedAssetResult } from '@/services/assets'
+import { uploadAsset, type UploadedAssetResult } from '@/services/assets'
 import { buildAssetUploadUrl } from '@/services/api-url'
 import { directoryService } from '@/services/directory.service'
 import { proxySteamAssetUrl } from '@/services/steam.service'
@@ -270,7 +270,7 @@ export const useEditGameModal = ({
       }
     }
 
-    const screenshotId = 'id' in asset ? asset.id : ('asset_id' in asset ? asset.asset_id : undefined)
+    const screenshotId = 'id' in asset ? asset.id : undefined
 
     return {
       id: screenshotId,
@@ -289,7 +289,7 @@ export const useEditGameModal = ({
       return { path: asset }
     }
     return {
-      id: 'id' in asset ? asset.id : ('asset_id' in asset ? asset.asset_id : undefined),
+      id: 'id' in asset ? asset.id : undefined,
       asset_uid: asset.asset_uid,
       path: asset.path,
     }
@@ -300,7 +300,7 @@ export const useEditGameModal = ({
       return { path: asset }
     }
     return {
-      id: 'id' in asset ? asset.id : ('asset_id' in asset ? asset.asset_id : undefined),
+      id: 'id' in asset ? asset.id : undefined,
       asset_uid: asset.asset_uid,
       path: asset.path,
     }
@@ -311,7 +311,7 @@ export const useEditGameModal = ({
       return { path: asset }
     }
     return {
-      id: 'id' in asset ? asset.id : ('asset_id' in asset ? asset.asset_id : undefined),
+      id: 'id' in asset ? asset.id : undefined,
       asset_uid: asset.asset_uid,
       path: asset.path,
     }
@@ -323,7 +323,7 @@ export const useEditGameModal = ({
     }
     const isLogoItem = 'sort_order' in asset
     return {
-      id: 'id' in asset ? asset.id : ('asset_id' in asset ? asset.asset_id : undefined),
+      id: 'id' in asset ? asset.id : undefined,
       asset_uid: asset.asset_uid,
       path: asset.path,
       position_x: isLogoItem ? (asset as LogoItem).position_x ?? null : null,
@@ -381,8 +381,6 @@ export const useEditGameModal = ({
   })
 
   const {
-    queueAssetDeletion,
-    resetPendingDeleteAssets,
     handleSubmit,
   } = useEditGameWorkflow({
     game: currentGame,
@@ -536,8 +534,6 @@ export const useEditGameModal = ({
     gameId: currentGameId,
     getWikiContent: () => props.game?.wiki_content || '',
     uploadAssetFromUrl,
-    queueAssetDeletion,
-    deleteAsset,
     createEditableCover,
     createEditableBanner,
     createEditableLogo,
@@ -582,8 +578,6 @@ export const useEditGameModal = ({
     isUploadingVideo,
     videoUploadProgress,
     videoUploadFileName,
-    queueAssetDeletion,
-    deleteAsset,
     createEditableCover,
     createEditableBanner,
     createEditableLogo,
@@ -594,7 +588,6 @@ export const useEditGameModal = ({
   })
 
   const resetTransientState = () => {
-    resetPendingDeleteAssets()
     resetFileBrowserState()
     resetSteamImportState()
     resetVideoUploadState()
@@ -620,7 +613,6 @@ export const useEditGameModal = ({
 
   const handleCancel = () => {
     visible.value = false
-    resetPendingDeleteAssets()
   }
 
   return {

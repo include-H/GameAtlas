@@ -189,6 +189,13 @@ func (s *AssetReconcileService) reconcileGameMissingAssetsTx(gameID int64) (bool
 	return true, nil
 }
 
+// CleanStaging deletes files in the staging directory older than 1 hour.
+// Staging files are ephemeral upload artifacts; if they survive past the
+// upload session they are orphans from abandoned edits.
+func (s *AssetReconcileService) CleanStaging() (int, error) {
+	return s.store.CleanStaging(1 * time.Hour)
+}
+
 // CleanOrphanedAssetFiles scans the assets filesystem and deletes files not
 // referenced by any game in the database. It runs at startup after
 // ReconcileAllMissingAssets has already pruned stale DB references.

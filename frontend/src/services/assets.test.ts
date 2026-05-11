@@ -30,7 +30,6 @@ describe('assets service', () => {
         data: {
           data: {
             path: '/assets/cover.png',
-            asset_id: 9,
             asset_uid: 'asset-9',
           },
         },
@@ -55,7 +54,6 @@ describe('assets service', () => {
     expect(progressValues).toEqual([25, 100])
     expect(result).toEqual({
       path: '/assets/cover.png',
-      asset_id: 9,
       asset_uid: 'asset-9',
     })
   })

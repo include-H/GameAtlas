@@ -68,10 +68,17 @@ func (r *GamesRepository) UpdateAggregate(id int64, input domain.GameAggregateUp
 		return nil, err
 	}
 
-	deletedAssetPaths, err := r.deleteAssetsTx(tx, id, input.Assets.DeleteAssets)
+	// Auto-diff: delete assets in DB but not in the submitted form.
+	deletedAssetPaths, err := r.diffAndDeleteAssetsTx(tx, id, input.Assets)
 	if err != nil {
 		return nil, err
 	}
+
+	// Auto-insert: create DB rows for new assets that don't exist yet.
+	if err := r.ensureAssetsExistTx(tx, id, input.Assets.NewAssets); err != nil {
+		return nil, err
+	}
+
 	if err := r.reorderAssetsTx(tx, id, "screenshot", input.Assets.ScreenshotOrderAssetUIDs); err != nil {
 		return nil, err
 	}
@@ -280,121 +287,95 @@ func (r *GamesRepository) syncGameFilesTx(tx *sqlx.Tx, gameID int64, files []dom
 	return nil
 }
 
-func (r *GamesRepository) deleteAssetsTx(tx *sqlx.Tx, gameID int64, deleteAssets []domain.GameAssetDeleteInput) ([]string, error) {
-	assetPaths := make([]string, 0, len(deleteAssets))
+// diffAndDeleteAssetsTx compares DB assets vs form-submitted UIDs for each asset type
+// and deletes assets that are in DB but not in the form. Returns deleted file paths.
+func (r *GamesRepository) diffAndDeleteAssetsTx(tx *sqlx.Tx, gameID int64, assets domain.GameAggregateAssetsInput) ([]string, error) {
+	typeOrderMap := map[string][]string{
+		"screenshot": assets.ScreenshotOrderAssetUIDs,
+		"video":      assets.VideoOrderAssetUIDs,
+		"cover":      assets.CoverOrderAssetUIDs,
+		"logo":       assets.LogoOrderAssetUIDs,
+		"banner":     assets.BannerOrderAssetUIDs,
+	}
 
-	for _, item := range deleteAssets {
-		switch strings.TrimSpace(item.AssetType) {
-		case "cover":
-			deletedPath, _, deleted, err := r.deleteSingleAssetTx(tx, gameID, "cover", item)
-			if err != nil {
-				return nil, err
+	var deletedPaths []string
+	for assetType, orderUIDs := range typeOrderMap {
+		// Build set of UIDs to keep.
+		keepUIDs := make(map[string]struct{}, len(orderUIDs))
+		for _, uid := range orderUIDs {
+			trimmed := strings.TrimSpace(uid)
+			if trimmed != "" {
+				keepUIDs[trimmed] = struct{}{}
 			}
-			if deleted {
-				assetPaths = append(assetPaths, deletedPath)
+		}
+
+		// Query current DB assets of this type.
+		var currentAssets []struct {
+			Path     string         `db:"path"`
+			AssetUID sql.NullString `db:"asset_uid"`
+		}
+		if err := tx.Select(&currentAssets, `
+			SELECT path, asset_uid FROM game_assets
+			WHERE game_id = ? AND asset_type = ?
+		`, gameID, assetType); err != nil {
+			return nil, fmt.Errorf("list current %s assets: %w", assetType, err)
+		}
+
+		// Delete assets not in the keep set.
+		for _, current := range currentAssets {
+			uid := strings.TrimSpace(current.AssetUID.String)
+			if uid == "" {
+				continue
 			}
-		case "banner":
-			deletedPath, _, deleted, err := r.deleteSingleAssetTx(tx, gameID, "banner", item)
-			if err != nil {
-				return nil, err
+			if _, keep := keepUIDs[uid]; keep {
+				continue
 			}
-			if deleted {
-				assetPaths = append(assetPaths, deletedPath)
+			if _, err := tx.Exec(`
+				DELETE FROM game_assets
+				WHERE game_id = ? AND asset_type = ? AND asset_uid = ?
+			`, gameID, assetType, uid); err != nil {
+				return nil, fmt.Errorf("delete old %s asset %s: %w", assetType, uid, err)
 			}
-		case "screenshot":
-			deletedPath, _, deleted, err := r.deleteSingleAssetTx(tx, gameID, "screenshot", item)
-			if err != nil {
-				return nil, err
+			if current.Path != "" {
+				deletedPaths = append(deletedPaths, current.Path)
 			}
-			if deleted {
-				assetPaths = append(assetPaths, deletedPath)
-			}
-		case "video":
-			deletedPath, _, deleted, err := r.deleteSingleAssetTx(tx, gameID, "video", item)
-			if err != nil {
-				return nil, err
-			}
-			if deleted {
-				assetPaths = append(assetPaths, deletedPath)
-			}
-		case "logo":
-			deletedPath, _, deleted, err := r.deleteSingleAssetTx(tx, gameID, "logo", item)
-			if err != nil {
-				return nil, err
-			}
-			if deleted {
-				assetPaths = append(assetPaths, deletedPath)
-			}
-		default:
-			return nil, fmt.Errorf("invalid asset type: %s", strings.TrimSpace(item.AssetType))
 		}
 	}
 
-	return assetPaths, nil
+	return deletedPaths, nil
 }
 
-func (r *GamesRepository) deleteSingleAssetTx(
-	tx *sqlx.Tx,
-	gameID int64,
-	assetType string,
-	item domain.GameAssetDeleteInput,
-) (string, string, bool, error) {
-	trimmedUID := strings.TrimSpace(item.AssetUID)
-	if trimmedUID != "" {
-		var deleted struct {
-			Path     string         `db:"path"`
-			AssetUID sql.NullString `db:"asset_uid"`
+// ensureAssetsExistTx inserts DB rows for new assets that don't exist yet.
+// It matches by asset_uid — if a row with that UID already exists for this game, it's skipped.
+func (r *GamesRepository) ensureAssetsExistTx(tx *sqlx.Tx, gameID int64, newAssets []domain.NewAssetEntry) error {
+	for _, asset := range newAssets {
+		trimmedUID := strings.TrimSpace(asset.AssetUID)
+		trimmedPath := strings.TrimSpace(asset.Path)
+		trimmedType := strings.TrimSpace(asset.AssetType)
+		if trimmedUID == "" || trimmedPath == "" || trimmedType == "" {
+			continue
 		}
-		if err := tx.Get(&deleted, `
-			DELETE FROM game_assets
-			WHERE game_id = ? AND asset_type = ? AND asset_uid = ?
-			RETURNING path, asset_uid
-		`, gameID, assetType, trimmedUID); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return "", "", false, nil
-			}
-			return "", "", false, fmt.Errorf("delete %s by uid: %w", assetType, err)
-		}
-		return deleted.Path, deleted.AssetUID.String, true, nil
-	}
 
-	if item.AssetID != nil && *item.AssetID > 0 {
-		var deleted struct {
-			Path     string         `db:"path"`
-			AssetUID sql.NullString `db:"asset_uid"`
+		// Check if this UID already exists for this game.
+		var existing int
+		if err := tx.Get(&existing, `
+			SELECT COUNT(*) FROM game_assets
+			WHERE game_id = ? AND asset_uid = ?
+		`, gameID, trimmedUID); err != nil {
+			return fmt.Errorf("check existing asset %s: %w", trimmedUID, err)
 		}
-		if err := tx.Get(&deleted, `
-			DELETE FROM game_assets
-			WHERE game_id = ? AND asset_type = ? AND id = ?
-			RETURNING path, asset_uid
-		`, gameID, assetType, *item.AssetID); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return "", "", false, nil
-			}
-			return "", "", false, fmt.Errorf("delete %s by id: %w", assetType, err)
+		if existing > 0 {
+			continue
 		}
-		return deleted.Path, deleted.AssetUID.String, true, nil
-	}
 
-	trimmedPath := strings.TrimSpace(item.Path)
-	if trimmedPath == "" {
-		return "", "", false, nil
-	}
-	var deleted struct {
-		Path     string         `db:"path"`
-		AssetUID sql.NullString `db:"asset_uid"`
-	}
-	if err := tx.Get(&deleted, `
-		DELETE FROM game_assets
-		WHERE game_id = ? AND asset_type = ? AND path = ?
-		RETURNING path, asset_uid
-	`, gameID, assetType, trimmedPath); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", "", false, nil
+		if _, err := tx.Exec(`
+			INSERT INTO game_assets (game_id, asset_uid, asset_type, path, sort_order)
+			VALUES (?, ?, ?, ?, 0)
+		`, gameID, trimmedUID, trimmedType, trimmedPath); err != nil {
+			return fmt.Errorf("insert new %s asset %s: %w", trimmedType, trimmedUID, err)
 		}
-		return "", "", false, fmt.Errorf("delete %s by path: %w", assetType, err)
 	}
-	return deleted.Path, deleted.AssetUID.String, true, nil
+	return nil
 }
 
 func (r *GamesRepository) reorderAssetsTx(tx *sqlx.Tx, gameID int64, assetType string, assetUIDs []string) error {

@@ -48,6 +48,11 @@ func New(cfg config.Config) (*App, error) {
 	} else if processed > 0 {
 		log.Printf("asset cleanup retry processed %d task(s)", processed)
 	}
+	if cleaned, err := assetReconcileService.CleanStaging(); err != nil {
+		log.Printf("staging cleanup failed: %v", err)
+	} else if cleaned > 0 {
+		log.Printf("staging cleanup removed %d expired file(s)", cleaned)
+	}
 	if reconciled, err := assetReconcileService.ReconcileAllMissingAssets(); err != nil {
 		log.Printf("asset reconcile failed: %v", err)
 	} else if reconciled > 0 {

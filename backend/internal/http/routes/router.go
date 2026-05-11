@@ -119,11 +119,6 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.POST("/assets/video", assetsHandler.Upload("video"))
 	api.POST("/assets/screenshot", assetsHandler.Upload("screenshot"))
 	api.POST("/assets/logo", assetsHandler.Upload("logo"))
-	api.DELETE("/assets/cover", assetsHandler.Delete("cover"))
-	api.DELETE("/assets/banner", assetsHandler.Delete("banner"))
-	api.DELETE("/assets/video", assetsHandler.Delete("video"))
-	api.DELETE("/assets/screenshot", assetsHandler.Delete("screenshot"))
-	api.DELETE("/assets/logo", assetsHandler.Delete("logo"))
 	api.GET("/directory/default", directoryHandler.Default)
 	api.GET("/directory/list", directoryHandler.List)
 	api.GET("/steam/search", steamHandler.Search)
@@ -195,8 +190,14 @@ func registerAssetRoutes(router *gin.Engine, assetsDir string, gamesRepo assetRo
 		}
 
 		if _, err := os.Stat(targetPath); err != nil {
-			c.Status(http.StatusNotFound)
-			return
+			// Fallback: check staging directory for files not yet moved to permanent.
+			stagingPath := filepath.Join(assetsDir, "_staging", filepath.Base(rawPath))
+			if _, statErr := os.Stat(stagingPath); statErr == nil {
+				targetPath = stagingPath
+			} else {
+				c.Status(http.StatusNotFound)
+				return
+			}
 		}
 
 		c.File(targetPath)

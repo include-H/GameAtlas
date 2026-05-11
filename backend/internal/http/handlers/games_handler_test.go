@@ -899,32 +899,6 @@ func TestGamesHandlerDeleteReturnsAssetDeleteWarnings(t *testing.T) {
 	}
 }
 
-func TestGamesHandlerUpdateAggregateReturnsBadRequestForInvalidDeleteAssetType(t *testing.T) {
-	t.Setenv("GIN_MODE", gin.TestMode)
-
-	db := openGamesHandlerTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	insertGamesHandlerTestGame(t, db, "aggregate-invalid-type", "Aggregate Invalid Type", "public", "")
-	handler := newSplitGamesHandlerForTest(config.Config{}, db)
-
-	recorder := httptest.NewRecorder()
-	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-invalid-type/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Invalid Type","visibility":"public"},"assets":{"delete_assets":[{"asset_type":"manual","path":"/assets/manual.pdf"}]}}`))
-	context.Request.Header.Set("Content-Type", "application/json")
-	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-invalid-type"}}
-	context.Set("is_admin", true)
-
-	handler.UpdateAggregate(context)
-
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
-	}
-	if !strings.Contains(recorder.Body.String(), `"error":"标题为必填项"`) {
-		t.Fatalf("body = %s, want 标题为必填项", recorder.Body.String())
-	}
-}
-
 func TestGamesHandlerUpdateAggregateRejectsInvalidJSONAfterResolvingGame(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 

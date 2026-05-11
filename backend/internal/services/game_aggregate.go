@@ -1,7 +1,7 @@
 package services
 
 import (
-	"strings"
+	"fmt"
 	"time"
 
 	"github.com/hao/game/internal/config"
@@ -54,6 +54,8 @@ func (s *GameAggregateService) Create(input domain.GameCreateInput) (*domain.Gam
 }
 
 // Update applies aggregate changes, then performs follow-up metadata and asset cleanup work.
+// New assets are moved from staging to permanent storage before the DB transaction.
+// Old assets not in the submitted form are auto-deleted by the repository layer.
 func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdateInput) (*domain.Game, []string, error) {
 	trimmedInput, err := validateAndTrimGameAggregateCoreUpdateInput(input.Game)
 	if err != nil {
@@ -73,11 +75,6 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 		}
 
 		trimmedFileInput := trimGameFileInput(fileInput)
-		// 2026-04-04: keep game file entries writable only through aggregate updates.
-		// Impact: the edit form submits the full game_files set, so omitted ids mean "remove this entry"
-		// and no standalone file-entry CRUD path remains to drift from aggregate semantics.
-		// File paths are normalized against the configured ROM root before they are persisted,
-		// so later launches and scans do not depend on user-provided relative path variants.
 		resolved, err := s.fileGuard.ValidateFile(trimmedFileInput.FilePath)
 		if err != nil {
 			return nil, nil, normalizeFileError(err)
@@ -91,11 +88,14 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 		})
 	}
 
-	for _, item := range input.Assets.DeleteAssets {
-		switch strings.TrimSpace(item.AssetType) {
-		case "cover", "banner", "screenshot", "video", "logo":
-		default:
-			return nil, nil, ErrValidation
+	// Move staging files to permanent storage before DB write.
+	game, gameErr := s.gamesRepo.GetByID(id)
+	if gameErr != nil {
+		return nil, nil, normalizeRepoError(gameErr)
+	}
+	for _, asset := range input.Assets.NewAssets {
+		if _, err := s.assetStore.MoveToPermanent(asset.Path, game.PublicID); err != nil {
+			return nil, nil, fmt.Errorf("move staging asset to permanent: %w", err)
 		}
 	}
 
@@ -110,6 +110,7 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 			LogoOrderAssetUIDs:       input.Assets.LogoOrderAssetUIDs,
 			BannerOrderAssetUIDs:     input.Assets.BannerOrderAssetUIDs,
 			LogoPositions:            input.Assets.LogoPositions,
+			NewAssets:                input.Assets.NewAssets,
 		},
 	})
 	if err != nil {
@@ -122,9 +123,6 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 
 	assetDeleteWarnings := make([]string, 0)
 	for _, path := range deletedAssetPaths {
-		// 2026-04-04: keep asset deletion best-effort because DB writes are the source of truth here,
-		// and filesystem cleanup can be retried safely without rolling back the aggregate update.
-		// Impact: only asset file removal is deferred; game data and relations stay committed.
 		warning, err := cleanupAssetPath(s.assetStore, s.assetCleanupTasksRepo, path, "games.update_aggregate")
 		if err != nil {
 			return nil, nil, err
@@ -134,7 +132,7 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 		}
 	}
 
-	game, err := s.gamesRepo.GetByID(id)
+	game, err = s.gamesRepo.GetByID(id)
 	if err != nil {
 		return nil, nil, normalizeRepoError(err)
 	}

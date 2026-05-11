@@ -30,7 +30,6 @@ type AssetsService struct {
 
 type UploadResult struct {
 	Path     string
-	AssetID  *int64
 	AssetUID string
 }
 
@@ -62,25 +61,12 @@ func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart
 
 	contentType := header.Header.Get("Content-Type")
 	assetUID, assetName := allocateAssetIdentity(assetType)
-	path, err := s.store.SaveUploadedAsset(game.PublicID, assetType, assetName, src, contentType)
+	path, err := s.store.SaveToStaging(game.PublicID, assetType, assetName, src, contentType)
 	if err != nil {
 		return nil, normalizeAssetError(err)
 	}
 
-	asset, err := s.persistAssetPath(gameID, assetType, assetUID, path, sortOrder)
-	if err != nil {
-		if cleanupErr := s.cleanupPersistFailedAsset(path, "assets.upload"); cleanupErr != nil {
-			return nil, cleanupErr
-		}
-		return nil, err
-	}
-
-	result := &UploadResult{Path: path}
-	if asset != nil {
-		result.AssetUID = asset.AssetUID
-		result.AssetID = &asset.ID
-	}
-	return result, nil
+	return &UploadResult{Path: path, AssetUID: assetUID}, nil
 }
 
 func (s *AssetsService) ApplyRemoteAsset(gameID int64, assetType string, remoteURL string, sortOrder int) (string, error) {
@@ -89,17 +75,11 @@ func (s *AssetsService) ApplyRemoteAsset(gameID int64, assetType string, remoteU
 		return "", normalizeRepoError(err)
 	}
 	assetUID, assetName := allocateAssetIdentity(assetType)
-	path, err := s.store.DownloadRemoteAsset(game.PublicID, assetType, assetName, remoteURL)
+	path, err := s.store.DownloadRemoteToStaging(game.PublicID, assetType, assetName, remoteURL)
 	if err != nil {
 		return "", normalizeAssetError(err)
 	}
-	_, err = s.persistAssetPath(gameID, assetType, assetUID, path, sortOrder)
-	if err != nil {
-		if cleanupErr := s.cleanupPersistFailedAsset(path, "assets.apply_remote"); cleanupErr != nil {
-			return "", cleanupErr
-		}
-		return "", err
-	}
+	_ = assetUID
 	return path, nil
 }
 
@@ -109,59 +89,19 @@ func (s *AssetsService) ApplyRawAsset(gameID int64, assetType string, content []
 		return "", normalizeRepoError(err)
 	}
 	assetUID, assetName := allocateAssetIdentity(assetType)
-	path, err := s.store.SaveUploadedAsset(game.PublicID, assetType, assetName, bytes.NewReader(content), contentType)
+	path, err := s.store.SaveToStaging(game.PublicID, assetType, assetName, bytes.NewReader(content), contentType)
 	if err != nil {
 		return "", normalizeAssetError(err)
 	}
-	_, err = s.persistAssetPath(gameID, assetType, assetUID, path, sortOrder)
-	if err != nil {
-		if cleanupErr := s.cleanupPersistFailedAsset(path, "assets.apply_raw"); cleanupErr != nil {
-			return "", cleanupErr
-		}
-		return "", err
-	}
+	_ = assetUID
 	return path, nil
 }
 
-func (s *AssetsService) cleanupPersistFailedAsset(path string, source string) error {
-	_, err := cleanupAssetPath(s.store, s.assetCleanupTasksRepo, path, source)
-	return err
-}
-
-func (s *AssetsService) Delete(gameID int64, assetType string, assetUID string) error {
-	switch assetType {
-	case "cover", "banner", "screenshot", "video", "logo":
-	default:
-		return ErrValidation
-	}
-
-	deletedPath, err := s.assetsRepo.DeleteByUID(gameID, assetType, assetUID)
-	if err != nil {
-		return err
-	}
-	if deletedPath != "" {
-		cleanupAssetPath(s.store, s.assetCleanupTasksRepo, deletedPath, "assets.delete")
-	}
-	return nil
-}
-
-func (s *AssetsService) persistAssetPath(gameID int64, assetType string, assetUID string, path string, sortOrder int) (*domain.GameAsset, error) {
-	switch assetType {
-	case "cover":
-		return s.assetsRepo.AddCover(gameID, assetUID, path, sortOrder)
-	case "logo":
-		return s.assetsRepo.AddLogo(gameID, assetUID, path, sortOrder)
-	case "banner":
-		return s.assetsRepo.AddBanner(gameID, assetUID, path, sortOrder)
-	case "screenshot":
-		asset, err := s.assetsRepo.AddScreenshot(gameID, assetUID, path, sortOrder)
-		return asset, err
-	case "video":
-		asset, err := s.assetsRepo.AddVideo(gameID, assetUID, path, sortOrder)
-		return asset, err
-	default:
-		return nil, ErrValidation
-	}
+// MoveStagingToPermanent moves an asset file from the staging directory to
+// the permanent game-specific directory. If the file is already in the permanent
+// location, it returns the path as-is.
+func (s *AssetsService) MoveStagingToPermanent(gamePublicID string, assetPath string) (string, error) {
+	return s.store.MoveToPermanent(assetPath, gamePublicID)
 }
 
 func newAssetUID() string {

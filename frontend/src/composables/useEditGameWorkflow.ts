@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import { type Ref } from 'vue'
 import type { EditGameForm } from '@/composables/edit-game-form'
 import gamesService from '@/services/games.service'
 import { seriesService } from '@/services/series.service'
@@ -10,18 +10,10 @@ import type {
   AdminGameDetail,
   Developer,
   GameAggregateGameUpdateRequest,
+  GameAggregateNewAsset,
   Publisher,
   Series,
 } from '@/services/types'
-
-type AssetType = 'cover' | 'banner' | 'screenshot' | 'video' | 'logo'
-
-interface PendingDeleteAsset {
-  type: AssetType
-  path: string
-  assetId?: number
-  assetUid?: string
-}
 
 interface UseEditGameWorkflowOptions {
   game: Ref<AdminGameDetail | null>
@@ -156,22 +148,6 @@ const createUpdatePayload = (params: {
 }
 
 export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
-  const pendingDeleteAssets = ref<PendingDeleteAsset[]>([])
-
-  const queueAssetDeletion = (
-    type: AssetType,
-    path: string,
-    assetId?: number,
-    assetUid?: string,
-  ) => {
-    if (!path) return
-    pendingDeleteAssets.value.push({ type, path, assetId, assetUid })
-  }
-
-  const resetPendingDeleteAssets = () => {
-    pendingDeleteAssets.value = []
-  }
-
   const refreshSeriesOptions = async () => {
     try {
       const popularSeries = await seriesService.getPopularSeries(50)
@@ -233,6 +209,32 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
         position_y: logo.position_y ?? null,
         width_pct: logo.width_pct ?? null,
       }] : []
+
+      const newAssets: GameAggregateNewAsset[] = []
+      for (const s of options.form.value.screenshots) {
+        if (s.asset_uid && s.path) {
+          newAssets.push({ asset_uid: s.asset_uid, asset_type: 'screenshot', path: s.path })
+        }
+      }
+      for (const v of options.form.value.preview_videos) {
+        if (v.asset_uid && v.path) {
+          newAssets.push({ asset_uid: v.asset_uid, asset_type: 'video', path: v.path })
+        }
+      }
+      for (const c of options.form.value.covers) {
+        if (c.asset_uid && c.path) {
+          newAssets.push({ asset_uid: c.asset_uid, asset_type: 'cover', path: c.path })
+        }
+      }
+      for (const b of options.form.value.banners) {
+        if (b.asset_uid && b.path) {
+          newAssets.push({ asset_uid: b.asset_uid, asset_type: 'banner', path: b.path })
+        }
+      }
+      if (logo?.asset_uid && logo.path) {
+        newAssets.push({ asset_uid: logo.asset_uid, asset_type: 'logo', path: logo.path })
+      }
+
       if (!game.public_id) {
         throw new Error('missing game public_id')
       }
@@ -250,15 +252,9 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
               id: item.id,
               file_path: item.path.trim(),
               label: item.label.trim() || null,
-              // The edit modal does not expose file notes yet, so preserve existing values.
               notes: item.notes ?? null,
             })),
-          delete_assets: pendingDeleteAssets.value.map((item) => ({
-            asset_type: item.type,
-            path: item.path,
-            asset_id: item.assetId,
-            asset_uid: item.assetUid,
-          })),
+          new_assets: newAssets,
           screenshot_order_asset_uids: orderedScreenshotUids,
           video_order_asset_uids: orderedVideoUids,
           cover_order_asset_uids: orderedCoverUids,
@@ -267,7 +263,6 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
           logo_positions: logoPositions,
         },
       })
-      pendingDeleteAssets.value = []
       if (aggregateResult.warnings.length > 0) {
         options.addAlert('部分素材文件未能物理删除，系统稍后可重试', 'warning')
       }
@@ -289,9 +284,6 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
   }
 
   return {
-    pendingDeleteAssets,
-    queueAssetDeletion,
-    resetPendingDeleteAssets,
     handleSubmit,
   }
 }

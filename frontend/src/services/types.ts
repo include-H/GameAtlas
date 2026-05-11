@@ -216,18 +216,17 @@ export interface GameAggregateFileRequest {
   notes?: string | null
 }
 
-export interface GameAggregateDeleteAssetRequest {
-  asset_type: 'cover' | 'banner' | 'screenshot' | 'video' | 'logo'
+export interface GameAggregateNewAsset {
+  asset_uid: string
+  asset_type: string
   path: string
-  asset_id?: number
-  asset_uid?: string
 }
 
 export interface GameAggregateUpdateRequest {
   game: GameAggregateGameUpdateRequest
   assets: {
     files: GameAggregateFileRequest[]
-    delete_assets: GameAggregateDeleteAssetRequest[]
+    new_assets: GameAggregateNewAsset[]
     screenshot_order_asset_uids: string[]
     video_order_asset_uids: string[]
     cover_order_asset_uids: string[]

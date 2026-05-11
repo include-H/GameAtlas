@@ -43,7 +43,6 @@ type authDeniedResponse struct {
 
 type assetUploadResponse struct {
 	Path     string `json:"path"`
-	AssetID  *int64 `json:"asset_id,omitempty"`
 	AssetUID string `json:"asset_uid,omitempty"`
 }
 

@@ -345,28 +345,6 @@ func TestValidateAndTrimGameAggregateCoreUpdateInputNormalizesSharedCoreFields(t
 	}
 }
 
-func TestGamesServiceUpdateAggregateRejectsUnsupportedDeleteAssetType(t *testing.T) {
-	db := openServicesTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	gameID := insertServicesTestGame(t, db, "aggregate-invalid-asset", "Aggregate Invalid Asset", domain.GameVisibilityPublic)
-	service := newServicesAggregateService(db, config.Config{})
-
-	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
-		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Invalid Asset", Visibility: domain.GameVisibilityPublic},
-		},
-		Assets: domain.GameAggregateAssetsInput{
-			DeleteAssets: []domain.GameAssetDeleteInput{
-				{AssetType: "manual", Path: "/assets/manual.pdf"},
-			},
-		},
-	})
-	if !errors.Is(err, ErrValidation) {
-		t.Fatalf("UpdateAggregate error = %v, want ErrValidation", err)
-	}
-}
-
 func TestGamesServiceUpdateAggregateReturnsMissingConfigForFileValidation(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()
@@ -402,9 +380,8 @@ func TestGamesServiceUpdateAggregateReturnsDeleteWarningsWhenAssetRemovalFails(t
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Warning", Visibility: domain.GameVisibilityPublic},
 		},
 		Assets: domain.GameAggregateAssetsInput{
-			DeleteAssets: []domain.GameAssetDeleteInput{
-				{AssetType: "cover", AssetUID: "bad-cover", Path: "/assets/../bad-cover.png"},
-			},
+			// Auto-diff: bad-cover is not in CoverOrderAssetUIDs, so it gets auto-deleted.
+			CoverOrderAssetUIDs: []string{},
 		},
 	})
 	if err != nil {
@@ -846,9 +823,7 @@ func TestGamesServiceUpdateAggregateDeletesFirstVideoAndKeepsNextVideo(t *testin
 			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Delete Primary Video", Visibility: domain.GameVisibilityPublic},
 		},
 		Assets: domain.GameAggregateAssetsInput{
-			DeleteAssets: []domain.GameAssetDeleteInput{
-				{AssetType: "video", AssetUID: "video-a"},
-			},
+			VideoOrderAssetUIDs: []string{"video-b"},
 		},
 	})
 	if err != nil {
