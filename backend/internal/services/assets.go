@@ -128,6 +128,23 @@ func (s *AssetsService) cleanupPersistFailedAsset(path string, source string) er
 	return err
 }
 
+func (s *AssetsService) Delete(gameID int64, assetType string, assetUID string) error {
+	switch assetType {
+	case "cover", "banner", "screenshot", "video", "logo":
+	default:
+		return ErrValidation
+	}
+
+	deletedPath, err := s.assetsRepo.DeleteByUID(gameID, assetType, assetUID)
+	if err != nil {
+		return err
+	}
+	if deletedPath != "" {
+		cleanupAssetPath(s.store, s.assetCleanupTasksRepo, deletedPath, "assets.delete")
+	}
+	return nil
+}
+
 func (s *AssetsService) persistAssetPath(gameID int64, assetType string, assetUID string, path string, sortOrder int) (*domain.GameAsset, error) {
 	switch assetType {
 	case "cover":
@@ -135,7 +152,7 @@ func (s *AssetsService) persistAssetPath(gameID int64, assetType string, assetUI
 	case "logo":
 		return s.assetsRepo.AddLogo(gameID, assetUID, path, sortOrder)
 	case "banner":
-		return nil, s.assetsRepo.UpdateGameImage(gameID, "banner_image", &path)
+		return s.assetsRepo.AddBanner(gameID, assetUID, path, sortOrder)
 	case "screenshot":
 		asset, err := s.assetsRepo.AddScreenshot(gameID, assetUID, path, sortOrder)
 		return asset, err
@@ -181,7 +198,8 @@ func allocateAssetIdentity(assetType string) (string, string) {
 		uid := newAssetUID()
 		return uid, uid
 	case "banner":
-		return "", newAssetUID()
+		uid := newAssetUID()
+		return uid, uid
 	default:
 		return "", newAssetUID()
 	}

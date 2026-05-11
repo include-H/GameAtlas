@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
@@ -46,6 +47,10 @@ func (r *AssetsRepository) AddLogo(gameID int64, assetUID string, path string, s
 	return r.addAsset(gameID, assetUID, "logo", path, sortOrder)
 }
 
+func (r *AssetsRepository) AddBanner(gameID int64, assetUID string, path string, sortOrder int) (*domain.GameAsset, error) {
+	return r.addAsset(gameID, assetUID, "banner", path, sortOrder)
+}
+
 func (r *AssetsRepository) UpdateLogoPosition(gameID int64, assetUID string, posX, posY, widthPct *float64) error {
 	_, err := r.db.Exec(`
 		UPDATE game_assets
@@ -56,6 +61,22 @@ func (r *AssetsRepository) UpdateLogoPosition(gameID int64, assetUID string, pos
 		return fmt.Errorf("update logo position: %w", err)
 	}
 	return nil
+}
+
+func (r *AssetsRepository) DeleteByUID(gameID int64, assetType string, assetUID string) (string, error) {
+	var path string
+	err := r.db.Get(&path, `
+		DELETE FROM game_assets
+		WHERE game_id = ? AND asset_type = ? AND asset_uid = ?
+		RETURNING path
+	`, gameID, assetType, assetUID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", fmt.Errorf("delete %s by uid: %w", assetType, err)
+	}
+	return path, nil
 }
 
 func (r *AssetsRepository) UpdateGameImage(gameID int64, column string, path *string) error {

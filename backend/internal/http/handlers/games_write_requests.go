@@ -34,6 +34,7 @@ type gameAggregateAssetsRequest struct {
 	VideoOrderAssetUIDs      []string                          `json:"video_order_asset_uids"`
 	CoverOrderAssetUIDs      []string                          `json:"cover_order_asset_uids"`
 	LogoOrderAssetUIDs       []string                          `json:"logo_order_asset_uids"`
+	BannerOrderAssetUIDs     []string                          `json:"banner_order_asset_uids"`
 	LogoPositions            []logoPositionRequest             `json:"logo_positions"`
 }
 
@@ -131,6 +132,7 @@ func (request gameAggregateAssetsRequest) toDomain() domain.GameAggregateAssetsI
 		VideoOrderAssetUIDs:      emptyStringSlice(request.VideoOrderAssetUIDs),
 		CoverOrderAssetUIDs:      emptyStringSlice(request.CoverOrderAssetUIDs),
 		LogoOrderAssetUIDs:       emptyStringSlice(request.LogoOrderAssetUIDs),
+		BannerOrderAssetUIDs:     emptyStringSlice(request.BannerOrderAssetUIDs),
 		LogoPositions:            logoPositions,
 	}
 }

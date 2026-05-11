@@ -136,6 +136,16 @@ func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDe
 		})
 	}
 
+	banners := make([]gameAssetResponse, 0, len(detail.Banners))
+	for _, asset := range detail.Banners {
+		banners = append(banners, gameAssetResponse{
+			ID:        asset.ID,
+			AssetUID:  asset.AssetUID,
+			Path:      asset.Path,
+			SortOrder: asset.SortOrder,
+		})
+	}
+
 	logos := make([]gameAssetResponse, 0, len(detail.Logos))
 	for _, asset := range detail.Logos {
 		logos = append(logos, gameAssetResponse{
@@ -175,6 +185,7 @@ func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDe
 		PreviewVideos: previewVideos,
 		Screenshots:   screenshots,
 		Covers:        covers,
+		Banners:       banners,
 		Logos:         logos,
 		Series:        series,
 		Developers:    toMetadataResponses(detail.Developers),

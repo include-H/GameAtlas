@@ -84,10 +84,16 @@ func (r *GamesRepository) UpdateAggregate(id int64, input domain.GameAggregateUp
 	if err := r.reorderAssetsTx(tx, id, "logo", input.Assets.LogoOrderAssetUIDs); err != nil {
 		return nil, err
 	}
+	if err := r.reorderAssetsTx(tx, id, "banner", input.Assets.BannerOrderAssetUIDs); err != nil {
+		return nil, err
+	}
 	if err := r.updateLogoPositionsTx(tx, id, input.Assets.LogoPositions); err != nil {
 		return nil, err
 	}
 	if err := r.syncPrimaryCoverTx(tx, id); err != nil {
+		return nil, err
+	}
+	if err := r.syncPrimaryBannerTx(tx, id); err != nil {
 		return nil, err
 	}
 
@@ -288,11 +294,13 @@ func (r *GamesRepository) deleteAssetsTx(tx *sqlx.Tx, gameID int64, deleteAssets
 				assetPaths = append(assetPaths, deletedPath)
 			}
 		case "banner":
-			// Only collect the old path for file cleanup. The column value was already
-			// set correctly by updateGameRowTx earlier in this transaction (either a
-			// new path for replacement, or NULL for explicit removal), so we must not
-			// overwrite it here.
-			assetPaths = append(assetPaths, strings.TrimSpace(item.Path))
+			deletedPath, _, deleted, err := r.deleteSingleAssetTx(tx, gameID, "banner", item)
+			if err != nil {
+				return nil, err
+			}
+			if deleted {
+				assetPaths = append(assetPaths, deletedPath)
+			}
 		case "screenshot":
 			deletedPath, _, deleted, err := r.deleteSingleAssetTx(tx, gameID, "screenshot", item)
 			if err != nil {
@@ -452,6 +460,25 @@ func (r *GamesRepository) syncPrimaryCoverTx(tx *sqlx.Tx, gameID int64) error {
 		UPDATE games SET cover_image = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
 	`, primaryPath, gameID); err != nil {
 		return fmt.Errorf("sync primary cover: %w", err)
+	}
+	return nil
+}
+
+func (r *GamesRepository) syncPrimaryBannerTx(tx *sqlx.Tx, gameID int64) error {
+	var primaryPath sql.NullString
+	if err := tx.Get(&primaryPath, `
+		SELECT path FROM game_assets
+		WHERE game_id = ? AND asset_type = 'banner'
+		ORDER BY sort_order ASC, id ASC
+		LIMIT 1
+	`, gameID); err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("query primary banner: %w", err)
+	}
+
+	if _, err := tx.Exec(`
+		UPDATE games SET banner_image = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+	`, primaryPath, gameID); err != nil {
+		return fmt.Errorf("sync primary banner: %w", err)
 	}
 	return nil
 }

@@ -152,7 +152,6 @@ const createUpdatePayload = (params: {
     publisher_ids: params.publisherIds,
     summary: toNullableFormText(params.form.summary),
     cover_image: null,
-    banner_image: toNullableFormText(params.form.banner_image),
   }
 }
 
@@ -223,6 +222,9 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       const orderedCoverUids = options.form.value.covers
         .map((item) => item.asset_uid)
         .filter((assetUid): assetUid is string => Boolean(assetUid))
+      const orderedBannerUids = options.form.value.banners
+        .map((item) => item.asset_uid)
+        .filter((assetUid): assetUid is string => Boolean(assetUid))
       const logo = options.form.value.logo
       const orderedLogoUids = logo?.asset_uid ? [logo.asset_uid] : []
       const logoPositions = logo?.asset_uid ? [{
@@ -261,6 +263,7 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
           video_order_asset_uids: orderedVideoUids,
           cover_order_asset_uids: orderedCoverUids,
           logo_order_asset_uids: orderedLogoUids,
+          banner_order_asset_uids: orderedBannerUids,
           logo_positions: logoPositions,
         },
       })

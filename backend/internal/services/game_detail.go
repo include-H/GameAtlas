@@ -60,6 +60,10 @@ func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) 
 	if err != nil {
 		return nil, err
 	}
+	banners, err := s.detailRepo.ListBanners(id)
+	if err != nil {
+		return nil, err
+	}
 	primarySeries, err := s.detailRepo.GetSeriesMetadata(id)
 	if err != nil {
 		return nil, err
@@ -88,6 +92,7 @@ func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) 
 		PreviewVideos: videos,
 		Screenshots:   screenshots,
 		Covers:        covers,
+		Banners:       banners,
 		Logos:         logos,
 		Series:        primarySeries,
 		Developers:    emptyMetadata(developers),

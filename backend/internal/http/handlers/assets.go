@@ -62,6 +62,32 @@ func (h *AssetsHandler) Upload(assetType string) gin.HandlerFunc {
 	}
 }
 
+func (h *AssetsHandler) Delete(assetType string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !requireAdmin(c) {
+			return
+		}
+		gameID, err := strconv.ParseInt(c.Query("game_id"), 10, 64)
+		if err != nil || gameID <= 0 {
+			writeJSONError(c, http.StatusBadRequest, "需要有效的 game_id")
+			return
+		}
+
+		assetUID := c.Query("asset_uid")
+		if assetUID == "" {
+			writeJSONError(c, http.StatusBadRequest, "需要 asset_uid")
+			return
+		}
+
+		if err := h.service.Delete(gameID, assetType, assetUID); err != nil {
+			writeServiceError(c, err, "删除资源失败")
+			return
+		}
+
+		c.Status(http.StatusNoContent)
+	}
+}
+
 func parseAssetUploadSortOrder(c *gin.Context) (int, bool) {
 	raw := c.PostForm("sort_order")
 	if raw == "" {

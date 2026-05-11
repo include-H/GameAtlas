@@ -152,6 +152,7 @@ type gameDetailResponse struct {
 	PreviewVideos []gameAssetResponse             `json:"preview_videos"`
 	Screenshots   []gameAssetResponse             `json:"screenshots"`
 	Covers        []gameAssetResponse             `json:"covers"`
+	Banners       []gameAssetResponse             `json:"banners"`
 	Logos         []gameAssetResponse             `json:"logos"`
 	Series        *metadataItemResponse           `json:"series"`
 	Developers    []metadataItemResponse          `json:"developers"`

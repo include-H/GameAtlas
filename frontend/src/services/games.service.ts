@@ -136,6 +136,7 @@ function normalizeGameDetail(item: GameDetailDto): GameDetail {
     isFavorite: item.is_favorite,
     preview_videos: item.preview_videos,
     screenshots: item.screenshots,
+    banners: item.banners,
     files: item.files,
     series: item.series,
     developers: item.developers,

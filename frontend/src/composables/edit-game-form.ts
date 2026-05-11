@@ -19,6 +19,12 @@ export interface EditGameEditableCover {
   path: string
 }
 
+export interface EditGameEditableBanner {
+  id?: number
+  asset_uid?: string
+  path: string
+}
+
 export interface EditGameEditableLogo {
   id?: number
   asset_uid?: string
@@ -42,6 +48,8 @@ export interface EditGameForm {
   banner_image: string
   // The first item is always the primary cover.
   covers: EditGameEditableCover[]
+  // The first item is always the primary banner.
+  banners: EditGameEditableBanner[]
   logo: EditGameEditableLogo | null
   // The first item is always the canonical preview video.
   preview_videos: EditGameEditableVideo[]
@@ -60,6 +68,7 @@ export const createEmptyEditGameForm = (): EditGameForm => ({
   summary: '',
   banner_image: '',
   covers: [],
+  banners: [],
   logo: null,
   preview_videos: [],
   screenshots: [],

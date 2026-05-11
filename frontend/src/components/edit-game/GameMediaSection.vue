@@ -82,44 +82,11 @@
 
       <section class="media-block media-block--banner">
         <div class="media-block__title">横幅图</div>
-        <div class="media-frame media-frame--banner">
-          <template v-if="bannerImage">
-            <a-image
-              :src="bannerImage"
-              :alt="title"
-              width="100%"
-              height="100%"
-              fit="contain"
-              hide-footer
-            />
-            <div class="media-overlay">
-              <div class="media-overlay-actions">
-                <a-button
-                  class="app-text-action-btn media-action-button"
-                  type="text"
-                  shape="circle"
-                  size="small"
-                  html-type="button"
-                  @click.stop="emit('open-banner-selector')"
-                >
-                  <icon-settings />
-                </a-button>
-                <a-button
-                  class="app-text-action-btn media-action-button media-action-button--danger"
-                  type="text"
-                  status="danger"
-                  shape="circle"
-                  size="small"
-                  html-type="button"
-                  @click.stop="emit('remove-banner')"
-                >
-                  <icon-delete />
-                </a-button>
-              </div>
-            </div>
-          </template>
+        <div
+          v-if="banners.length === 0"
+          class="media-frame media-frame--banner"
+        >
           <div
-            v-else
             class="media-empty-action"
             role="button"
             tabindex="0"
@@ -128,6 +95,67 @@
             <icon-image class="media-empty-icon" />
             <span class="media-empty-title">未设置横幅</span>
             <span class="media-empty-subtitle">点击选择图片</span>
+          </div>
+        </div>
+        <div v-else class="media-frame media-frame--banner banners-frame">
+          <div class="banners-scroll">
+            <a-image-preview-group infinite>
+              <div class="banners-grid">
+                <div
+                  v-for="(banner, index) in banners"
+                  :key="banner.asset_uid || banner.path"
+                  class="banner-thumb"
+                  :class="{ 'is-primary': index === 0 }"
+                >
+                  <a-image
+                    :src="banner.path"
+                    width="100%"
+                    height="100%"
+                    fit="contain"
+                    hide-footer
+                  />
+                  <div v-if="index === 0" class="banner-primary-badge">主横幅</div>
+                  <div class="banner-overlay">
+                    <div class="banner-overlay-actions">
+                      <a-button
+                        class="app-text-action-btn media-action-button"
+                        type="text"
+                        shape="circle"
+                        size="small"
+                        html-type="button"
+                        title="管理横幅"
+                        @click.stop="emit('open-banner-selector')"
+                      >
+                        <icon-settings />
+                      </a-button>
+                      <a-button
+                        v-if="index !== 0"
+                        class="app-text-action-btn media-action-button"
+                        type="text"
+                        shape="circle"
+                        size="small"
+                        html-type="button"
+                        title="设为主横幅"
+                        @click.stop="emit('set-primary-banner', index)"
+                      >
+                        <icon-star />
+                      </a-button>
+                      <a-button
+                        class="app-text-action-btn media-action-button media-action-button--danger"
+                        type="text"
+                        status="danger"
+                        shape="circle"
+                        size="small"
+                        html-type="button"
+                        @click.stop="emit('remove-banner', index)"
+                      >
+                        <icon-delete />
+                      </a-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </a-image-preview-group>
           </div>
         </div>
       </section>
@@ -316,6 +344,11 @@ interface EditableCover {
   path: string
 }
 
+interface EditableBanner {
+  asset_uid?: string
+  path: string
+}
+
 interface EditableScreenshot {
   asset_uid?: string
   path: string
@@ -333,7 +366,8 @@ const emit = defineEmits<{
   'set-primary-cover': [index: number]
   'reorder-cover': [payload: { key: string; direction: -1 | 1 }]
   'open-banner-selector': []
-  'remove-banner': []
+  'remove-banner': [index: number]
+  'set-primary-banner': [index: number]
   'open-video-selector': []
   'open-screenshot-selector': []
   'remove-screenshot': [clientKey: string]
@@ -348,7 +382,7 @@ const emit = defineEmits<{
 defineProps<{
   title: string
   covers: EditableCover[]
-  bannerImage: string
+  banners: EditableBanner[]
   primaryPreviewVideo: EditableVideo | null
   previewVideoSources: string[]
   screenshots: EditableScreenshot[]
@@ -445,6 +479,7 @@ defineProps<{
 .media-frame--banner {
   width: 100%;
   height: 270px;
+  min-height: 270px;
 }
 
 .media-frame--logo {
@@ -571,6 +606,7 @@ defineProps<{
 }
 
 .covers-frame,
+.banners-frame,
 .screenshots-frame {
   align-items: stretch;
   justify-content: stretch;
@@ -579,6 +615,7 @@ defineProps<{
 }
 
 .covers-scroll,
+.banners-scroll,
 .screenshots-scroll {
   width: 100%;
   height: 100%;
@@ -594,6 +631,13 @@ defineProps<{
 }
 
 .covers-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+.banners-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
@@ -623,6 +667,60 @@ defineProps<{
 .cover-thumb.is-primary {
   border-color: rgb(var(--primary-6));
   box-shadow: 0 0 0 1px rgba(var(--primary-6), 0.35);
+}
+
+.banner-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    color-mix(in srgb, var(--app-card-surface) 90%, transparent);
+  position: relative;
+  border: 1px solid var(--app-card-border);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.banner-thumb.is-primary {
+  border-color: rgb(var(--primary-6));
+  box-shadow: 0 0 0 1px rgba(var(--primary-6), 0.35);
+}
+
+.banner-primary-badge {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  background: rgb(var(--primary-6));
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  line-height: 1.3;
+  z-index: 1;
+}
+
+.banner-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 10, 16, 0.5);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.banner-overlay-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.banner-thumb:hover .banner-overlay {
+  opacity: 1;
 }
 
 .cover-primary-badge {
@@ -694,6 +792,7 @@ defineProps<{
   }
 
   .covers-grid,
+  .banners-grid,
   .screenshots-grid {
     grid-template-columns: 1fr;
   }

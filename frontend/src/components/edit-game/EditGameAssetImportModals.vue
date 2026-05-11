@@ -213,21 +213,24 @@
               v-for="(image, index) in steamBannerImages"
               :key="index"
               class="steam-image-item banner-thumb"
-              :class="{ 'steam-image-selected': selectedBannerImage === image }"
-              @click="emit('update:selected-banner-image', image)"
+              :class="{ 'steam-image-selected': selectedBanners.has(index) }"
+              @click="emit('toggle-banner-selection', index)"
             >
               <img :src="image" />
+              <div v-if="selectedBanners.has(index)" class="steam-screenshot-check">
+                <icon-check />
+              </div>
             </div>
           </div>
           <a-button
-            v-if="selectedBannerImage"
+            v-if="selectedBanners.size > 0"
             type="primary"
             long
-            :loading="isSearchingBanner"
+            :loading="isDownloadingSteamBanners"
             html-type="button"
             @click="emit('download-selected-steam-banner')"
           >
-            下载选中的横幅
+            下载选中的 {{ selectedBanners.size }} 张横幅
           </a-button>
         </div>
       </steam-search-panel>
@@ -597,7 +600,8 @@ const props = defineProps<{
   bannerSearchResults: SteamGameSearchResult[]
   selectedSteamBannerGame: SteamGameSearchResult | null
   steamBannerImages: string[]
-  selectedBannerImage: string
+  selectedBanners: Set<number>
+  isDownloadingSteamBanners: boolean
   bannerUploadAction: string
   bannerUploadData: Record<string, string>
   bannerSearchUrl: string
@@ -672,7 +676,7 @@ const emit = defineEmits<{
   'clear-banner': []
   'select-banner-game': [game: SteamGameSearchResult]
   'back-banner-game-search': []
-  'update:selected-banner-image': [value: string]
+  'toggle-banner-selection': [index: number]
   'download-selected-steam-banner': []
   'banner-upload-success': [fileItem: FileItem]
   'banner-upload-error': []

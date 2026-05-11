@@ -1,5 +1,6 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import type {
+  EditGameEditableBanner,
   EditGameEditableCover,
   EditGameEditableLogo,
   EditGameEditableScreenshot,
@@ -34,7 +35,7 @@ interface SteamScreenshotsData {
 }
 
 interface UseSteamImportOptions {
-  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'developer_ids' | 'publisher_ids' | 'covers' | 'logo' | 'banner_image' | 'screenshots'>>
+  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'developer_ids' | 'publisher_ids' | 'covers' | 'logo' | 'banner_image' | 'banners' | 'screenshots'>>
   gameId: Ref<number | undefined>
   getWikiContent: () => string
   uploadAssetFromUrl: (
@@ -48,9 +49,13 @@ interface UseSteamImportOptions {
     assetId?: number,
     assetUid?: string,
   ) => void
+  deleteAsset?: (type: AssetType, gameId: number, assetUid: string) => Promise<void>
   createEditableCover: (
     asset: UploadedAssetLike | string,
   ) => EditGameEditableCover
+  createEditableBanner: (
+    asset: UploadedAssetLike | string,
+  ) => EditGameEditableBanner
   createEditableLogo: (
     asset: UploadedAssetLike | string,
   ) => EditGameEditableLogo
@@ -77,7 +82,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const bannerPreviewUrl = ref('')
   const isDownloadingBanner = ref(false)
   const steamBannerImages = ref<string[]>([])
-  const selectedBannerImage = ref('')
+  const selectedBanners = ref<Set<number>>(new Set())
+  const isDownloadingSteamBanners = ref(false)
 
   const showScreenshotSelector = ref(false)
   const screenshotSearchUrl = ref('')
@@ -154,7 +160,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       const details = await steamService.getGameDetails(game.id)
       const images = Array.from(new Set([details.bannerImage, details.coverImage].filter(Boolean) as string[]))
       steamBannerImages.value = images
-      selectedBannerImage.value = ''
+      selectedBanners.value = new Set()
       return images
     },
     onError: (message) => {
@@ -387,12 +393,12 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     sgdbSearchResults.value = []
     sgdbThumbs.value = {}
     steamBannerImages.value = []
-    selectedBannerImage.value = ''
+    selectedBanners.value = new Set()
   }
 
   const searchSteamForBanner = async () => {
     steamBannerImages.value = []
-    selectedBannerImage.value = ''
+    selectedBanners.value = new Set()
     if (bannerSource.value === 'steamgriddb') {
       sgdbSearching.value = true
       try {
@@ -418,7 +424,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
         const heroes = await steamGridDBService.getHeroesByGameId(Number(game.id))
         const images = heroes.map((g) => g.url)
         steamBannerImages.value = images
-        selectedBannerImage.value = ''
+        selectedBanners.value = new Set()
       } catch (e) {
         options.addAlert('SteamGridDB 获取横幅失败：' + getHttpErrorMessage(e), 'error')
         bannerSteamPicker.selectedGame.value = null
@@ -433,6 +439,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const backToBannerGameSearch = () => {
     bannerSteamPicker.back()
     steamBannerImages.value = []
+    selectedBanners.value = new Set()
   }
 
   const loadBannerFromUrl = async () => {
@@ -441,10 +448,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     isDownloadingBanner.value = true
     try {
       const uploaded = await options.uploadAssetFromUrl(bannerSearchUrl.value, 'banner')
-      if (options.form.value.banner_image) {
-        options.queueAssetDeletion('banner', options.form.value.banner_image)
-      }
-      options.form.value.banner_image = uploaded.path
+      options.form.value.banners.push(options.createEditableBanner(uploaded))
+      options.form.value.banner_image = options.form.value.banners[0]?.path || ''
       await options.onAssetPersisted?.()
       showBannerSelector.value = false
       bannerSearchUrl.value = ''
@@ -464,15 +469,19 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   }
 
   const downloadSelectedSteamBanner = async () => {
-    if (!selectedBannerImage.value || !options.gameId.value) return
+    if (!selectedBanners.value.size || !options.gameId.value) return
 
-    isDownloadingBanner.value = true
+    const indices = Array.from(selectedBanners.value).sort((a, b) => a - b)
+    if (indices.length === 0) return
+
+    isDownloadingSteamBanners.value = true
     try {
-      const uploaded = await options.uploadAssetFromUrl(selectedBannerImage.value, 'banner')
-      if (options.form.value.banner_image) {
-        options.queueAssetDeletion('banner', options.form.value.banner_image)
+      for (const index of indices) {
+        const bannerUrl = steamBannerImages.value[index]
+        const uploaded = await options.uploadAssetFromUrl(bannerUrl, 'banner')
+        options.form.value.banners.push(options.createEditableBanner(uploaded))
       }
-      options.form.value.banner_image = uploaded.path
+      options.form.value.banner_image = options.form.value.banners[0]?.path || ''
       await options.onAssetPersisted?.()
       showBannerSelector.value = false
       backToBannerGameSearch()
@@ -480,11 +489,19 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       steamBannerSearchResults.value = []
       bannerSearchUrl.value = ''
       bannerPreviewUrl.value = ''
-      options.addAlert('横幅下载成功', 'success')
+      options.addAlert(`成功添加 ${indices.length} 张横幅`, 'success')
     } catch (error) {
       options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
     } finally {
-      isDownloadingBanner.value = false
+      isDownloadingSteamBanners.value = false
+    }
+  }
+
+  const toggleBannerSelection = (index: number) => {
+    if (selectedBanners.value.has(index)) {
+      selectedBanners.value.delete(index)
+    } else {
+      selectedBanners.value.add(index)
     }
   }
 
@@ -614,8 +631,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     try {
       const uploaded = await options.uploadAssetFromUrl(selectedLogoImage.value, 'logo')
       const oldLogo = options.form.value.logo
-      if (oldLogo) {
-        options.queueAssetDeletion('logo', oldLogo.path, oldLogo.id, oldLogo.asset_uid)
+      if (oldLogo?.asset_uid && options.deleteAsset) {
+        void options.deleteAsset('logo', options.gameId.value, oldLogo.asset_uid)
       }
       options.form.value.logo = options.createEditableLogo(uploaded)
       await options.onAssetPersisted?.()
@@ -638,8 +655,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     try {
       const uploaded = await options.uploadAssetFromUrl(logoSearchUrl.value, 'logo')
       const oldLogo = options.form.value.logo
-      if (oldLogo) {
-        options.queueAssetDeletion('logo', oldLogo.path, oldLogo.id, oldLogo.asset_uid)
+      if (oldLogo?.asset_uid && options.deleteAsset) {
+        void options.deleteAsset('logo', options.gameId.value!, oldLogo.asset_uid)
       }
       options.form.value.logo = options.createEditableLogo(uploaded)
       await options.onAssetPersisted?.()
@@ -757,7 +774,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     steamBannerSearchResults.value = []
     selectedSteamBannerGame.value = null
     steamBannerImages.value = []
-    selectedBannerImage.value = ''
+    selectedBanners.value = new Set()
     bannerSearchUrl.value = ''
     bannerPreviewUrl.value = ''
 
@@ -798,7 +815,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     bannerPreviewUrl,
     isDownloadingBanner,
     steamBannerImages,
-    selectedBannerImage,
+    selectedBanners,
+    isDownloadingSteamBanners,
     showScreenshotSelector,
     screenshotSearchUrl,
     screenshotPreviewUrl,
@@ -860,6 +878,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     loadBannerFromUrl,
     confirmBannerSelection,
     downloadSelectedSteamBanner,
+    toggleBannerSelection,
     handleScreenshotSearchClear,
     searchSteamForScreenshots,
     selectSteamScreenshotGame,

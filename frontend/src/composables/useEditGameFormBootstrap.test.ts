@@ -37,6 +37,7 @@ describe('useEditGameFormBootstrap', () => {
       series_id: null as string | number | null,
       summary: '',
       banner_image: '',
+      banners: [],
       covers: [] as Array<{ asset_uid?: string; path: string }>,
       logo: null,
       preview_videos: [] as Array<{ asset_uid?: string; path: string }>,
@@ -51,6 +52,10 @@ describe('useEditGameFormBootstrap', () => {
       publisherOptions: ref([]),
       addAlert: vi.fn(),
       createEditableCover: (asset) => ({
+        asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
+        path: typeof asset === 'string' ? asset : asset.path,
+      }),
+      createEditableBanner: (asset) => ({
         asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
         path: typeof asset === 'string' ? asset : asset.path,
       }),
@@ -82,6 +87,7 @@ describe('useEditGameFormBootstrap', () => {
       cover_image: null,
       banner_image: null,
       covers: [],
+      banners: [],
       logos: [],
       wiki_content: null,
       downloads: 0,
@@ -123,6 +129,7 @@ describe('useEditGameFormBootstrap', () => {
       series_id: null as string | number | null,
       summary: '',
       banner_image: '',
+      banners: [],
       covers: [] as Array<{ asset_uid?: string; path: string }>,
       logo: null,
       preview_videos: [] as Array<{ asset_uid?: string; path: string }>,
@@ -137,6 +144,10 @@ describe('useEditGameFormBootstrap', () => {
       publisherOptions: ref([]),
       addAlert: vi.fn(),
       createEditableCover: (asset) => ({
+        asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
+        path: typeof asset === 'string' ? asset : asset.path,
+      }),
+      createEditableBanner: (asset) => ({
         asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
         path: typeof asset === 'string' ? asset : asset.path,
       }),
@@ -168,6 +179,7 @@ describe('useEditGameFormBootstrap', () => {
       cover_image: null,
       banner_image: null,
       covers: [],
+      banners: [],
       logos: [],
       wiki_content: null,
       downloads: 0,
@@ -230,6 +242,7 @@ describe('useEditGameFormBootstrap', () => {
         series_id: null,
         summary: '',
         banner_image: '',
+        banners: [],
         covers: [],
         logo: null,
         preview_videos: [],
@@ -241,6 +254,10 @@ describe('useEditGameFormBootstrap', () => {
       publisherOptions: ref([]),
       addAlert,
       createEditableCover: (asset) => ({
+        asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
+        path: typeof asset === 'string' ? asset : asset.path,
+      }),
+      createEditableBanner: (asset) => ({
         asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
         path: typeof asset === 'string' ? asset : asset.path,
       }),

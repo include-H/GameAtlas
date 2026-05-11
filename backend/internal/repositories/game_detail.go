@@ -52,6 +52,10 @@ func (r *GameDetailRepository) ListLogos(gameID int64) ([]domain.GameAsset, erro
 	return r.games.ListLogos(gameID)
 }
 
+func (r *GameDetailRepository) ListBanners(gameID int64) ([]domain.GameAsset, error) {
+	return r.games.ListBanners(gameID)
+}
+
 func (r *GameDetailRepository) GetSeriesMetadata(gameID int64) (*domain.MetadataItem, error) {
 	return r.games.GetSeriesMetadata(gameID)
 }

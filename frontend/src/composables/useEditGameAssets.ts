@@ -1,5 +1,6 @@
 import { type Ref } from 'vue'
 import type {
+  EditGameEditableBanner,
   EditGameEditableCover,
   EditGameEditableLogo,
   EditGameEditableScreenshot,
@@ -20,7 +21,7 @@ interface UploadResponseLike {
 }
 
 interface UseEditGameAssetsOptions {
-  form: Ref<Pick<EditGameForm, 'covers' | 'logo' | 'banner_image' | 'screenshots' | 'preview_videos'>>
+  form: Ref<Pick<EditGameForm, 'covers' | 'logo' | 'banner_image' | 'banners' | 'screenshots' | 'preview_videos'>>
   gameId: Ref<number | undefined>
   showCoverSelector: Ref<boolean>
   showBannerSelector: Ref<boolean>
@@ -31,7 +32,9 @@ interface UseEditGameAssetsOptions {
   videoUploadProgress: Ref<number>
   videoUploadFileName: Ref<string>
   queueAssetDeletion: (type: AssetType, path: string, assetId?: number, assetUid?: string) => void
+  deleteAsset?: (type: AssetType, gameId: number, assetUid: string) => Promise<void>
   createEditableCover: (asset: UploadedAssetResult) => EditGameEditableCover
+  createEditableBanner: (asset: UploadedAssetResult) => EditGameEditableBanner
   createEditableLogo: (asset: UploadedAssetResult) => EditGameEditableLogo
   createEditableScreenshot: (asset: UploadedAssetResult, index: number) => EditGameEditableScreenshot
   createEditableVideo: (asset: UploadedAssetResult) => EditGameEditableVideo
@@ -69,8 +72,8 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     const response = fileItem.response as UploadResponseLike | undefined
     if (response?.success && response.data) {
       const oldLogo = options.form.value.logo
-      if (oldLogo) {
-        options.queueAssetDeletion('logo', oldLogo.path, oldLogo.id, oldLogo.asset_uid)
+      if (oldLogo?.asset_uid && options.gameId.value && options.deleteAsset) {
+        void options.deleteAsset('logo', options.gameId.value, oldLogo.asset_uid)
       }
       options.form.value.logo = options.createEditableLogo(response.data)
       void options.onAssetPersisted?.()
@@ -88,11 +91,9 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
 
   const handleBannerUploadSuccess = (fileItem: FileItem) => {
     const response = fileItem.response as UploadResponseLike | undefined
-    if (response?.success && response.data?.path) {
-      if (options.form.value.banner_image) {
-        options.queueAssetDeletion('banner', options.form.value.banner_image)
-      }
-      options.form.value.banner_image = response.data.path
+    if (response?.success && response.data) {
+      options.form.value.banners.push(options.createEditableBanner(response.data))
+      options.form.value.banner_image = options.form.value.banners[0]?.path || ''
       void options.onAssetPersisted?.()
       options.showBannerSelector.value = false
       options.addAlert('横幅上传成功', 'success')
@@ -186,11 +187,21 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     logo.width_pct = payload.width_pct
   }
 
-  const removeBanner = () => {
-    const bannerUrl = options.form.value.banner_image
-    if (!bannerUrl) return
-    options.queueAssetDeletion('banner', bannerUrl)
-    options.form.value.banner_image = ''
+  const removeBanner = (index: number) => {
+    const banner = options.form.value.banners[index]
+    if (!banner) return
+    options.queueAssetDeletion('banner', banner.path, banner.id, banner.asset_uid)
+    options.form.value.banners = options.form.value.banners.filter((_, i) => i !== index)
+    options.form.value.banner_image = options.form.value.banners[0]?.path || ''
+  }
+
+  const setPrimaryBanner = (index: number) => {
+    if (index <= 0 || index >= options.form.value.banners.length) return
+    const banners = [...options.form.value.banners]
+    const [moved] = banners.splice(index, 1)
+    banners.splice(0, 0, moved)
+    options.form.value.banners = banners
+    options.form.value.banner_image = banners[0]?.path || ''
   }
 
   const removeScreenshot = (clientKey: string) => {
@@ -231,6 +242,7 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     removeScreenshot,
     removePreviewVideo,
     setPrimaryCover,
+    setPrimaryBanner,
     handleLogoPositionConfirm,
     resetVideoUploadState,
   }

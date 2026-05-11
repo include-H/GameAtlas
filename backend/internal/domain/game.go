@@ -246,6 +246,7 @@ type GameAggregateAssetsInput struct {
 	VideoOrderAssetUIDs      []string
 	CoverOrderAssetUIDs      []string
 	LogoOrderAssetUIDs       []string
+	BannerOrderAssetUIDs     []string
 	LogoPositions            []LogoPositionInput
 }
 

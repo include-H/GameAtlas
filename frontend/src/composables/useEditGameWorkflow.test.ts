@@ -70,6 +70,7 @@ const buildOptions = () => {
         cover_image: null,
         banner_image: null,
         covers: [],
+        banners: [],
         logos: [],
         wiki_content: null,
         downloads: 0,
@@ -93,6 +94,7 @@ const buildOptions = () => {
         series_id: null,
         summary: '',
         banner_image: '',
+        banners: [],
         covers: [],
         logo: null,
         preview_videos: [],
@@ -183,7 +185,6 @@ describe('useEditGameWorkflow', () => {
     const { options } = buildOptions()
     options.form.value.title_alt = '   '
     options.form.value.summary = '  '
-    options.form.value.banner_image = '   '
 
     const workflow = useEditGameWorkflow(options)
     await workflow.handleSubmit()
@@ -193,7 +194,6 @@ describe('useEditGameWorkflow', () => {
         title_alt: null,
         summary: null,
         cover_image: null,
-        banner_image: null,
       }),
     }))
   })

@@ -108,6 +108,7 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 			VideoOrderAssetUIDs:      input.Assets.VideoOrderAssetUIDs,
 			CoverOrderAssetUIDs:      input.Assets.CoverOrderAssetUIDs,
 			LogoOrderAssetUIDs:       input.Assets.LogoOrderAssetUIDs,
+			BannerOrderAssetUIDs:     input.Assets.BannerOrderAssetUIDs,
 			LogoPositions:            input.Assets.LogoPositions,
 		},
 	})

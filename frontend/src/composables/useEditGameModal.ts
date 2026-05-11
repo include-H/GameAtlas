@@ -3,13 +3,14 @@ import {
   createEmptyEditGameForm,
   formatEditGameReleaseDate,
   parseEditGameReleaseDate,
+  type EditGameEditableBanner,
   type EditGameEditableCover,
   type EditGameEditableLogo,
   type EditGameEditableScreenshot,
   type EditGameEditableVideo,
   type EditGameForm,
 } from '@/composables/edit-game-form'
-import { uploadAsset, type UploadedAssetResult } from '@/services/assets'
+import { uploadAsset, deleteAsset, type UploadedAssetResult } from '@/services/assets'
 import { buildAssetUploadUrl } from '@/services/api-url'
 import { directoryService } from '@/services/directory.service'
 import { proxySteamAssetUrl } from '@/services/steam.service'
@@ -30,6 +31,7 @@ import {
 } from '@/utils/creatable-select'
 import type {
   AdminGameDetail,
+  BannerItem,
   CoverItem,
   Developer,
   LogoItem,
@@ -88,7 +90,7 @@ export const useEditGameModal = ({
     return form.value.logo || null
   })
 
-  const logoBannerSrc = computed(() => form.value.banner_image || form.value.covers[0]?.path || '')
+  const logoBannerSrc = computed(() => form.value.banners[0]?.path || form.value.banner_image || form.value.covers[0]?.path || '')
   const logoPath = computed(() => form.value.logo?.path || '')
 
   const primaryPreviewVideo = computed(() => {
@@ -304,6 +306,17 @@ export const useEditGameModal = ({
     }
   }
 
+  const createEditableBanner = (asset: BannerItem | UploadedAssetResult | string): EditGameEditableBanner => {
+    if (typeof asset === 'string') {
+      return { path: asset }
+    }
+    return {
+      id: 'id' in asset ? asset.id : ('asset_id' in asset ? asset.asset_id : undefined),
+      asset_uid: asset.asset_uid,
+      path: asset.path,
+    }
+  }
+
   const createEditableLogo = (asset: LogoItem | UploadedAssetResult | string): EditGameEditableLogo => {
     if (typeof asset === 'string') {
       return { path: asset, position_x: null, position_y: null, width_pct: null }
@@ -361,6 +374,7 @@ export const useEditGameModal = ({
     publisherOptions,
     addAlert,
     createEditableCover,
+    createEditableBanner,
     createEditableLogo,
     createEditableScreenshot,
     createEditableVideo,
@@ -437,7 +451,8 @@ export const useEditGameModal = ({
     bannerPreviewUrl,
     isDownloadingBanner,
     steamBannerImages,
-    selectedBannerImage,
+    selectedBanners,
+    isDownloadingSteamBanners,
     showScreenshotSelector,
     screenshotSearchUrl,
     screenshotPreviewUrl,
@@ -499,6 +514,7 @@ export const useEditGameModal = ({
     loadBannerFromUrl,
     confirmBannerSelection,
     downloadSelectedSteamBanner,
+    toggleBannerSelection,
     handleScreenshotSearchClear,
     searchSteamForScreenshots,
     selectSteamScreenshotGame,
@@ -521,7 +537,9 @@ export const useEditGameModal = ({
     getWikiContent: () => props.game?.wiki_content || '',
     uploadAssetFromUrl,
     queueAssetDeletion,
+    deleteAsset,
     createEditableCover,
+    createEditableBanner,
     createEditableLogo,
     createEditableScreenshot,
     addAlert,
@@ -550,6 +568,7 @@ export const useEditGameModal = ({
     removeScreenshot,
     removePreviewVideo,
     setPrimaryCover,
+    setPrimaryBanner,
     handleLogoPositionConfirm,
     resetVideoUploadState,
   } = useEditGameAssets({
@@ -564,7 +583,9 @@ export const useEditGameModal = ({
     videoUploadProgress,
     videoUploadFileName,
     queueAssetDeletion,
+    deleteAsset,
     createEditableCover,
+    createEditableBanner,
     createEditableLogo,
     createEditableScreenshot,
     createEditableVideo,
@@ -619,6 +640,7 @@ export const useEditGameModal = ({
     coverPreviewUrl,
     coverSearchUrl,
     downloadSelectedSteamBanner,
+    toggleBannerSelection,
     downloadSelectedSteamCover,
     downloadSelectedSteamCovers,
     downloadSelectedSteamLogo,
@@ -708,6 +730,7 @@ export const useEditGameModal = ({
     reorderEditableCovers,
     reorderEditableVideos,
     setPrimaryCover,
+    setPrimaryBanner,
     handleLogoPositionConfirm,
     rules,
     screenshotPreviewUrl,
@@ -724,7 +747,8 @@ export const useEditGameModal = ({
     selectSteamLogoGame,
     selectSteamScreenshotGame,
     selectSteamSummaryGame,
-    selectedBannerImage,
+    selectedBanners,
+    isDownloadingSteamBanners,
     selectedCoverImage,
     selectedCovers,
     selectedSteamBannerGame,

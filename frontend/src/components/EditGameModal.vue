@@ -170,7 +170,7 @@
           <game-media-section
             :title="form.title"
             :covers="form.covers"
-            :banner-image="form.banner_image"
+            :banners="form.banners"
             :primary-preview-video="primaryPreviewVideo"
             :preview-video-sources="previewVideoSources"
             :screenshots="form.screenshots"
@@ -183,6 +183,7 @@
             @reorder-cover="reorderEditableCovers($event.key, $event.direction)"
             @open-banner-selector="showBannerSelector = true"
             @remove-banner="removeBanner"
+            @set-primary-banner="setPrimaryBanner"
             @open-video-selector="openVideoSelector"
             @open-screenshot-selector="showScreenshotSelector = true"
             @remove-screenshot="removeScreenshot"
@@ -244,7 +245,8 @@
       :banner-search-results="bannerSearchResults"
       :selected-steam-banner-game="selectedSteamBannerGame"
       :steam-banner-images="steamBannerImages"
-      :selected-banner-image="selectedBannerImage"
+      :selected-banners="selectedBanners"
+      :is-downloading-steam-banners="isDownloadingSteamBanners"
       :banner-upload-action="bannerUploadAction"
       :banner-upload-data="bannerUploadData"
       :banner-search-url="bannerSearchUrl"
@@ -312,7 +314,7 @@
       @clear-banner="handleBannerSearchClear"
       @select-banner-game="selectSteamBannerGame"
       @back-banner-game-search="backToBannerGameSearch"
-      @update:selected-banner-image="selectedBannerImage = $event"
+      @toggle-banner-selection="toggleBannerSelection"
       @download-selected-steam-banner="downloadSelectedSteamBanner"
       @banner-upload-success="handleBannerUploadSuccess"
       @banner-upload-error="handleBannerUploadError"
@@ -522,7 +524,10 @@ const {
   selectSteamLogoGame,
   selectSteamScreenshotGame,
   selectSteamSummaryGame,
-  selectedBannerImage,
+  selectedBanners,
+  isDownloadingSteamBanners,
+  toggleBannerSelection,
+  setPrimaryBanner,
   selectedCoverImage,
   selectedCovers,
   selectedLogoImage,

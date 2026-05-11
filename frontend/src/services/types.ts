@@ -123,6 +123,13 @@ export interface CoverItem {
   sort_order: number
 }
 
+export interface BannerItem {
+  id: number
+  asset_uid: string
+  path: string
+  sort_order: number
+}
+
 export interface LogoItem {
   id: number
   asset_uid: string
@@ -160,6 +167,7 @@ export interface GameDetailDtoBase<TFile extends GameFileEntry = GameFileEntry> 
   preview_videos: VideoAssetItem[]
   screenshots: ScreenshotItem[]
   covers: CoverItem[]
+  banners: BannerItem[]
   logos: LogoItem[]
   series: Series | null
   developers: Developer[]
@@ -192,7 +200,6 @@ export interface GameAggregateCoreRequest {
   summary: string | null
   release_date: string | null
   cover_image: string | null
-  banner_image: string | null
 }
 
 // Aggregate update rewrites the editable game aggregate in one request.
@@ -225,6 +232,7 @@ export interface GameAggregateUpdateRequest {
     video_order_asset_uids: string[]
     cover_order_asset_uids: string[]
     logo_order_asset_uids: string[]
+    banner_order_asset_uids: string[]
     logo_positions: LogoPosition[]
   }
 }

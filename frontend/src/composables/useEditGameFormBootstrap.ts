@@ -1,6 +1,7 @@
 import { type Ref } from 'vue'
 import {
   createEmptyEditGameForm,
+  type EditGameEditableBanner,
   type EditGameEditableCover,
   type EditGameEditableLogo,
   type EditGameEditableScreenshot,
@@ -12,6 +13,7 @@ import { developersService } from '@/services/developers.service'
 import { publishersService } from '@/services/publishers.service'
 import type {
   AdminGameDetail,
+  BannerItem,
   CoverItem,
   Developer,
   LogoItem,
@@ -28,6 +30,7 @@ interface UseEditGameFormBootstrapOptions {
   publisherOptions: Ref<Publisher[]>
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
   createEditableCover: (asset: CoverItem | string) => EditGameEditableCover
+  createEditableBanner: (asset: BannerItem | string) => EditGameEditableBanner
   createEditableLogo: (asset: LogoItem | string) => EditGameEditableLogo
   createEditableScreenshot: (asset: ScreenshotItem | string, index: number) => EditGameEditableScreenshot
   createEditableVideo: (asset: VideoAssetItem | string) => EditGameEditableVideo
@@ -56,6 +59,10 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
         }))
     }
 
+    const banners = game.banners.map((asset) =>
+      options.createEditableBanner(asset),
+    )
+
     options.form.value = {
       title: game.title || '',
       title_alt: game.title_alt || '',
@@ -65,10 +72,11 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
       release_date: game.release_date || undefined,
       series_id: game.series?.id ?? null,
       summary: game.summary || '',
-      banner_image: game.banner_image || '',
+      banner_image: banners[0]?.path || game.banner_image || '',
       covers: game.covers.map((asset) =>
         options.createEditableCover(asset),
       ),
+      banners,
       logo: game.logos[0] ? options.createEditableLogo(game.logos[0]) : null,
       preview_videos: game.preview_videos.map((asset) =>
         options.createEditableVideo(asset),
