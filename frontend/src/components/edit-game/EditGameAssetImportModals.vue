@@ -827,6 +827,7 @@ const handleLogoPosConfirm = () => {
 }
 
 .steam-image-item {
+  position: relative;
   border: 1px solid var(--color-border-2);
   border-radius: 8px;
   overflow: hidden;
