@@ -232,7 +232,7 @@
           </div>
         </div>
         <div v-else class="media-frame media-frame--screenshots screenshots-frame">
-          <div class="screenshots-scroll">
+          <div ref="screenshotsScrollRef" class="screenshots-scroll" @dragover="onScreenshotsDragOver" @dragend="onScreenshotsDragEnd">
             <a-image-preview-group infinite>
               <div class="screenshots-grid">
                 <div
@@ -348,6 +348,7 @@
 
 <script setup lang="ts">
 import { IconDelete, IconDragArrow, IconImage, IconSettings, IconStar, IconUpload } from '@arco-design/web-vue/es/icon'
+import { ref, onBeforeUnmount } from 'vue'
 
 interface EditableCover {
   asset_uid?: string
@@ -400,6 +401,55 @@ defineProps<{
   dragOverScreenshotKey: string | null
   logoImage: string
 }>()
+
+const screenshotsScrollRef = ref<HTMLElement | null>(null)
+let autoScrollRaf = 0
+
+const SCROLL_ZONE = 60
+const SCROLL_SPEED = 12
+
+const onScreenshotsDragOver = (e: DragEvent) => {
+  const container = screenshotsScrollRef.value
+  if (!container) return
+
+  const rect = container.getBoundingClientRect()
+  const y = e.clientY
+
+  if (y < rect.top - SCROLL_ZONE || y > rect.bottom + SCROLL_ZONE) {
+    cancelAnimationFrame(autoScrollRaf)
+    return
+  }
+
+  if (y < rect.top + SCROLL_ZONE) {
+    if (!autoScrollRaf) {
+      const tick = () => {
+        container.scrollTop -= SCROLL_SPEED
+        autoScrollRaf = requestAnimationFrame(tick)
+      }
+      autoScrollRaf = requestAnimationFrame(tick)
+    }
+  } else if (y > rect.bottom - SCROLL_ZONE) {
+    if (!autoScrollRaf) {
+      const tick = () => {
+        container.scrollTop += SCROLL_SPEED
+        autoScrollRaf = requestAnimationFrame(tick)
+      }
+      autoScrollRaf = requestAnimationFrame(tick)
+    }
+  } else {
+    cancelAnimationFrame(autoScrollRaf)
+    autoScrollRaf = 0
+  }
+}
+
+const onScreenshotsDragEnd = () => {
+  cancelAnimationFrame(autoScrollRaf)
+  autoScrollRaf = 0
+}
+
+onBeforeUnmount(() => {
+  cancelAnimationFrame(autoScrollRaf)
+})
 
 </script>
 

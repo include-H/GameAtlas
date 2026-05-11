@@ -25,7 +25,7 @@ const getPendingCenterAmbientPriorityImage = (game: GameListItem) => {
 }
 
 const getPendingCenterDisplayImage = (game: GameListItem) => {
-  return game.cover_image || game.banner_image || game.primary_screenshot || PLACEHOLDER_IMAGE
+  return game.cover_image || PLACEHOLDER_IMAGE
 }
 
 const formatPendingCenterDate = (value?: string | null) => {
