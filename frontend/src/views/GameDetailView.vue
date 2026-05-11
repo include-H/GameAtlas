@@ -175,7 +175,7 @@
         <!-- Wiki Content with TOC -->
         <div v-if="hasWikiContent" class="game-detail__wiki-wrapper">
           <!-- Wiki TOC Sidebar -->
-          <wiki-toc />
+          <wiki-toc :content="game.wiki_content || ''" />
 
           <!-- Wiki Main Content -->
           <a-card class="game-detail__card game-detail__wiki-card">

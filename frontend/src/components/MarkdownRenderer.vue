@@ -9,14 +9,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import MarkdownIt from 'markdown-it'
+import { generateHeadingId } from '@/utils/markdown-headings'
 
 interface Props {
   content: string
   compact?: boolean
+  headingOffset?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
   compact: false,
+  headingOffset: 76,
 })
 
 const md = new MarkdownIt({
@@ -25,6 +28,22 @@ const md = new MarkdownIt({
   typographer: true,
   breaks: true,
 })
+
+const headingSeen = new Map<string, number>()
+const defaultHeadingOpen = md.renderer.rules.heading_open ?? ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options))
+
+md.renderer.rules.heading_open = (tokens, idx, options, env, self) => {
+  const token = tokens[idx]
+  const level = parseInt(token.tag.slice(1), 10)
+  if (level >= 1 && level <= 3) {
+    const inlineToken = tokens[idx + 1]
+    const text = inlineToken?.children?.map((c) => c.content).join('') || ''
+    const id = generateHeadingId(text, headingSeen)
+    token.attrSet('id', id)
+    token.attrSet('style', `scroll-margin-top: ${props.headingOffset}px`)
+  }
+  return defaultHeadingOpen(tokens, idx, options, env, self)
+}
 
 const epigraphBlockPattern = /(^|\n):::epigraph[ \t]*\n([\s\S]*?)\n:::(?=\n|$)/g
 const epigraphTokenPrefix = '@@EPIGRAPH_BLOCK_'
@@ -166,6 +185,8 @@ function renderEpigraphBlocks(content: string): string {
 
 const renderedHtml = computed(() => {
   if (!props.content) return ''
+
+  headingSeen.clear()
 
   try {
     return renderEpigraphBlocks(props.content)

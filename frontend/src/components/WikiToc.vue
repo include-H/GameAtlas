@@ -24,41 +24,24 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { extractHeadings } from '@/utils/markdown-headings'
 
-interface Heading {
-  id: string
-  text: string
-  level: number
-}
+const props = defineProps<{
+  content: string
+}>()
 
-const headings = ref<Heading[]>([])
+const headings = computed(() => extractHeadings(props.content))
 const activeId = ref('')
 const tocBodyRef = ref<HTMLElement | null>(null)
 const router = useRouter()
 
-const HEADING_SELECTOR = 'h1, h2, h3'
 const HEADING_SCROLL_OFFSET = 76
 
 let scrollContainer: HTMLElement | null = null
-let contentObserver: MutationObserver | null = null
 let headingObserver: IntersectionObserver | null = null
-let wikiCardObserver: MutationObserver | null = null
-let observedWikiContent: HTMLElement | null = null
 let isPageUnloading = false
-
-const generateId = (text: string, index: number): string => {
-  const baseId = text
-    .toLowerCase()
-    .replace(/[^\w\u4e00-\u9fa5]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-  return index > 0 ? `${baseId}-${index}` : baseId
-}
-
-const getWikiContent = () => {
-  return document.querySelector('.game-detail__wiki-card .markdown-renderer') as HTMLElement | null
-}
 
 const getHeadingElements = () => {
   return headings.value
@@ -130,43 +113,6 @@ const setupHeadingObserver = () => {
   }
 }
 
-const extractHeadingsFromDOM = async () => {
-  await nextTick()
-
-  const wikiContent = getWikiContent()
-  if (!wikiContent) {
-    headings.value = []
-    activeId.value = ''
-    disconnectHeadingObserver()
-    return
-  }
-
-  const hElements = Array.from(wikiContent.querySelectorAll(HEADING_SELECTOR)) as HTMLElement[]
-  const result: Heading[] = []
-  const idMap: Record<string, number> = {}
-
-  for (const element of hElements) {
-    const text = element.textContent?.trim() || ''
-    if (!text) continue
-
-    const level = Number.parseInt(element.tagName[1] || '1', 10)
-    const baseId = generateId(text, 0)
-    const count = idMap[baseId] || 0
-    idMap[baseId] = count + 1
-
-    const id = count > 0 ? `${baseId}-${count}` : baseId
-    element.id = id
-    element.style.scrollMarginTop = `${HEADING_SCROLL_OFFSET}px`
-    result.push({ id, text, level })
-  }
-
-  headings.value = result
-  activeId.value = result[0]?.id || ''
-
-  setupHeadingObserver()
-  computeActiveHeading()
-}
-
 const scrollToHeading = (id: string) => {
   const element = document.getElementById(id)
   if (!element) return
@@ -233,50 +179,18 @@ const scrollToActiveItem = () => {
   }
 }
 
-const setupContentObserver = () => {
-  const wikiContent = getWikiContent()
-  if (!wikiContent || typeof MutationObserver === 'undefined') return
-  if (observedWikiContent === wikiContent && contentObserver) return
-
-  contentObserver?.disconnect()
-  observedWikiContent = wikiContent
-  contentObserver = new MutationObserver(() => {
-    void extractHeadingsFromDOM()
-  })
-  contentObserver.observe(wikiContent, {
-    childList: true,
-    subtree: true,
-    characterData: true,
-  })
-}
-
-const setupWikiCardObserver = () => {
-  if (typeof MutationObserver === 'undefined') return
-
-  const wikiCard = document.querySelector('.game-detail__wiki-card') as HTMLElement | null
-  if (!wikiCard) return
-
-  wikiCardObserver?.disconnect()
-  wikiCardObserver = new MutationObserver(() => {
-    setupContentObserver()
-    void extractHeadingsFromDOM()
-  })
-  wikiCardObserver.observe(wikiCard, {
-    childList: true,
-    subtree: true,
-  })
-}
-
 const handleResize = () => {
   computeActiveHeading()
 }
 
+watch(headings, () => {
+  activeId.value = headings.value[0]?.id || ''
+  nextTick(setupHeadingObserver)
+})
+
 onMounted(() => {
   isPageUnloading = false
   scrollContainer = document.querySelector('.content')
-  setupWikiCardObserver()
-  setupContentObserver()
-  void extractHeadingsFromDOM()
 
   if (scrollContainer) {
     scrollContainer.addEventListener('scroll', computeActiveHeading, { passive: true })
@@ -290,11 +204,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   disconnectHeadingObserver()
-  contentObserver?.disconnect()
-  contentObserver = null
-  observedWikiContent = null
-  wikiCardObserver?.disconnect()
-  wikiCardObserver = null
 
   if (scrollContainer) {
     scrollContainer.removeEventListener('scroll', computeActiveHeading)
