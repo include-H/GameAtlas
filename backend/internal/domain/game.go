@@ -225,13 +225,6 @@ type GameFileUpsertInput struct {
 	SortOrder int
 }
 
-type GameAssetDeleteInput struct {
-	AssetType string
-	Path      string
-	AssetID   *int64
-	AssetUID  string
-}
-
 type GameAggregateUpdateInput struct {
 	Game   GameAggregateCoreUpdateInput
 	Assets GameAggregateAssetsInput
@@ -246,7 +239,6 @@ type LogoPositionInput struct {
 
 type GameAggregateAssetsInput struct {
 	Files                    []GameFileUpsertInput
-	DeleteAssets             []GameAssetDeleteInput
 	ScreenshotOrderAssetUIDs []string
 	VideoOrderAssetUIDs      []string
 	CoverOrderAssetUIDs      []string

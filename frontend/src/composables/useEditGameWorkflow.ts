@@ -144,6 +144,7 @@ const createUpdatePayload = (params: {
     publisher_ids: params.publisherIds,
     summary: toNullableFormText(params.form.summary),
     cover_image: null,
+    banner_image: null,
     logo_visible: params.form.logo_visible,
   }
 }

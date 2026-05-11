@@ -31,7 +31,7 @@ func attachPendingIssues(games []domain.GameListItem, reviewIssueOverridesRepo *
 
 	ignoredReasonsByGameID := make(map[int64]map[domain.PendingIssueDetailKey]*string, len(games))
 	for _, item := range overrides {
-		if item.Status != "ignored" || !domain.IsAllowedPendingIssueDetail(item.IssueKey) {
+		if item.Status != domain.ReviewIssueStatusIgnored || !domain.IsAllowedPendingIssueDetail(item.IssueKey) {
 			continue
 		}
 		if ignoredReasonsByGameID[item.GameID] == nil {
@@ -61,7 +61,7 @@ func getPendingIssueEvaluation(game domain.Game, reviewIssueOverridesRepo *repos
 
 	ignoredReasons := make(map[domain.PendingIssueDetailKey]*string)
 	for _, item := range overrides {
-		if item.Status != "ignored" || !domain.IsAllowedPendingIssueDetail(item.IssueKey) {
+		if item.Status != domain.ReviewIssueStatusIgnored || !domain.IsAllowedPendingIssueDetail(item.IssueKey) {
 			continue
 		}
 		ignoredReasons[domain.PendingIssueDetailKey(item.IssueKey)] = item.Reason

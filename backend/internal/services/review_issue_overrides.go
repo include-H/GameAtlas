@@ -40,7 +40,7 @@ func (s *ReviewIssueOverrideService) Ignore(gameID int64, issueKey string, reaso
 		return nil, err
 	}
 
-	return s.overridesRepo.Upsert(gameID, normalizedIssueKey, "ignored", normalizedReason)
+	return s.overridesRepo.Upsert(gameID, normalizedIssueKey, domain.ReviewIssueStatusIgnored, normalizedReason)
 }
 
 func (s *ReviewIssueOverrideService) Delete(gameID int64, issueKey string) error {

@@ -71,14 +71,6 @@ func TestGameAggregateUpdateRequestToInputPreservesAssetPayloadWithoutLegacyFile
 					"notes": "note"
 				}
 			],
-			"delete_assets": [
-				{
-					"asset_type": "video",
-					"path": "/assets/demo/video.mp4",
-					"asset_id": 11,
-					"asset_uid": "video-a"
-				}
-			],
 			"screenshot_order_asset_uids": ["shot-a"],
 			"video_order_asset_uids": ["video-a"]
 		}
@@ -100,12 +92,6 @@ func TestGameAggregateUpdateRequestToInputPreservesAssetPayloadWithoutLegacyFile
 	}
 	if file.FilePath != "/roms/demo.vhdx" {
 		t.Fatalf("file_path = %q, want /roms/demo.vhdx", file.FilePath)
-	}
-	if len(input.Assets.DeleteAssets) != 1 {
-		t.Fatalf("delete_assets len = %d, want 1", len(input.Assets.DeleteAssets))
-	}
-	if input.Assets.DeleteAssets[0].AssetUID != "video-a" {
-		t.Fatalf("delete asset uid = %q, want video-a", input.Assets.DeleteAssets[0].AssetUID)
 	}
 	if len(input.Assets.ScreenshotOrderAssetUIDs) != 1 || input.Assets.ScreenshotOrderAssetUIDs[0] != "shot-a" {
 		t.Fatalf("screenshot order = %#v, want [shot-a]", input.Assets.ScreenshotOrderAssetUIDs)

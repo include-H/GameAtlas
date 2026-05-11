@@ -201,6 +201,7 @@ export interface GameAggregateCoreRequest {
   summary: string | null
   release_date: string | null
   cover_image: string | null
+  banner_image: string | null
   logo_visible: boolean
 }
 

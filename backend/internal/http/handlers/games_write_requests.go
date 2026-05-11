@@ -30,7 +30,6 @@ type gameAggregateCoreUpdateRequest struct {
 
 type gameAggregateAssetsRequest struct {
 	Files                    []gameAggregateFileRequest        `json:"files"`
-	DeleteAssets             []gameAggregateDeleteAssetRequest `json:"delete_assets"`
 	ScreenshotOrderAssetUIDs []string                          `json:"screenshot_order_asset_uids"`
 	VideoOrderAssetUIDs      []string                          `json:"video_order_asset_uids"`
 	CoverOrderAssetUIDs      []string                          `json:"cover_order_asset_uids"`
@@ -58,13 +57,6 @@ type gameAggregateFileRequest struct {
 	FilePath string  `json:"file_path"`
 	Label    *string `json:"label"`
 	Notes    *string `json:"notes"`
-}
-
-type gameAggregateDeleteAssetRequest struct {
-	AssetType string `json:"asset_type"`
-	Path      string `json:"path"`
-	AssetID   *int64 `json:"asset_id"`
-	AssetUID  string `json:"asset_uid"`
 }
 
 func (request gameCreateRequest) toInput() domain.GameCreateInput {
@@ -114,16 +106,6 @@ func (request gameAggregateAssetsRequest) toDomain() domain.GameAggregateAssetsI
 		})
 	}
 
-	deleteAssets := make([]domain.GameAssetDeleteInput, 0, len(request.DeleteAssets))
-	for _, item := range request.DeleteAssets {
-		deleteAssets = append(deleteAssets, domain.GameAssetDeleteInput{
-			AssetType: item.AssetType,
-			Path:      item.Path,
-			AssetID:   item.AssetID,
-			AssetUID:  item.AssetUID,
-		})
-	}
-
 	logoPositions := make([]domain.LogoPositionInput, 0, len(request.LogoPositions))
 	for _, lp := range request.LogoPositions {
 		logoPositions = append(logoPositions, domain.LogoPositionInput{
@@ -145,7 +127,6 @@ func (request gameAggregateAssetsRequest) toDomain() domain.GameAggregateAssetsI
 
 	return domain.GameAggregateAssetsInput{
 		Files:                    files,
-		DeleteAssets:             deleteAssets,
 		ScreenshotOrderAssetUIDs: emptyStringSlice(request.ScreenshotOrderAssetUIDs),
 		VideoOrderAssetUIDs:      emptyStringSlice(request.VideoOrderAssetUIDs),
 		CoverOrderAssetUIDs:      emptyStringSlice(request.CoverOrderAssetUIDs),

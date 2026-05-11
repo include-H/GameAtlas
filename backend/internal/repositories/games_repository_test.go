@@ -560,9 +560,6 @@ func TestGamesRepositoryUpdateAggregateReplaceCoverPreservesNewPath(t *testing.T
 			},
 		},
 		Assets: domain.GameAggregateAssetsInput{
-			DeleteAssets: []domain.GameAssetDeleteInput{
-				{AssetType: "cover", AssetUID: "old-cover", Path: "/assets/replace-cover/old-cover.jpg"},
-			},
 			CoverOrderAssetUIDs: []string{"new-cover"},
 		},
 	}); err != nil {
@@ -599,9 +596,6 @@ func TestGamesRepositoryUpdateAggregateRemoveCoverSetsNull(t *testing.T) {
 			},
 		},
 		Assets: domain.GameAggregateAssetsInput{
-			DeleteAssets: []domain.GameAssetDeleteInput{
-				{AssetType: "cover", AssetUID: "old-cover", Path: "/assets/remove-cover/old-cover.jpg"},
-			},
 		},
 	}); err != nil {
 		t.Fatalf("UpdateAggregate returned error: %v", err)

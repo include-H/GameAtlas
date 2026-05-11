@@ -103,7 +103,6 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 		Game: trimmedInput,
 		Assets: domain.GameAggregateAssetsInput{
 			Files:                    normalizedFiles,
-			DeleteAssets:             input.Assets.DeleteAssets,
 			ScreenshotOrderAssetUIDs: input.Assets.ScreenshotOrderAssetUIDs,
 			VideoOrderAssetUIDs:      input.Assets.VideoOrderAssetUIDs,
 			CoverOrderAssetUIDs:      input.Assets.CoverOrderAssetUIDs,

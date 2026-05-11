@@ -42,15 +42,3 @@ func (r *GameFilesRepository) GetByID(gameID, fileID int64) (*domain.GameFile, e
 	}
 	return &file, nil
 }
-
-func (r *GameFilesRepository) UpdateSizeBytes(gameID, fileID, sizeBytes int64) error {
-	_, err := r.db.Exec(`
-		UPDATE game_files
-		SET size_bytes = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE game_id = ? AND id = ?
-	`, sizeBytes, gameID, fileID)
-	if err != nil {
-		return fmt.Errorf("update game file size: %w", err)
-	}
-	return nil
-}

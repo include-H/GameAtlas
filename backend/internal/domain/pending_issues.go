@@ -121,14 +121,6 @@ func PendingIssueCatalogDefinitions() PendingIssueCatalog {
 	}
 }
 
-func PendingIssueGroupDefinitions() []PendingIssueDefinition {
-	return append([]PendingIssueDefinition(nil), pendingIssueDefinitions...)
-}
-
-func PendingIssueDetailDefinitions() []PendingIssueDetailDefinition {
-	return append([]PendingIssueDetailDefinition(nil), pendingIssueDetailDefinitions...)
-}
-
 func PendingIssueSeverityRules() PendingIssueSeverityPolicy {
 	policy := PendingIssueSeverityPolicy{
 		MinVisibleDetails: pendingIssueSeverityPolicy.MinVisibleDetails,

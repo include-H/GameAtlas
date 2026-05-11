@@ -1,7 +1,6 @@
 package repositories
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
 
@@ -50,22 +49,6 @@ func (r *AssetCleanupTasksRepository) DeleteByPath(assetPath string) error {
 	}
 
 	return nil
-}
-
-func (r *AssetCleanupTasksRepository) GetByPath(assetPath string) (*domain.AssetCleanupTask, error) {
-	var task domain.AssetCleanupTask
-	if err := r.db.Get(&task, `
-		SELECT id, asset_path, source, last_error, attempt_count, created_at, updated_at
-		FROM asset_cleanup_tasks
-		WHERE asset_path = ?
-	`, strings.TrimSpace(assetPath)); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, err
-		}
-		return nil, fmt.Errorf("get asset cleanup task: %w", err)
-	}
-
-	return &task, nil
 }
 
 func (r *AssetCleanupTasksRepository) ListPending(limit int) ([]domain.AssetCleanupTask, error) {

@@ -721,7 +721,7 @@ func TestGamesHandlerUpdateAggregateIncludesAssetDeleteWarnings(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-warning/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Warning","visibility":"public"},"assets":{"delete_assets":[{"asset_type":"cover","asset_uid":"bad-cover","path":"/assets/../bad-cover.png"}]}}`))
+	context.Request = httptest.NewRequest(http.MethodPut, "/api/games/aggregate-warning/aggregate", strings.NewReader(`{"game":{"title":"Aggregate Warning","visibility":"public"},"assets":{}}`))
 	context.Request.Header.Set("Content-Type", "application/json")
 	context.Params = gin.Params{{Key: "publicId", Value: "aggregate-warning"}}
 	context.Set("is_admin", true)

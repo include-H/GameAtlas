@@ -78,19 +78,3 @@ func (r *AssetsRepository) DeleteByUID(gameID int64, assetType string, assetUID 
 	}
 	return path, nil
 }
-
-func (r *AssetsRepository) UpdateGameImage(gameID int64, column string, path *string) error {
-	query := fmt.Sprintf("UPDATE games SET %s = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", column)
-	result, err := r.db.Exec(query, path, gameID)
-	if err != nil {
-		return fmt.Errorf("update game image column %s: %w", column, err)
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("read updated image rows: %w", err)
-	}
-	if rows == 0 {
-		return sql.ErrNoRows
-	}
-	return nil
-}
