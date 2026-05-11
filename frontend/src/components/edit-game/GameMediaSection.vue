@@ -415,8 +415,9 @@ const onScreenshotsDragOver = (e: DragEvent) => {
   const rect = container.getBoundingClientRect()
   const y = e.clientY
 
-  if (y < rect.top - SCROLL_ZONE || y > rect.bottom + SCROLL_ZONE) {
+  if (y < rect.top || y > rect.bottom) {
     cancelAnimationFrame(autoScrollRaf)
+    autoScrollRaf = 0
     return
   }
 
