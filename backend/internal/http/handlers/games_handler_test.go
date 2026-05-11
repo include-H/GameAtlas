@@ -268,9 +268,21 @@ func TestGamesHandlerListPendingUsesNativePendingFilter(t *testing.T) {
 	}
 	if _, err := db.Exec(`
 		INSERT INTO game_assets (game_id, asset_uid, asset_type, path, sort_order)
+		VALUES (?, 'resolved-logo', 'logo', '/assets/pending-resolved/logo.png', 0)
+	`, resolvedID); err != nil {
+		t.Fatalf("insert resolved logo: %v", err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO game_assets (game_id, asset_uid, asset_type, path, sort_order)
 		VALUES (?, 'ignored-shot', 'screenshot', '/assets/pending-ignored/shot.png', 0)
 	`, ignoredID); err != nil {
 		t.Fatalf("insert ignored screenshot: %v", err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO game_assets (game_id, asset_uid, asset_type, path, sort_order)
+		VALUES (?, 'ignored-logo', 'logo', '/assets/pending-ignored/logo.png', 0)
+	`, ignoredID); err != nil {
+		t.Fatalf("insert ignored logo: %v", err)
 	}
 	if _, err := db.Exec(`
 		INSERT INTO game_files (game_id, file_path, sort_order)

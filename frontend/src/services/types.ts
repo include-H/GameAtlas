@@ -153,6 +153,7 @@ export interface GameListItemDto {
   wiki_content: string | null
   primary_screenshot: string | null
   screenshot_count: number
+  logo_count: number
   file_count: number
   developer_count: number
   publisher_count: number

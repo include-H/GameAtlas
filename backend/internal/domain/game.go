@@ -21,6 +21,7 @@ type Game struct {
 	Downloads         int64   `db:"downloads"`
 	PrimaryScreenshot *string `db:"primary_screenshot"`
 	ScreenshotCount   int64   `db:"screenshot_count"`
+	LogoCount         int64   `db:"logo_count"`
 	FileCount         int64   `db:"file_count"`
 	DeveloperCount    int64   `db:"developer_count"`
 	PublisherCount    int64   `db:"publisher_count"`
@@ -43,6 +44,7 @@ type GameListItem struct {
 	Downloads         int64   `db:"downloads"`
 	PrimaryScreenshot *string `db:"primary_screenshot"`
 	ScreenshotCount   int64   `db:"screenshot_count"`
+	LogoCount         int64   `db:"logo_count"`
 	FileCount         int64   `db:"file_count"`
 	DeveloperCount    int64   `db:"developer_count"`
 	PublisherCount    int64   `db:"publisher_count"`
