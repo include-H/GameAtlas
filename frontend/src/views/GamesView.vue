@@ -66,6 +66,21 @@
             :options="itemsPerPageOptions"
           />
         </a-col>
+
+        <!-- Favorites Toggle -->
+        <a-col :xs="24" :sm="8" :md="1" :lg="1" :xl="1" :xxl="1" class="games-filters-col games-filters-col--favorite">
+          <a-tag
+            checkable
+            :checked="filterFavorites"
+            color="red"
+            class="favorite-toggle-tag"
+            @click="updateRoute({ favorite: filterFavorites ? undefined : 'true' })"
+          >
+            <icon-heart-fill v-if="filterFavorites" />
+            <icon-heart v-else />
+            收藏
+          </a-tag>
+        </a-col>
       </a-row>
 
       <!-- Active Filters -->
@@ -213,7 +228,7 @@ import { useUiStore } from '@/stores/ui'
 import GameCard from '@/components/GameCard.vue'
 import AddGameModal from '@/components/AddGameModal.vue'
 import { useGamesView } from '@/composables/useGamesView'
-import { IconApps, IconList, IconPlus, IconSearch, IconSort, IconTrophy } from '@arco-design/web-vue/es/icon'
+import { IconApps, IconHeart, IconHeartFill, IconList, IconPlus, IconSearch, IconSort, IconTrophy } from '@arco-design/web-vue/es/icon'
 
 defineOptions({
   name: 'GamesView',
