@@ -3,6 +3,7 @@
 游戏管理系统，面向 NAS / 局域网 / 家庭游戏库场景。核心能力：
 
 - 在网页里整理和浏览游戏库（封面、横幅、截图、视频、Wiki）
+- Steam / SteamGridDB 在线素材搜索与导入
 - 管理 `.vhd` / `.vhdx` 游戏文件版本
 - 通过 SMB + 差分盘方式让 Windows 客户端远程挂载并启动游戏
 
@@ -84,6 +85,9 @@ SMB_SHARE_ROOT=\\192.168.1.4\Game1
 SMB_USERNAME=game
 SMB_PASSWORD=game
 VHD_DIFF_ROOT=C:              # 客户端差分盘存放位置
+
+# 可选：SteamGridDB 在线素材搜索
+STEAMGRIDDB_API_KEY=          # 注册：https://www.steamgriddb.com/account
 ```
 
 多 SMB 挂载点场景用 `SMB_PATH_MAPPINGS`：
