@@ -90,10 +90,12 @@ VHD_DIFF_ROOT=C:              # 客户端差分盘存放位置
 STEAMGRIDDB_API_KEY=          # 注册：https://www.steamgriddb.com/account
 ```
 
-多 SMB 挂载点场景用 `SMB_PATH_MAPPINGS`：
+多 SMB 挂载点场景用 `SMB_PATH_MAPPINGS`（本地路径=UNC路径，分号分隔）：
 
 ```env
-SMB_PATH_MAPPINGS=/mnt/Game=\\192.168.1.4\Game1;/mnt/Gal=\\192.168.1.4\Gal
+# 每行一条，实际写在一行，分号隔开
+/mnt/Game=\\192.168.1.4\Game
+/mnt/gal=\\192.168.1.4\Gal
 ```
 
 ## VHD 远程启动

@@ -47,7 +47,7 @@ backend/
 | `PRIMARY_ROM_ROOT` | ROM 根目录，文件操作限制在此目录内 | `ROM` |
 | `STATIC_DIR` | 磁盘前端目录，不存在时回退到内嵌 `web/dist` | `../frontend/dist` |
 | `SMB_SHARE_ROOT` | 单共享 UNC 路径 | — |
-| `SMB_PATH_MAPPINGS` | 多挂载点映射 `本地路径=UNC路径;...` | — |
+| `SMB_PATH_MAPPINGS` | 多挂载点映射（分号分隔，见 `.env.example` 示例） | — |
 | `VHD_DIFF_ROOT` | 客户端差分盘盘符 | `C:` |
 
 路径配置支持绝对和相对路径，相对路径以 `.env` 所在目录为基准。
