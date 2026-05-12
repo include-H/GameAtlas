@@ -48,7 +48,7 @@ Outputs to `release/game-release-<version>/`. The script:
 1. Builds frontend (`npm run build`)
 2. Copies frontend dist to `backend/web/dist/` for embedding
 3. Builds Go binary with `-trimpath -ldflags="-s -w"`
-4. Copies `backend/.env.release.example` → `.env`
+4. Copies `backend/.env.example` → `.env`（自动设为 `APP_ENV=production`）
 5. Cleans up embedded web dir
 
 **Do NOT commit `backend/web/dist/` contents** — they're gitignored. CI/release workflow creates a `.gitkeep` placeholder.
@@ -75,7 +75,7 @@ Outputs to `release/game-release-<version>/`. The script:
 
 **Database**: SQLite. Migrations in `backend/migrations/` (numbered `.sql` files, embedded via `//go:embed *.sql`). Auto-applied at startup, deduplicated by `schema_migrations.name`. New migrations: increment number, semantic name, forward-only SQL. **Never modify existing migration files.**
 
-**Config**: `.env` file in the *current working directory*. Dev: `backend/.env`. Release: release directory's `.env`. Templates: `backend/.env.example` (dev), `backend/.env.release.example` (release). `ADMIN_PASSWORD` required or server refuses to start.
+**Config**: `.env` file in the *current working directory*. Dev: `backend/.env`. Release: release directory's `.env`. Template: `backend/.env.example`. `ADMIN_PASSWORD` required or server refuses to start.
 
 **Frontend serving**: Backend checks `STATIC_DIR` (default `../frontend/dist`) first, falls back to embedded `web/dist`. The `STATIC_DIR` path is relative to the loaded `.env` file's directory.
 
@@ -142,7 +142,7 @@ Outputs to `release/game-release-<version>/`. The script:
 1. **`backend/web/dist/` is embedded into the Go binary** — the release build copies frontend dist here before building. CI creates a `.gitkeep` placeholder. Never commit built artifacts.
 2. **Frontend reads backend's `.env`** — `vite.config.ts` sets `envDir` to `../backend/`.
 3. **`backend/check.sh`Appends `GODEBUG=goindex=0`** — required on some Linux distros with Go 1.22.x to avoid false "not in std" errors.
-4. **`.env` is gitignored** — both root-level and `backend/.env`. Use `.env.example` / `.env.release.example` as templates.
+4. **`.env` is gitignored** — both root-level and `backend/.env`. Use `backend/.env.example` as template.
 5. **Custom frontend lint step** — `npm run lint` includes a custom button policy check (`lint:policy`) beyond standard ESLint.
 6. **`docs/项目风格约定.md`** — the authoritative style guide. Read it before making significant changes.
 7. **`release/` directory is gitignored** — build artifacts are not committed.

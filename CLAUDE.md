@@ -55,7 +55,7 @@ Layer structure (`backend/internal/`):
 
 Database: SQLite with numbered forward-only migrations in `backend/migrations/`. Auto-applied at startup, deduplicated by `schema_migrations.name`. **Never modify existing migration files.** New migrations: increment number, semantic name, forward-only SQL only.
 
-Config: `.env` in current working directory. `ADMIN_PASSWORD` required or server refuses to start. Templates: `backend/.env.example` (dev), `backend/.env.release.example` (release).
+Config: `.env` in current working directory. `ADMIN_PASSWORD` required or server refuses to start. Template: `backend/.env.example`.
 
 Frontend serving: Backend checks `STATIC_DIR` (default `../frontend/dist`) first, falls back to embedded `web/dist`. The `STATIC_DIR` path is relative to the loaded `.env` file's directory.
 
@@ -113,6 +113,7 @@ Vite config (`vite.config.ts`):
 | `ASSETS_DIR` | Game asset directory | No (default: `data/gamelist`) |
 | `PRIMARY_ROM_ROOT` | ROM root for file access boundaries | No (default: `ROM`) |
 | `SMB_SHARE_ROOT` | SMB UNC path for VHD launch scripts | No |
+| `STEAMGRIDDB_API_KEY` | SteamGridDB API key for online cover/banner/logo search | No |
 
 ## Testing
 
@@ -124,6 +125,6 @@ Vite config (`vite.config.ts`):
 
 1. **`backend/web/dist/` is embedded into the Go binary** — the release build copies frontend dist here before building. Never commit built artifacts.
 2. **Frontend reads backend's `.env`** — `vite.config.ts` sets `envDir` to `../backend/`.
-3. **`.env` is gitignored** — use `.env.example` / `.env.release.example` as templates.
+3. **`.env` is gitignored** — use `backend/.env.example` as template.
 4. **`docs/项目风格约定.md`** is the authoritative style guide. Read it before making significant changes.
 5. **`release/` directory is gitignored** — build artifacts are not committed.

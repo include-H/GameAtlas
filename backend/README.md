@@ -6,7 +6,7 @@ Go + Gin + SQLite 后端，提供游戏库 API、文件管理、Wiki、认证、
 
 ```bash
 cd backend
-cp .env.example .env        # 或 .env.release.example
+cp .env.example .env
 go run ./cmd/server         # 启动，监听 :3000
 
 bash check.sh               # go test + go vet（自动设置 GODEBUG=goindex=0）
@@ -37,7 +37,7 @@ backend/
 
 ## 配置
 
-模板见 `.env.example`（开发）和 `.env.release.example`（发布），以下仅列关键项：
+模板见 `backend/.env.example`，以下仅列关键项：
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|

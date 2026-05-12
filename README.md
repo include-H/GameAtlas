@@ -50,7 +50,7 @@ bash build-release.sh v1.0.0       # 自定义版本名
 release/game-release-<version>/
 ├── game-server
 ├── start.sh
-├── .env                  # 从 backend/.env.release.example 复制
+├── .env                  # 从 backend/.env.example 复制并填写
 ├── data/                 # 数据库、素材、默认 ROM 目录
 └── ROM/
 ```
@@ -69,7 +69,7 @@ git tag v1.0.0 && git push origin v1.0.0
 
 ## 配置
 
-后端读取运行目录下的 `.env`。模板见 `backend/.env.example`（开发）和 `backend/.env.release.example`（发布）。
+后端读取运行目录下的 `.env`。模板见 `backend/.env.example`，每个配置项都有注释说明。
 
 ```env
 # 必填
