@@ -125,22 +125,26 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
 
   const handleVideoFileChange = async (event: Event) => {
     const input = event.target as HTMLInputElement
-    const file = input.files?.[0]
+    const files = input.files
     const gameId = options.gameId.value
-    if (!file || !gameId) return
+    if (!files || files.length === 0 || !gameId) return
 
     options.isUploadingVideo.value = true
-    options.videoUploadProgress.value = 0
-    options.videoUploadFileName.value = file.name
 
     try {
-      const uploaded = await uploadAsset('video', gameId, file, options.form.value.preview_videos.length, (percent) => {
-        options.videoUploadProgress.value = percent
-      })
-      appendPreviewVideo(options.createEditableVideo(uploaded))
-      await options.onAssetPersisted?.()
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        options.videoUploadProgress.value = 0
+        options.videoUploadFileName.value = file.name
+
+        const uploaded = await uploadAsset('video', gameId, file, options.form.value.preview_videos.length, (percent) => {
+          options.videoUploadProgress.value = percent
+        })
+        appendPreviewVideo(options.createEditableVideo(uploaded))
+        await options.onAssetPersisted?.()
+      }
       options.videoUploadProgress.value = 100
-      options.addAlert('预告片上传成功', 'success')
+      options.addAlert(files.length > 1 ? `${files.length} 个预告片上传成功` : '预告片上传成功', 'success')
     } catch (error) {
       options.videoUploadProgress.value = 0
       options.addAlert('预告片上传失败：' + getHttpErrorMessage(error), 'error')

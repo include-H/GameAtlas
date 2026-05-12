@@ -70,6 +70,7 @@
 
       <a-divider>本地上传</a-divider>
       <a-upload
+        multiple
         :action="uploadAction"
         :data="uploadData"
         :headers="uploadHeaders"

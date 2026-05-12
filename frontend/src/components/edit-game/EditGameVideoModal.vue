@@ -10,6 +10,7 @@
       <input
         ref="videoFileInput"
         type="file"
+        multiple
         accept="video/mp4,video/webm"
         class="hidden-file-input"
         @change="emit('video-file-change', $event)"

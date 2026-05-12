@@ -65,6 +65,7 @@
 
       <a-divider>本地上传</a-divider>
       <a-upload
+        multiple
         :action="screenshotUploadAction"
         :data="screenshotUploadData"
         :headers="uploadHeaders"
