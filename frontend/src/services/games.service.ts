@@ -271,8 +271,8 @@ const gamesService = {
 
   // Use the generic detail reader for page/store flows that can legally render either
   // public or admin payloads from /games/:publicId.
-  async getGameDetail(id: string): Promise<GameDetail> {
-    const response = await get<ApiEnvelope<GameDetailDto>>(`/games/${id}`)
+  async getGameDetail(id: string, signal?: AbortSignal): Promise<GameDetail> {
+    const response = await get<ApiEnvelope<GameDetailDto>>(`/games/${id}`, { signal })
     return normalizeGameDetail(response.data)
   },
 

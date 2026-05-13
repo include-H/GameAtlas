@@ -74,7 +74,6 @@ declare module 'vue' {
     GameCarousel: typeof import('./components/GameCarousel.vue')['default']
     GameFilePathsSection: typeof import('./components/edit-game/GameFilePathsSection.vue')['default']
     GameMediaSection: typeof import('./components/edit-game/GameMediaSection.vue')['default']
-    LiveTile: typeof import('./components/LiveTile.vue')['default']
     LogoSelectorModal: typeof import('./components/edit-game/import-modals/LogoSelectorModal.vue')['default']
     MarkdownRenderer: typeof import('./components/MarkdownRenderer.vue')['default']
     Pupil: typeof import('./components/login/Pupil.vue')['default']
@@ -86,8 +85,6 @@ declare module 'vue' {
     StatCard: typeof import('./components/StatCard.vue')['default']
     SteamSearchPanel: typeof import('./components/SteamSearchPanel.vue')['default']
     SummaryImportModal: typeof import('./components/edit-game/import-modals/SummaryImportModal.vue')['default']
-    TileGrid: typeof import('./components/TileGrid.vue')['default']
-    TileGroup: typeof import('./components/TileGroup.vue')['default']
     WikiEditor: typeof import('./components/WikiEditor.vue')['default']
     WikiToc: typeof import('./components/WikiToc.vue')['default']
   }

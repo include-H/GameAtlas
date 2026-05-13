@@ -326,9 +326,10 @@
 </template>
 
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
-import EditGameModal from '@/components/EditGameModal.vue'
+const EditGameModal = defineAsyncComponent(() => import('@/components/EditGameModal.vue'))
 import { PENDING_WORKBENCH_PAGE_SIZE } from '@/composables/usePendingWorkbench'
 import { usePendingCenterView } from '@/composables/usePendingCenterView'
 import { IconBook, IconEdit, IconRefresh, IconRight, IconSearch } from '@arco-design/web-vue/es/icon'

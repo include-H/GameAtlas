@@ -1,4 +1,6 @@
 import { computed, nextTick, onActivated, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
+
+let currentAbortController: AbortController | null = null
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import downloadService from '@/services/download.service'
 import { isAdminGameDetail, type AdminGameDetail, type GameVersion } from '@/services/types'
@@ -228,10 +230,19 @@ export const useGameDetailView = ({
   }
 
   const loadGameDetail = async (gameId: string) => {
+    // Abort previous request if still in flight
+    if (currentAbortController) {
+      currentAbortController.abort()
+    }
+    currentAbortController = new AbortController()
+    const { signal } = currentAbortController
+
     hasLoadFailure.value = false
     try {
-      await gamesStore.fetchGame(gameId)
+      await gamesStore.fetchGame(gameId, signal)
     } catch (error) {
+      // Ignore aborted requests
+      if (signal.aborted) return
       const status = getHttpStatus(error)
       if (status === 404) {
         router.replace({ name: 'not-found' })
@@ -312,6 +323,10 @@ export const useGameDetailView = ({
   )
 
   onUnmounted(() => {
+    if (currentAbortController) {
+      currentAbortController.abort()
+      currentAbortController = null
+    }
     disconnectTopSectionObserver()
     if (typeof window !== 'undefined') {
       window.removeEventListener('resize', syncTopSectionHeight)

@@ -243,7 +243,7 @@ import { useGamesStore } from '@/stores/games'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import ScreenshotCarousel from '@/components/ScreenshotCarousel.vue'
-import EditGameModal from '@/components/EditGameModal.vue'
+const EditGameModal = defineAsyncComponent(() => import('@/components/EditGameModal.vue'))
 import WikiToc from '@/components/WikiToc.vue'
 import { useGameDetailView } from '@/composables/useGameDetailView'
 import {

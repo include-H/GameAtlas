@@ -7,8 +7,9 @@
         class="carousel-slide"
         :class="{ active: currentIndex === index }"
       >
-        <div 
-          class="slide-foreground" 
+        <div
+          v-if="shouldLoadSlide(index)"
+          class="slide-foreground"
           :style="{ backgroundImage: `url(${getBackgroundImage(game)})` }"
         />
       </div>
@@ -83,6 +84,14 @@ const getBackgroundImage = (game: GameListItem) => {
       || game.cover_image
       || '/placeholder-game.jpg',
   )
+}
+
+// Only load current and adjacent slides for smooth transitions
+const shouldLoadSlide = (index: number) => {
+  const total = games.value.length
+  if (total <= 3) return true
+  const diff = Math.abs(index - currentIndex.value)
+  return diff <= 1 || diff >= total - 1
 }
 
 const getDescription = (game: GameListItem) => {

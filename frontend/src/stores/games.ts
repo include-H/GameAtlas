@@ -139,12 +139,12 @@ export const useGamesStore = defineStore('games', () => {
     }
   }
 
-  const fetchGame = async (id: string) => {
+  const fetchGame = async (id: string, signal?: AbortSignal) => {
     detailLoading.value = true
     detailError.value = null
 
     try {
-      const game = await gamesService.getGameDetail(id)
+      const game = await gamesService.getGameDetail(id, signal)
       currentGame.value = game
       currentVersions.value = mapGameVersions(game)
       return game
