@@ -50,7 +50,7 @@
         >
           <div class="series-card__cover">
             <div
-              v-if="(series.game_count || 0) > 4 && series.cover_candidates && series.cover_candidates.length >= 4"
+              v-if="(series.game_count || 0) >= 4 && series.cover_candidates && series.cover_candidates.length >= 4"
               class="series-card__collage"
             >
               <div

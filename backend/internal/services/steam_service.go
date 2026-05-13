@@ -16,10 +16,16 @@ import (
 
 var ErrUpstream = errors.New("upstream request failed")
 
+type cachedPreview struct {
+	preview  *domain.SteamAssetsPreview
+	cachedAt time.Time
+}
+
 type SteamService struct {
-	client *http.Client
-	proxy  string
-	assets *AssetsService
+	client      *http.Client
+	proxy       string
+	assets      *AssetsService
+	previewCache sync.Map // int64 -> cachedPreview
 }
 
 type steamStoreSearchResponse struct {
@@ -139,6 +145,13 @@ func (s *SteamService) Search(query string, proxyOverride string) ([]domain.Stea
 }
 
 func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain.SteamAssetsPreview, error) {
+	if v, ok := s.previewCache.Load(appID); ok {
+		entry := v.(cachedPreview)
+		if time.Since(entry.cachedAt) < 24*time.Hour {
+			return entry.preview, nil
+		}
+	}
+
 	appKey := fmt.Sprintf("%d", appID)
 
 	// Fetch both locales concurrently
@@ -287,7 +300,7 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 		coverURL = &apiHeaderImage
 	}
 
-	return &domain.SteamAssetsPreview{
+	result := &domain.SteamAssetsPreview{
 		AppID:          appID,
 		Name:           name,
 		Description:    description,
@@ -297,7 +310,9 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 		CoverURL:       coverURL,
 		BannerURL:      bannerURL,
 		ScreenshotURLs: screenshotURLs,
-	}, nil
+	}
+	s.previewCache.Store(appID, cachedPreview{preview: result, cachedAt: time.Now()})
+	return result, nil
 }
 
 // previewAssetsFromStorePage is the fallback when appdetails returns success:false
@@ -340,7 +355,7 @@ func (s *SteamService) previewAssetsFromStorePage(appID int64, proxyOverride str
 		)
 	}
 
-	return &domain.SteamAssetsPreview{
+	result := &domain.SteamAssetsPreview{
 		AppID:          appID,
 		Name:           name,
 		Description:    description,
@@ -350,7 +365,9 @@ func (s *SteamService) previewAssetsFromStorePage(appID int64, proxyOverride str
 		CoverURL:       coverURL,
 		BannerURL:      bannerURL,
 		ScreenshotURLs: screenshotURLs,
-	}, nil
+	}
+	s.previewCache.Store(appID, cachedPreview{preview: result, cachedAt: time.Now()})
+	return result, nil
 }
 
 var storePageTitlePattern = regexp.MustCompile(`(?i)<title>(.*?)</title>`)
