@@ -58,6 +58,7 @@ export interface Series {
   game_count?: number
   cover_image?: string | null
   cover_candidates?: string[]
+  background_candidates?: string[]
   latest_updated_at?: string | null
 }
 

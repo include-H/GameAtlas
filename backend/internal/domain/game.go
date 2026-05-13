@@ -102,15 +102,16 @@ type GameFile struct {
 }
 
 type MetadataItem struct {
-	ID              int64    `db:"id"`
-	Name            string   `db:"name"`
-	Slug            string   `db:"slug"`
-	SortOrder       int      `db:"sort_order"`
-	CreatedAt       string   `db:"created_at"`
-	GameCount       int
-	CoverImage      *string
-	CoverCandidates []string
-	LatestUpdatedAt *string
+	ID                  int64    `db:"id"`
+	Name                string   `db:"name"`
+	Slug                string   `db:"slug"`
+	SortOrder           int      `db:"sort_order"`
+	CreatedAt           string   `db:"created_at"`
+	GameCount           int
+	CoverImage          *string
+	CoverCandidates     []string
+	BackgroundCandidates []string
+	LatestUpdatedAt     *string
 }
 
 type MetadataWriteInput struct {

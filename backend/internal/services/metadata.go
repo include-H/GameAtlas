@@ -267,32 +267,56 @@ func applySeriesItemGames(item *domain.MetadataItem, games []domain.SeriesGameSu
 	item.LatestUpdatedAt = nil
 	item.CoverCandidates = nil
 	item.CoverImage = nil
+	item.BackgroundCandidates = nil
 	if len(games) == 0 {
 		return
 	}
 
 	item.LatestUpdatedAt = &games[0].UpdatedAt
 	coverCandidates := make([]string, 0, 4)
-	seen := make(map[string]struct{}, 4)
+	backgroundCandidates := make([]string, 0, 4)
+	seen := make(map[string]struct{}, 8)
+	bgSeen := make(map[string]struct{}, 8)
 	for _, game := range games {
 		path := pickSeriesCoverSource(game)
-		if path == "" {
-			continue
+		if path != "" {
+			if _, exists := seen[path]; !exists {
+				seen[path] = struct{}{}
+				coverCandidates = append(coverCandidates, path)
+			}
 		}
-		if _, exists := seen[path]; exists {
-			continue
+
+		// Collect landscape images (banner + screenshot) for ambient background
+		for _, bg := range pickSeriesBackgroundSources(game) {
+			if _, exists := bgSeen[bg]; !exists {
+				bgSeen[bg] = struct{}{}
+				backgroundCandidates = append(backgroundCandidates, bg)
+			}
 		}
-		seen[path] = struct{}{}
-		coverCandidates = append(coverCandidates, path)
-		if len(coverCandidates) == 4 {
+
+		if len(coverCandidates) >= 4 && len(backgroundCandidates) >= 4 {
 			break
 		}
 	}
 
 	if len(coverCandidates) > 0 {
-		item.CoverCandidates = coverCandidates
+		item.CoverCandidates = coverCandidates[:min(len(coverCandidates), 4)]
 		item.CoverImage = &coverCandidates[0]
 	}
+	if len(backgroundCandidates) > 0 {
+		item.BackgroundCandidates = backgroundCandidates[:min(len(backgroundCandidates), 4)]
+	}
+}
+
+func pickSeriesBackgroundSources(game domain.SeriesGameSummary) []string {
+	var sources []string
+	if game.BannerImage != nil && strings.TrimSpace(*game.BannerImage) != "" {
+		sources = append(sources, strings.TrimSpace(*game.BannerImage))
+	}
+	if game.PrimaryScreenshot != nil && strings.TrimSpace(*game.PrimaryScreenshot) != "" {
+		sources = append(sources, strings.TrimSpace(*game.PrimaryScreenshot))
+	}
+	return sources
 }
 
 func pickSeriesCoverSource(game domain.SeriesGameSummary) string {

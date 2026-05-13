@@ -12,8 +12,7 @@ type ImageCandidateGameDetail = {
 }
 
 type ImageCandidateSeries = {
-  cover_image?: Series['cover_image']
-  cover_candidates?: Series['cover_candidates']
+  background_candidates?: Series['background_candidates']
 }
 
 const pushResolved = (target: string[], value: string | null | undefined) => {
@@ -66,9 +65,8 @@ export const getAmbientBackgroundUrlsFromSeries = (series?: ImageCandidateSeries
   }
 
   const urls: string[] = []
-  for (const candidate of series.cover_candidates || []) {
+  for (const candidate of series.background_candidates || []) {
     pushResolved(urls, candidate)
   }
-  pushResolved(urls, series.cover_image)
   return urls
 }

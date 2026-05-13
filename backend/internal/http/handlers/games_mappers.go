@@ -210,15 +210,16 @@ func toMetadataResponses(items []domain.MetadataItem) []metadataItemResponse {
 
 func toMetadataResponse(item domain.MetadataItem) metadataItemResponse {
 	return metadataItemResponse{
-		ID:              item.ID,
-		Name:            item.Name,
-		Slug:            item.Slug,
-		SortOrder:       item.SortOrder,
-		CreatedAt:       item.CreatedAt,
-		GameCount:       item.GameCount,
-		CoverImage:      item.CoverImage,
-		CoverCandidates: item.CoverCandidates,
-		LatestUpdatedAt: item.LatestUpdatedAt,
+		ID:                   item.ID,
+		Name:                 item.Name,
+		Slug:                 item.Slug,
+		SortOrder:            item.SortOrder,
+		CreatedAt:            item.CreatedAt,
+		GameCount:            item.GameCount,
+		CoverImage:           item.CoverImage,
+		CoverCandidates:      item.CoverCandidates,
+		BackgroundCandidates: item.BackgroundCandidates,
+		LatestUpdatedAt:      item.LatestUpdatedAt,
 	}
 }
 

@@ -112,15 +112,16 @@ type gameAssetResponse struct {
 }
 
 type metadataItemResponse struct {
-	ID              int64    `json:"id"`
-	Name            string   `json:"name"`
-	Slug            string   `json:"slug"`
-	SortOrder       int      `json:"sort_order"`
-	CreatedAt       string   `json:"created_at"`
-	GameCount       int      `json:"game_count,omitempty"`
-	CoverImage      *string  `json:"cover_image,omitempty"`
-	CoverCandidates []string `json:"cover_candidates,omitempty"`
-	LatestUpdatedAt *string  `json:"latest_updated_at,omitempty"`
+	ID                   int64    `json:"id"`
+	Name                 string   `json:"name"`
+	Slug                 string   `json:"slug"`
+	SortOrder            int      `json:"sort_order"`
+	CreatedAt            string   `json:"created_at"`
+	GameCount            int      `json:"game_count,omitempty"`
+	CoverImage           *string  `json:"cover_image,omitempty"`
+	CoverCandidates      []string `json:"cover_candidates,omitempty"`
+	BackgroundCandidates []string `json:"background_candidates,omitempty"`
+	LatestUpdatedAt      *string  `json:"latest_updated_at,omitempty"`
 }
 
 type gameFileResponse struct {
