@@ -216,13 +216,15 @@ func TestSteamServiceProxyAssetReturnsPayloadForPartialContent(t *testing.T) {
 		})},
 	}
 
-	contentType, payload, err := service.ProxyAsset("https://cdn.cloudflare.steamstatic.com/demo.jpg", "")
+	contentType, body, _, err := service.ProxyAssetStream("https://cdn.cloudflare.steamstatic.com/demo.jpg", "")
 	if err != nil {
-		t.Fatalf("ProxyAsset returned error: %v", err)
+		t.Fatalf("ProxyAssetStream returned error: %v", err)
 	}
+	defer body.Close()
 	if contentType != "image/jpeg" {
 		t.Fatalf("contentType = %q, want image/jpeg", contentType)
 	}
+	payload, _ := io.ReadAll(body)
 	if string(payload) != "asset-bytes" {
 		t.Fatalf("payload = %q, want asset-bytes", string(payload))
 	}
@@ -235,9 +237,9 @@ func TestSteamServiceProxyAssetReturnsErrorForUnexpectedStatus(t *testing.T) {
 		})},
 	}
 
-	_, _, err := service.ProxyAsset("https://cdn.cloudflare.steamstatic.com/demo.jpg", "")
+	_, _, _, err := service.ProxyAssetStream("https://cdn.cloudflare.steamstatic.com/demo.jpg", "")
 	if err == nil {
-		t.Fatalf("ProxyAsset error = nil, want failure")
+		t.Fatalf("ProxyAssetStream error = nil, want failure")
 	}
 	if err.Error() != "steam request failed with status 502" {
 		t.Fatalf("error = %q, want status failure", err.Error())
@@ -247,7 +249,7 @@ func TestSteamServiceProxyAssetReturnsErrorForUnexpectedStatus(t *testing.T) {
 func TestSteamServiceProxyAssetRejectsMissingHost(t *testing.T) {
 	service := &SteamService{}
 
-	_, _, err := service.ProxyAsset("https:///missing-host.jpg", "")
+	_, _, _, err := service.ProxyAssetStream("https:///missing-host.jpg", "")
 	if err != ErrValidation {
 		t.Fatalf("error = %v, want ErrValidation", err)
 	}
@@ -256,7 +258,7 @@ func TestSteamServiceProxyAssetRejectsMissingHost(t *testing.T) {
 func TestSteamServiceProxyAssetRejectsNonSteamHosts(t *testing.T) {
 	service := &SteamService{}
 
-	_, _, err := service.ProxyAsset("https://cdn.example.com/demo.jpg", "")
+	_, _, _, err := service.ProxyAssetStream("https://cdn.example.com/demo.jpg", "")
 	if err != ErrValidation {
 		t.Fatalf("error = %v, want ErrValidation", err)
 	}

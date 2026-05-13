@@ -8,24 +8,24 @@ import (
 	"strings"
 )
 
-func (s *SteamService) ProxyAsset(assetURL string, proxyOverride string) (string, []byte, error) {
+func (s *SteamService) ProxyAssetStream(assetURL string, proxyOverride string) (string, io.ReadCloser, int64, error) {
 	parsed, err := url.Parse(strings.TrimSpace(assetURL))
 	if err != nil {
-		return "", nil, ErrValidation
+		return "", nil, 0, ErrValidation
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return "", nil, ErrValidation
+		return "", nil, 0, ErrValidation
 	}
 	if parsed.Hostname() == "" {
-		return "", nil, ErrValidation
+		return "", nil, 0, ErrValidation
 	}
 	if !isAllowedSteamAssetHost(parsed.Hostname()) {
-		return "", nil, ErrValidation
+		return "", nil, 0, ErrValidation
 	}
 
 	req, err := http.NewRequest(http.MethodGet, parsed.String(), nil)
 	if err != nil {
-		return "", nil, err
+		return "", nil, 0, err
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0")
 	req.Header.Set("Accept", "*/*")
@@ -34,19 +34,17 @@ func (s *SteamService) ProxyAsset(assetURL string, proxyOverride string) (string
 
 	resp, err := s.doRequest(req, proxyOverride)
 	if err != nil {
-		return "", nil, err
+		return "", nil, 0, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
-		return "", nil, fmt.Errorf("steam request failed with status %d", resp.StatusCode)
+		resp.Body.Close()
+		return "", nil, 0, fmt.Errorf("steam request failed with status %d", resp.StatusCode)
 	}
 
-	payload, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", nil, err
-	}
-	return strings.TrimSpace(resp.Header.Get("Content-Type")), payload, nil
+	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
+	contentLength := resp.ContentLength
+	return contentType, resp.Body, contentLength, nil
 }
 
 func sanitizeRawURLForLog(raw string) string {

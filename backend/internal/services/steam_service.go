@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hao/game/internal/config"
@@ -139,8 +140,31 @@ func (s *SteamService) Search(query string, proxyOverride string) ([]domain.Stea
 
 func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain.SteamAssetsPreview, error) {
 	appKey := fmt.Sprintf("%d", appID)
-	primaryPayload, primaryErr := s.fetchAppDetails(appID, "schinese", proxyOverride)
-	fallbackPayload, fallbackErr := s.fetchAppDetails(appID, "english", proxyOverride)
+
+	// Fetch both locales concurrently
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var primaryPayload, fallbackPayload steamAppDetailsResponse
+	var primaryErr, fallbackErr error
+
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		payload, err := s.fetchAppDetails(appID, "schinese", proxyOverride)
+		mu.Lock()
+		primaryPayload = payload
+		primaryErr = err
+		mu.Unlock()
+	}()
+	go func() {
+		defer wg.Done()
+		payload, err := s.fetchAppDetails(appID, "english", proxyOverride)
+		mu.Lock()
+		fallbackPayload = payload
+		fallbackErr = err
+		mu.Unlock()
+	}()
+	wg.Wait()
 
 	primaryDetails, primaryOK := primaryPayload[appKey]
 	fallbackDetails, fallbackOK := fallbackPayload[appKey]
@@ -221,15 +245,25 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 		screenshotURLs = s.fetchScreenshotURLsFromStorePage(appID, proxyOverride)
 	}
 
-	// Resolve cover/banner: try old CDN patterns first, then fall back to API-provided URLs.
-	coverURL := s.resolveSteamAssetURL(appID, proxyOverride,
-		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_600x900_2x.jpg",
-		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_600x900.jpg",
-	)
-	bannerURL := s.resolveSteamAssetURL(appID, proxyOverride,
-		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_hero_2x.jpg",
-		"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_hero.jpg",
-	)
+	// Resolve cover/banner concurrently
+	var coverURL, bannerURL *string
+	var wg2 sync.WaitGroup
+	wg2.Add(2)
+	go func() {
+		defer wg2.Done()
+		coverURL = s.resolveSteamAssetURL(appID, proxyOverride,
+			"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_600x900_2x.jpg",
+			"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_600x900.jpg",
+		)
+	}()
+	go func() {
+		defer wg2.Done()
+		bannerURL = s.resolveSteamAssetURL(appID, proxyOverride,
+			"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_hero_2x.jpg",
+			"https://steamcdn-a.akamaihd.net/steam/apps/%d/library_hero.jpg",
+		)
+	}()
+	wg2.Wait()
 
 	// Use API-provided header_image as fallback — it uses hashed CDN paths that
 	// the old-style URL guessing cannot discover.

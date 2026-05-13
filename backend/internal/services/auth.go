@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/hao/game/internal/config"
@@ -24,6 +26,11 @@ import (
 const AuthCookieName = "gameatlas_admin"
 
 var ErrAuthDisabled = errors.New("authentication is not configured")
+
+type sessionCacheEntry struct {
+	valid         bool
+	checkedAtUnix int64
+}
 
 type LoginDeniedReason string
 
@@ -60,6 +67,14 @@ type AuthService struct {
 	stateTTL     time.Duration
 	sessionTTL   time.Duration
 	trackBy      string
+
+	// Session validation cache
+	sessionCache    sync.Map
+	sessionCacheTTL int64 // seconds
+
+	// Cleanup throttle
+	lastCleanupUnix atomic.Int64
+	cleanupInterval int64 // seconds
 }
 
 func NewAuthService(cfg config.Config, attemptsRepo *repositories.AuthAttemptRepository, sessionsRepo *repositories.AuthSessionRepository) *AuthService {
@@ -86,15 +101,17 @@ func NewAuthService(cfg config.Config, attemptsRepo *repositories.AuthAttemptRep
 	sessionTTL := 30 * 24 * time.Hour
 
 	return &AuthService{
-		adminPassword: strings.TrimSpace(cfg.AdminPassword),
-		attemptsRepo:  attemptsRepo,
-		sessionsRepo:  sessionsRepo,
-		maxFails:      maxFails,
-		cooldown:      cooldown,
-		failWindow:    failWindow,
-		stateTTL:      stateTTL,
-		sessionTTL:    sessionTTL,
-		trackBy:       trackBy,
+		adminPassword:   strings.TrimSpace(cfg.AdminPassword),
+		attemptsRepo:    attemptsRepo,
+		sessionsRepo:    sessionsRepo,
+		maxFails:        maxFails,
+		cooldown:        cooldown,
+		failWindow:      failWindow,
+		stateTTL:        stateTTL,
+		sessionTTL:      sessionTTL,
+		trackBy:         trackBy,
+		sessionCacheTTL: 30,
+		cleanupInterval: 300,
 	}
 }
 
@@ -199,17 +216,31 @@ func (s *AuthService) IsAdmin(session string) bool {
 		return false
 	}
 	nowUnix := time.Now().UTC().Unix()
-	_ = s.cleanupExpired(nowUnix)
+
+	// Check cache first
+	if cached, ok := s.sessionCache.Load(session); ok {
+		entry := cached.(sessionCacheEntry)
+		if nowUnix-entry.checkedAtUnix < s.sessionCacheTTL {
+			return entry.valid
+		}
+	}
+
+	// Cache miss or expired: throttle cleanup, then query DB
+	_ = s.cleanupExpiredThrottled(nowUnix)
 
 	item, err := s.loadSession(session)
 	if err != nil || item == nil {
+		s.sessionCache.Store(session, sessionCacheEntry{valid: false, checkedAtUnix: nowUnix})
 		return false
 	}
 	if item.ExpiresAtUnix <= nowUnix {
 		_ = s.deleteSession(session)
+		s.sessionCache.Store(session, sessionCacheEntry{valid: false, checkedAtUnix: nowUnix})
 		return false
 	}
-	return subtle.ConstantTimeCompare([]byte(session), []byte(item.Token)) == 1
+	valid := subtle.ConstantTimeCompare([]byte(session), []byte(item.Token)) == 1
+	s.sessionCache.Store(session, sessionCacheEntry{valid: valid, checkedAtUnix: nowUnix})
+	return valid
 }
 
 func (s *AuthService) Logout(session string) error {
@@ -217,6 +248,7 @@ func (s *AuthService) Logout(session string) error {
 	if session == "" {
 		return nil
 	}
+	s.sessionCache.Delete(session)
 	return s.deleteSession(session)
 }
 
@@ -236,6 +268,17 @@ func (s *AuthService) cleanupExpired(nowUnix int64) error {
 		}
 	}
 	return nil
+}
+
+func (s *AuthService) cleanupExpiredThrottled(nowUnix int64) error {
+	lastCleanup := s.lastCleanupUnix.Load()
+	if nowUnix-lastCleanup < s.cleanupInterval {
+		return nil
+	}
+	if !s.lastCleanupUnix.CompareAndSwap(lastCleanup, nowUnix) {
+		return nil
+	}
+	return s.cleanupExpired(nowUnix)
 }
 
 func (s *AuthService) loadAttempt(sourceKey string) (*repositories.AuthAttemptState, error) {

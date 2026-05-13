@@ -2,6 +2,8 @@ package services
 
 import (
 	"math"
+	"sync"
+	"time"
 
 	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/repositories"
@@ -10,6 +12,17 @@ import (
 type GameCatalogService struct {
 	catalogRepo              *repositories.GameCatalogRepository
 	reviewIssueOverridesRepo *repositories.ReviewIssueOverrideRepository
+	statsCache               sync.Map // key: statsCacheKey -> cachedStatsEntry
+}
+
+type statsCacheKey struct {
+	Visibility string
+	IncludeAll bool
+}
+
+type cachedStatsEntry struct {
+	stats    *domain.GameStats
+	cachedAt time.Time
 }
 
 // NewGameCatalogService wires the read-only catalog boundary used by list, stats, and pending
@@ -84,5 +97,24 @@ func (s *GameCatalogService) Stats(params domain.GamesListParams) (*domain.GameS
 	if err := normalizeListParams(&params); err != nil {
 		return nil, err
 	}
-	return s.catalogRepo.Stats(params)
+
+	key := statsCacheKey{Visibility: params.Visibility, IncludeAll: params.IncludeAll}
+	if cached, ok := s.statsCache.Load(key); ok {
+		entry := cached.(cachedStatsEntry)
+		if time.Since(entry.cachedAt) < 30*time.Second {
+			return entry.stats, nil
+		}
+	}
+
+	stats, err := s.catalogRepo.Stats(params)
+	if err != nil {
+		return nil, err
+	}
+	s.statsCache.Store(key, cachedStatsEntry{stats: stats, cachedAt: time.Now()})
+	return stats, nil
+}
+
+// InvalidateStatsCache clears the stats cache. Call this after game create/update/delete.
+func (s *GameCatalogService) InvalidateStatsCache() {
+	s.statsCache = sync.Map{}
 }

@@ -38,10 +38,14 @@ func New(cfg config.Config) (*App, error) {
 
 	gamesRepo := repositories.NewGamesRepository(sqliteDB)
 	assetReconcileService := services.NewAssetReconcileService(cfg, sqliteDB)
+	catalogRepo := repositories.NewGameCatalogRepository(gamesRepo)
+	reviewIssueOverridesRepo := repositories.NewReviewIssueOverrideRepository(sqliteDB)
+	catalogService := services.NewGameCatalogService(catalogRepo, reviewIssueOverridesRepo)
 	gameAggregateService := services.NewGameAggregateService(
 		cfg,
 		gamesRepo,
 		repositories.NewMetadataRepository(sqliteDB),
+		catalogService,
 	)
 	if processed, err := gameAggregateService.ProcessPendingAssetCleanup(100); err != nil {
 		log.Printf("asset cleanup retry failed after %d task(s): %v", processed, err)

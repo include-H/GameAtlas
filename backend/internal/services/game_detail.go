@@ -44,26 +44,19 @@ func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) 
 		return nil, ErrNotFound
 	}
 
-	screenshots, err := s.detailRepo.ListScreenshots(id)
+	allAssets, err := s.detailRepo.ListAllAssets(id)
 	if err != nil {
 		return nil, err
 	}
-	videos, err := s.detailRepo.ListVideos(id)
-	if err != nil {
-		return nil, err
+	assetsByType := make(map[string][]domain.GameAsset)
+	for _, a := range allAssets {
+		assetsByType[a.AssetType] = append(assetsByType[a.AssetType], a)
 	}
-	covers, err := s.detailRepo.ListCovers(id)
-	if err != nil {
-		return nil, err
-	}
-	logos, err := s.detailRepo.ListLogos(id)
-	if err != nil {
-		return nil, err
-	}
-	banners, err := s.detailRepo.ListBanners(id)
-	if err != nil {
-		return nil, err
-	}
+	screenshots := assetsByType["screenshot"]
+	videos := assetsByType["video"]
+	covers := assetsByType["cover"]
+	logos := assetsByType["logo"]
+	banners := assetsByType["banner"]
 	primarySeries, err := s.detailRepo.GetSeriesMetadata(id)
 	if err != nil {
 		return nil, err

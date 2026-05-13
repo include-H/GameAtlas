@@ -68,10 +68,10 @@ func (r *GamesRepository) GetByPublicID(publicID string) (*domain.Game, error) {
 			created_at,
 			updated_at
 		FROM games
-		WHERE lower(public_id) = lower(?)`
+		WHERE public_id = ?`
 
 	var game domain.Game
-	if err := r.db.Get(&game, query, strings.TrimSpace(publicID)); err != nil {
+	if err := r.db.Get(&game, query, strings.ToLower(strings.TrimSpace(publicID))); err != nil {
 		return nil, err
 	}
 
@@ -85,7 +85,7 @@ func (r *GamesRepository) ResolveIDByPublicID(publicID string) (int64, error) {
 	}
 
 	var id int64
-	if err := r.db.Get(&id, "SELECT id FROM games WHERE lower(public_id) = lower(?) LIMIT 1", trimmed); err != nil {
+	if err := r.db.Get(&id, "SELECT id FROM games WHERE public_id = ? LIMIT 1", strings.ToLower(trimmed)); err != nil {
 		return 0, err
 	}
 	return id, nil
@@ -101,6 +101,20 @@ func (r *GamesRepository) IncrementDownloads(id int64) error {
 		return fmt.Errorf("increment game downloads: %w", err)
 	}
 	return nil
+}
+
+func (r *GamesRepository) ListAllAssets(gameID int64) ([]domain.GameAsset, error) {
+	var assets []domain.GameAsset
+	err := r.db.Select(&assets, `
+		SELECT id, game_id, asset_uid, asset_type, path, sort_order, position_x, position_y, width_pct, created_at
+		FROM game_assets
+		WHERE game_id = ?
+		ORDER BY asset_type ASC, sort_order ASC, id ASC
+	`, gameID)
+	if err != nil {
+		return nil, fmt.Errorf("list all assets: %w", err)
+	}
+	return assets, nil
 }
 
 func (r *GamesRepository) listAssetsByType(gameID int64, assetType string) ([]domain.GameAsset, error) {

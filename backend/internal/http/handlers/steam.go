@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -80,19 +82,24 @@ func (h *SteamHandler) Proxy(c *gin.Context) {
 		return
 	}
 
-	contentType, payload, err := h.service.ProxyAsset(rawURL, proxy)
+	contentType, body, contentLength, err := h.service.ProxyAssetStream(rawURL, proxy)
 	if err != nil {
 		// 2026-05-09: 统一为中文错误信息
 		writeServiceError(c, err, "无效的 Steam 代理请求")
 		return
 	}
+	defer body.Close()
 
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
 	c.Header("Cache-Control", "no-store")
 	c.Header("Access-Control-Expose-Headers", "Content-Type, Content-Length")
-	c.Data(http.StatusOK, contentType, payload)
+	c.Header("Content-Type", contentType)
+	if contentLength > 0 {
+		c.Header("Content-Length", strconv.FormatInt(contentLength, 10))
+	}
+	io.Copy(c.Writer, body)
 }
 
 func parseSteamProxyQuery(c *gin.Context) (string, bool) {

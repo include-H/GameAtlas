@@ -16,6 +16,7 @@ type GameAggregateService struct {
 	assetCleanupTasksRepo *repositories.AssetCleanupTasksRepository
 	fileGuard             *files.Guard
 	assetStore            *files.AssetStore
+	catalogService        *GameCatalogService
 }
 
 // NewGameAggregateService owns aggregate writes plus their follow-up filesystem/metadata cleanup.
@@ -25,6 +26,7 @@ func NewGameAggregateService(
 	cfg config.Config,
 	gamesRepo *repositories.GamesRepository,
 	metadataRepo *repositories.MetadataRepository,
+	catalogService *GameCatalogService,
 ) *GameAggregateService {
 	return &GameAggregateService{
 		gamesRepo:             gamesRepo,
@@ -32,6 +34,7 @@ func NewGameAggregateService(
 		assetCleanupTasksRepo: repositories.NewAssetCleanupTasksRepository(gamesRepo.DB()),
 		fileGuard:             files.NewGuard(cfg.PrimaryROMRoot),
 		assetStore:            files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
+		catalogService:        catalogService,
 	}
 }
 
@@ -50,7 +53,14 @@ func (s *GameAggregateService) Create(input domain.GameCreateInput) (*domain.Gam
 	if err != nil {
 		return nil, err
 	}
-	return s.gamesRepo.Create(trimmedInput)
+	game, err := s.gamesRepo.Create(trimmedInput)
+	if err != nil {
+		return nil, err
+	}
+	if s.catalogService != nil {
+		s.catalogService.InvalidateStatsCache()
+	}
+	return game, nil
 }
 
 // Update applies aggregate changes, then performs follow-up metadata and asset cleanup work.
@@ -136,6 +146,10 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 		return nil, nil, normalizeRepoError(err)
 	}
 
+	if s.catalogService != nil {
+		s.catalogService.InvalidateStatsCache()
+	}
+
 	return game, assetDeleteWarnings, nil
 }
 
@@ -164,6 +178,10 @@ func (s *GameAggregateService) Delete(id int64) (*GameDeleteResult, error) {
 	}
 	if err := cleanupUnusedMetadata(s.metadataRepo); err != nil {
 		return nil, err
+	}
+
+	if s.catalogService != nil {
+		s.catalogService.InvalidateStatsCache()
 	}
 
 	return &GameDeleteResult{Warnings: warnings}, nil

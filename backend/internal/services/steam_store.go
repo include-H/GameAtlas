@@ -12,6 +12,16 @@ import (
 	"time"
 )
 
+var (
+	reSteamChineseDate         = regexp.MustCompile(`(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日`)
+	rePathFullDoubleEscape     = regexp.MustCompile(`"path_full":"(https:\\/\\/[^"]+)"`)
+	rePathFullSingleEscape     = regexp.MustCompile(`"path_full\\":\\"(https:\\\\/\\\\/[^"]+)\\"`)
+	reGameDescriptionSnippetDQ = regexp.MustCompile(`(?s)<div[^>]*class="[^"]*\bgame_description_snippet\b[^"]*"[^>]*>(.*?)</div>`)
+	reGameDescriptionSnippetSQ = regexp.MustCompile(`(?s)<div[^>]*class='[^']*\bgame_description_snippet\b[^']*'[^>]*>(.*?)</div>`)
+	reHTMLBreak                = regexp.MustCompile(`(?is)<br\s*/?>`)
+	reHTMLTag                  = regexp.MustCompile(`(?is)<[^>]+>`)
+)
+
 func cleanSteamNames(values []string) []string {
 	if len(values) == 0 {
 		return []string{}
@@ -73,8 +83,7 @@ func normalizeSteamReleaseDate(release *struct {
 }
 
 func parseSteamChineseDate(value string) (int, int, int, bool) {
-	pattern := regexp.MustCompile(`(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日`)
-	match := pattern.FindStringSubmatch(value)
+	match := reSteamChineseDate.FindStringSubmatch(value)
 	if len(match) != 4 {
 		return 0, 0, 0, false
 	}
@@ -219,8 +228,8 @@ func (s *SteamService) fetchScreenshotURLsFromStorePage(appID int64, proxyOverri
 	}
 
 	patterns := []*regexp.Regexp{
-		regexp.MustCompile(`"path_full":"(https:\\/\\/[^"]+)"`),
-		regexp.MustCompile(`"path_full\\":\\"(https:\\\\/\\\\/[^"]+)\\"`),
+		rePathFullDoubleEscape,
+		rePathFullSingleEscape,
 	}
 
 	seen := map[string]struct{}{}
@@ -251,8 +260,8 @@ func (s *SteamService) fetchScreenshotURLsFromStorePage(appID int64, proxyOverri
 
 func (s *SteamService) fetchDescriptionFromStorePage(appID int64, proxyOverride string) string {
 	patterns := []*regexp.Regexp{
-		regexp.MustCompile(`(?s)<div[^>]*class="[^"]*\bgame_description_snippet\b[^"]*"[^>]*>(.*?)</div>`),
-		regexp.MustCompile(`(?s)<div[^>]*class='[^']*\bgame_description_snippet\b[^']*'[^>]*>(.*?)</div>`),
+		reGameDescriptionSnippetDQ,
+		reGameDescriptionSnippetSQ,
 	}
 
 	for _, endpoint := range []string{
@@ -283,8 +292,8 @@ func (s *SteamService) fetchDescriptionFromStorePage(appID int64, proxyOverride 
 
 func stripSteamHTML(raw string) string {
 	value := html.UnescapeString(raw)
-	value = regexp.MustCompile(`(?is)<br\s*/?>`).ReplaceAllString(value, " ")
-	value = regexp.MustCompile(`(?is)<[^>]+>`).ReplaceAllString(value, " ")
+	value = reHTMLBreak.ReplaceAllString(value, " ")
+	value = reHTMLTag.ReplaceAllString(value, " ")
 	value = strings.ReplaceAll(value, "\u00a0", " ")
 	value = strings.Join(strings.Fields(value), " ")
 	return strings.TrimSpace(value)

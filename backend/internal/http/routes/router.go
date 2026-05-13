@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -45,7 +47,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	gameCatalogService := services.NewGameCatalogService(gameCatalogRepo, reviewIssueOverridesRepo)
 	gameTimelineService := services.NewGameTimelineService(gameTimelineRepo)
 	gameDetailService := services.NewGameDetailService(gameDetailRepo, gameFilesRepo, reviewIssueOverridesRepo)
-	gameAggregateService := services.NewGameAggregateService(cfg, gamesRepo, metadataRepo)
+	gameAggregateService := services.NewGameAggregateService(cfg, gamesRepo, metadataRepo, gameCatalogService)
 	gameFavoriteService := services.NewGameFavoriteService(gameDetailRepo, favoriteGamesRepo)
 	gameFilesService := services.NewGameFilesService(cfg, gameDetailRepo, gameFilesRepo)
 	windowsLaunchService := services.NewWindowsLaunchService(cfg, gameDetailRepo, gameFilesRepo)
@@ -145,10 +147,18 @@ type assetRouteGameRepository interface {
 	GetByPublicID(publicID string) (*domain.Game, error)
 }
 
+type assetRouteCacheEntry struct {
+	exists     bool
+	visibility string
+	loadedAt   time.Time
+}
+
 func registerAssetRoutes(router *gin.Engine, assetsDir string, gamesRepo assetRouteGameRepository) {
 	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
 		return
 	}
+
+	var assetCache sync.Map
 
 	router.GET("/assets/*filepath", func(c *gin.Context) {
 		rawPath := strings.TrimPrefix(c.Param("filepath"), "/")
@@ -169,15 +179,32 @@ func registerAssetRoutes(router *gin.Engine, assetsDir string, gamesRepo assetRo
 			return
 		}
 
-		game, err := gamesRepo.GetByPublicID(gamePublicID)
-		if err != nil {
-			c.Status(http.StatusNotFound)
-			return
+		// Check cache first
+		var gameExists bool
+		var gameVisibility string
+		if cached, ok := assetCache.Load(gamePublicID); ok {
+			entry := cached.(assetRouteCacheEntry)
+			if time.Since(entry.loadedAt) < 5*time.Minute {
+				gameExists = entry.exists
+				gameVisibility = entry.visibility
+			}
+		}
+
+		if !gameExists || gameVisibility == "" {
+			game, err := gamesRepo.GetByPublicID(gamePublicID)
+			if err != nil {
+				assetCache.Store(gamePublicID, assetRouteCacheEntry{exists: false, loadedAt: time.Now()})
+				c.Status(http.StatusNotFound)
+				return
+			}
+			gameExists = true
+			gameVisibility = game.Visibility
+			assetCache.Store(gamePublicID, assetRouteCacheEntry{exists: true, visibility: game.Visibility, loadedAt: time.Now()})
 		}
 
 		isAdmin, _ := c.Get("is_admin")
 		admin, _ := isAdmin.(bool)
-		if !admin && game.Visibility == domain.GameVisibilityPrivate {
+		if !admin && gameVisibility == domain.GameVisibilityPrivate {
 			c.Status(http.StatusNotFound)
 			return
 		}
@@ -200,6 +227,7 @@ func registerAssetRoutes(router *gin.Engine, assetsDir string, gamesRepo assetRo
 			}
 		}
 
+		c.Header("Cache-Control", "public, max-age=86400")
 		c.File(targetPath)
 	})
 }

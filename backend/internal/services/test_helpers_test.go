@@ -112,10 +112,14 @@ func newServicesDetailService(db *sqlx.DB) *GameDetailService {
 
 func newServicesAggregateService(db *sqlx.DB, cfg config.Config) *GameAggregateService {
 	gamesRepo := repositories.NewGamesRepository(db)
+	catalogRepo := repositories.NewGameCatalogRepository(gamesRepo)
+	reviewIssueOverridesRepo := repositories.NewReviewIssueOverrideRepository(db)
+	catalogService := NewGameCatalogService(catalogRepo, reviewIssueOverridesRepo)
 	return NewGameAggregateService(
 		cfg,
 		gamesRepo,
 		repositories.NewMetadataRepository(db),
+		catalogService,
 	)
 }
 

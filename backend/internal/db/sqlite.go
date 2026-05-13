@@ -23,6 +23,8 @@ func OpenSQLite(path string) (*sqlx.DB, error) {
 		"PRAGMA foreign_keys = ON;",
 		"PRAGMA journal_mode = WAL;",
 		"PRAGMA busy_timeout = 5000;",
+		"PRAGMA synchronous = NORMAL;",
+		"PRAGMA cache_size = -8000;",
 	}
 
 	for _, stmt := range pragmas {
@@ -31,6 +33,9 @@ func OpenSQLite(path string) (*sqlx.DB, error) {
 			return nil, fmt.Errorf("apply sqlite pragma %q: %w", stmt, err)
 		}
 	}
+
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
 
 	if err := db.Ping(); err != nil {
 		_ = db.Close()

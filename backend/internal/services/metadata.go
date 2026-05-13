@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 	"unicode"
 
 	"github.com/hao/game/internal/domain"
@@ -12,7 +14,13 @@ import (
 )
 
 type MetadataService struct {
-	repo *repositories.MetadataRepository
+	repo      *repositories.MetadataRepository
+	listCache sync.Map // table -> cachedMetadataList
+}
+
+type cachedMetadataList struct {
+	items    []domain.MetadataItem
+	cachedAt time.Time
 }
 
 type MetadataResource struct {
@@ -43,9 +51,23 @@ func NewMetadataService(repo *repositories.MetadataRepository) *MetadataService 
 }
 
 func (s *MetadataService) List(resource MetadataResource, includeAll bool, options MetadataListOptions) ([]domain.MetadataItem, error) {
-	items, err := s.repo.List(resource.Table)
-	if err != nil {
-		return nil, err
+	// Check cache first
+	var items []domain.MetadataItem
+	if cached, ok := s.listCache.Load(resource.Table); ok {
+		entry := cached.(cachedMetadataList)
+		if time.Since(entry.cachedAt) < 60*time.Second {
+			items = make([]domain.MetadataItem, len(entry.items))
+			copy(items, entry.items)
+		}
+	}
+
+	if items == nil {
+		var err error
+		items, err = s.repo.List(resource.Table)
+		if err != nil {
+			return nil, err
+		}
+		s.listCache.Store(resource.Table, cachedMetadataList{items: items, cachedAt: time.Now()})
 	}
 	if resource.Table == "series" {
 		if err := s.enrichSeriesItems(items, includeAll); err != nil {
@@ -97,7 +119,12 @@ func (s *MetadataService) Create(resource MetadataResource, input domain.Metadat
 
 	switch resource.Table {
 	case "series":
-		return s.repo.CreateSeries(cleanInput, slugValue, sortOrder)
+		result, err := s.repo.CreateSeries(cleanInput, slugValue, sortOrder)
+		if err != nil {
+			return nil, err
+		}
+		s.listCache.Delete(resource.Table)
+		return result, nil
 	case "developers", "publishers":
 		existing, err := s.repo.FindSimpleByName(resource.Table, name)
 		if err != nil {
@@ -113,7 +140,12 @@ func (s *MetadataService) Create(resource MetadataResource, input domain.Metadat
 		if existing != nil {
 			return existing, nil
 		}
-		return s.repo.CreateSimple(resource.Table, cleanInput, slugValue, sortOrder)
+		result, err := s.repo.CreateSimple(resource.Table, cleanInput, slugValue, sortOrder)
+		if err != nil {
+			return nil, err
+		}
+		s.listCache.Delete(resource.Table)
+		return result, nil
 	default:
 		return nil, fmt.Errorf("unsupported metadata resource: %s", resource.Table)
 	}

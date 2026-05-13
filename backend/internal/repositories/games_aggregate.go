@@ -360,20 +360,8 @@ func (r *GamesRepository) ensureAssetsExistTx(tx *sqlx.Tx, gameID int64, newAsse
 			continue
 		}
 
-		// Check if this UID already exists for this game.
-		var existing int
-		if err := tx.Get(&existing, `
-			SELECT COUNT(*) FROM game_assets
-			WHERE game_id = ? AND asset_uid = ?
-		`, gameID, trimmedUID); err != nil {
-			return fmt.Errorf("check existing asset %s: %w", trimmedUID, err)
-		}
-		if existing > 0 {
-			continue
-		}
-
 		if _, err := tx.Exec(`
-			INSERT INTO game_assets (game_id, asset_uid, asset_type, path, sort_order)
+			INSERT OR IGNORE INTO game_assets (game_id, asset_uid, asset_type, path, sort_order)
 			VALUES (?, ?, ?, ?, 0)
 		`, gameID, trimmedUID, trimmedType, trimmedPath); err != nil {
 			return fmt.Errorf("insert new %s asset %s: %w", trimmedType, trimmedUID, err)
@@ -387,45 +375,89 @@ func (r *GamesRepository) reorderAssetsTx(tx *sqlx.Tx, gameID int64, assetType s
 		return nil
 	}
 
-	for index, assetUID := range assetUIDs {
-		trimmedUID := strings.TrimSpace(assetUID)
+	var caseClauses strings.Builder
+	args := make([]any, 0, len(assetUIDs)*2+2)
+	for index, uid := range assetUIDs {
+		trimmedUID := strings.TrimSpace(uid)
 		if trimmedUID == "" {
 			return fmt.Errorf("empty %s asset uid", assetType)
 		}
+		if index > 0 {
+			caseClauses.WriteString(" ")
+		}
+		caseClauses.WriteString("WHEN asset_uid = ? THEN ?")
+		args = append(args, trimmedUID, index)
+	}
 
-		result, err := tx.Exec(`
-			UPDATE game_assets
-			SET sort_order = ?
-			WHERE game_id = ? AND asset_type = ? AND asset_uid = ?
-		`, index, gameID, assetType, trimmedUID)
-		if err != nil {
-			return fmt.Errorf("update %s sort order: %w", assetType, err)
-		}
-		rows, err := result.RowsAffected()
-		if err != nil {
-			return fmt.Errorf("read %s reorder rows: %w", assetType, err)
-		}
-		if rows == 0 {
-			return sql.ErrNoRows
-		}
+	uidPlaceholders := strings.Repeat("?,", len(assetUIDs))
+	uidPlaceholders = uidPlaceholders[:len(uidPlaceholders)-1]
+	args = append(args, gameID, assetType)
+	for _, uid := range assetUIDs {
+		args = append(args, strings.TrimSpace(uid))
+	}
+
+	query := fmt.Sprintf(`
+		UPDATE game_assets
+		SET sort_order = CASE %s END
+		WHERE game_id = ? AND asset_type = ? AND asset_uid IN (%s)
+	`, caseClauses.String(), uidPlaceholders)
+
+	result, err := tx.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("batch update %s sort order: %w", assetType, err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("read %s reorder rows: %w", assetType, err)
+	}
+	if rows == 0 {
+		return sql.ErrNoRows
 	}
 
 	return nil
 }
 
 func (r *GamesRepository) updateLogoPositionsTx(tx *sqlx.Tx, gameID int64, positions []domain.LogoPositionInput) error {
-	for _, lp := range positions {
+	if len(positions) == 0 {
+		return nil
+	}
+
+	var caseX, caseY, caseW strings.Builder
+	args := make([]any, 0, len(positions)*3+2)
+	for i, lp := range positions {
 		trimmedUID := strings.TrimSpace(lp.AssetUID)
 		if trimmedUID == "" {
 			continue
 		}
-		if _, err := tx.Exec(`
-			UPDATE game_assets
-			SET position_x = ?, position_y = ?, width_pct = ?
-			WHERE game_id = ? AND asset_type = 'logo' AND asset_uid = ?
-		`, lp.PositionX, lp.PositionY, lp.WidthPct, gameID, trimmedUID); err != nil {
-			return fmt.Errorf("update logo position for %s: %w", trimmedUID, err)
+		if i > 0 {
+			caseX.WriteString(" ")
+			caseY.WriteString(" ")
+			caseW.WriteString(" ")
 		}
+		caseX.WriteString("WHEN asset_uid = ? THEN ?")
+		caseY.WriteString("WHEN asset_uid = ? THEN ?")
+		caseW.WriteString("WHEN asset_uid = ? THEN ?")
+		args = append(args, trimmedUID, lp.PositionX, trimmedUID, lp.PositionY, trimmedUID, lp.WidthPct)
+	}
+
+	uidPlaceholders := strings.Repeat("?,", len(positions))
+	uidPlaceholders = uidPlaceholders[:len(uidPlaceholders)-1]
+	args = append(args, gameID)
+	for _, lp := range positions {
+		args = append(args, strings.TrimSpace(lp.AssetUID))
+	}
+
+	query := fmt.Sprintf(`
+		UPDATE game_assets
+		SET position_x = CASE %s END,
+			position_y = CASE %s END,
+			width_pct = CASE %s END
+		WHERE game_id = ? AND asset_type = 'logo' AND asset_uid IN (%s)
+	`, caseX.String(), caseY.String(), caseW.String(), uidPlaceholders)
+
+	if _, err := tx.Exec(query, args...); err != nil {
+		return fmt.Errorf("batch update logo positions: %w", err)
 	}
 	return nil
 }
