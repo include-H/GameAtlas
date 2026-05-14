@@ -39,6 +39,7 @@ const SUPPORTED_ROUTE_NAMES = new Set([
   'series-library',
   'series-detail',
   'wiki-edit',
+  'not-found',
 ])
 
 const DEFAULT_BACKGROUND =
