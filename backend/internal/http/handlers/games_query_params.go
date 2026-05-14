@@ -125,7 +125,11 @@ func decodeGamesListParams(c *gin.Context) (domain.GamesListParams, bool) {
 			writeGamesListQueryError(c, "visibility")
 			return domain.GamesListParams{}, false
 		}
-		params.Visibility = raw
+		// 2026-05-13: visibility filter is admin-only — non-admin callers must not
+		// bypass the default public-only restriction via query parameters.
+		if params.IncludeAll {
+			params.Visibility = raw
+		}
 	}
 
 	return params, true

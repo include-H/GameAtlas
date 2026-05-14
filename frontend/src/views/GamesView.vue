@@ -82,8 +82,8 @@
           </a-tag>
         </a-col>
 
-        <!-- Private Toggle -->
-        <a-col :xs="24" :sm="8" :md="1" :lg="1" :xl="1" :xxl="1" class="games-filters-col games-filters-col--favorite">
+        <!-- Private Toggle (admin only) -->
+        <a-col v-if="isAdmin" :xs="24" :sm="8" :md="1" :lg="1" :xl="1" :xxl="1" class="games-filters-col games-filters-col--favorite">
           <a-tag
             checkable
             :checked="filterPrivate"
@@ -117,7 +117,7 @@
               仅收藏
             </a-tag>
             <a-tag
-              v-if="filterPrivate"
+              v-if="filterPrivate && isAdmin"
               closable
               @close="updateRoute({ visibility: undefined })"
             >
