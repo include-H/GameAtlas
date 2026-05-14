@@ -19,10 +19,17 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response) {
-      // Handle specific error codes
       switch (error.response.status) {
         case 404:
-          console.error('Not Found: The requested resource was not found')
+          // 2026-05-13: GET 404s from page-level API calls redirect to the not-found page.
+          // Non-GET requests (POST/PUT/DELETE) and non-page resources are rejected normally.
+          if (error.config?.method === 'get') {
+            import('@/router').then(({ default: router }) => {
+              if (router.currentRoute.value.name !== 'not-found') {
+                router.replace({ name: 'not-found' })
+              }
+            })
+          }
           break
         case 500:
           console.error('Server Error: An unexpected error occurred')

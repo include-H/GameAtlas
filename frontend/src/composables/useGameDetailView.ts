@@ -4,7 +4,6 @@ let currentAbortController: AbortController | null = null
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import downloadService from '@/services/download.service'
 import { isAdminGameDetail, type AdminGameDetail, type GameVersion } from '@/services/types'
-import { getHttpStatus } from '@/utils/http-error'
 import { formatDisplayDate } from '@/utils/date'
 import { navigateBackOrFallback } from '@/utils/navigation'
 import { useGamesStore } from '@/stores/games'
@@ -243,11 +242,6 @@ export const useGameDetailView = ({
     } catch (error) {
       // Ignore aborted requests
       if (signal.aborted) return
-      const status = getHttpStatus(error)
-      if (status === 404) {
-        router.replace({ name: 'not-found' })
-        return
-      }
       // 2026-04-07: detail routing must never keep rendering the previous game when
       // the current publicId fails to load. A failed read is not the same as "show stale detail".
       hasLoadFailure.value = true
