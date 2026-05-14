@@ -81,6 +81,20 @@
             收藏
           </a-tag>
         </a-col>
+
+        <!-- Private Toggle -->
+        <a-col :xs="24" :sm="8" :md="1" :lg="1" :xl="1" :xxl="1" class="games-filters-col games-filters-col--favorite">
+          <a-tag
+            checkable
+            :checked="filterPrivate"
+            color="orangered"
+            class="favorite-toggle-tag"
+            @click="updateRoute({ visibility: filterPrivate ? undefined : 'private' })"
+          >
+            <icon-lock />
+            私有
+          </a-tag>
+        </a-col>
       </a-row>
 
       <!-- Active Filters -->
@@ -101,6 +115,13 @@
               @close="updateRoute({ favorite: undefined })"
             >
               仅收藏
+            </a-tag>
+            <a-tag
+              v-if="filterPrivate"
+              closable
+              @close="updateRoute({ visibility: undefined })"
+            >
+              仅私有
             </a-tag>
             <a-button
               class="app-text-action-btn"
@@ -228,7 +249,7 @@ import { useUiStore } from '@/stores/ui'
 import GameCard from '@/components/GameCard.vue'
 import AddGameModal from '@/components/AddGameModal.vue'
 import { useGamesView } from '@/composables/useGamesView'
-import { IconApps, IconHeart, IconHeartFill, IconList, IconPlus, IconSearch, IconSort, IconTrophy } from '@arco-design/web-vue/es/icon'
+import { IconApps, IconHeart, IconHeartFill, IconList, IconLock, IconPlus, IconSearch, IconSort, IconTrophy } from '@arco-design/web-vue/es/icon'
 
 defineOptions({
   name: 'GamesView',
@@ -246,6 +267,7 @@ const {
   currentPage,
   addGameSubmitting,
   filterFavorites,
+  filterPrivate,
   games,
   handleAddGame,
   handleAddGameSubmit,

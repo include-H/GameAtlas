@@ -120,6 +120,14 @@ func decodeGamesListParams(c *gin.Context) (domain.GamesListParams, bool) {
 		params.FavoriteOnly = value
 	}
 
+	if raw := strings.TrimSpace(c.Query("visibility")); raw != "" {
+		if raw != domain.GameVisibilityPublic && raw != domain.GameVisibilityPrivate {
+			writeGamesListQueryError(c, "visibility")
+			return domain.GamesListParams{}, false
+		}
+		params.Visibility = raw
+	}
+
 	return params, true
 }
 

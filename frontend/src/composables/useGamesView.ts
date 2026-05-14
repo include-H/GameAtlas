@@ -139,6 +139,7 @@ export const buildGamesRouteQuery = (
   if (
     newParams.search !== undefined
     || newParams.favorite !== undefined
+    || newParams.visibility !== undefined
   ) {
     query.page = '1'
   }
@@ -156,12 +157,15 @@ export const buildGamesListRequest = ({
   const sortField = parseGamesSortField(rawSort)
   const rawFavorite = readSingleQueryValue(routeQuery.favorite)
   const favorite = parseRouteBoolean(routeQuery.favorite)
+  const rawVisibility = readSingleQueryValue(routeQuery.visibility)
+  const visibility = rawVisibility === 'private' ? 'private' as const : rawVisibility === 'public' ? 'public' as const : undefined
 
   const request: { query: GameListQuery; sort?: GameSortQuery } = {
     query: {
       page,
       limit: itemsPerPage,
       search: normalizeCommittedSearchValue(readSingleQueryValue(routeQuery.search)),
+      visibility,
       favorite,
     },
   }
@@ -189,7 +193,8 @@ export const buildGamesListRequest = ({
 export const hasGamesActiveFilters = (routeQuery: LocationQuery): boolean => {
   return Boolean(
     normalizeCommittedSearchValue(readSingleQueryValue(routeQuery.search))
-    || parseRouteBoolean(routeQuery.favorite) === true,
+    || parseRouteBoolean(routeQuery.favorite) === true
+    || readSingleQueryValue(routeQuery.visibility) === 'private',
   )
 }
 
@@ -418,10 +423,15 @@ export const useGamesView = ({
     return parseRouteBoolean(route.query.favorite) === true
   })
 
+  const filterPrivate = computed(() => {
+    return readSingleQueryValue(route.query.visibility) === 'private'
+  })
+
   const hasActiveFilters = computed(() => hasGamesActiveFilters(route.query))
 
   const pageTitle = computed(() => {
     if (filterFavorites.value) return '收藏的游戏'
+    if (filterPrivate.value) return '私有游戏'
     return '所有游戏'
   })
 
@@ -648,6 +658,7 @@ export const useGamesView = ({
     currentPage,
     addGameSubmitting,
     filterFavorites,
+    filterPrivate,
     games,
     handleAddGame,
     handleAddGameSubmit,

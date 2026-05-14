@@ -73,6 +73,7 @@ function buildGamesQueryParams(params?: {
   const search = typeof params?.query?.search === 'string' ? params.query.search.trim() : ''
   if (search) queryParams.append('search', search)
   if (params?.query?.series) queryParams.append('series', String(params.query.series))
+  if (params?.query?.visibility) queryParams.append('visibility', params.query.visibility)
   // 2026-05-01: forward route-owned favorite transport values verbatim so the backend
   // decoder decides validity. Do not silently drop favorite=false or unknown strings here,
   // otherwise the client hides a bad query instead of surfacing the backend 400 contract.

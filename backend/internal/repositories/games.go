@@ -146,7 +146,7 @@ func (r *GamesRepository) buildGamesListWhere(params domain.GamesListParams, exc
 	where := []string{"1 = 1"}
 	args := map[string]any{}
 
-	if !params.IncludeAll {
+	if !params.IncludeAll || strings.TrimSpace(params.Visibility) != "" {
 		visibility := strings.TrimSpace(params.Visibility)
 		if visibility == "" {
 			visibility = domain.GameVisibilityPublic
