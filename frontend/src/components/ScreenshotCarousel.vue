@@ -45,6 +45,7 @@
                 @loadedmetadata="onVideoLoaded"
                 @playing="onVideoPlaying"
                 @ended="handleVideoEnded"
+                @volumechange="onVideoVolumeChange"
               />
               <transition name="screenshot-carousel-spinner-fade">
                 <div v-if="!videoReady" class="screenshot-carousel__video-loader">
@@ -164,6 +165,7 @@ const brokenImages = ref<string[]>([])
 const aspectResolved = ref(false)
 const imageLoaded = ref(false)
 const videoReady = ref(false)
+const userUnmuted = ref(false)
 let resizeObserver: ResizeObserver | null = null
 let imageAutoplayTimer: number | null = null
 
@@ -243,6 +245,7 @@ watch(currentMedia, (nextMedia, previousMedia) => {
   if (nextMedia.type === 'video') {
     imageLoaded.value = true
     videoReady.value = false
+    userUnmuted.value = false
     aspectResolved.value = true
     viewportAspect.value = '16 / 9'
     stopImageAutoplay()
@@ -300,10 +303,20 @@ const onVideoPlaying = () => {
   videoReady.value = true
 }
 
+const onVideoVolumeChange = () => {
+  const video = videoRef.value
+  if (!video) return
+  if (!video.muted) {
+    userUnmuted.value = true
+  }
+}
+
 const tryPlayVideo = () => {
   const video = videoRef.value
   if (!video) return
-  video.muted = true
+  if (!userUnmuted.value) {
+    video.muted = true
+  }
   const playPromise = video.play()
   if (playPromise && typeof playPromise.catch === 'function') {
     playPromise.catch(() => {
