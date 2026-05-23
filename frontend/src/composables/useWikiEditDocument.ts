@@ -48,7 +48,7 @@ export const useWikiEditDocument = ({
     try {
       await gamesStore.fetchGame(gameId)
     } catch {
-      uiStore.addAlert('Failed to load game', 'error')
+      uiStore.addAlert('加载游戏失败', 'error')
       await onLoadGameFailed()
       return false
     }

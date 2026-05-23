@@ -218,7 +218,7 @@ func TestDownloadsHandlerLaunchScriptReturnsBadRequestWhenSMBConfigMissing(t *te
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), services.ErrMissingSMBConfig.Error()) {
+	if !strings.Contains(recorder.Body.String(), "启动脚本配置不完整") {
 		t.Fatalf("body = %s, want missing SMB config error", recorder.Body.String())
 	}
 }

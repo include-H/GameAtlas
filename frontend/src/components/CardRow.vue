@@ -116,7 +116,7 @@ const props = withDefaults(defineProps<Props>(), {
   showViewAll: true,
   viewAllRoute: '/',
   showScrollButtons: true,
-  emptyMessage: 'No items found',
+  emptyMessage: '暂无数据',
 })
 
 const router = useRouter()

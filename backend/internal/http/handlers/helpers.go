@@ -86,11 +86,11 @@ func writeServiceError(c *gin.Context, err error, validationMessage string) {
 		writeJSONError(c, http.StatusBadRequest, validationMessage)
 	case errors.Is(err, services.ErrUpstream):
 		// 2026-05-09: 统一为中文错误信息
-		writeJSONError(c, http.StatusBadGateway, err.Error())
+		writeJSONError(c, http.StatusBadGateway, "上游服务请求失败")
 	case errors.Is(err, services.ErrMissingConfig):
-		writeJSONError(c, http.StatusBadRequest, err.Error())
+		writeJSONError(c, http.StatusBadRequest, "服务配置不完整")
 	case errors.Is(err, services.ErrInvalidLaunchFile), errors.Is(err, services.ErrMissingSMBConfig):
-		writeJSONError(c, http.StatusBadRequest, err.Error())
+		writeJSONError(c, http.StatusBadRequest, "启动脚本配置不完整")
 	default:
 		// 2026-05-09: 统一为中文错误信息 (internal server error)
 		writeJSONError(c, http.StatusInternalServerError, "服务器内部错误")

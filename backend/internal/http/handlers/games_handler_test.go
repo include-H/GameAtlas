@@ -1010,7 +1010,7 @@ func TestGamesHandlerUpdateAggregateReturnsBadRequestWhenPrimaryROMRootMissing(t
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"PRIMARY_ROM_ROOT is not configured"`) {
+	if !strings.Contains(recorder.Body.String(), `"error":"服务配置不完整"`) {
 		t.Fatalf("body = %s, want missing PRIMARY_ROM_ROOT error", recorder.Body.String())
 	}
 }

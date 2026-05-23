@@ -90,8 +90,8 @@ func TestWriteServiceError(t *testing.T) {
 		{name: "forbidden path", err: services.ErrForbiddenPath, status: http.StatusForbidden, msg: "文件路径超出允许范围"},
 		{name: "missing file", err: services.ErrMissingFile, status: http.StatusBadRequest, msg: "注册文件不可用"},
 		{name: "validation", err: services.ErrValidation, status: http.StatusBadRequest, msg: "bad payload"},
-		{name: "upstream", err: services.ErrUpstream, status: http.StatusBadGateway, msg: services.ErrUpstream.Error()},
-		{name: "missing config", err: services.ErrMissingConfig, status: http.StatusBadRequest, msg: services.ErrMissingConfig.Error()},
+		{name: "upstream", err: services.ErrUpstream, status: http.StatusBadGateway, msg: "上游服务请求失败"},
+		{name: "missing config", err: services.ErrMissingConfig, status: http.StatusBadRequest, msg: "服务配置不完整"},
 		{name: "internal", err: errors.New("boom"), status: http.StatusInternalServerError, msg: "服务器内部错误"},
 	}
 
