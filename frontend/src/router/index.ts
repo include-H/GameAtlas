@@ -38,6 +38,18 @@ const router = createRouter({
   routes,
 })
 
+// 2026-05-15: Edge 最小化 bug workaround —— Edge 在 visibilitychange 事件中
+// 调用 history.replaceState 会触发内部"页面激活"机制，导致最小化后立刻弹回。
+// Vue Router 在 visibilitychange 中调用 replaceState 更新历史状态，
+// 其他浏览器正常，唯独 Edge 有此问题。暂时拦截 replaceState 的 state 参数。
+// 参考：https://www.cnblogs.com/misillas/p/19614838
+if (typeof window !== 'undefined' && /Edg\//.test(navigator.userAgent)) {
+  const originalReplaceState = window.history.replaceState.bind(window.history)
+  window.history.replaceState = (_state: unknown, _title: string, url?: string | URL | null) => {
+    originalReplaceState(null, '', url)
+  }
+}
+
 const isCompactNavigationViewport = () => {
   if (typeof window === 'undefined') return false
   return window.innerWidth < 992
