@@ -66,7 +66,7 @@ func (h *SteamGridDBHandler) Search(c *gin.Context) {
 		writeJSONError(c, http.StatusBadGateway, "SteamGridDB 搜索失败")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": results})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamGridDBGameResponses(results)})
 }
 
 func (h *SteamGridDBHandler) GetGridsByGameID(c *gin.Context) {
@@ -98,7 +98,7 @@ func (h *SteamGridDBHandler) handleImagesByGameID(c *gin.Context, fetch func(int
 		writeJSONError(c, http.StatusBadGateway, "SteamGridDB 请求失败")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": images})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamGridDBImageResponses(images)})
 }
 
 func (h *SteamGridDBHandler) handleImages(c *gin.Context, fetch func(int64) ([]services.SteamGridDBImage, error)) {
@@ -118,5 +118,5 @@ func (h *SteamGridDBHandler) handleImages(c *gin.Context, fetch func(int64) ([]s
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": images})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamGridDBImageResponses(images)})
 }

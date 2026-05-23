@@ -76,6 +76,7 @@ declare module 'vue' {
     GameMediaSection: typeof import('./components/edit-game/GameMediaSection.vue')['default']
     LogoSelectorModal: typeof import('./components/edit-game/import-modals/LogoSelectorModal.vue')['default']
     MarkdownRenderer: typeof import('./components/MarkdownRenderer.vue')['default']
+    MediaScreenshotSection: typeof import('./components/edit-game/MediaScreenshotSection.vue')['default']
     Pupil: typeof import('./components/login/Pupil.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

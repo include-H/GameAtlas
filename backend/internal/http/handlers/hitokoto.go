@@ -72,8 +72,7 @@ func (h *HitokotoHandler) Get(c *gin.Context) {
 	case "text":
 		c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(sentence.Hitokoto))
 	default:
-		// 2026-05-09: HitokotoSentence 是外部 API 透传对象，结构简单且外部依赖性强，无需额外 DTO 转换。
-		c.JSON(http.StatusOK, sentence)
+		c.JSON(http.StatusOK, toHitokotoSentenceResponse(sentence))
 	}
 }
 

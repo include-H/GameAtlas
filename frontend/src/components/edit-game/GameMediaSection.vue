@@ -214,91 +214,17 @@
         </div>
       </section>
 
-      <section class="media-block media-block--screenshots">
-        <div class="media-block__title">游戏截图</div>
-        <div
-          v-if="screenshots.length === 0"
-          class="media-frame media-frame--screenshots"
-        >
-          <div
-            class="media-empty-action"
-            role="button"
-            tabindex="0"
-            @click="emit('open-screenshot-selector')"
-          >
-            <icon-image class="media-empty-icon" />
-            <span class="media-empty-title">未设置截图</span>
-            <span class="media-empty-subtitle">点击添加截图</span>
-          </div>
-        </div>
-        <div v-else class="media-frame media-frame--screenshots screenshots-frame">
-          <div ref="screenshotsScrollRef" class="screenshots-scroll" @dragover="onScreenshotsDragOver" @dragend="onScreenshotsDragEnd">
-            <a-image-preview-group infinite>
-              <div class="screenshots-grid">
-                <div
-                  v-for="screenshot in screenshots"
-                  :key="screenshot.asset_uid || screenshot.client_key"
-                  class="screenshot-thumb"
-                  :class="{
-                    'is-dragging': draggedScreenshotKey === screenshot.client_key,
-                    'is-drop-target': dragOverScreenshotKey === screenshot.client_key,
-                  }"
-                  @dragenter.prevent="emit('screenshot-drag-enter', screenshot.client_key)"
-                  @dragover.prevent
-                  @drop.prevent="emit('screenshot-drop', screenshot.client_key)"
-                >
-                  <a-image
-                    :src="screenshot.path"
-                    width="100%"
-                    height="100%"
-                    fit="contain"
-                    hide-footer
-                  />
-                  <div class="screenshot-overlay">
-                    <div class="screenshot-overlay-actions">
-                      <a-button
-                        class="app-text-action-btn media-action-button screenshot-drag-handle"
-                        type="text"
-                        shape="circle"
-                        size="small"
-                        html-type="button"
-                        title="拖拽排序"
-                        draggable="true"
-                        @dragstart="emit('screenshot-drag-start', screenshot.client_key)"
-                        @dragend="emit('screenshot-drag-end')"
-                      >
-                        <icon-drag-arrow />
-                      </a-button>
-                      <a-button
-                        class="app-text-action-btn media-action-button"
-                        type="text"
-                        shape="circle"
-                        size="small"
-                        html-type="button"
-                        title="管理截图"
-                        @click.stop="emit('open-screenshot-selector')"
-                      >
-                        <icon-settings />
-                      </a-button>
-                      <a-button
-                        class="app-text-action-btn media-action-button media-action-button--danger"
-                        type="text"
-                        status="danger"
-                        shape="circle"
-                        size="small"
-                        html-type="button"
-                        @click.stop="emit('remove-screenshot', screenshot.client_key)"
-                      >
-                        <icon-delete />
-                      </a-button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </a-image-preview-group>
-          </div>
-        </div>
-      </section>
+      <MediaScreenshotSection
+        :screenshots="screenshots"
+        :dragged-screenshot-key="draggedScreenshotKey"
+        :drag-over-screenshot-key="dragOverScreenshotKey"
+        @open-screenshot-selector="emit('open-screenshot-selector')"
+        @remove-screenshot="(key) => emit('remove-screenshot', key)"
+        @screenshot-drag-start="(key) => emit('screenshot-drag-start', key)"
+        @screenshot-drag-enter="(key) => emit('screenshot-drag-enter', key)"
+        @screenshot-drop="(key) => emit('screenshot-drop', key)"
+        @screenshot-drag-end="emit('screenshot-drag-end')"
+      />
 
       <section class="media-block media-block--video">
         <div class="media-block__title-row">
@@ -347,8 +273,8 @@
 </template>
 
 <script setup lang="ts">
-import { IconDelete, IconDragArrow, IconImage, IconSettings, IconStar, IconUpload } from '@arco-design/web-vue/es/icon'
-import { ref, onBeforeUnmount } from 'vue'
+import { IconDelete, IconImage, IconSettings, IconStar, IconUpload } from '@arco-design/web-vue/es/icon'
+import MediaScreenshotSection from './MediaScreenshotSection.vue'
 
 interface EditableCover {
   asset_uid?: string
@@ -402,55 +328,6 @@ defineProps<{
   logoImage: string
 }>()
 
-const screenshotsScrollRef = ref<HTMLElement | null>(null)
-let autoScrollRaf = 0
-
-const SCROLL_ZONE = 60
-const SCROLL_SPEED = 12
-
-const onScreenshotsDragOver = (e: DragEvent) => {
-  const container = screenshotsScrollRef.value
-  if (!container) return
-
-  const rect = container.getBoundingClientRect()
-  const y = e.clientY
-
-  if (y < rect.top || y > rect.bottom) {
-    cancelAnimationFrame(autoScrollRaf)
-    autoScrollRaf = 0
-    return
-  }
-
-  if (y < rect.top + SCROLL_ZONE) {
-    if (!autoScrollRaf) {
-      const tick = () => {
-        container.scrollTop -= SCROLL_SPEED
-        autoScrollRaf = requestAnimationFrame(tick)
-      }
-      autoScrollRaf = requestAnimationFrame(tick)
-    }
-  } else if (y > rect.bottom - SCROLL_ZONE) {
-    if (!autoScrollRaf) {
-      const tick = () => {
-        container.scrollTop += SCROLL_SPEED
-        autoScrollRaf = requestAnimationFrame(tick)
-      }
-      autoScrollRaf = requestAnimationFrame(tick)
-    }
-  } else {
-    cancelAnimationFrame(autoScrollRaf)
-    autoScrollRaf = 0
-  }
-}
-
-const onScreenshotsDragEnd = () => {
-  cancelAnimationFrame(autoScrollRaf)
-  autoScrollRaf = 0
-}
-
-onBeforeUnmount(() => {
-  cancelAnimationFrame(autoScrollRaf)
-})
 
 </script>
 
@@ -526,8 +403,7 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
 }
 
-.media-frame--cover,
-.media-frame--screenshots {
+.media-frame--cover {
   height: var(--media-frame-height);
   min-height: var(--media-frame-height);
 }
@@ -601,8 +477,7 @@ onBeforeUnmount(() => {
 
 
 .media-overlay-actions,
-.cover-overlay-actions,
-.screenshot-overlay-actions {
+.cover-overlay-actions {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -624,25 +499,15 @@ onBeforeUnmount(() => {
   transform: scale(1.06);
 }
 
-.cover-overlay-actions .media-action-button,
-.screenshot-overlay-actions .media-action-button {
+.cover-overlay-actions .media-action-button {
   width: 28px;
   height: 28px;
   min-width: 28px;
   font-size: 12px;
 }
 
-.screenshot-drag-handle {
-  cursor: grab;
-}
-
-.screenshot-drag-handle:active {
-  cursor: grabbing;
-}
-
 .media-frame:hover .media-overlay,
-.cover-thumb:hover .cover-overlay,
-.screenshot-thumb:hover .screenshot-overlay {
+.cover-thumb:hover .cover-overlay {
   opacity: 1;
 }
 
@@ -657,8 +522,7 @@ onBeforeUnmount(() => {
 
 .media-frame :deep(.arco-image),
 .cover-thumb :deep(.arco-image),
-.logo-frame :deep(.arco-image),
-.screenshot-thumb :deep(.arco-image) {
+.logo-frame :deep(.arco-image) {
   display: flex;
   width: 100%;
   height: 100%;
@@ -666,8 +530,7 @@ onBeforeUnmount(() => {
 
 .media-frame :deep(.arco-image-img),
 .cover-thumb :deep(.arco-image-img),
-.logo-frame :deep(.arco-image-img),
-.screenshot-thumb :deep(.arco-image-img) {
+.logo-frame :deep(.arco-image-img) {
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -675,8 +538,7 @@ onBeforeUnmount(() => {
 }
 
 .covers-frame,
-.banners-frame,
-.screenshots-frame {
+.banners-frame {
   align-items: stretch;
   justify-content: stretch;
   padding: var(--media-panel-padding);
@@ -684,8 +546,7 @@ onBeforeUnmount(() => {
 }
 
 .covers-scroll,
-.banners-scroll,
-.screenshots-scroll {
+.banners-scroll {
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -693,8 +554,7 @@ onBeforeUnmount(() => {
   overflow-y: auto;
 }
 
-.covers-scroll :deep(.arco-image-preview-group),
-.screenshots-scroll :deep(.arco-image-preview-group) {
+.covers-scroll :deep(.arco-image-preview-group) {
   display: block;
   width: 100%;
 }
@@ -707,13 +567,6 @@ onBeforeUnmount(() => {
 }
 
 .banners-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
-  gap: 12px;
-}
-
-.screenshots-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
@@ -806,8 +659,7 @@ onBeforeUnmount(() => {
   z-index: 1;
 }
 
-.cover-overlay,
-.screenshot-overlay {
+.cover-overlay {
   position: absolute;
   inset: 0;
   display: flex;
@@ -824,31 +676,6 @@ onBeforeUnmount(() => {
   justify-content: center;
 }
 
-.screenshot-thumb {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border-radius: 10px;
-  overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
-    color-mix(in srgb, var(--app-card-surface) 90%, transparent);
-  cursor: grab;
-  position: relative;
-  border: 1px solid var(--app-card-border);
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
-}
-
-.screenshot-thumb.is-dragging {
-  opacity: 0.45;
-  transform: scale(0.98);
-  cursor: grabbing;
-}
-
-.screenshot-thumb.is-drop-target {
-  border-color: rgb(var(--primary-6));
-  box-shadow: 0 0 0 1px rgba(var(--primary-6), 0.35);
-}
-
 @media (max-width: 768px) {
   .media-section-list {
     --media-gap: 16px;
@@ -861,8 +688,7 @@ onBeforeUnmount(() => {
   }
 
   .covers-grid,
-  .banners-grid,
-  .screenshots-grid {
+  .banners-grid {
     grid-template-columns: 1fr;
   }
 }
