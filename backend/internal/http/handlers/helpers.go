@@ -88,6 +88,8 @@ func writeServiceError(c *gin.Context, err error, validationMessage string) {
 		writeJSONError(c, http.StatusBadGateway, err.Error())
 	case errors.Is(err, services.ErrMissingConfig):
 		writeJSONError(c, http.StatusBadRequest, err.Error())
+	case errors.Is(err, services.ErrInvalidLaunchFile), errors.Is(err, services.ErrMissingSMBConfig):
+		writeJSONError(c, http.StatusBadRequest, err.Error())
 	default:
 		// 2026-05-09: 统一为中文错误信息 (internal server error)
 		writeJSONError(c, http.StatusInternalServerError, "服务器内部错误")

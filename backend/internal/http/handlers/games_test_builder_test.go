@@ -18,9 +18,9 @@ func newSplitGamesHandlerForTest(cfg config.Config, db *sqlx.DB) *GamesHandler {
 	catalogService := services.NewGameCatalogService(repositories.NewGameCatalogRepository(gamesRepo), reviewRepo)
 	return NewSplitGamesHandler(
 		catalogService,
-		services.NewGameTimelineService(repositories.NewGameTimelineRepository(gamesRepo)),
-		services.NewGameDetailService(repositories.NewGameDetailRepository(gamesRepo), gameFilesRepo, reviewRepo),
+		services.NewGameTimelineService(gamesRepo),
+		services.NewGameDetailService(gamesRepo, gameFilesRepo, reviewRepo),
 		services.NewGameAggregateService(cfg, gamesRepo, metadataRepo, catalogService),
-		services.NewGameFavoriteService(repositories.NewGameDetailRepository(gamesRepo), favoriteRepo),
+		services.NewGameFavoriteService(gamesRepo, favoriteRepo),
 	)
 }

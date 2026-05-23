@@ -3,7 +3,7 @@
     <div class="screenshot-carousel__viewport" :style="viewportStyle" ref="viewportRef">
       <a-button
         v-if="mediaItems.length > 1"
-        class="screenshot-carousel__arrow screenshot-carousel__arrow--prev"
+        class="screenshot-carousel__arrow screenshot-carousel__arrow--prev app-text-action-btn"
         type="text"
         shape="circle"
         @click="prevImage"
@@ -78,7 +78,7 @@
 
       <a-button
         v-if="mediaItems.length > 1"
-        class="screenshot-carousel__arrow screenshot-carousel__arrow--next"
+        class="screenshot-carousel__arrow screenshot-carousel__arrow--next app-text-action-btn"
         type="text"
         shape="circle"
         @click="nextImage"

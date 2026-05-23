@@ -625,6 +625,7 @@ const handleBannerCropConfirm = async (blob: Blob) => {
     }
   } catch (err) {
     console.error('Banner crop upload failed:', err)
+    uiStore.addAlert('横幅裁剪上传失败', 'error')
   }
 }
 </script>

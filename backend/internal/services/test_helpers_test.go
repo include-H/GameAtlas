@@ -104,7 +104,7 @@ func newServicesCatalogService(db *sqlx.DB) *GameCatalogService {
 func newServicesDetailService(db *sqlx.DB) *GameDetailService {
 	gamesRepo := repositories.NewGamesRepository(db)
 	return NewGameDetailService(
-		repositories.NewGameDetailRepository(gamesRepo),
+		gamesRepo,
 		repositories.NewGameFilesRepository(db),
 		repositories.NewReviewIssueOverrideRepository(db),
 	)
@@ -157,10 +157,7 @@ func mustLoadServicesGame(t *testing.T, db *sqlx.DB, gameID int64) domain.Game {
 			wiki_content,
 			downloads,
 			NULL AS primary_screenshot,
-			0 AS screenshot_count,
-			0 AS file_count,
-			0 AS developer_count,
-			0 AS publisher_count,
+			logo_visible,
 			0 AS is_favorite,
 			created_at,
 			updated_at
@@ -173,10 +170,10 @@ func mustLoadServicesGame(t *testing.T, db *sqlx.DB, gameID int64) domain.Game {
 	return game
 }
 
-func mustLoadAssetCleanupTask(t *testing.T, db *sqlx.DB, assetPath string) domain.AssetCleanupTask {
+func mustLoadAssetCleanupTask(t *testing.T, db *sqlx.DB, assetPath string) repositories.AssetCleanupTask {
 	t.Helper()
 
-	var task domain.AssetCleanupTask
+	var task repositories.AssetCleanupTask
 	if err := db.Get(&task, `
 		SELECT id, asset_path, source, last_error, attempt_count, created_at, updated_at
 		FROM asset_cleanup_tasks

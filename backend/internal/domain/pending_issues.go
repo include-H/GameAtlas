@@ -216,18 +216,18 @@ type pendingIssueGameFields struct {
 	PublisherCount    int64
 }
 
-func EvaluatePendingIssues(game Game, ignoredReasons map[PendingIssueDetailKey]*string) PendingIssueEvaluation {
+func EvaluatePendingIssues(game Game, screenshotCount int64, logoCount int64, fileCount int64, developerCount int64, publisherCount int64, ignoredReasons map[PendingIssueDetailKey]*string) PendingIssueEvaluation {
 	return evaluatePendingIssues(pendingIssueGameFields{
 		Summary:           game.Summary,
 		CoverImage:        game.CoverImage,
 		BannerImage:       game.BannerImage,
 		WikiContent:       game.WikiContent,
 		PrimaryScreenshot: game.PrimaryScreenshot,
-		ScreenshotCount:   game.ScreenshotCount,
-		LogoCount:         game.LogoCount,
-		FileCount:         game.FileCount,
-		DeveloperCount:    game.DeveloperCount,
-		PublisherCount:    game.PublisherCount,
+		ScreenshotCount:   screenshotCount,
+		LogoCount:         logoCount,
+		FileCount:         fileCount,
+		DeveloperCount:    developerCount,
+		PublisherCount:    publisherCount,
 	}, ignoredReasons)
 }
 

@@ -73,9 +73,6 @@ const steamService = {
       releaseDate: data.release_date || '',
       developers: data.developers ?? [],
       publishers: data.publishers ?? [],
-      previewVideos: [],
-      genres: [],
-      tags: [],
       screenshots: (data.screenshot_urls ?? []).map((url) => proxySteamAssetUrl(url)),
       // 2026-04-06: keep Steam asset semantics aligned with the backend preview contract.
       // Impact: the frontend only carries cover/banner/screenshots here and does not invent

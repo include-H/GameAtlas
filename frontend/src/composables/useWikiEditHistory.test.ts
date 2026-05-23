@@ -22,12 +22,14 @@ describe('useWikiEditHistory', () => {
     const entries: WikiHistoryEntry[] = [
       {
         id: 2,
+        game_id: 1,
         content: 'latest',
         change_summary: 'latest summary',
         created_at: '2026-04-03T10:00:00Z',
       },
       {
         id: 1,
+        game_id: 1,
         content: 'older',
         change_summary: 'older summary',
         created_at: '2026-04-02T10:00:00Z',
@@ -68,6 +70,7 @@ describe('useWikiEditHistory', () => {
 
     history.selectedHistory.value = {
       id: 1,
+      game_id: 1,
       content: 'restored content',
       created_at: '2026-04-01T10:00:00Z',
     }

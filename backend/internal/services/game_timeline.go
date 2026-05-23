@@ -8,11 +8,11 @@ import (
 )
 
 type GameTimelineService struct {
-	timelineRepo *repositories.GameTimelineRepository
+	gamesRepo *repositories.GamesRepository
 }
 
-func NewGameTimelineService(timelineRepo *repositories.GameTimelineRepository) *GameTimelineService {
-	return &GameTimelineService{timelineRepo: timelineRepo}
+func NewGameTimelineService(gamesRepo *repositories.GamesRepository) *GameTimelineService {
+	return &GameTimelineService{gamesRepo: gamesRepo}
 }
 
 // List returns one page of the release timeline with a cursor for the next page.
@@ -21,7 +21,7 @@ func (s *GameTimelineService) List(params domain.GamesTimelineParams) (*GamesTim
 		return nil, err
 	}
 
-	games, err := s.timelineRepo.List(params)
+	games, err := s.gamesRepo.ListTimeline(params)
 	if err != nil {
 		return nil, err
 	}

@@ -20,12 +20,7 @@ type Game struct {
 	WikiContent       *string `db:"wiki_content"`
 	Downloads         int64   `db:"downloads"`
 	PrimaryScreenshot *string `db:"primary_screenshot"`
-	ScreenshotCount   int64   `db:"screenshot_count"`
-	LogoCount         int64   `db:"logo_count"`
 	LogoVisible       bool    `db:"logo_visible"`
-	FileCount         int64   `db:"file_count"`
-	DeveloperCount    int64   `db:"developer_count"`
-	PublisherCount    int64   `db:"publisher_count"`
 	IsFavorite        bool    `db:"is_favorite"`
 	CreatedAt         string `db:"created_at"`
 	UpdatedAt         string `db:"updated_at"`
@@ -232,10 +227,10 @@ type GameAggregateUpdateInput struct {
 }
 
 type LogoPositionInput struct {
-	AssetUID  string   `json:"asset_uid"`
-	PositionX *float64 `json:"position_x"`
-	PositionY *float64 `json:"position_y"`
-	WidthPct  *float64 `json:"width_pct"`
+	AssetUID  string
+	PositionX *float64
+	PositionY *float64
+	WidthPct  *float64
 }
 
 type GameAggregateAssetsInput struct {

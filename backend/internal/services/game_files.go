@@ -2,7 +2,10 @@ package services
 
 import (
 	"errors"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/domain"
@@ -21,10 +24,18 @@ type gameFilesGameRepository interface {
 	IncrementDownloads(id int64) error
 }
 
+const downloadRecordWindow = 10 * time.Minute
+
 type GameFilesService struct {
 	gamesRepo     gameFilesGameRepository
 	gameFilesRepo *repositories.GameFilesRepository
 	fileGuard     *files.Guard
+	// Download stats only need lightweight single-process dedupe for this app's
+	// main use case: preventing accidental double-counts from repeated clicks by
+	// the same person. This is intentionally in-memory and approximate, not a
+	// cross-restart or multi-instance guarantee.
+	downloadDedupeMu sync.Mutex
+	downloadDedupe   map[string]time.Time
 }
 
 type DownloadFile struct {
@@ -40,6 +51,7 @@ func NewGameFilesService(cfg config.Config, gamesRepo gameFilesGameRepository, g
 		gamesRepo:     gamesRepo,
 		gameFilesRepo: gameFilesRepo,
 		fileGuard:     files.NewGuard(cfg.PrimaryROMRoot),
+		downloadDedupe: make(map[string]time.Time),
 	}
 }
 
@@ -95,6 +107,33 @@ func (s *GameFilesService) GetDownloadFile(gameID, fileID int64, includeAll bool
 		SizeBytes:    resolved.SizeBytes,
 		ModTime:      resolved.ModTime,
 	}, nil
+}
+
+// ShouldRecordDownload returns true if this download should be counted, using an
+// in-memory time-window dedupe keyed by source + game + file. Repeated requests
+// within the window are suppressed to absorb accidental double-clicks.
+func (s *GameFilesService) ShouldRecordDownload(sourceKey string, gameID, fileID int64) bool {
+	s.downloadDedupeMu.Lock()
+	defer s.downloadDedupeMu.Unlock()
+
+	now := time.Now().UTC()
+
+	// Best-effort cleanup for the in-memory dedupe window. We do not persist this
+	// state because the goal is only to absorb local click bursts, not to enforce
+	// stable rate limiting semantics across process restarts or deployments.
+	for key, expiresAt := range s.downloadDedupe {
+		if !expiresAt.After(now) {
+			delete(s.downloadDedupe, key)
+		}
+	}
+
+	recordKey := sourceKey + ":" + strconv.FormatInt(gameID, 10) + ":" + strconv.FormatInt(fileID, 10)
+	if expiresAt, exists := s.downloadDedupe[recordKey]; exists && expiresAt.After(now) {
+		return false
+	}
+
+	s.downloadDedupe[recordKey] = now.Add(downloadRecordWindow)
+	return true
 }
 
 func (s *GameFilesService) RecordDownload(gameID, fileID int64, includeAll bool) error {

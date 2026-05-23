@@ -46,15 +46,10 @@ func TestEvaluatePendingIssuesUsesDomainSeverityRules(t *testing.T) {
 		BannerImage:       &ready,
 		Summary:           &ready,
 		PrimaryScreenshot: &ready,
-		ScreenshotCount:   1,
-		LogoCount:         1,
-		FileCount:         0,
-		DeveloperCount:    1,
-		PublisherCount:    1,
 		WikiContent:       &ready,
 	}
 
-	evaluation := EvaluatePendingIssues(game, nil)
+	evaluation := EvaluatePendingIssues(game, 1, 1, 0, 1, 1, nil)
 	if !evaluation.Severe {
 		t.Fatalf("evaluation.severe = false, want true when missing files is visible")
 	}

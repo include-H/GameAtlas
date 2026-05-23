@@ -6,7 +6,6 @@ export interface DirectoryItem {
   path: string
   type: 'file' | 'directory'
   size?: number | null
-  extension?: string
 }
 
 interface DirectoryListResponse {

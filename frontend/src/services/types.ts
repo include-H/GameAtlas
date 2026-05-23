@@ -73,6 +73,11 @@ export interface Developer {
   slug: string
   sort_order: number
   created_at: string
+  game_count?: number
+  cover_image?: string | null
+  cover_candidates?: string[]
+  background_candidates?: string[]
+  latest_updated_at?: string | null
 }
 
 export interface Publisher {
@@ -81,6 +86,11 @@ export interface Publisher {
   slug: string
   sort_order: number
   created_at: string
+  game_count?: number
+  cover_image?: string | null
+  cover_candidates?: string[]
+  background_candidates?: string[]
+  latest_updated_at?: string | null
 }
 
 
@@ -331,18 +341,13 @@ export interface SteamGameSearchResult {
 
 export interface SteamGameDetails {
   name: string
-  originalName?: string
   description: string
   releaseDate: string
   developers: string[]
   publishers: string[]
-  previewVideos: Array<{ url: string; name: string; isDash: boolean }>
-  genres: string[]
-  tags: string[]
   screenshots: string[]
   coverImage: string
   bannerImage?: string
-  website?: string
 }
 
 export interface ReviewIssueOverride {

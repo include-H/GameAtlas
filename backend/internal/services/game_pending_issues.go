@@ -48,9 +48,9 @@ func attachPendingIssues(games []domain.GameListItem, reviewIssueOverridesRepo *
 	return nil
 }
 
-func getPendingIssueEvaluation(game domain.Game, reviewIssueOverridesRepo *repositories.ReviewIssueOverrideRepository) (*domain.PendingIssueEvaluation, error) {
+func getPendingIssueEvaluation(game domain.Game, screenshotCount int64, logoCount int64, fileCount int64, developerCount int64, publisherCount int64, reviewIssueOverridesRepo *repositories.ReviewIssueOverrideRepository) (*domain.PendingIssueEvaluation, error) {
 	if reviewIssueOverridesRepo == nil {
-		evaluation := domain.EvaluatePendingIssues(game, nil)
+		evaluation := domain.EvaluatePendingIssues(game, screenshotCount, logoCount, fileCount, developerCount, publisherCount, nil)
 		return &evaluation, nil
 	}
 
@@ -67,6 +67,6 @@ func getPendingIssueEvaluation(game domain.Game, reviewIssueOverridesRepo *repos
 		ignoredReasons[domain.PendingIssueDetailKey(item.IssueKey)] = item.Reason
 	}
 
-	evaluation := domain.EvaluatePendingIssues(game, ignoredReasons)
+	evaluation := domain.EvaluatePendingIssues(game, screenshotCount, logoCount, fileCount, developerCount, publisherCount, ignoredReasons)
 	return &evaluation, nil
 }

@@ -1,12 +1,10 @@
 package handlers
 
 import (
-	"errors"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -19,22 +17,13 @@ type DownloadsHandler struct {
 	service       *services.GameFilesService
 	windowsLaunch *services.WindowsLaunchService
 	authService   *services.AuthService
-	// Download stats only need lightweight single-process dedupe for this app's
-	// main use case: preventing accidental double-counts from repeated clicks by
-	// the same person. This is intentionally in-memory and approximate, not a
-	// cross-restart or multi-instance guarantee.
-	downloadDedupeMu sync.Mutex
-	downloadDedupe   map[string]time.Time
 }
-
-const downloadRecordWindow = 10 * time.Minute
 
 func NewDownloadsHandler(service *services.GameFilesService, windowsLaunch *services.WindowsLaunchService, authService *services.AuthService) *DownloadsHandler {
 	return &DownloadsHandler{
-		service:        service,
-		windowsLaunch:  windowsLaunch,
-		authService:    authService,
-		downloadDedupe: make(map[string]time.Time),
+		service:       service,
+		windowsLaunch: windowsLaunch,
+		authService:   authService,
 	}
 }
 
@@ -50,7 +39,7 @@ func (h *DownloadsHandler) Download(c *gin.Context) {
 
 	downloadFile, err := h.service.GetDownloadFile(gameID, fileID, isAdminRequest(c))
 	if err != nil {
-		writeDownloadLookupError(c, err)
+		writeServiceError(c, err, "无效的下载请求")
 		return
 	}
 
@@ -82,39 +71,17 @@ func (h *DownloadsHandler) RecordDownload(c *gin.Context) {
 	}
 
 	sourceKey := h.authService.SourceKey(c.ClientIP(), c.Request.UserAgent())
-	if !h.shouldRecordDownload(gameID, fileID, sourceKey, time.Now().UTC()) {
+	if !h.service.ShouldRecordDownload(sourceKey, gameID, fileID) {
 		writeJSONSuccess(c, http.StatusOK, operationStatusResponse{Recorded: false})
 		return
 	}
 
 	if err := h.service.RecordDownload(gameID, fileID, isAdminRequest(c)); err != nil {
-		writeDownloadRecordError(c, err)
+		writeServiceError(c, err, "无效的下载记录请求")
 		return
 	}
 
 	writeJSONSuccess(c, http.StatusOK, operationStatusResponse{Recorded: true})
-}
-
-func (h *DownloadsHandler) shouldRecordDownload(gameID, fileID int64, sourceKey string, now time.Time) bool {
-	h.downloadDedupeMu.Lock()
-	defer h.downloadDedupeMu.Unlock()
-
-	// Best-effort cleanup for the in-memory dedupe window. We do not persist this
-	// state because the goal is only to absorb local click bursts, not to enforce
-	// stable rate limiting semantics across process restarts or deployments.
-	for key, expiresAt := range h.downloadDedupe {
-		if !expiresAt.After(now) {
-			delete(h.downloadDedupe, key)
-		}
-	}
-
-	recordKey := sourceKey + ":" + int64ToString(gameID) + ":" + int64ToString(fileID)
-	if expiresAt, exists := h.downloadDedupe[recordKey]; exists && expiresAt.After(now) {
-		return false
-	}
-
-	h.downloadDedupe[recordKey] = now.Add(downloadRecordWindow)
-	return true
 }
 
 func (h *DownloadsHandler) LaunchScript(c *gin.Context) {
@@ -139,7 +106,7 @@ func (h *DownloadsHandler) LaunchScript(c *gin.Context) {
 
 	script, filename, err := h.windowsLaunch.BuildLaunchScript(gameID, fileID, isAdminRequest(c))
 	if err != nil {
-		writeLaunchScriptError(c, err)
+		writeServiceError(c, err, "无效的启动脚本请求")
 		return
 	}
 
@@ -169,57 +136,4 @@ func buildAttachmentDisposition(filename string) string {
 		return "attachment"
 	}
 	return value
-}
-
-func writeDownloadLookupError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, services.ErrNotFound):
-		// 2026-05-09: 统一为中文错误信息
-		writeJSONError(c, http.StatusNotFound, "资源不存在")
-	case errors.Is(err, services.ErrForbiddenPath):
-		// 2026-05-09: 统一为中文错误信息
-		writeJSONError(c, http.StatusForbidden, "文件路径超出允许范围")
-	case errors.Is(err, services.ErrMissingFile), errors.Is(err, services.ErrInvalidFile):
-		// 2026-05-09: 统一为中文错误信息
-		writeJSONError(c, http.StatusNotFound, "注册文件不可用")
-	case errors.Is(err, services.ErrValidation), errors.Is(err, services.ErrMissingConfig):
-		writeJSONError(c, http.StatusBadRequest, err.Error())
-	default:
-		// 2026-05-09: 统一为中文错误信息 (internal server error)
-		writeJSONError(c, http.StatusInternalServerError, "服务器内部错误")
-	}
-}
-
-func writeDownloadRecordError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, services.ErrNotFound):
-		// 2026-05-09: 统一为中文错误信息
-		writeJSONError(c, http.StatusNotFound, "资源不存在")
-	case errors.Is(err, services.ErrValidation), errors.Is(err, services.ErrMissingConfig):
-		writeJSONError(c, http.StatusBadRequest, err.Error())
-	default:
-		// 2026-05-09: 统一为中文错误信息 (internal server error)
-		writeJSONError(c, http.StatusInternalServerError, "服务器内部错误")
-	}
-}
-
-func writeLaunchScriptError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, services.ErrNotFound):
-		// 2026-05-09: 统一为中文错误信息
-		writeJSONError(c, http.StatusNotFound, "资源不存在")
-	case errors.Is(err, services.ErrForbiddenPath):
-		// 2026-05-09: 统一为中文错误信息
-		writeJSONError(c, http.StatusForbidden, "文件路径超出允许范围")
-	case errors.Is(err, services.ErrMissingFile), errors.Is(err, services.ErrInvalidFile):
-		// 2026-05-09: 统一为中文错误信息
-		writeJSONError(c, http.StatusNotFound, "注册文件不可用")
-	case errors.Is(err, services.ErrInvalidLaunchFile), errors.Is(err, services.ErrMissingSMBConfig):
-		writeJSONError(c, http.StatusBadRequest, err.Error())
-	case errors.Is(err, services.ErrValidation), errors.Is(err, services.ErrMissingConfig):
-		writeJSONError(c, http.StatusBadRequest, err.Error())
-	default:
-		// 2026-05-09: 统一为中文错误信息 (internal server error)
-		writeJSONError(c, http.StatusInternalServerError, "服务器内部错误")
-	}
 }

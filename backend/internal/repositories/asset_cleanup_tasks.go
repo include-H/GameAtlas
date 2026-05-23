@@ -5,9 +5,17 @@ import (
 	"strings"
 
 	"github.com/jmoiron/sqlx"
-
-	"github.com/hao/game/internal/domain"
 )
+
+type AssetCleanupTask struct {
+	ID           int64   `db:"id"`
+	AssetPath    string  `db:"asset_path"`
+	Source       string  `db:"source"`
+	LastError    *string `db:"last_error"`
+	AttemptCount int64   `db:"attempt_count"`
+	CreatedAt    string  `db:"created_at"`
+	UpdatedAt    string  `db:"updated_at"`
+}
 
 type AssetCleanupTasksRepository struct {
 	db *sqlx.DB
@@ -51,7 +59,7 @@ func (r *AssetCleanupTasksRepository) DeleteByPath(assetPath string) error {
 	return nil
 }
 
-func (r *AssetCleanupTasksRepository) ListPending(limit int) ([]domain.AssetCleanupTask, error) {
+func (r *AssetCleanupTasksRepository) ListPending(limit int) ([]AssetCleanupTask, error) {
 	query := `
 		SELECT id, asset_path, source, last_error, attempt_count, created_at, updated_at
 		FROM asset_cleanup_tasks
@@ -63,7 +71,7 @@ func (r *AssetCleanupTasksRepository) ListPending(limit int) ([]domain.AssetClea
 		args = append(args, limit)
 	}
 
-	tasks := make([]domain.AssetCleanupTask, 0)
+	tasks := make([]AssetCleanupTask, 0)
 	if err := r.db.Select(&tasks, query, args...); err != nil {
 		return nil, fmt.Errorf("list asset cleanup tasks: %w", err)
 	}

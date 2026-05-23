@@ -2,8 +2,8 @@ import { get, put } from './api'
 import type { ApiEnvelope } from './types'
 
 export interface WikiDocumentResponse {
-  game_id?: number
-  title?: string
+  game_id: number
+  title: string
   content: string | null
   updated_at: string
   history_count?: number
@@ -11,6 +11,7 @@ export interface WikiDocumentResponse {
 
 export interface WikiHistoryEntry {
   id: number
+  game_id: number
   content: string
   change_summary?: string
   created_at: string

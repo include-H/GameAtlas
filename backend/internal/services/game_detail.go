@@ -6,19 +6,19 @@ import (
 )
 
 type GameDetailService struct {
-	detailRepo               *repositories.GameDetailRepository
+	gamesRepo                *repositories.GamesRepository
 	gameFilesRepo            *repositories.GameFilesRepository
 	reviewIssueOverridesRepo *repositories.ReviewIssueOverrideRepository
 }
 
 // NewGameDetailService wires the repositories required to assemble the full detail payload for one game.
 func NewGameDetailService(
-	detailRepo *repositories.GameDetailRepository,
+	gamesRepo *repositories.GamesRepository,
 	gameFilesRepo *repositories.GameFilesRepository,
 	reviewIssueOverridesRepo *repositories.ReviewIssueOverrideRepository,
 ) *GameDetailService {
 	return &GameDetailService{
-		detailRepo:               detailRepo,
+		gamesRepo:                gamesRepo,
 		gameFilesRepo:            gameFilesRepo,
 		reviewIssueOverridesRepo: reviewIssueOverridesRepo,
 	}
@@ -26,7 +26,7 @@ func NewGameDetailService(
 
 // ResolveGameID translates the public id used by routes into the internal numeric id used by repositories.
 func (s *GameDetailService) ResolveGameID(publicID string) (int64, error) {
-	id, err := s.detailRepo.ResolveIDByPublicID(publicID)
+	id, err := s.gamesRepo.ResolveIDByPublicID(publicID)
 	if err != nil {
 		return 0, normalizeRepoError(err)
 	}
@@ -35,7 +35,7 @@ func (s *GameDetailService) ResolveGameID(publicID string) (int64, error) {
 
 // Get assembles the detail response from multiple repositories and applies visibility checks up front.
 func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) {
-	game, err := s.detailRepo.GetByID(id)
+	game, err := s.gamesRepo.GetByID(id)
 	if err != nil {
 		return nil, normalizeRepoError(err)
 	}
@@ -44,7 +44,7 @@ func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) 
 		return nil, ErrNotFound
 	}
 
-	allAssets, err := s.detailRepo.ListAllAssets(id)
+	allAssets, err := s.gamesRepo.ListAllAssets(id)
 	if err != nil {
 		return nil, err
 	}
@@ -57,15 +57,15 @@ func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) 
 	covers := assetsByType["cover"]
 	logos := assetsByType["logo"]
 	banners := assetsByType["banner"]
-	primarySeries, err := s.detailRepo.GetSeriesMetadata(id)
+	primarySeries, err := s.gamesRepo.GetSeriesMetadata(id)
 	if err != nil {
 		return nil, err
 	}
-	developers, err := s.detailRepo.ListMetadata("developers", "game_developers", "developer_id", id)
+	developers, err := s.gamesRepo.ListMetadata("developers", "game_developers", "developer_id", id)
 	if err != nil {
 		return nil, err
 	}
-	publishers, err := s.detailRepo.ListMetadata("publishers", "game_publishers", "publisher_id", id)
+	publishers, err := s.gamesRepo.ListMetadata("publishers", "game_publishers", "publisher_id", id)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) 
 	if err != nil {
 		return nil, err
 	}
-	pendingIssues, err := getPendingIssueEvaluation(*game, s.reviewIssueOverridesRepo)
+	pendingIssues, err := getPendingIssueEvaluation(*game, int64(len(screenshots)), int64(len(logos)), int64(len(files)), int64(len(developers)), int64(len(publishers)), s.reviewIssueOverridesRepo)
 	if err != nil {
 		return nil, err
 	}

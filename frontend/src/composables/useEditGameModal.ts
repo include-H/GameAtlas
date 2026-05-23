@@ -358,7 +358,7 @@ export const useEditGameModal = ({
     form,
     getDefaultDirectory: () => directoryService.getDefaultDirectory(),
     onResolveInitialPathError: (message) => {
-      console.error(message)
+      addAlert(message, 'error')
     },
   })
 
