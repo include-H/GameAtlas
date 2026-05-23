@@ -220,19 +220,14 @@ const viewportStyle = computed(() => {
 
 watch(() => [props.screenshots, props.previewVideos], () => {
   brokenImages.value = []
-  currentIndex.value = 0
   aspectResolved.value = false
-}, { deep: true })
-
-watch(mediaItems, (items) => {
+  const items = mediaItems.value
   if (items.length === 0) {
     currentIndex.value = 0
     stopImageAutoplay()
     return
   }
-  if (currentIndex.value >= items.length) {
-    currentIndex.value = items.length - 1
-  }
+  currentIndex.value = 0
 })
 
 watch(currentMedia, (nextMedia, previousMedia) => {

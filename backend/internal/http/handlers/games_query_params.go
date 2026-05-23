@@ -143,14 +143,14 @@ func decodeGamesTimelineRequest(c *gin.Context) (string, int64, bool) {
 
 	parts := strings.SplitN(raw, "|", 2)
 	if len(parts) != 2 {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "无效的时间线游标"})
+		writeJSONError(c, http.StatusBadRequest, "无效的时间线游标")
 		return "", 0, false
 	}
 
 	afterDate := strings.TrimSpace(parts[0])
 	id, err := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "无效的时间线游标"})
+		writeJSONError(c, http.StatusBadRequest, "无效的时间线游标")
 		return "", 0, false
 	}
 
@@ -171,11 +171,8 @@ func parseGamesTimelineIntQuery(c *gin.Context, key string, fallback int) (int, 
 }
 
 func writeGamesTimelineQueryError(c *gin.Context, key string) {
-	c.JSON(http.StatusBadRequest, gin.H{
-		"success": false,
-		// 2026-05-09: 统一为中文错误信息
-		"error":   "无效的时间线查询参数: " + key,
-	})
+	// 2026-05-09: 统一为中文错误信息
+	writeJSONError(c, http.StatusBadRequest, "无效的时间线查询参数: "+key)
 }
 
 func parseGamesListIntQuery(c *gin.Context, key string, fallback int) (int, bool) {
@@ -214,9 +211,6 @@ func parseGamesListBoolQuery(c *gin.Context, key string) (bool, bool) {
 }
 
 func writeGamesListQueryError(c *gin.Context, key string) {
-	c.JSON(http.StatusBadRequest, gin.H{
-		"success": false,
-		// 2026-05-09: 统一为中文错误信息
-		"error":   "无效的游戏查询参数: " + key,
-	})
+	// 2026-05-09: 统一为中文错误信息
+	writeJSONError(c, http.StatusBadRequest, "无效的游戏查询参数: "+key)
 }

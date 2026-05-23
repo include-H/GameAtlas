@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue'
-import type { EditGameForm } from '@/composables/edit-game-form'
+import type { EditGameForm } from '@/utils/edit-game-form'
 import { getHttpErrorMessage } from '@/utils/http-error'
 
 export interface FilePathItem {

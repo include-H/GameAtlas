@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EditGameForm } from '@/composables/edit-game-form'
+import type { EditGameForm } from '@/utils/edit-game-form'
 import type { AdminGameDetail } from '@/services/types'
 import { useEditGameWorkflow } from './useEditGameWorkflow'
 

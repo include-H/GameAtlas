@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import type { EditGameForm } from '@/composables/edit-game-form'
+import type { EditGameForm } from '@/utils/edit-game-form'
 import type { AdminGameDetail } from '@/services/types'
 import { useEditGameFormBootstrap } from './useEditGameFormBootstrap'
 import { seriesService } from '@/services/series.service'

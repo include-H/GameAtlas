@@ -5,7 +5,7 @@ import type {
   EditGameEditableLogo,
   EditGameEditableScreenshot,
   EditGameForm,
-} from '@/composables/edit-game-form'
+} from '@/utils/edit-game-form'
 import steamService, { proxySteamAssetUrl } from '@/services/steam.service'
 import steamGridDBService from '@/services/steamgriddb.service'
 import { useSteamPicker } from '@/composables/useSteamPicker'

@@ -475,6 +475,7 @@ onBeforeUnmount(() => {
   border-left: 0;
 }
 
+/* 品牌化特例：登录页沉浸式设计，不外溢到通用容器 */
 .login-card {
   position: relative;
   width: min(100%, 468px);

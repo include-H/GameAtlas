@@ -31,7 +31,7 @@ func (h *SteamHandler) Search(c *gin.Context) {
 	}
 	if query == "" {
 		// 2026-05-09: 统一为中文错误信息
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "搜索关键词为必填项"})
+		writeJSONError(c, http.StatusBadRequest, "搜索关键词为必填项")
 		return
 	}
 	results, err := h.service.Search(query, proxy)
@@ -78,7 +78,7 @@ func (h *SteamHandler) Proxy(c *gin.Context) {
 	}
 	if rawURL == "" {
 		// 2026-05-09: 统一为中文错误信息
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "URL 为必填项"})
+		writeJSONError(c, http.StatusBadRequest, "URL 为必填项")
 		return
 	}
 
@@ -114,12 +114,12 @@ func parseSteamProxyQuery(c *gin.Context) (string, bool) {
 	parsed, err := url.Parse(proxy)
 	if err != nil || parsed == nil || parsed.Scheme == "" || parsed.Host == "" {
 		// 2026-05-09: 统一为中文错误信息
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "需要有效的 Steam 代理地址"})
+		writeJSONError(c, http.StatusBadRequest, "需要有效的 Steam 代理地址")
 		return "", false
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		// 2026-05-09: 统一为中文错误信息
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "需要有效的 Steam 代理地址"})
+		writeJSONError(c, http.StatusBadRequest, "需要有效的 Steam 代理地址")
 		return "", false
 	}
 

@@ -7,7 +7,7 @@ import {
   type EditGameEditableScreenshot,
   type EditGameEditableVideo,
   type EditGameForm,
-} from '@/composables/edit-game-form'
+} from '@/utils/edit-game-form'
 import { seriesService } from '@/services/series.service'
 import { developersService } from '@/services/developers.service'
 import { publishersService } from '@/services/publishers.service'

@@ -1,5 +1,5 @@
 <template>
-  <aside class="wiki-toc" aria-labelledby="wiki-toc-title">
+  <aside class="wiki-toc app-glass-surface" aria-labelledby="wiki-toc-title">
     <div id="wiki-toc-title" class="wiki-toc__header">目录</div>
     <div ref="tocBodyRef" class="wiki-toc__body">
       <nav v-if="headings.length > 0" class="wiki-toc__nav" aria-label="Wiki 目录">
@@ -218,11 +218,7 @@ onUnmounted(() => {
 
 <style scoped>
 .wiki-toc {
-  background: var(--app-card-surface);
-  border: 1px solid var(--app-card-border);
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   position: sticky;
   top: 80px;
   max-height: calc(100vh - 100px);

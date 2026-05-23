@@ -1,5 +1,5 @@
 import { type Ref } from 'vue'
-import type { EditGameForm } from '@/composables/edit-game-form'
+import type { EditGameForm } from '@/utils/edit-game-form'
 import gamesService from '@/services/games.service'
 import { seriesService } from '@/services/series.service'
 import { developersService } from '@/services/developers.service'
@@ -156,7 +156,7 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       options.seriesOptions.value = popularSeries
       return true
     } catch (error) {
-      console.error('Failed to refresh series:', error)
+      console.warn('Failed to refresh series:', error)
       return false
     }
   }

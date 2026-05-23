@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue'
-import type { EditGameForm, EditGameEditableCover, EditGameEditableVideo } from '@/composables/edit-game-form'
+import type { EditGameForm, EditGameEditableCover, EditGameEditableVideo } from '@/utils/edit-game-form'
 
 interface UseEditGameMediaStateOptions {
   form: Ref<Pick<EditGameForm, 'screenshots' | 'preview_videos' | 'covers'>>

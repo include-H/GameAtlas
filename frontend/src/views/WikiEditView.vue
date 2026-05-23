@@ -622,14 +622,12 @@ onActivated(() => {
   --wiki-surface-bg: color-mix(in srgb, var(--app-card-surface) 92%, transparent);
 }
 
+/* 模态玻璃覆盖：仅声明与全局 .arco-modal 不同的属性，共享 border/backdrop-filter 由全局提供 */
 .wiki-edit-history-modal .arco-modal {
   overflow: hidden;
-  border: 1px solid var(--app-card-border);
   border-radius: 16px;
   background: color-mix(in srgb, var(--app-card-surface) 92%, transparent);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .wiki-edit-history-modal .arco-modal-header {

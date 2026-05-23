@@ -1,5 +1,5 @@
 import { ref, watch, type Ref } from 'vue'
-import type { EditGameForm } from '@/composables/edit-game-form'
+import type { EditGameForm } from '@/utils/edit-game-form'
 import steamService from '@/services/steam.service'
 import { useSteamPicker } from '@/composables/useSteamPicker'
 import type { SteamGameDetails, SteamGameSearchResult } from '@/services/types'

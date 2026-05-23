@@ -6,7 +6,7 @@ import type {
   EditGameEditableScreenshot,
   EditGameEditableVideo,
   EditGameForm,
-} from '@/composables/edit-game-form'
+} from '@/utils/edit-game-form'
 import { uploadAsset, type UploadedAssetResult } from '@/services/assets'
 import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
 import { getHttpErrorMessage } from '@/utils/http-error'

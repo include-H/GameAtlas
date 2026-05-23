@@ -1,5 +1,5 @@
 <template>
-  <div class="wiki-editor">
+  <div class="wiki-editor app-glass-surface">
     <div class="wiki-editor__toolbar">
       <div class="wiki-editor__toolbar-groups">
         <a-button-group class="wiki-editor__toolbar-group">
@@ -300,10 +300,6 @@ const handleTab = () => {
   flex-direction: column;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid var(--app-card-border);
-  background: var(--app-card-surface);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   height: 100%;
   min-height: 0;
 }

@@ -9,7 +9,7 @@ import {
   type EditGameEditableScreenshot,
   type EditGameEditableVideo,
   type EditGameForm,
-} from '@/composables/edit-game-form'
+} from '@/utils/edit-game-form'
 import { uploadAsset, type UploadedAssetResult } from '@/services/assets'
 import { buildAssetUploadUrl } from '@/services/api-url'
 import { directoryService } from '@/services/directory.service'

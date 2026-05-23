@@ -53,12 +53,12 @@ func (h *SteamGridDBHandler) Search(c *gin.Context) {
 		return
 	}
 	if !h.service.Available() {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "error": "SteamGridDB API 未配置"})
+		writeJSONError(c, http.StatusServiceUnavailable, "SteamGridDB API 未配置")
 		return
 	}
 	query := c.Query("q")
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "搜索关键词为必填项"})
+		writeJSONError(c, http.StatusBadRequest, "搜索关键词为必填项")
 		return
 	}
 	results, err := h.service.Search(query)
@@ -86,7 +86,7 @@ func (h *SteamGridDBHandler) handleImagesByGameID(c *gin.Context, fetch func(int
 		return
 	}
 	if !h.service.Available() {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "error": "SteamGridDB API 未配置"})
+		writeJSONError(c, http.StatusServiceUnavailable, "SteamGridDB API 未配置")
 		return
 	}
 	gameID, ok := parseIDParam(c, "gameId")
@@ -103,7 +103,7 @@ func (h *SteamGridDBHandler) handleImagesByGameID(c *gin.Context, fetch func(int
 
 func (h *SteamGridDBHandler) handleImages(c *gin.Context, fetch func(int64) ([]services.SteamGridDBImage, error)) {
 	if !h.service.Available() {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "error": "SteamGridDB API 未配置"})
+		writeJSONError(c, http.StatusServiceUnavailable, "SteamGridDB API 未配置")
 		return
 	}
 

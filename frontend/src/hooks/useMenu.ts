@@ -2,7 +2,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { Component } from 'vue'
 import { useRoute, type RouteRecordRaw } from 'vue-router'
 import { appRoutes } from '@/router'
-import usePermission from './permission'
+import usePermission from './usePermission'
 
 export interface MenuItem {
   name: string
