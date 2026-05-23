@@ -282,7 +282,7 @@ const renderedHtml = computed(() => {
 }
 
 .markdown-renderer :deep(blockquote) {
-  border-left: 4px solid #6200EE;
+  border-left: 4px solid var(--accent-color);
   padding-left: 1em;
   margin: 1em 0;
   opacity: 0.8;

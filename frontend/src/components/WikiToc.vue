@@ -269,7 +269,7 @@ onUnmounted(() => {
 }
 
 .wiki-toc__item--active {
-  color: #1a9fff;
+  color: var(--color-primary-6);
   background: rgba(26, 159, 255, 0.1);
   font-weight: 500;
 }
