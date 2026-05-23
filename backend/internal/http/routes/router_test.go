@@ -89,7 +89,7 @@ func TestRegisterStaticRoutesFromDiskReturnsJSON404ForUnknownAPIGet(t *testing.T
 	if contentType := recorder.Header().Get("Content-Type"); !strings.Contains(contentType, "application/json") {
 		t.Fatalf("content-type = %q, want application/json", contentType)
 	}
-	if body := recorder.Body.String(); !strings.Contains(body, "\"error\":\"route not found\"") {
+	if body := recorder.Body.String(); !strings.Contains(body, "\"error\":\"路由不存在\"") {
 		t.Fatalf("body = %q, want JSON 404 payload", body)
 	}
 }

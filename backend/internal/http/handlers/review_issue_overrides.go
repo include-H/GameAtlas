@@ -33,11 +33,7 @@ func (h *ReviewIssueOverrideHandler) Ignore(c *gin.Context) {
 		// 2026-04-06: review override writes are strict so temporary client-side
 		// fields do not silently become part of this narrow transport contract.
 		if err := decodeJSONStrict(c, &payload); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"success": false,
-				// 2026-05-09: 统一为中文错误信息
-		"error":   "无效的审查覆盖请求",
-			})
+			writeJSONError(c, http.StatusBadRequest, "无效的审查覆盖请求")
 			return
 		}
 	}
@@ -49,10 +45,7 @@ func (h *ReviewIssueOverrideHandler) Ignore(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    toReviewIssueOverrideResponse(*item),
-	})
+	writeJSONSuccess(c, http.StatusOK, toReviewIssueOverrideResponse(*item))
 }
 
 func (h *ReviewIssueOverrideHandler) Delete(c *gin.Context) {
@@ -70,10 +63,7 @@ func (h *ReviewIssueOverrideHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"deleted": true,
-		},
+	writeJSONSuccess(c, http.StatusOK, gin.H{
+		"deleted": true,
 	})
 }

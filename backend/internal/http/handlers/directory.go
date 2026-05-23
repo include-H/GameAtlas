@@ -28,11 +28,8 @@ func (h *DirectoryHandler) Default(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"path": path,
-		},
+	writeJSONSuccess(c, http.StatusOK, gin.H{
+		"path": path,
 	})
 }
 
@@ -48,8 +45,5 @@ func (h *DirectoryHandler) List(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    toDirectoryListResponse(result),
-	})
+	writeJSONSuccess(c, http.StatusOK, toDirectoryListResponse(result))
 }

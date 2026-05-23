@@ -36,10 +36,7 @@ func (h *MetadataHandler) List(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    toMetadataResponses(items),
-	})
+	writeJSONSuccess(c, http.StatusOK, toMetadataResponses(items))
 }
 
 func decodeMetadataListOptions(c *gin.Context) (services.MetadataListOptions, bool) {
@@ -67,7 +64,7 @@ func parseMetadataListLimit(c *gin.Context) (int, bool) {
 	}
 	value, err := strconv.Atoi(raw)
 	if err != nil {
-		writeMetadataQueryError(c, "limit")
+		writeJSONError(c, http.StatusBadRequest, "无效的元数据查询参数: limit")
 		return 0, false
 	}
 	return value, true
@@ -82,18 +79,11 @@ func parseMetadataListSort(c *gin.Context) (string, bool) {
 	case "name", "popular":
 		return raw, true
 	default:
-		writeMetadataQueryError(c, "sort")
+		writeJSONError(c, http.StatusBadRequest, "无效的元数据查询参数: sort")
 		return "", false
 	}
 }
 
-func writeMetadataQueryError(c *gin.Context, key string) {
-	c.JSON(http.StatusBadRequest, gin.H{
-		"success": false,
-		// 2026-05-09: 统一为中文错误信息
-		"error":   "无效的元数据查询参数: " + key,
-	})
-}
 
 func (h *MetadataHandler) Get(c *gin.Context) {
 	// 2026-05-09: only series resources support detail queries today. This guard
@@ -101,11 +91,7 @@ func (h *MetadataHandler) Get(c *gin.Context) {
 	// constraint: the Get endpoint was wired for series specifically, not as a
 	// generic metadata detail action.
 	if h.resource.Type != domain.MetadataSeries {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			// 2026-05-09: 统一为中文错误信息
-		"error":   "资源不存在",
-		})
+		writeJSONError(c, http.StatusNotFound, "资源不存在")
 		return
 	}
 
@@ -121,12 +107,9 @@ func (h *MetadataHandler) Get(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"series": toMetadataResponse(*detail.Series),
-			"games":  toSeriesGameSummaryResponses(detail.Games),
-		},
+	writeJSONSuccess(c, http.StatusOK, gin.H{
+		"series": toMetadataResponse(*detail.Series),
+		"games":  toSeriesGameSummaryResponses(detail.Games),
 	})
 }
 
@@ -138,11 +121,7 @@ func (h *MetadataHandler) Create(c *gin.Context) {
 	// 2026-04-06: metadata writes use strict JSON decode so transport contracts
 	// do not silently accept unknown fields that service/domain never defined.
 	if err := decodeJSONStrict(c, &request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			// 2026-05-09: 统一为中文错误信息
-		"error":   "无效的元数据请求",
-		})
+		writeJSONError(c, http.StatusBadRequest, "无效的元数据请求")
 		return
 	}
 
@@ -154,8 +133,5 @@ func (h *MetadataHandler) Create(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"success": true,
-		"data":    toMetadataResponse(*item),
-	})
+	writeJSONSuccess(c, http.StatusCreated, toMetadataResponse(*item))
 }

@@ -124,16 +124,13 @@ func (h *GamesHandler) Stats(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"total_games":     stats.TotalGames,
-			"total_downloads": stats.TotalDownloads,
-			"recent_games":    toGameListItemResponses(stats.RecentGames),
-			"popular_games":   toGameListItemResponses(stats.PopularGames),
-			"favorite_count":  stats.FavoriteCount,
-			"pending_reviews": stats.PendingReviews,
-		},
+	writeJSONSuccess(c, http.StatusOK, gin.H{
+		"total_games":     stats.TotalGames,
+		"total_downloads": stats.TotalDownloads,
+		"recent_games":    toGameListItemResponses(stats.RecentGames),
+		"popular_games":   toGameListItemResponses(stats.PopularGames),
+		"favorite_count":  stats.FavoriteCount,
+		"pending_reviews": stats.PendingReviews,
 	})
 }
 
@@ -151,10 +148,7 @@ func (h *GamesHandler) Get(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    toGameDetailResponse(detail, isAdminRequest(c)),
-	})
+	writeJSONSuccess(c, http.StatusOK, toGameDetailResponse(detail, isAdminRequest(c)))
 }
 
 func (h *GamesHandler) Create(c *gin.Context) {
@@ -163,11 +157,7 @@ func (h *GamesHandler) Create(c *gin.Context) {
 	}
 	var request gameCreateRequest
 	if err := decodeJSONStrict(c, &request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			// 2026-05-09: 统一为中文错误信息
-		"error":   "无效的游戏请求",
-		})
+		writeJSONError(c, http.StatusBadRequest, "无效的游戏请求")
 		return
 	}
 
@@ -179,10 +169,7 @@ func (h *GamesHandler) Create(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"success": true,
-		"data":    toGameSummaryResponse(*game),
-	})
+	writeJSONSuccess(c, http.StatusCreated, toGameSummaryResponse(*game))
 }
 
 func (h *GamesHandler) UpdateAggregate(c *gin.Context) {
@@ -196,11 +183,7 @@ func (h *GamesHandler) UpdateAggregate(c *gin.Context) {
 
 	var request gameAggregateUpdateRequest
 	if err := decodeJSONStrict(c, &request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			// 2026-05-09: 统一为中文错误信息
-		"error":   "无效的游戏请求",
-		})
+		writeJSONError(c, http.StatusBadRequest, "无效的游戏请求")
 		return
 	}
 
@@ -220,10 +203,7 @@ func (h *GamesHandler) UpdateAggregate(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    data,
-	})
+	writeJSONSuccess(c, http.StatusOK, data)
 }
 
 func (h *GamesHandler) Delete(c *gin.Context) {
@@ -249,7 +229,7 @@ func (h *GamesHandler) Delete(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": data})
+	writeJSONSuccess(c, http.StatusOK, data)
 }
 
 func (h *GamesHandler) Favorite(c *gin.Context) {
@@ -265,11 +245,8 @@ func (h *GamesHandler) Favorite(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"is_favorite": isFavorite,
-		},
+	writeJSONSuccess(c, http.StatusOK, gin.H{
+		"is_favorite": isFavorite,
 	})
 }
 
@@ -286,10 +263,7 @@ func (h *GamesHandler) Unfavorite(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"is_favorite": isFavorite,
-		},
+	writeJSONSuccess(c, http.StatusOK, gin.H{
+		"is_favorite": isFavorite,
 	})
 }

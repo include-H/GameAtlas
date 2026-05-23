@@ -26,23 +26,29 @@ func TestHitokotoHandlerGetReturnsJSONSentence(t *testing.T) {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
 	}
 
-	var response struct {
-		Hitokoto string `json:"hitokoto"`
-		Type     string `json:"type"`
-		From     string `json:"from"`
-		Length   int    `json:"length"`
+	var envelope struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Hitokoto string `json:"hitokoto"`
+			Type     string `json:"type"`
+			From     string `json:"from"`
+			Length   int    `json:"length"`
+		} `json:"data"`
 	}
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+	if err := json.Unmarshal(recorder.Body.Bytes(), &envelope); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if response.Hitokoto == "" || response.From == "" {
-		t.Fatalf("unexpected response: %+v", response)
+	if !envelope.Success {
+		t.Fatal("expected success=true")
 	}
-	if response.Type != "c" {
-		t.Fatalf("type = %q, want c", response.Type)
+	if envelope.Data.Hitokoto == "" || envelope.Data.From == "" {
+		t.Fatalf("unexpected response: %+v", envelope.Data)
 	}
-	if response.Length < 8 || response.Length > 20 {
-		t.Fatalf("length = %d, want within [8,20]", response.Length)
+	if envelope.Data.Type != "c" {
+		t.Fatalf("type = %q, want c", envelope.Data.Type)
+	}
+	if envelope.Data.Length < 8 || envelope.Data.Length > 20 {
+		t.Fatalf("length = %d, want within [8,20]", envelope.Data.Length)
 	}
 }
 

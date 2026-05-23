@@ -51,7 +51,7 @@ func (h *HitokotoHandler) Get(c *gin.Context) {
 	case "text":
 		c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(sentence.Hitokoto))
 	default:
-		c.JSON(http.StatusOK, toHitokotoSentenceResponse(sentence))
+		writeJSONSuccess(c, http.StatusOK, toHitokotoSentenceResponse(sentence))
 	}
 }
 

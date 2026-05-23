@@ -45,7 +45,7 @@ func (h *SteamGridDBHandler) GetIcons(c *gin.Context) {
 }
 
 func (h *SteamGridDBHandler) Available(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": h.service.Available()})
+	writeJSONSuccess(c, http.StatusOK, h.service.Available())
 }
 
 func (h *SteamGridDBHandler) Search(c *gin.Context) {
@@ -66,7 +66,7 @@ func (h *SteamGridDBHandler) Search(c *gin.Context) {
 		writeServiceError(c, err, "SteamGridDB 搜索失败")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamGridDBGameResponses(results)})
+	writeJSONSuccess(c, http.StatusOK, toSteamGridDBGameResponses(results))
 }
 
 func (h *SteamGridDBHandler) GetGridsByGameID(c *gin.Context) {
@@ -98,7 +98,7 @@ func (h *SteamGridDBHandler) handleImagesByGameID(c *gin.Context, fetch func(int
 		writeServiceError(c, err, "SteamGridDB 请求失败")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamGridDBImageResponses(images)})
+	writeJSONSuccess(c, http.StatusOK, toSteamGridDBImageResponses(images))
 }
 
 func (h *SteamGridDBHandler) handleImages(c *gin.Context, fetch func(int64) ([]services.SteamGridDBImage, error)) {
@@ -118,5 +118,5 @@ func (h *SteamGridDBHandler) handleImages(c *gin.Context, fetch func(int64) ([]s
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamGridDBImageResponses(images)})
+	writeJSONSuccess(c, http.StatusOK, toSteamGridDBImageResponses(images))
 }

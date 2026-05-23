@@ -369,6 +369,6 @@ func shouldServeSPAIndex(c *gin.Context) bool {
 func renderRouteNotFound(c *gin.Context) {
 	c.JSON(http.StatusNotFound, gin.H{
 		"success": false,
-		"error":   "route not found",
+		"error":   "路由不存在",
 	})
 }

@@ -29,8 +29,5 @@ func (h *GameFilesHandler) List(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    toGameFileResponses(files, isAdminRequest(c)),
-	})
+	writeJSONSuccess(c, http.StatusOK, toGameFileResponses(files, isAdminRequest(c)))
 }

@@ -19,18 +19,12 @@ func NewHealthHandler(db *sqlx.DB) *HealthHandler {
 
 func (h *HealthHandler) Get(c *gin.Context) {
 	if err := h.db.PingContext(c.Request.Context()); err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"success": false,
-			"error":   "database unavailable",
-		})
+		writeJSONError(c, http.StatusServiceUnavailable, "数据库不可用")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"status":    "ok",
-			"timestamp": time.Now().UTC().Format(time.RFC3339),
-		},
+	writeJSONSuccess(c, http.StatusOK, gin.H{
+		"status":    "ok",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	})
 }

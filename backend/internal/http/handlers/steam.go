@@ -40,7 +40,7 @@ func (h *SteamHandler) Search(c *gin.Context) {
 		writeServiceError(c, err, "Steam 搜索失败")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamSearchResultResponses(results)})
+	writeJSONSuccess(c, http.StatusOK, toSteamSearchResultResponses(results))
 }
 
 func (h *SteamHandler) Preview(c *gin.Context) {
@@ -61,7 +61,7 @@ func (h *SteamHandler) Preview(c *gin.Context) {
 		writeServiceError(c, err, "无效的 Steam 请求")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamAssetsPreviewResponse(preview)})
+	writeJSONSuccess(c, http.StatusOK, toSteamAssetsPreviewResponse(preview))
 }
 
 func (h *SteamHandler) Proxy(c *gin.Context) {
