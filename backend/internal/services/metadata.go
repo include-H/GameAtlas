@@ -29,7 +29,7 @@ type MetadataResource struct {
 	// than permanently curated master data. They can be pre-created for form
 	// input convenience and are expected to be auto-pruned once no games refer
 	// to them anymore.
-	Type         repositories.MetadataType
+	Type         domain.MetadataType
 	ResourceName string
 }
 
@@ -69,7 +69,7 @@ func (s *MetadataService) List(resource MetadataResource, includeAll bool, optio
 		}
 		s.listCache.Store(resource.Type, cachedMetadataList{items: items, cachedAt: time.Now()})
 	}
-	if resource.Type == repositories.MetadataSeries {
+	if resource.Type == domain.MetadataSeries {
 		if err := s.enrichSeriesItems(items, includeAll); err != nil {
 			return nil, err
 		}
@@ -118,14 +118,14 @@ func (s *MetadataService) Create(resource MetadataResource, input domain.Metadat
 	}
 
 	switch resource.Type {
-	case repositories.MetadataSeries:
+	case domain.MetadataSeries:
 		result, err := s.repo.CreateSeries(cleanInput, slugValue, sortOrder)
 		if err != nil {
 			return nil, err
 		}
 		s.listCache.Delete(resource.Type)
 		return result, nil
-	case repositories.MetadataDevelopers, repositories.MetadataPublishers:
+	case domain.MetadataDevelopers, domain.MetadataPublishers:
 		existing, err := s.repo.FindSimpleByName(resource.Type, name)
 		if err != nil {
 			return nil, err
@@ -152,7 +152,7 @@ func (s *MetadataService) Create(resource MetadataResource, input domain.Metadat
 }
 
 func (s *MetadataService) GetSeriesDetail(id int64, includeAll bool) (*SeriesDetail, error) {
-	item, err := s.repo.Get(repositories.MetadataSeries, id)
+	item, err := s.repo.Get(domain.MetadataSeries, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound

@@ -113,7 +113,7 @@ func (s *SteamService) Search(query string, proxyOverride string) ([]domain.Stea
 	}
 
 	if len(payloads) == 0 {
-		return nil, fmt.Errorf("steam search failed")
+		return nil, fmt.Errorf("steam search failed: %w", ErrUpstream)
 	}
 
 	seen := make(map[int64]struct{})

@@ -162,7 +162,7 @@ func (r *GamesRepository) GetSeriesMetadata(gameID int64) (*domain.MetadataItem,
 	return &item, nil
 }
 
-func (r *GamesRepository) ListMetadata(typ MetadataType, gameID int64) ([]domain.MetadataItem, error) {
+func (r *GamesRepository) ListMetadata(typ domain.MetadataType, gameID int64) ([]domain.MetadataItem, error) {
 	table := metadataTableName(typ)
 	joinTable := metadataJoinTable(typ)
 	joinColumn := metadataJoinColumn(typ)

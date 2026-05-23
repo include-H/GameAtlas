@@ -94,7 +94,7 @@
       </div>
     </div>
 
-    <div v-if="mediaItems.length > 1" class="screenshot-carousel__filmstrip">
+    <div v-if="mediaItems.length > 1" class="screenshot-carousel__filmstrip app-glass-surface">
       <div class="screenshot-carousel__filmstrip-inner">
         <div
           v-for="(item, index) in mediaItems"
@@ -542,27 +542,23 @@ const handleImageError = (url: string) => {
   position: absolute;
   bottom: 12px;
   right: 16px;
-  background: rgba(5, 10, 18, 0.78);
+  background: var(--app-card-surface);
   padding: 6px 14px;
   border-radius: 20px;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.9);
   font-weight: 500;
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  border: 1px solid var(--app-card-border);
+  box-shadow: var(--app-glass-shadow-rest);
   z-index: 10;
 }
 
 /* Filmstrip (Thumbnail Navigation) - Steam Style */
 .screenshot-carousel__filmstrip {
   padding: 10px 0 0;
-  background: var(--app-card-surface);
   border-radius: 16px;
-  border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   overflow: hidden;
-  box-shadow: var(--shadow-soft);
 }
 
 .screenshot-carousel__filmstrip-inner {

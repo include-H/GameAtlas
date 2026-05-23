@@ -31,11 +31,8 @@ func (h *HitokotoHandler) Get(c *gin.Context) {
 		maxLength = 1000
 	}
 	if maxLength < minLength {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			// 2026-05-09: 统一为中文错误信息
-		"error":   "`max_length` 不能小于 `min_length`",
-		})
+		// 2026-05-09: 统一为中文错误信息
+		writeJSONError(c, http.StatusBadRequest, "`max_length` 不能小于 `min_length`")
 		return
 	}
 
@@ -45,26 +42,8 @@ func (h *HitokotoHandler) Get(c *gin.Context) {
 		MaxLength:  maxLength,
 	})
 	if err != nil {
-		switch err {
-		case services.ErrValidation:
-			c.JSON(http.StatusBadRequest, gin.H{
-				"success": false,
-				// 2026-05-09: 统一为中文错误信息
-			"error":   "无效的一言查询",
-			})
-		case services.ErrNotFound:
-			c.JSON(http.StatusBadRequest, gin.H{
-				"success": false,
-				// 2026-05-09: 统一为中文错误信息
-			"error":   "没有匹配的句子",
-			})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"success": false,
-				// 2026-05-09: 统一为中文错误信息
-			"error":   "服务器内部错误",
-			})
-		}
+		// 2026-05-09: 统一为中文错误信息
+		writeServiceError(c, err, "无效的一言查询")
 		return
 	}
 
@@ -83,11 +62,8 @@ func parseHitokotoLengthQuery(c *gin.Context, key string, fallback int) (int, bo
 	}
 	value, err := strconv.Atoi(raw)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			// 2026-05-09: 统一为中文错误信息
-		"error":   "无效的一言查询参数: " + key,
-		})
+		// 2026-05-09: 统一为中文错误信息
+		writeJSONError(c, http.StatusBadRequest, "无效的一言查询参数: "+key)
 		return 0, false
 	}
 	return value, true

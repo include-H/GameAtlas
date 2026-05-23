@@ -15,6 +15,7 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/hao/game/internal/config"
+	"github.com/hao/game/internal/domain"
 	dbpkg "github.com/hao/game/internal/db"
 	"github.com/hao/game/internal/repositories"
 )
@@ -789,7 +790,7 @@ func TestGamesHandlerUpdateAggregateReplacesRelations(t *testing.T) {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
 	}
 
-	developers, err := repositories.NewGamesRepository(db).ListMetadata(repositories.MetadataDevelopers, gameID)
+	developers, err := repositories.NewGamesRepository(db).ListMetadata(domain.MetadataDevelopers, gameID)
 	if err != nil {
 		t.Fatalf("ListMetadata(developers) returned error: %v", err)
 	}

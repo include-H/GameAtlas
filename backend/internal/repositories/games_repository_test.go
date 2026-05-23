@@ -45,7 +45,7 @@ func TestGamesRepositoryUpdateAggregateReplacesRelationsAndSeries(t *testing.T) 
 		t.Fatalf("series = %#v, want cleared series", series)
 	}
 
-	developers, err := repo.ListMetadata(MetadataDevelopers, gameID)
+	developers, err := repo.ListMetadata(domain.MetadataDevelopers, gameID)
 	if err != nil {
 		t.Fatalf("ListMetadata(developers) returned error: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestGamesRepositoryUpdateAggregateReplacesRelationsAndSeries(t *testing.T) 
 		t.Fatalf("developers = %#v, want cleared developers", developers)
 	}
 
-	publishers, err := repo.ListMetadata(MetadataPublishers, gameID)
+	publishers, err := repo.ListMetadata(domain.MetadataPublishers, gameID)
 	if err != nil {
 		t.Fatalf("ListMetadata(publishers) returned error: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestGamesRepositoryUpdateAggregateClearsPresentRelationsAndSeries(t *testin
 		t.Fatalf("series = %#v, want nil", series)
 	}
 
-	developers, err := repo.ListMetadata(MetadataDevelopers, gameID)
+	developers, err := repo.ListMetadata(domain.MetadataDevelopers, gameID)
 	if err != nil {
 		t.Fatalf("ListMetadata(developers) returned error: %v", err)
 	}

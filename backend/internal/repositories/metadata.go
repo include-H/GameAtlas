@@ -9,50 +9,39 @@ import (
 	"github.com/hao/game/internal/domain"
 )
 
-// MetadataType enumerates the supported metadata entity kinds. The repository
-// layer owns this type so that table-name strings never leak into service or
-// handler code.
-type MetadataType int
-
-const (
-	MetadataDevelopers MetadataType = iota
-	MetadataPublishers
-	MetadataSeries
-)
-
-func metadataTableName(typ MetadataType) string {
+func metadataTableName(typ domain.MetadataType) string {
 	switch typ {
-	case MetadataDevelopers:
+	case domain.MetadataDevelopers:
 		return "developers"
-	case MetadataPublishers:
+	case domain.MetadataPublishers:
 		return "publishers"
-	case MetadataSeries:
+	case domain.MetadataSeries:
 		return "series"
 	default:
 		return ""
 	}
 }
 
-func metadataJoinTable(typ MetadataType) string {
+func metadataJoinTable(typ domain.MetadataType) string {
 	switch typ {
-	case MetadataDevelopers:
+	case domain.MetadataDevelopers:
 		return "game_developers"
-	case MetadataPublishers:
+	case domain.MetadataPublishers:
 		return "game_publishers"
-	case MetadataSeries:
+	case domain.MetadataSeries:
 		return "game_series"
 	default:
 		return ""
 	}
 }
 
-func metadataJoinColumn(typ MetadataType) string {
+func metadataJoinColumn(typ domain.MetadataType) string {
 	switch typ {
-	case MetadataDevelopers:
+	case domain.MetadataDevelopers:
 		return "developer_id"
-	case MetadataPublishers:
+	case domain.MetadataPublishers:
 		return "publisher_id"
-	case MetadataSeries:
+	case domain.MetadataSeries:
 		return "series_id"
 	default:
 		return ""
@@ -67,7 +56,7 @@ func NewMetadataRepository(db *sqlx.DB) *MetadataRepository {
 	return &MetadataRepository{db: db}
 }
 
-func (r *MetadataRepository) List(typ MetadataType) ([]domain.MetadataItem, error) {
+func (r *MetadataRepository) List(typ domain.MetadataType) ([]domain.MetadataItem, error) {
 	table := metadataTableName(typ)
 	query := fmt.Sprintf(`
 		SELECT id, name, slug, sort_order, created_at
@@ -83,7 +72,7 @@ func (r *MetadataRepository) List(typ MetadataType) ([]domain.MetadataItem, erro
 	return items, nil
 }
 
-func (r *MetadataRepository) Get(typ MetadataType, id int64) (*domain.MetadataItem, error) {
+func (r *MetadataRepository) Get(typ domain.MetadataType, id int64) (*domain.MetadataItem, error) {
 	table := metadataTableName(typ)
 	query := fmt.Sprintf(`
 		SELECT id, name, slug, sort_order, created_at
@@ -99,7 +88,7 @@ func (r *MetadataRepository) Get(typ MetadataType, id int64) (*domain.MetadataIt
 	return &item, nil
 }
 
-func (r *MetadataRepository) FindSimpleByName(typ MetadataType, name string) (*domain.MetadataItem, error) {
+func (r *MetadataRepository) FindSimpleByName(typ domain.MetadataType, name string) (*domain.MetadataItem, error) {
 	table := metadataTableName(typ)
 	query := fmt.Sprintf(`
 		SELECT id, name, slug, sort_order, created_at
@@ -119,7 +108,7 @@ func (r *MetadataRepository) FindSimpleByName(typ MetadataType, name string) (*d
 	return &item, nil
 }
 
-func (r *MetadataRepository) FindSimpleBySlug(typ MetadataType, slug string) (*domain.MetadataItem, error) {
+func (r *MetadataRepository) FindSimpleBySlug(typ domain.MetadataType, slug string) (*domain.MetadataItem, error) {
 	table := metadataTableName(typ)
 	query := fmt.Sprintf(`
 		SELECT id, name, slug, sort_order, created_at
@@ -152,7 +141,7 @@ func (r *MetadataRepository) CreateSeries(input domain.MetadataWriteInput, slug 
 	return &item, nil
 }
 
-func (r *MetadataRepository) CreateSimple(typ MetadataType, input domain.MetadataWriteInput, slug string, sortOrder int) (*domain.MetadataItem, error) {
+func (r *MetadataRepository) CreateSimple(typ domain.MetadataType, input domain.MetadataWriteInput, slug string, sortOrder int) (*domain.MetadataItem, error) {
 	table := metadataTableName(typ)
 	query := fmt.Sprintf(`
 		INSERT INTO %s (name, slug, sort_order)
@@ -295,7 +284,7 @@ func (r *MetadataRepository) DeleteUnusedSeries() error {
 	return nil
 }
 
-func (r *MetadataRepository) DeleteUnused(typ MetadataType) error {
+func (r *MetadataRepository) DeleteUnused(typ domain.MetadataType) error {
 	table := metadataTableName(typ)
 	joinTable := metadataJoinTable(typ)
 	joinColumn := metadataJoinColumn(typ)

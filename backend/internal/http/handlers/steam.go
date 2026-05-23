@@ -36,11 +36,8 @@ func (h *SteamHandler) Search(c *gin.Context) {
 	}
 	results, err := h.service.Search(query, proxy)
 	if err != nil {
-		// 2026-05-09: upstream Steam errors surface as 502 Bad Gateway rather than
-		// 500 because the failure originates from an external dependency, not from
-		// this server. Use writeJSONError to preserve the status code.
 		// 2026-05-09: 统一为中文错误信息
-		writeJSONError(c, http.StatusBadGateway, "Steam 搜索失败")
+		writeServiceError(c, err, "Steam 搜索失败")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamSearchResultResponses(results)})

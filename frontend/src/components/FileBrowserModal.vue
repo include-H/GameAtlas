@@ -18,7 +18,7 @@
       </div>
 
       <!-- Path Navigation -->
-      <div class="file-browser-header">
+      <div class="file-browser-header app-glass-surface">
         <a-space>
           <a-button 
             class="app-text-action-btn app-secondary-compact"
@@ -84,6 +84,9 @@
 import { ref, computed, watch } from 'vue'
 import { IconFolder, IconFile, IconArrowUp } from '@arco-design/web-vue/es/icon'
 import { directoryService, type DirectoryItem } from '@/services/directory.service'
+import { useUiStore } from '@/stores/ui'
+
+const uiStore = useUiStore()
 
 interface Props {
   visible: boolean
@@ -132,6 +135,7 @@ const loadDirectory = async (path?: string) => {
     // Impact: initial load shows an explicit failure, while refresh failures keep stale content with a warning.
     if (currentPath.value || directoryItems.value.length > 0) {
       loadFailedWithStaleData.value = true
+      uiStore.addAlert('目录刷新失败，当前显示的是上次成功加载的内容', 'warning')
       return
     }
     currentPath.value = ''
@@ -141,6 +145,7 @@ const loadDirectory = async (path?: string) => {
     skippedCount.value = 0
     hasLoadFailure.value = true
     console.error('Failed to load directory:', error)
+    uiStore.addAlert('目录加载失败，请稍后重试', 'error')
   }
 }
 
@@ -223,11 +228,7 @@ watch(visible, async (newVal) => {
 
 .file-browser-header {
   padding: 12px;
-  border: 1px solid var(--app-card-border);
-  background: var(--app-card-surface);
   border-radius: 8px;
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   margin-bottom: 12px;
 }
 

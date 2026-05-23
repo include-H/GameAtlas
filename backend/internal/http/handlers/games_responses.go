@@ -47,9 +47,9 @@ type assetUploadResponse struct {
 }
 
 type operationStatusResponse struct {
-	Deleted  bool `json:"deleted,omitempty"`
-	Updated  bool `json:"updated,omitempty"`
-	Recorded bool `json:"recorded,omitempty"`
+	Deleted  bool `json:"deleted"`
+	Updated  bool `json:"updated"`
+	Recorded bool `json:"recorded"`
 }
 
 type wikiDocumentResponse struct {
@@ -106,9 +106,9 @@ type gameAssetResponse struct {
 	AssetUID  string  `json:"asset_uid"`
 	Path      string  `json:"path"`
 	SortOrder int     `json:"sort_order"`
-	PositionX *float64 `json:"position_x,omitempty"`
-	PositionY *float64 `json:"position_y,omitempty"`
-	WidthPct  *float64 `json:"width_pct,omitempty"`
+	PositionX *float64 `json:"position_x"`
+	PositionY *float64 `json:"position_y"`
+	WidthPct  *float64 `json:"width_pct"`
 }
 
 type metadataItemResponse struct {

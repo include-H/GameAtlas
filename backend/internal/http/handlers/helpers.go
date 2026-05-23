@@ -85,6 +85,7 @@ func writeServiceError(c *gin.Context, err error, validationMessage string) {
 	case errors.Is(err, services.ErrValidation):
 		writeJSONError(c, http.StatusBadRequest, validationMessage)
 	case errors.Is(err, services.ErrUpstream):
+		// 2026-05-09: 统一为中文错误信息
 		writeJSONError(c, http.StatusBadGateway, err.Error())
 	case errors.Is(err, services.ErrMissingConfig):
 		writeJSONError(c, http.StatusBadRequest, err.Error())

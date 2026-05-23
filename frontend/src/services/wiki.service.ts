@@ -13,7 +13,7 @@ export interface WikiHistoryEntry {
   id: number
   game_id: number
   content: string
-  change_summary?: string
+  change_summary?: string | null
   created_at: string
 }
 

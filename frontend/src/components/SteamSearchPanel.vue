@@ -29,7 +29,7 @@
 
     <div
       v-if="results.length > 0 && !selectedGame"
-      class="steam-search-results"
+      class="steam-search-results app-glass-surface"
     >
       <div class="steam-search-title">选择游戏</div>
       <div
@@ -94,11 +94,7 @@ const emit = defineEmits<{
   max-height: 300px;
   overflow-y: auto;
   padding: 8px;
-  background: var(--app-card-surface);
-  border: 1px solid var(--app-card-border);
   border-radius: 10px;
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-search-result-item {

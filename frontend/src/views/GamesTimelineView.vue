@@ -40,7 +40,7 @@
           </template>
 
           <div class="timeline-item__content">
-            <a-card class="timeline-month">
+            <a-card class="timeline-month app-glass-surface">
               <div class="timeline-month__header">
                 <div>
                   <h2 class="timeline-month__title">{{ row.month.monthLabel }}</h2>
@@ -375,10 +375,7 @@ onBeforeUnmount(() => {
 }
 
 .timeline-month {
-  background: var(--app-card-surface);
-  border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
+  /* glass styling via app-glass-surface */
 }
 
 .timeline-month__header {

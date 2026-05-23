@@ -225,10 +225,10 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 }
 
 func (r *GamesRepository) replaceRelationsTx(tx *sqlx.Tx, gameID int64, input domain.GameAggregateCoreUpdateInput) error {
-	if err := replaceRelationRows(tx, MetadataDevelopers, gameID, input.DeveloperIDs); err != nil {
+	if err := replaceRelationRows(tx, domain.MetadataDevelopers, gameID, input.DeveloperIDs); err != nil {
 		return err
 	}
-	if err := replaceRelationRows(tx, MetadataPublishers, gameID, input.PublisherIDs); err != nil {
+	if err := replaceRelationRows(tx, domain.MetadataPublishers, gameID, input.PublisherIDs); err != nil {
 		return err
 	}
 	return nil

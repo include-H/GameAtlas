@@ -2,6 +2,8 @@ package repositories
 
 import (
 	"testing"
+
+	"github.com/hao/game/internal/domain"
 )
 
 func TestMetadataRepositoryListSeriesGamesBySeriesIDsInitializesEmptyAndFiltersVisibility(t *testing.T) {
@@ -72,7 +74,7 @@ func TestMetadataRepositoryFindSimpleBySlugReturnsExistingItem(t *testing.T) {
 
 	repo := NewMetadataRepository(db)
 
-	found, err := repo.FindSimpleBySlug(MetadataDevelopers, "io-interactive-a-s")
+	found, err := repo.FindSimpleBySlug(domain.MetadataDevelopers, "io-interactive-a-s")
 	if err != nil {
 		t.Fatalf("FindSimpleBySlug returned error: %v", err)
 	}
@@ -83,7 +85,7 @@ func TestMetadataRepositoryFindSimpleBySlugReturnsExistingItem(t *testing.T) {
 		t.Fatalf("FindSimpleBySlug name = %q, want %q", found.Name, "IO Interactive A/S")
 	}
 
-	notFound, err := repo.FindSimpleBySlug(MetadataDevelopers, "nonexistent-slug")
+	notFound, err := repo.FindSimpleBySlug(domain.MetadataDevelopers, "nonexistent-slug")
 	if err != nil {
 		t.Fatalf("FindSimpleBySlug nonexistent returned error: %v", err)
 	}
@@ -127,7 +129,7 @@ func TestMetadataRepositoryDeleteUnusedRemovesOrphansOnly(t *testing.T) {
 	if err := repo.DeleteUnusedSeries(); err != nil {
 		t.Fatalf("DeleteUnusedSeries returned error: %v", err)
 	}
-	if err := repo.DeleteUnused(MetadataDevelopers); err != nil {
+	if err := repo.DeleteUnused(domain.MetadataDevelopers); err != nil {
 		t.Fatalf("DeleteUnused developers returned error: %v", err)
 	}
 

@@ -102,8 +102,8 @@ func TestSteamServiceSearchReturnsErrorWhenAllLocalesFail(t *testing.T) {
 	if results != nil {
 		t.Fatalf("results = %#v, want nil on total failure", results)
 	}
-	if err.Error() != "steam search failed" {
-		t.Fatalf("error = %q, want steam search failed", err.Error())
+	if !errors.Is(err, ErrUpstream) {
+		t.Fatalf("error = %v, want wrapped ErrUpstream", err)
 	}
 }
 

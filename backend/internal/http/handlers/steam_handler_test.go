@@ -67,8 +67,9 @@ func TestSteamHandlerSearchReturnsBadGatewayWhenUpstreamFails(t *testing.T) {
 	if recorder.Code != http.StatusBadGateway {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadGateway, recorder.Body.String())
 	}
-	if !strings.Contains(recorder.Body.String(), `"error":"Steam 搜索失败"`) {
-		t.Fatalf("body = %s, want Steam 搜索失败", recorder.Body.String())
+	// writeServiceError maps ErrUpstream to 502 with err.Error() as the message
+	if !strings.Contains(recorder.Body.String(), `"error":"steam search failed`) {
+		t.Fatalf("body = %s, want upstream error payload", recorder.Body.String())
 	}
 }
 

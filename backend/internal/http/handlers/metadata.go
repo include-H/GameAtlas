@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/hao/game/internal/repositories"
+	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/services"
 )
 
@@ -100,7 +100,7 @@ func (h *MetadataHandler) Get(c *gin.Context) {
 	// belongs here rather than in the service because it is a routing-level
 	// constraint: the Get endpoint was wired for series specifically, not as a
 	// generic metadata detail action.
-	if h.resource.Type != repositories.MetadataSeries {
+	if h.resource.Type != domain.MetadataSeries {
 		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
 			// 2026-05-09: 统一为中文错误信息

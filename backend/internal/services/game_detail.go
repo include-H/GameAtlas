@@ -61,11 +61,11 @@ func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) 
 	if err != nil {
 		return nil, err
 	}
-	developers, err := s.gamesRepo.ListMetadata(repositories.MetadataDevelopers, id)
+	developers, err := s.gamesRepo.ListMetadata(domain.MetadataDevelopers, id)
 	if err != nil {
 		return nil, err
 	}
-	publishers, err := s.gamesRepo.ListMetadata(repositories.MetadataPublishers, id)
+	publishers, err := s.gamesRepo.ListMetadata(domain.MetadataPublishers, id)
 	if err != nil {
 		return nil, err
 	}

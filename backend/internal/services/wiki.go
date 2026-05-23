@@ -14,11 +14,11 @@ type WikiService struct {
 }
 
 type WikiDocument struct {
-	GameID       int64   `json:"game_id"`
-	Title        string  `json:"title"`
-	Content      *string `json:"content"`
-	UpdatedAt    string  `json:"updated_at"`
-	HistoryCount int     `json:"history_count,omitempty"`
+	GameID       int64
+	Title        string
+	Content      *string
+	UpdatedAt    string
+	HistoryCount int
 }
 
 func NewWikiService(gamesRepo gameDetailReadRepository, wikiRepo *repositories.WikiRepository, wikiHistoryLimit int) *WikiService {
