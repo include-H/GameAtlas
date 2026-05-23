@@ -29,7 +29,7 @@ type MetadataResource struct {
 	// than permanently curated master data. They can be pre-created for form
 	// input convenience and are expected to be auto-pruned once no games refer
 	// to them anymore.
-	Table        string
+	Type         repositories.MetadataType
 	ResourceName string
 }
 
@@ -53,7 +53,7 @@ func NewMetadataService(repo *repositories.MetadataRepository) *MetadataService 
 func (s *MetadataService) List(resource MetadataResource, includeAll bool, options MetadataListOptions) ([]domain.MetadataItem, error) {
 	// Check cache first
 	var items []domain.MetadataItem
-	if cached, ok := s.listCache.Load(resource.Table); ok {
+	if cached, ok := s.listCache.Load(resource.Type); ok {
 		entry := cached.(cachedMetadataList)
 		if time.Since(entry.cachedAt) < 60*time.Second {
 			items = make([]domain.MetadataItem, len(entry.items))
@@ -63,13 +63,13 @@ func (s *MetadataService) List(resource MetadataResource, includeAll bool, optio
 
 	if items == nil {
 		var err error
-		items, err = s.repo.List(resource.Table)
+		items, err = s.repo.List(resource.Type)
 		if err != nil {
 			return nil, err
 		}
-		s.listCache.Store(resource.Table, cachedMetadataList{items: items, cachedAt: time.Now()})
+		s.listCache.Store(resource.Type, cachedMetadataList{items: items, cachedAt: time.Now()})
 	}
-	if resource.Table == "series" {
+	if resource.Type == repositories.MetadataSeries {
 		if err := s.enrichSeriesItems(items, includeAll); err != nil {
 			return nil, err
 		}
@@ -117,42 +117,42 @@ func (s *MetadataService) Create(resource MetadataResource, input domain.Metadat
 		SortOrder: &sortOrder,
 	}
 
-	switch resource.Table {
-	case "series":
+	switch resource.Type {
+	case repositories.MetadataSeries:
 		result, err := s.repo.CreateSeries(cleanInput, slugValue, sortOrder)
 		if err != nil {
 			return nil, err
 		}
-		s.listCache.Delete(resource.Table)
+		s.listCache.Delete(resource.Type)
 		return result, nil
-	case "developers", "publishers":
-		existing, err := s.repo.FindSimpleByName(resource.Table, name)
+	case repositories.MetadataDevelopers, repositories.MetadataPublishers:
+		existing, err := s.repo.FindSimpleByName(resource.Type, name)
 		if err != nil {
 			return nil, err
 		}
 		if existing != nil {
 			return existing, nil
 		}
-		existing, err = s.repo.FindSimpleBySlug(resource.Table, slugValue)
+		existing, err = s.repo.FindSimpleBySlug(resource.Type, slugValue)
 		if err != nil {
 			return nil, err
 		}
 		if existing != nil {
 			return existing, nil
 		}
-		result, err := s.repo.CreateSimple(resource.Table, cleanInput, slugValue, sortOrder)
+		result, err := s.repo.CreateSimple(resource.Type, cleanInput, slugValue, sortOrder)
 		if err != nil {
 			return nil, err
 		}
-		s.listCache.Delete(resource.Table)
+		s.listCache.Delete(resource.Type)
 		return result, nil
 	default:
-		return nil, fmt.Errorf("unsupported metadata resource: %s", resource.Table)
+		return nil, fmt.Errorf("unsupported metadata resource type: %d", resource.Type)
 	}
 }
 
 func (s *MetadataService) GetSeriesDetail(id int64, includeAll bool) (*SeriesDetail, error) {
-	item, err := s.repo.Get("series", id)
+	item, err := s.repo.Get(repositories.MetadataSeries, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound

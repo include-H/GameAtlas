@@ -789,7 +789,7 @@ func TestGamesHandlerUpdateAggregateReplacesRelations(t *testing.T) {
 		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
 	}
 
-	developers, err := repositories.NewGamesRepository(db).ListMetadata("developers", "game_developers", "developer_id", gameID)
+	developers, err := repositories.NewGamesRepository(db).ListMetadata(repositories.MetadataDevelopers, gameID)
 	if err != nil {
 		t.Fatalf("ListMetadata(developers) returned error: %v", err)
 	}

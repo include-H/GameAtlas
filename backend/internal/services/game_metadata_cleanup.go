@@ -10,17 +10,13 @@ func cleanupUnusedMetadata(metadataRepo *repositories.MetadataRepository) error 
 		return err
 	}
 
-	targets := []struct {
-		table      string
-		joinTable  string
-		joinColumn string
-	}{
-		{table: "developers", joinTable: "game_developers", joinColumn: "developer_id"},
-		{table: "publishers", joinTable: "game_publishers", joinColumn: "publisher_id"},
+	targets := []repositories.MetadataType{
+		repositories.MetadataDevelopers,
+		repositories.MetadataPublishers,
 	}
 
-	for _, target := range targets {
-		if err := metadataRepo.DeleteUnused(target.table, target.joinTable, target.joinColumn); err != nil {
+	for _, typ := range targets {
+		if err := metadataRepo.DeleteUnused(typ); err != nil {
 			return err
 		}
 	}

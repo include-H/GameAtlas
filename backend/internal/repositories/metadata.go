@@ -9,6 +9,56 @@ import (
 	"github.com/hao/game/internal/domain"
 )
 
+// MetadataType enumerates the supported metadata entity kinds. The repository
+// layer owns this type so that table-name strings never leak into service or
+// handler code.
+type MetadataType int
+
+const (
+	MetadataDevelopers MetadataType = iota
+	MetadataPublishers
+	MetadataSeries
+)
+
+func metadataTableName(typ MetadataType) string {
+	switch typ {
+	case MetadataDevelopers:
+		return "developers"
+	case MetadataPublishers:
+		return "publishers"
+	case MetadataSeries:
+		return "series"
+	default:
+		return ""
+	}
+}
+
+func metadataJoinTable(typ MetadataType) string {
+	switch typ {
+	case MetadataDevelopers:
+		return "game_developers"
+	case MetadataPublishers:
+		return "game_publishers"
+	case MetadataSeries:
+		return "game_series"
+	default:
+		return ""
+	}
+}
+
+func metadataJoinColumn(typ MetadataType) string {
+	switch typ {
+	case MetadataDevelopers:
+		return "developer_id"
+	case MetadataPublishers:
+		return "publisher_id"
+	case MetadataSeries:
+		return "series_id"
+	default:
+		return ""
+	}
+}
+
 type MetadataRepository struct {
 	db *sqlx.DB
 }
@@ -17,7 +67,8 @@ func NewMetadataRepository(db *sqlx.DB) *MetadataRepository {
 	return &MetadataRepository{db: db}
 }
 
-func (r *MetadataRepository) List(table string) ([]domain.MetadataItem, error) {
+func (r *MetadataRepository) List(typ MetadataType) ([]domain.MetadataItem, error) {
+	table := metadataTableName(typ)
 	query := fmt.Sprintf(`
 		SELECT id, name, slug, sort_order, created_at
 		FROM %s
@@ -32,7 +83,8 @@ func (r *MetadataRepository) List(table string) ([]domain.MetadataItem, error) {
 	return items, nil
 }
 
-func (r *MetadataRepository) Get(table string, id int64) (*domain.MetadataItem, error) {
+func (r *MetadataRepository) Get(typ MetadataType, id int64) (*domain.MetadataItem, error) {
+	table := metadataTableName(typ)
 	query := fmt.Sprintf(`
 		SELECT id, name, slug, sort_order, created_at
 		FROM %s
@@ -47,7 +99,8 @@ func (r *MetadataRepository) Get(table string, id int64) (*domain.MetadataItem, 
 	return &item, nil
 }
 
-func (r *MetadataRepository) FindSimpleByName(table string, name string) (*domain.MetadataItem, error) {
+func (r *MetadataRepository) FindSimpleByName(typ MetadataType, name string) (*domain.MetadataItem, error) {
+	table := metadataTableName(typ)
 	query := fmt.Sprintf(`
 		SELECT id, name, slug, sort_order, created_at
 		FROM %s
@@ -66,7 +119,8 @@ func (r *MetadataRepository) FindSimpleByName(table string, name string) (*domai
 	return &item, nil
 }
 
-func (r *MetadataRepository) FindSimpleBySlug(table string, slug string) (*domain.MetadataItem, error) {
+func (r *MetadataRepository) FindSimpleBySlug(typ MetadataType, slug string) (*domain.MetadataItem, error) {
+	table := metadataTableName(typ)
 	query := fmt.Sprintf(`
 		SELECT id, name, slug, sort_order, created_at
 		FROM %s
@@ -98,7 +152,8 @@ func (r *MetadataRepository) CreateSeries(input domain.MetadataWriteInput, slug 
 	return &item, nil
 }
 
-func (r *MetadataRepository) CreateSimple(table string, input domain.MetadataWriteInput, slug string, sortOrder int) (*domain.MetadataItem, error) {
+func (r *MetadataRepository) CreateSimple(typ MetadataType, input domain.MetadataWriteInput, slug string, sortOrder int) (*domain.MetadataItem, error) {
+	table := metadataTableName(typ)
 	query := fmt.Sprintf(`
 		INSERT INTO %s (name, slug, sort_order)
 		VALUES (?, ?, ?)
@@ -240,7 +295,10 @@ func (r *MetadataRepository) DeleteUnusedSeries() error {
 	return nil
 }
 
-func (r *MetadataRepository) DeleteUnused(table, joinTable, joinColumn string) error {
+func (r *MetadataRepository) DeleteUnused(typ MetadataType) error {
+	table := metadataTableName(typ)
+	joinTable := metadataJoinTable(typ)
+	joinColumn := metadataJoinColumn(typ)
 	query := fmt.Sprintf(`
 		DELETE FROM %s
 		WHERE id NOT IN (

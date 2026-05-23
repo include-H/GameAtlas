@@ -191,7 +191,9 @@ func (r *GamesRepository) buildGamesListWhere(params domain.GamesListParams, exc
 	return where, args, nil
 }
 
-func replaceRelationRows(tx *sqlx.Tx, table, column string, gameID int64, ids []int64) error {
+func replaceRelationRows(tx *sqlx.Tx, typ MetadataType, gameID int64, ids []int64) error {
+	table := metadataJoinTable(typ)
+	column := metadataJoinColumn(typ)
 	if _, err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE game_id = ?", table), gameID); err != nil {
 		return fmt.Errorf("clear %s: %w", table, err)
 	}
