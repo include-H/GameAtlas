@@ -63,7 +63,7 @@ func (h *SteamGridDBHandler) Search(c *gin.Context) {
 	}
 	results, err := h.service.Search(query)
 	if err != nil {
-		writeJSONError(c, http.StatusBadGateway, "SteamGridDB 搜索失败")
+		writeServiceError(c, err, "SteamGridDB 搜索失败")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamGridDBGameResponses(results)})
@@ -95,7 +95,7 @@ func (h *SteamGridDBHandler) handleImagesByGameID(c *gin.Context, fetch func(int
 	}
 	images, err := fetch(int(gameID))
 	if err != nil {
-		writeJSONError(c, http.StatusBadGateway, "SteamGridDB 请求失败")
+		writeServiceError(c, err, "SteamGridDB 请求失败")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": toSteamGridDBImageResponses(images)})
@@ -114,7 +114,7 @@ func (h *SteamGridDBHandler) handleImages(c *gin.Context, fetch func(int64) ([]s
 
 	images, err := fetch(appID)
 	if err != nil {
-		writeJSONError(c, http.StatusBadGateway, "SteamGridDB 请求失败")
+		writeServiceError(c, err, "SteamGridDB 请求失败")
 		return
 	}
 

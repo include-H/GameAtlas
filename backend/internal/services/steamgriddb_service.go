@@ -69,7 +69,7 @@ func (s *SteamGridDBService) Search(query string) ([]SteamGridDBGame, error) {
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request search: %w", err)
+		return nil, fmt.Errorf("%w: request search: %w", ErrUpstream, err)
 	}
 	defer resp.Body.Close()
 
@@ -79,7 +79,7 @@ func (s *SteamGridDBService) Search(query string) ([]SteamGridDBGame, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("steamgriddb search: HTTP %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("%w: steamgriddb search: HTTP %d: %s", ErrUpstream, resp.StatusCode, string(body))
 	}
 
 	var result steamGridDBSearchResponse
@@ -88,7 +88,7 @@ func (s *SteamGridDBService) Search(query string) ([]SteamGridDBGame, error) {
 	}
 
 	if !result.Success {
-		return nil, fmt.Errorf("steamgriddb search: api returned success=false")
+		return nil, fmt.Errorf("%w: steamgriddb search: api returned success=false", ErrUpstream)
 	}
 
 	return result.Data, nil
@@ -144,7 +144,7 @@ func (s *SteamGridDBService) fetchImages(endpoint string, extra url.Values) ([]S
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request %s: %w", endpoint, err)
+		return nil, fmt.Errorf("%w: request %s: %w", ErrUpstream, endpoint, err)
 	}
 	defer resp.Body.Close()
 
@@ -154,7 +154,7 @@ func (s *SteamGridDBService) fetchImages(endpoint string, extra url.Values) ([]S
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("steamgriddb %s: HTTP %d: %s", endpoint, resp.StatusCode, string(body))
+		return nil, fmt.Errorf("%w: steamgriddb %s: HTTP %d: %s", ErrUpstream, endpoint, resp.StatusCode, string(body))
 	}
 
 	var result steamGridDBImageResponse
@@ -163,7 +163,7 @@ func (s *SteamGridDBService) fetchImages(endpoint string, extra url.Values) ([]S
 	}
 
 	if !result.Success {
-		return nil, fmt.Errorf("steamgriddb %s: api returned success=false", endpoint)
+		return nil, fmt.Errorf("%w: steamgriddb %s: api returned success=false", ErrUpstream, endpoint)
 	}
 
 	return result.Data, nil

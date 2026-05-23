@@ -546,7 +546,7 @@ const handleImageError = (url: string) => {
   padding: 6px 14px;
   border-radius: 20px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--color-text-1);
   font-weight: 500;
   backdrop-filter: blur(var(--app-card-backdrop-blur));
   border: 1px solid var(--app-card-border);

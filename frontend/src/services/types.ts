@@ -52,8 +52,8 @@ export interface PendingIssueEvaluation {
 export interface Series {
   id: number
   name: string
-  slug?: string
-  sort_order?: number
+  slug: string
+  sort_order: number
   created_at: string
   game_count?: number
   cover_image?: string | null
@@ -98,9 +98,9 @@ export interface PublicGameFileEntry {
   id: number
   game_id: number
   file_name: string
-  label?: string | null
-  notes?: string | null
-  size_bytes?: number | null
+  label: string | null
+  notes: string | null
+  size_bytes: number | null
   sort_order: number
   source_created_at: string | null
   created_at: string
@@ -162,12 +162,12 @@ export interface GameListItemDto {
   cover_image: string | null
   banner_image: string | null
   wiki_content: string | null
-  primary_screenshot?: string | null
-  screenshot_count?: number
+  primary_screenshot: string | null
+  screenshot_count: number
   logo_visible: boolean
-  file_count?: number
-  developer_count?: number
-  publisher_count?: number
+  file_count: number
+  developer_count: number
+  publisher_count: number
   is_favorite: boolean
   pending_issues?: PendingIssueEvaluation | null
   downloads: number
@@ -355,7 +355,7 @@ export interface ReviewIssueOverride {
   game_id: number
   issue_key: string
   status: string
-  reason?: string | null
+  reason: string | null
   created_at: string
   updated_at: string
 }

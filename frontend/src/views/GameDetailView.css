@@ -206,15 +206,10 @@
 }
 
 .sidebar-card {
-  background: var(--app-card-surface);
-  border: 1px solid var(--app-card-border);
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--shadow-soft);
 }
 
 .sidebar-card--meta {
@@ -347,11 +342,6 @@
 .download-version-panel {
   padding: 14px;
   border-radius: var(--radius-lg);
-  background: var(--app-card-surface);
-  border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
-  box-shadow: var(--shadow-soft);
 }
 
 .download-version-list {
@@ -465,11 +455,6 @@
   min-height: 46px;
   padding: 8px 12px;
   border-radius: var(--radius-lg);
-  background: var(--app-card-surface);
-  border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
-  box-shadow: var(--shadow-soft);
   gap: 4px;
 }
 

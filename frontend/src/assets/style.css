@@ -207,14 +207,6 @@ body[arco-theme='dark'] #app {
 /* -----------------------------------------------------------------------
    Utility Classes (Glassmorphism & Layouts)
    ----------------------------------------------------------------------- */
-.glass-panel {
-  background: var(--app-card-surface);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
-  border: 1px solid var(--app-card-border);
-  box-shadow: var(--app-glass-shadow-rest);
-}
-
 .app-glass-surface {
   background: var(--app-card-surface);
   border: 1px solid var(--app-card-border);

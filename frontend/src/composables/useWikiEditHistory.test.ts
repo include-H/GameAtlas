@@ -72,6 +72,7 @@ describe('useWikiEditHistory', () => {
       id: 1,
       game_id: 1,
       content: 'restored content',
+      change_summary: null,
       created_at: '2026-04-01T10:00:00Z',
     }
     history.historyPreviewVisible.value = true

@@ -2,6 +2,12 @@ package domain
 
 import "strings"
 
+// 2026-05-09: 架构说明 — domain 层结构体带 db:"..." 标签，是项目初始化时的有意设计。
+// SQLX 直接扫描到 domain 类型，省去 repository 层的私有 scan struct + mapper。
+// 严格来说 domain 不应感知持久化细节，但当前写法在 Go + SQLX 项目中属常见简化，
+// 且项目已进入稳定期，大规模重构收益不高。如需改为严格分层，需为每个查询创建
+// repository 私有 scan struct 再 mapper 到 domain 类型。
+
 // 2026-05-09: A-5 审查结论 — Game 与 GameListItem 字段重复但不合并。
 // 两者各有清晰边界：Game 用于单条读写路径（detail/create/update），GameListItem
 // 用于列表聚合查询（含 screenshot_stats/file_stats 等 CTE）。合并会模糊 SQL

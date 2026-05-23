@@ -65,7 +65,7 @@
         </div>
 
         <div class="game-detail__sidebar">
-          <div class="sidebar-card sidebar-card--hero">
+          <div class="sidebar-card sidebar-card--hero app-glass-surface">
             <div class="sidebar-header-image">
               <img
                 v-if="game.banner_image"
@@ -96,7 +96,7 @@
             </div>
           </div>
 
-          <div class="sidebar-card sidebar-card--meta">
+          <div class="sidebar-card sidebar-card--meta app-glass-surface">
             <div class="sidebar-info">
               <div v-if="game.series" class="sidebar-info__item">
                 <span class="sidebar-info__label">系列</span>
@@ -120,7 +120,7 @@
       </div>
 
       <div class="game-detail__download-section">
-        <div v-if="versions.length > 0" class="download-version-panel">
+        <div v-if="versions.length > 0" class="download-version-panel app-glass-surface">
           <div class="download-version-list">
             <div
               v-for="version in versions"
@@ -166,7 +166,7 @@
           </div>
         </div>
 
-        <div v-else class="download-empty">
+        <div v-else class="download-empty app-glass-surface">
           <p class="download-empty-title">暂无可下载版本</p>
         </div>
       </div>
