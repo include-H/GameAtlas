@@ -289,7 +289,6 @@ describe('games service', () => {
     expect(result).toEqual([
       {
         id: '9',
-        gameId: 'game-1',
         version: 'Legacy',
         releaseDate: '2026-03-20T00:00:00Z',
         size: 99,
@@ -297,11 +296,9 @@ describe('games service', () => {
         canLaunch: false,
         downloadUrl: '/api/games/game-1/files/9/download',
         launchScriptUrl: '/api/games/game-1/files/9/launch-script',
-        changelog: undefined,
       },
       {
         id: '10',
-        gameId: 'game-1',
         version: 'Alpha',
         releaseDate: '2026-03-25T00:00:00Z',
         size: 123,
@@ -309,7 +306,6 @@ describe('games service', () => {
         canLaunch: true,
         downloadUrl: '/api/games/game-1/files/10/download',
         launchScriptUrl: '/api/games/game-1/files/10/launch-script',
-        changelog: 'latest build',
       },
     ])
   })

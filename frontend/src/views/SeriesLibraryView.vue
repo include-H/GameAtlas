@@ -201,6 +201,9 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .series-library {
+  --series-collage-bg: linear-gradient(135deg, rgba(12, 18, 30, 0.96), rgba(16, 20, 30, 0.82));
+  --series-placeholder-text: rgba(255, 255, 255, 0.92);
+
   animation: fadeInUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
@@ -288,7 +291,7 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 2px;
-  background: linear-gradient(135deg, rgba(12, 18, 30, 0.96), rgba(16, 20, 30, 0.82));
+  background: var(--series-collage-bg);
 }
 
 .series-card__collage-tile {
@@ -316,7 +319,7 @@ onBeforeUnmount(() => {
   place-items: center;
   font-size: 48px;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--series-placeholder-text);
 }
 
 .series-card__overlay {

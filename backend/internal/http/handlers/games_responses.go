@@ -81,11 +81,11 @@ type gameListItemResponse struct {
 	WikiContent       *string                         `json:"wiki_content"`
 	Downloads         int64                           `json:"downloads"`
 	PrimaryScreenshot *string                         `json:"primary_screenshot"`
-	ScreenshotCount   int64                           `json:"screenshot_count"`
-	LogoVisible       bool                            `json:"logo_visible"`
-	FileCount         int64                           `json:"file_count"`
-	DeveloperCount    int64                           `json:"developer_count"`
-	PublisherCount    int64                           `json:"publisher_count"`
+	ScreenshotCount   int64                           `json:"screenshot_count,omitempty"`
+	LogoVisible       bool                            `json:"logo_visible,omitempty"`
+	FileCount         int64                           `json:"file_count,omitempty"`
+	DeveloperCount    int64                           `json:"developer_count,omitempty"`
+	PublisherCount    int64                           `json:"publisher_count,omitempty"`
 	IsFavorite        bool                            `json:"is_favorite"`
 	PendingIssues     *pendingIssueEvaluationResponse `json:"pending_issues,omitempty"`
 	CreatedAt         string                          `json:"created_at"`
@@ -102,10 +102,10 @@ type timelineGameItemResponse struct {
 }
 
 type gameAssetResponse struct {
-	ID        int64   `json:"id"`
-	AssetUID  string  `json:"asset_uid"`
-	Path      string  `json:"path"`
-	SortOrder int     `json:"sort_order"`
+	ID        int64    `json:"id"`
+	AssetUID  string   `json:"asset_uid"`
+	Path      string   `json:"path"`
+	SortOrder int      `json:"sort_order"`
 	PositionX *float64 `json:"position_x"`
 	PositionY *float64 `json:"position_y"`
 	WidthPct  *float64 `json:"width_pct"`
@@ -244,4 +244,3 @@ type pendingIssueCatalogResponse struct {
 	Groups  []pendingIssueDefinitionResponse       `json:"groups"`
 	Details []pendingIssueDetailDefinitionResponse `json:"details"`
 }
-

@@ -14,7 +14,7 @@
             :pupil-size="7"
             :max-distance="5"
             eye-color="white"
-            pupil-color="#2D2D2D"
+            pupil-color="var(--login-dark)"
             :is-blinking="isPurpleBlinking"
             :force-look-x="purpleForceLook.x"
             :force-look-y="purpleForceLook.y"
@@ -24,7 +24,7 @@
             :pupil-size="7"
             :max-distance="5"
             eye-color="white"
-            pupil-color="#2D2D2D"
+            pupil-color="var(--login-dark)"
             :is-blinking="isPurpleBlinking"
             :force-look-x="purpleForceLook.x"
             :force-look-y="purpleForceLook.y"
@@ -39,7 +39,7 @@
             :pupil-size="6"
             :max-distance="4"
             eye-color="white"
-            pupil-color="#2D2D2D"
+            pupil-color="var(--login-dark)"
             :is-blinking="isBlackBlinking"
             :force-look-x="blackForceLook.x"
             :force-look-y="blackForceLook.y"
@@ -49,7 +49,7 @@
             :pupil-size="6"
             :max-distance="4"
             eye-color="white"
-            pupil-color="#2D2D2D"
+            pupil-color="var(--login-dark)"
             :is-blinking="isBlackBlinking"
             :force-look-x="blackForceLook.x"
             :force-look-y="blackForceLook.y"
@@ -62,14 +62,14 @@
           <Pupil
             :size="12"
             :max-distance="5"
-            pupil-color="#2D2D2D"
+            pupil-color="var(--login-dark)"
             :force-look-x="sharedPupilForceLook.x"
             :force-look-y="sharedPupilForceLook.y"
           />
           <Pupil
             :size="12"
             :max-distance="5"
-            pupil-color="#2D2D2D"
+            pupil-color="var(--login-dark)"
             :force-look-x="sharedPupilForceLook.x"
             :force-look-y="sharedPupilForceLook.y"
           />
@@ -81,14 +81,14 @@
           <Pupil
             :size="12"
             :max-distance="5"
-            pupil-color="#2D2D2D"
+            pupil-color="var(--login-dark)"
             :force-look-x="sharedPupilForceLook.x"
             :force-look-y="sharedPupilForceLook.y"
           />
           <Pupil
             :size="12"
             :max-distance="5"
-            pupil-color="#2D2D2D"
+            pupil-color="var(--login-dark)"
             :force-look-x="sharedPupilForceLook.x"
             :force-look-y="sharedPupilForceLook.y"
           />
@@ -263,7 +263,7 @@ const purpleStyle = computed(() => ({
   left: '70px',
   width: '180px',
   height: props.isTyping || isHidingPassword.value ? '440px' : '400px',
-  backgroundColor: '#6C3FF5',
+  backgroundColor: 'var(--login-purple)',
   borderRadius: '10px 10px 0 0',
   zIndex: 1,
   transform: isRevealed.value
@@ -283,7 +283,7 @@ const blackStyle = computed(() => ({
   left: '240px',
   width: '120px',
   height: '310px',
-  backgroundColor: '#2D2D2D',
+  backgroundColor: 'var(--login-dark)',
   borderRadius: '8px 8px 0 0',
   zIndex: 2,
   transform: isRevealed.value
@@ -306,7 +306,7 @@ const orangeStyle = computed(() => ({
   width: '240px',
   height: '200px',
   zIndex: 3,
-  backgroundColor: '#FF9B6B',
+  backgroundColor: 'var(--login-orange)',
   borderRadius: '120px 120px 0 0',
   transform: isRevealed.value ? 'skewX(0deg)' : `skewX(${orangePos.value.bodySkew}deg)`,
   transformOrigin: 'bottom center',
@@ -321,7 +321,7 @@ const yellowStyle = computed(() => ({
   left: '310px',
   width: '140px',
   height: '230px',
-  backgroundColor: '#E8D754',
+  backgroundColor: 'var(--login-yellow)',
   borderRadius: '70px 70px 0 0',
   zIndex: 4,
   transform: isRevealed.value ? 'skewX(0deg)' : `skewX(${yellowPos.value.bodySkew}deg)`,
@@ -377,7 +377,13 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* Login page brand colors — 特例，不外溢到通用容器 */
 .animated-characters {
+  --login-purple: #6C3FF5;
+  --login-dark: #2D2D2D;
+  --login-orange: #FF9B6B;
+  --login-yellow: #E8D754;
+
   position: relative;
   width: min(770px, 100%);
   height: 560px;

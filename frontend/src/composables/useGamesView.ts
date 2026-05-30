@@ -348,6 +348,7 @@ export const useGamesView = ({
   const viewMode = ref<GamesViewMode>('grid')
   const showAddModal = ref(false)
   const addGameSubmitting = ref(false)
+  const isTogglingFavorite = ref(false)
 
   const itemsPerPageOptions = [
     { label: '12', value: 12 },
@@ -546,30 +547,34 @@ export const useGamesView = ({
 
   const toggleFavorite = async (gameRef: string) => {
     if (!gameRef) return
+    isTogglingFavorite.value = true
     try {
       await gamesStore.toggleFavorite(gameRef)
       uiStore.addAlert('收藏已更新', 'success')
     } catch {
       uiStore.addAlert('更新收藏失败', 'error')
+    } finally {
+      isTogglingFavorite.value = false
     }
   }
 
   const deleteGame = async (gameRef: string, title: string) => {
-    const result = await gamesService.deleteGame(gameRef)
-    uiStore.addAlert(`游戏 "${title}" 已删除`, 'success')
-    if (result.warnings.length > 0) {
-      uiStore.addAlert(
-        `游戏 "${title}" 已删除，但仍有 ${result.warnings.length} 个残留素材等待清理，系统会在下次后端启动时自动重试删除`,
-        'warning'
-      )
-    }
     try {
-      // 2026-04-10: deletion and catalog refresh are separate outcomes.
-      // Impact: once the delete request succeeds, a later list refresh failure must not
-      // be reported as "delete failed".
-      await loadGames()
-    } catch {
-      uiStore.addAlert('删除已生效，但列表刷新失败，请稍后重试', 'warning')
+      const result = await gamesService.deleteGame(gameRef)
+      uiStore.addAlert(`游戏 "${title}" 已删除`, 'success')
+      if (result.warnings.length > 0) {
+        uiStore.addAlert(
+          `游戏 "${title}" 已删除，但仍有 ${result.warnings.length} 个残留素材等待清理，系统会在下次后端启动时自动重试删除`,
+          'warning'
+        )
+      }
+      try {
+        await loadGames()
+      } catch {
+        uiStore.addAlert('删除已生效，但列表刷新失败，请稍后重试', 'warning')
+      }
+    } catch (error) {
+      uiStore.addAlert(`删除游戏失败：${getHttpErrorMessage(error)}`, 'error')
     }
   }
 
@@ -667,6 +672,7 @@ export const useGamesView = ({
     hasActiveFilters,
     hasLoadFailure,
     isLoading,
+    isTogglingFavorite,
     itemsPerPage,
     itemsPerPageOptions,
     loadGames,

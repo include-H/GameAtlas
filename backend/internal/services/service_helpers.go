@@ -8,6 +8,8 @@ import (
 	"github.com/hao/game/internal/domain"
 )
 
+// Sentinel errors: English messages are for logs and errors.Is matching only.
+// User-visible messages are translated to Chinese by writeServiceError in handlers.
 var ErrNotFound = errors.New("resource not found")
 var ErrValidation = errors.New("validation error")
 

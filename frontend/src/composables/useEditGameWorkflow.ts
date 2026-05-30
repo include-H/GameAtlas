@@ -125,6 +125,7 @@ const createUpdatePayload = (params: {
     developer_ids: params.developerIds,
     publisher_ids: params.publisherIds,
     summary: toNullableFormText(params.form.summary),
+    // cover_image/banner_image 由后端从 asset sort-order 表同步，此处值会被覆写
     cover_image: null,
     banner_image: null,
     logo_visible: params.form.logo_visible,

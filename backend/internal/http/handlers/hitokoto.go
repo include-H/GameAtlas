@@ -23,7 +23,7 @@ func (h *HitokotoHandler) Get(c *gin.Context) {
 	if !ok {
 		return
 	}
-	maxLength, ok := parseHitokotoLengthQuery(c, "max_length", 30)
+	maxLength, ok := parseHitokotoLengthQuery(c, "max_length", 34)
 	if !ok {
 		return
 	}

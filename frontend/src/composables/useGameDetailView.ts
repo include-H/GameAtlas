@@ -46,7 +46,7 @@ interface StartVersionDownloadOptions {
   versionId: string
   versionLabel: string
   downloadUrl: string
-  recordDownload: (gameId: string, fileId: string) => Promise<void>
+  recordDownload: (gameId: string, fileId: string) => Promise<{ recorded: boolean }>
   navigateToUrl: (url?: string) => void
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
 }

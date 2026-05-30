@@ -170,6 +170,12 @@ onUnmounted(() => {
 
 <style scoped>
 .game-carousel {
+  --carousel-text-muted: rgba(255, 255, 255, 0.7);
+  --carousel-text-secondary: rgba(255, 255, 255, 0.85);
+  --carousel-indicator-bg: rgba(255, 255, 255, 0.4);
+  --carousel-indicator-active: white;
+  --carousel-indicator-active-bg: rgba(255, 255, 255, 0.8);
+
   position: relative;
   width: 100%;
   height: 45vh;
@@ -252,14 +258,14 @@ onUnmounted(() => {
 
 .carousel-meta {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--carousel-text-muted);
   margin: 0 0 12px 0;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .carousel-description {
   font-size: 16px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--carousel-text-secondary);
   margin: 0 0 24px 0;
   line-height: 1.6;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -280,7 +286,7 @@ onUnmounted(() => {
   height: 8px;
   min-width: 8px !important;
   min-height: 8px !important;
-  background: rgba(255, 255, 255, 0.4);
+  background: var(--carousel-indicator-bg);
   transition: all 0.3s ease;
   padding: 0;
   color: transparent;
@@ -291,13 +297,13 @@ onUnmounted(() => {
 }
 
 .indicator.active {
-  background: white;
+  background: var(--carousel-indicator-active);
   width: 24px;
   border-radius: 4px;
 }
 
 .indicator:hover {
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--carousel-indicator-active-bg);
 }
 
 /* Responsive - Arco Design Breakpoints */

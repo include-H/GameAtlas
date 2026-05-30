@@ -169,7 +169,7 @@ export interface GameListItemDto {
   developer_count: number
   publisher_count: number
   is_favorite: boolean
-  pending_issues?: PendingIssueEvaluation | null
+  pending_issues?: PendingIssueEvaluation
   downloads: number
   created_at: string
   updated_at: string
@@ -298,17 +298,13 @@ export const isAdminGameDetail = (game: GameDetail | null | undefined): game is 
 
 export interface GameVersion {
   id: string
-  gameId: string
   version: string
-  buildNumber?: string
   releaseDate: string
   size: number
-  checksum?: string
   isLatest: boolean
   canLaunch?: boolean
   downloadUrl?: string
   launchScriptUrl?: string
-  changelog?: string
 }
 
 export interface GameStats {

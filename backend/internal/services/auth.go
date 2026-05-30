@@ -39,6 +39,8 @@ const (
 	LoginDeniedLocked          LoginDeniedReason = "locked"
 )
 
+// LoginDeniedError must be translated to Chinese by the consuming handler
+// via errors.As type assertion (not through writeServiceError's sentinel switch).
 type LoginDeniedError struct {
 	Reason             LoginDeniedReason
 	RemainingAttempts  int

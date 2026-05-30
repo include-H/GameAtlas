@@ -304,21 +304,6 @@ onBeforeUnmount(() => {
   pointer-events: auto;
 }
 
-.media-action-button {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  padding: 0;
-  border-radius: 999px;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
-  transition: transform 0.2s ease;
-}
-
-.media-action-button:hover {
-  transform: scale(1.06);
-}
-
 .screenshot-overlay-actions .media-action-button {
   width: 28px;
   height: 28px;

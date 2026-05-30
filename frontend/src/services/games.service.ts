@@ -113,14 +113,8 @@ async function fetchGamesPage(params?: {
 }
 
 function normalizeGameListItem(item: GameListItemDto): GameListItem {
-  return {
-    ...item,
-    isFavorite: item.is_favorite,
-  }
-}
-
-function normalizeTimelineGame(item: TimelineGameResponse): TimelineGame {
-  return { ...item }
+  const { is_favorite, ...rest } = item
+  return { ...rest, isFavorite: is_favorite }
 }
 
 function readTimelinePagination(response: TimelineGamesApiResponse): TimelinePaginationApi {
@@ -132,9 +126,12 @@ function readTimelinePagination(response: TimelineGamesApiResponse): TimelinePag
 }
 
 function normalizeGameDetail(item: GameDetailDto): GameDetail {
+  const { is_favorite, ...rest } = item
   return {
-    ...item,
-    isFavorite: item.is_favorite,
+    ...rest,
+    isFavorite: is_favorite,
+    covers: item.covers,
+    logos: item.logos,
     preview_videos: item.preview_videos,
     screenshots: item.screenshots,
     banners: item.banners,
@@ -196,7 +193,6 @@ export function mapGameVersions(game: Pick<GameDetail, 'public_id' | 'files'>): 
 
   return files.map((file, index) => ({
     id: String(file.id),
-    gameId,
     version: file.label?.trim() || getFileName(file.file_name) || `文件 ${index + 1}`,
     releaseDate: getGameFileReleaseDate(file),
     size: file.size_bytes ?? 0,
@@ -204,7 +200,6 @@ export function mapGameVersions(game: Pick<GameDetail, 'public_id' | 'files'>): 
     canLaunch: canLaunchFromFileName(file.file_name),
     downloadUrl: buildApiUrl(`/games/${gameId}/files/${file.id}/download`),
     launchScriptUrl: buildApiUrl(`/games/${gameId}/files/${file.id}/launch-script`),
-    changelog: file.notes || undefined,
   }))
 }
 
@@ -264,7 +259,7 @@ const gamesService = {
     const pagination = readTimelinePagination(response)
 
     return {
-      data: response.data.map((item) => normalizeTimelineGame(item)),
+      data: response.data,
       hasMore: pagination.hasMore,
       nextCursor: pagination.nextCursor || null,
     }
