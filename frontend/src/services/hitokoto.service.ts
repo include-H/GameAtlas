@@ -1,4 +1,5 @@
 import { get } from './api'
+import type { ApiEnvelope } from './types'
 
 interface HitokotoSentence {
   id: number
@@ -20,13 +21,14 @@ const hitokotoService = {
     min_length?: number
     max_length?: number
   }): Promise<HitokotoSentence> {
-    return get<HitokotoSentence>('/hitokoto', {
+    const response = await get<ApiEnvelope<HitokotoSentence>>('/hitokoto', {
       params: {
         c: 'c',
         min_length: params?.min_length ?? 10,
         max_length: params?.max_length ?? 34,
       },
     })
+    return response.data
   },
 }
 

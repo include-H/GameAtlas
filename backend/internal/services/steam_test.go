@@ -241,8 +241,8 @@ func TestSteamServiceProxyAssetReturnsErrorForUnexpectedStatus(t *testing.T) {
 	if err == nil {
 		t.Fatalf("ProxyAssetStream error = nil, want failure")
 	}
-	if err.Error() != "steam request failed with status 502" {
-		t.Fatalf("error = %q, want status failure", err.Error())
+	if !errors.Is(err, ErrUpstream) {
+		t.Fatalf("error = %q, want ErrUpstream", err.Error())
 	}
 }
 

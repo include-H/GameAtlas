@@ -38,11 +38,10 @@
       </div>
 
       <a-button
-        class="app-text-action-btn"
+        class="app-text-action-btn add-path-btn"
         type="text"
         long
         html-type="button"
-        :style="{ marginTop: '8px' }"
         @click="emit('add')"
       >
         <template #icon>
@@ -110,6 +109,10 @@ const handleLabelUpdate = (index: number, value: string | number | undefined) =>
 .file-path-input {
   flex: 5;
   min-width: 0;
+}
+
+.add-path-btn {
+  margin-top: 8px;
 }
 
 .file-label-input {

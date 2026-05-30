@@ -371,7 +371,7 @@ const handleImageError = (url: string) => {
   aspect-ratio: 16 / 9;
   background:
     radial-gradient(circle at 20% 18%, rgba(40, 52, 84, 0.36), transparent 30%),
-    linear-gradient(180deg, #090b10 0%, #05070b 100%);
+    linear-gradient(180deg, var(--color-carousel-empty-start) 0%, var(--color-carousel-empty-end) 100%);
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 24px 50px rgba(0, 0, 0, 0.34);
@@ -439,7 +439,7 @@ const handleImageError = (url: string) => {
   height: 100%;
   display: block;
   object-fit: contain;
-  background: #000;
+  background: var(--color-media-bg);
   object-position: center center;
   opacity: 0;
   transform: scale(1.02);

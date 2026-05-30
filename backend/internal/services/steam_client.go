@@ -24,15 +24,21 @@ func (s *SteamService) clientForProxy(proxyOverride string) *http.Client {
 		return s.client
 	}
 
+	if cached, ok := s.proxyClients.Load(proxyOverride); ok {
+		return cached.(*http.Client)
+	}
+
 	transport := &http.Transport{Proxy: http.ProxyFromEnvironment}
 	if parsed, err := url.Parse(proxyOverride); err == nil {
 		transport.Proxy = http.ProxyURL(parsed)
 	}
 
-	return &http.Client{
+	client := &http.Client{
 		Timeout:   30 * time.Second,
 		Transport: transport,
 	}
+	s.proxyClients.Store(proxyOverride, client)
+	return client
 }
 
 func (s *SteamService) proxyLogValue(proxyOverride string) string {

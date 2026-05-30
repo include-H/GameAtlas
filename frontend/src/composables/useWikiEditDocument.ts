@@ -93,7 +93,6 @@ export const useWikiEditDocument = ({
     } catch (error) {
       const errorMessage = getHttpErrorMessage(error, '保存 Wiki 失败')
       uiStore.addAlert(errorMessage, 'error')
-      console.error('Failed to save wiki:', error)
     } finally {
       isSaving.value = false
     }

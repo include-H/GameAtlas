@@ -235,7 +235,7 @@ const emit = defineEmits<{
   display: grid;
   place-items: center;
   background: rgba(var(--primary-6), 0.9);
-  color: #fff;
+  color: var(--color-text-on-dark);
 }
 
 .steam-screenshots-empty {

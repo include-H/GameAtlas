@@ -144,7 +144,6 @@ const loadDirectory = async (path?: string) => {
     directoryListIncomplete.value = false
     skippedCount.value = 0
     hasLoadFailure.value = true
-    console.error('Failed to load directory:', error)
     uiStore.addAlert('目录加载失败，请稍后重试', 'error')
   }
 }
@@ -215,13 +214,13 @@ watch(visible, async (newVal) => {
 }
 
 .file-browser-status--warning {
-  color: #9a6700;
+  color: var(--color-status-warning-text);
   background: rgba(255, 196, 92, 0.16);
   border: 1px solid rgba(255, 196, 92, 0.28);
 }
 
 .file-browser-status--error {
-  color: #b42318;
+  color: var(--color-status-error-text);
   background: rgba(217, 45, 32, 0.12);
   border: 1px solid rgba(217, 45, 32, 0.22);
 }

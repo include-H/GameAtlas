@@ -244,13 +244,13 @@ const renderedHtml = computed(() => {
 }
 
 .markdown-renderer :deep(a) {
-  color: #67c1f5;
+  color: var(--color-link);
   text-decoration: none;
 }
 
 .markdown-renderer :deep(a:hover) {
   text-decoration: underline;
-  color: #8ed4ff;
+  color: var(--color-link-hover);
 }
 
 .markdown-renderer :deep(img) {
@@ -269,7 +269,7 @@ const renderedHtml = computed(() => {
 }
 
 .markdown-renderer :deep(pre) {
-  background: #1E1E1E;
+  background: var(--color-code-block-bg);
   padding: 1em;
   border-radius: 8px;
   overflow-x: auto;
@@ -292,7 +292,7 @@ const renderedHtml = computed(() => {
   margin: 2em auto;
   max-width: 900px;
   text-align: center;
-  color: color-mix(in srgb, var(--color-text-1) 78%, #6f7f93 22%);
+  color: color-mix(in srgb, var(--color-text-1) 78%, var(--color-epigraph-mix) 22%);
 }
 
 .markdown-renderer :deep(.epigraph__content) {
@@ -305,7 +305,7 @@ const renderedHtml = computed(() => {
   position: absolute;
   font-size: clamp(2.75rem, 5vw, 4.2rem);
   line-height: 1;
-  color: rgba(140, 154, 255, 0.7);
+  color: var(--color-epigraph-decor);
   font-family: Georgia, 'Times New Roman', serif;
   pointer-events: none;
 }
@@ -363,7 +363,7 @@ const renderedHtml = computed(() => {
   font-size: clamp(0.82rem, 0.72vw + 0.58rem, 1rem);
   line-height: 1.35;
   letter-spacing: 0.01em;
-  color: color-mix(in srgb, var(--color-text-1) 58%, #8b97a8 42%);
+  color: color-mix(in srgb, var(--color-text-1) 58%, var(--color-epigraph-en-mix) 42%);
 }
 
 .markdown-renderer :deep(.epigraph__author) {
@@ -371,7 +371,7 @@ const renderedHtml = computed(() => {
   text-align: right;
   font-size: clamp(0.84rem, 0.62vw + 0.7rem, 1.02rem);
   line-height: 1.35;
-  color: color-mix(in srgb, var(--color-text-1) 56%, #8a96a6 44%);
+  color: color-mix(in srgb, var(--color-text-1) 56%, var(--color-epigraph-author-mix) 44%);
   opacity: 0.9;
 }
 
@@ -409,51 +409,26 @@ const renderedHtml = computed(() => {
   margin: 2em 0;
 }
 
-/* Dark theme support */
-@media (prefers-color-scheme: dark) {
-  .markdown-renderer :deep(h1),
-  .markdown-renderer :deep(h2) {
-    border-bottom-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .markdown-renderer :deep(code) {
-    background: rgba(255, 255, 255, 0.1);
-  }
-
-  .markdown-renderer :deep(th),
-  .markdown-renderer :deep(td) {
-    border-color: rgba(255, 255, 255, 0.12);
-  }
-
-  .markdown-renderer :deep(th) {
-    background: rgba(255, 255, 255, 0.05);
-  }
-
-  .markdown-renderer :deep(hr) {
-    border-top-color: rgba(255, 255, 255, 0.1);
-  }
-}
-
-/* Arco Design dark theme support */
-body.arco-layout-sidemenu-dark .markdown-renderer :deep(h1),
-body.arco-layout-sidemenu-dark .markdown-renderer :deep(h2) {
+/* Dark theme overrides (app uses body[arco-theme='dark']) */
+body[arco-theme='dark'] .markdown-renderer :deep(h1),
+body[arco-theme='dark'] .markdown-renderer :deep(h2) {
   border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
-body.arco-layout-sidemenu-dark .markdown-renderer :deep(code) {
+body[arco-theme='dark'] .markdown-renderer :deep(code) {
   background: rgba(255, 255, 255, 0.1);
 }
 
-body.arco-layout-sidemenu-dark .markdown-renderer :deep(th),
-body.arco-layout-sidemenu-dark .markdown-renderer :deep(td) {
+body[arco-theme='dark'] .markdown-renderer :deep(th),
+body[arco-theme='dark'] .markdown-renderer :deep(td) {
   border-color: rgba(255, 255, 255, 0.12);
 }
 
-body.arco-layout-sidemenu-dark .markdown-renderer :deep(th) {
+body[arco-theme='dark'] .markdown-renderer :deep(th) {
   background: rgba(255, 255, 255, 0.05);
 }
 
-body.arco-layout-sidemenu-dark .markdown-renderer :deep(hr) {
+body[arco-theme='dark'] .markdown-renderer :deep(hr) {
   border-top-color: rgba(255, 255, 255, 0.1);
 }
 

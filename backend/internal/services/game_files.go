@@ -126,6 +126,9 @@ func (s *GameFilesService) ShouldRecordDownload(sourceKey string, gameID, fileID
 			delete(s.downloadDedupe, key)
 		}
 	}
+	if len(s.downloadDedupe) > 10000 {
+		s.downloadDedupe = make(map[string]time.Time)
+	}
 
 	recordKey := sourceKey + ":" + strconv.FormatInt(gameID, 10) + ":" + strconv.FormatInt(fileID, 10)
 	if expiresAt, exists := s.downloadDedupe[recordKey]; exists && expiresAt.After(now) {

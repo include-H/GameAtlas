@@ -198,7 +198,7 @@
       </a-tabs>
 
       <a-form-item>
-        <a-space style="justify-content: flex-end; width: 100%">
+        <a-space class="edit-modal-footer">
           <a-button class="app-text-action-btn" type="text" html-type="button" @click="handleCancel">取消</a-button>
           <a-button type="primary" html-type="submit" :loading="isSubmitting">
             保存
@@ -624,7 +624,6 @@ const handleBannerCropConfirm = async (blob: Blob) => {
       form.value.banner_image = result.path
     }
   } catch (err) {
-    console.error('Banner crop upload failed:', err)
     uiStore.addAlert('横幅裁剪上传失败', 'error')
   }
 }

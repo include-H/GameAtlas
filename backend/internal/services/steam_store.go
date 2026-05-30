@@ -151,7 +151,7 @@ func (s *SteamService) fetchJSON(endpoint string, target any, proxyOverride stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("steam request failed with status %d", resp.StatusCode)
+		return fmt.Errorf("%w: steam request failed with status %d", ErrUpstream, resp.StatusCode)
 	}
 
 	return json.NewDecoder(resp.Body).Decode(target)
@@ -174,7 +174,7 @@ func (s *SteamService) fetchText(endpoint string, proxyOverride string) (string,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("steam request failed with status %d", resp.StatusCode)
+		return "", fmt.Errorf("%w: steam request failed with status %d", ErrUpstream, resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)

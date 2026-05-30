@@ -56,7 +56,7 @@
 .header-title {
   font-size: clamp(28px, 3.2vw, 36px);
   font-weight: 700;
-  color: #fff;
+  color: var(--color-text-on-dark);
   margin: 0;
   letter-spacing: -0.5px;
   line-height: 1.15;

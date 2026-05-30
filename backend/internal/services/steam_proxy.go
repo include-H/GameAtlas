@@ -39,7 +39,7 @@ func (s *SteamService) ProxyAssetStream(assetURL string, proxyOverride string) (
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
 		resp.Body.Close()
-		return "", nil, 0, fmt.Errorf("steam request failed with status %d", resp.StatusCode)
+		return "", nil, 0, fmt.Errorf("%w: steam request failed with status %d", ErrUpstream, resp.StatusCode)
 	}
 
 	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))

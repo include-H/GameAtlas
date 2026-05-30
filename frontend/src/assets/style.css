@@ -47,6 +47,39 @@
   --color-success-6: #00b42a;
   
   /* -----------------------------------------------------------------------
+     1b. Semantic Component Colors (dark-only palette)
+     ----------------------------------------------------------------------- */
+  /* Links */
+  --color-link: #67c1f5;
+  --color-link-hover: #8ed4ff;
+
+  /* Code blocks */
+  --color-code-block-bg: #1E1E1E;
+
+  /* Epigraph (quote decoration) */
+  --color-epigraph-mix: #6f7f93;
+  --color-epigraph-decor: rgba(140, 154, 255, 0.7);
+  --color-epigraph-en-mix: #8b97a8;
+  --color-epigraph-author-mix: #8a96a6;
+
+  /* App chrome */
+  --color-logo-text-mix: #c6d7e7;
+  --color-welcome-warning-mix: #ffcc66;
+  --color-sidebar-selected-bg: rgba(122, 162, 199, 0.14);
+
+  /* Media, badges & inverse text */
+  --color-media-bg: #000;
+  --color-text-on-dark: #fff;
+
+  /* Carousel empty state */
+  --color-carousel-empty-start: #090b10;
+  --color-carousel-empty-end: #05070b;
+
+  /* File browser status */
+  --color-status-warning-text: #9a6700;
+  --color-status-error-text: #b42318;
+
+  /* -----------------------------------------------------------------------
      2. Shadows and Glows
      ----------------------------------------------------------------------- */
   --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.05);

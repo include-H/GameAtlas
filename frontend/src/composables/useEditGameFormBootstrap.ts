@@ -37,8 +37,7 @@ interface UseEditGameFormBootstrapOptions {
 }
 
 export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOptions) => {
-  const handleInitializeOptionsError = (context: string, error: unknown) => {
-    console.error(`Failed to load ${context}:`, error)
+  const handleInitializeOptionsError = (context: string, _error: unknown) => {
     options.addAlert(`加载编辑元数据失败：${context}`, 'error')
   }
 

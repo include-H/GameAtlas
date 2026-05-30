@@ -116,5 +116,8 @@ func (s *GameCatalogService) Stats(params domain.GamesListParams) (*domain.GameS
 
 // InvalidateStatsCache clears the stats cache. Call this after game create/update/delete.
 func (s *GameCatalogService) InvalidateStatsCache() {
-	s.statsCache = sync.Map{}
+	s.statsCache.Range(func(k, v any) bool {
+		s.statsCache.Delete(k)
+		return true
+	})
 }

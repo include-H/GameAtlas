@@ -155,11 +155,6 @@ func IsAllowedPendingIssueDetail(value string) bool {
 	return ok
 }
 
-func PendingIssueDetailDefinitionForKey(key PendingIssueDetailKey) (PendingIssueDetailDefinition, bool) {
-	definition, ok := pendingIssueDetailDefinitionMap[key]
-	return definition, ok
-}
-
 func PendingIssueFilterMatches(filter string, detailKey PendingIssueDetailKey) bool {
 	if filter == "" {
 		return false

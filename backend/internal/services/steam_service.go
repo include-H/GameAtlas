@@ -22,10 +22,11 @@ type cachedPreview struct {
 }
 
 type SteamService struct {
-	client      *http.Client
-	proxy       string
-	assets      *AssetsService
+	client       *http.Client
+	proxy        string
+	assets       *AssetsService
 	previewCache sync.Map // int64 -> cachedPreview
+	proxyClients sync.Map // string -> *http.Client, keyed by proxy URL
 }
 
 type steamStoreSearchResponse struct {
@@ -150,6 +151,7 @@ func (s *SteamService) PreviewAssets(appID int64, proxyOverride string) (*domain
 		if time.Since(entry.cachedAt) < 24*time.Hour {
 			return entry.preview, nil
 		}
+		s.previewCache.Delete(appID)
 	}
 
 	appKey := fmt.Sprintf("%d", appID)

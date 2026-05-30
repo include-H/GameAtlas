@@ -168,7 +168,6 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
     try {
       prepareWikiMetadataCandidates()
     } catch (error) {
-      console.error('Failed to extract wiki metadata:', error)
       options.addAlert('从 Wiki 提取元数据失败', 'warning')
     } finally {
       isPreparingWikiMetadataCandidates.value = false

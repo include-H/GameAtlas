@@ -75,7 +75,7 @@ func (s *SteamGridDBService) Search(query string) ([]SteamGridDBGame, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
+		return nil, fmt.Errorf("%w: read response: %w", ErrUpstream, err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -84,7 +84,7 @@ func (s *SteamGridDBService) Search(query string) ([]SteamGridDBGame, error) {
 
 	var result steamGridDBSearchResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
+		return nil, fmt.Errorf("%w: decode response: %w", ErrUpstream, err)
 	}
 
 	if !result.Success {
@@ -150,7 +150,7 @@ func (s *SteamGridDBService) fetchImages(endpoint string, extra url.Values) ([]S
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
+		return nil, fmt.Errorf("%w: read response: %w", ErrUpstream, err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -159,7 +159,7 @@ func (s *SteamGridDBService) fetchImages(endpoint string, extra url.Values) ([]S
 
 	var result steamGridDBImageResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
+		return nil, fmt.Errorf("%w: decode response: %w", ErrUpstream, err)
 	}
 
 	if !result.Success {

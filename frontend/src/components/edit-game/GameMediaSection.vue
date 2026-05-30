@@ -515,7 +515,7 @@ defineProps<{
   width: 100%;
   height: 100%;
   display: block;
-  background: #000;
+  background: var(--color-media-bg);
   object-fit: contain;
 }
 
@@ -614,7 +614,7 @@ defineProps<{
   top: 3px;
   left: 3px;
   background: rgb(var(--primary-6));
-  color: #fff;
+  color: var(--color-text-on-dark);
   font-size: 9px;
   font-weight: 700;
   padding: 1px 5px;
@@ -650,7 +650,7 @@ defineProps<{
   top: 3px;
   left: 3px;
   background: rgb(var(--primary-6));
-  color: #fff;
+  color: var(--color-text-on-dark);
   font-size: 9px;
   font-weight: 700;
   padding: 1px 5px;

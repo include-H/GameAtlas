@@ -258,7 +258,7 @@ const imageItemClass = computed(() => props.mode === 'banner' ? 'banner-thumb' :
   display: grid;
   place-items: center;
   background: rgba(var(--primary-6), 0.9);
-  color: #fff;
+  color: var(--color-text-on-dark);
 }
 
 .url-input-row {

@@ -32,7 +32,6 @@ apiClient.interceptors.response.use(
           }
           break
         case 500:
-          console.error('Server Error: An unexpected error occurred')
           import('@/stores/ui').then(({ useUiStore }) => {
             useUiStore().addAlert('服务器内部错误', 'error')
           })

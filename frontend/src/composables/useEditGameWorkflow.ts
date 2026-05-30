@@ -74,7 +74,6 @@ const resolveSeriesSelection = async (
         })
         seriesIds = [newSeries.id]
       } catch (error) {
-        console.error('Failed to process series:', seriesValue, error)
         throw createWorkflowStepError(`系列 "${seriesValue}" 处理失败`, error)
       }
     }
@@ -101,7 +100,6 @@ const resolveDevelopers = async (
     })
     return result
   } catch (error) {
-    console.error('Failed to process developers:', values, error)
     throw createWorkflowStepError('开发商处理失败', error)
   }
 }
@@ -123,7 +121,6 @@ const resolvePublishers = async (
     })
     return result
   } catch (error) {
-    console.error('Failed to process publishers:', values, error)
     throw createWorkflowStepError('发行商处理失败', error)
   }
 }
@@ -156,7 +153,6 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       options.seriesOptions.value = popularSeries
       return true
     } catch (error) {
-      console.warn('Failed to refresh series:', error)
       return false
     }
   }

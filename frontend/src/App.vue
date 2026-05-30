@@ -327,7 +327,7 @@ onUnmounted(() => {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  color: color-mix(in srgb, var(--color-text-1) 74%, #c6d7e7 26%);
+  color: color-mix(in srgb, var(--color-text-1) 74%, var(--color-logo-text-mix) 26%);
   text-shadow: none;
 }
 
@@ -338,7 +338,7 @@ onUnmounted(() => {
 }
 
 .welcome-text--warning {
-  color: color-mix(in srgb, #ffcc66 74%, var(--color-text-1) 26%);
+  color: color-mix(in srgb, var(--color-welcome-warning-mix) 74%, var(--color-text-1) 26%);
 }
 
 .pro-header :deep(.arco-btn-text) {
@@ -557,7 +557,7 @@ body {
 }
 
 .app-navigation-menu .arco-menu-selected {
-  background-color: rgba(122, 162, 199, 0.14) !important;
+  background-color: var(--color-sidebar-selected-bg) !important;
   color: var(--color-primary-6) !important;
   font-weight: 600;
 }
