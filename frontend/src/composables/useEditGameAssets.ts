@@ -20,7 +20,7 @@ interface UploadResponseLike {
 }
 
 interface UseEditGameAssetsOptions {
-  form: Ref<Pick<EditGameForm, 'covers' | 'logo' | 'logo_visible' | 'banner_image' | 'banners' | 'screenshots' | 'preview_videos'>>
+  form: Ref<Pick<EditGameForm, 'covers' | 'logo' | 'logo_visible' | 'banners' | 'screenshots' | 'preview_videos'>>
   gameId: Ref<number | undefined>
   showCoverSelector: Ref<boolean>
   showBannerSelector: Ref<boolean>
@@ -86,7 +86,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     const response = fileItem.response as UploadResponseLike | undefined
     if (response?.success && response.data) {
       options.form.value.banners.push(options.createEditableBanner(response.data))
-      options.form.value.banner_image = options.form.value.banners[0]?.path || ''
       void options.onAssetPersisted?.()
       options.showBannerSelector.value = false
       options.addAlert('横幅上传成功', 'success')
@@ -187,7 +186,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     const banner = options.form.value.banners[index]
     if (!banner) return
     options.form.value.banners = options.form.value.banners.filter((_, i) => i !== index)
-    options.form.value.banner_image = options.form.value.banners[0]?.path || ''
   }
 
   const setPrimaryBanner = (index: number) => {
@@ -196,7 +194,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     const [moved] = banners.splice(index, 1)
     banners.splice(0, 0, moved)
     options.form.value.banners = banners
-    options.form.value.banner_image = banners[0]?.path || ''
   }
 
   const removeScreenshot = (clientKey: string) => {

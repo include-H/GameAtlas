@@ -357,7 +357,7 @@
       :video-upload-progress="videoUploadProgress"
       :video-upload-file-name="videoUploadFileName"
       :preview-videos="form.preview_videos"
-      :banner-image="form.banner_image"
+      :banner-image="form.banners[0]?.path || ''"
       :cover-image="primaryCover?.path || ''"
       @update:visible="showVideoSelector = $event"
       @video-file-change="handleVideoFileChange"
@@ -621,7 +621,6 @@ const handleBannerCropConfirm = async (blob: Blob) => {
     const result = await uploadAsset('banner', gameId, file)
     if (result) {
       form.value.banners.unshift({ asset_uid: result.asset_uid, path: result.path })
-      form.value.banner_image = result.path
     }
   } catch (err) {
     uiStore.addAlert('横幅裁剪上传失败', 'error')

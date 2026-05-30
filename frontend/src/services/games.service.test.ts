@@ -250,7 +250,7 @@ describe('games service', () => {
       data: [],
     })
 
-    await expect(gamesService.getTimelineGames()).rejects.toThrow('timeline response missing pagination')
+    await expect(gamesService.getTimelineGames()).rejects.toThrow('时间线响应缺少分页信息')
   })
 
   it('maps game files to version metadata using backend file order', () => {
@@ -422,7 +422,7 @@ describe('games service', () => {
     })
 
     await expect(gamesService.getAdminGameDetail('game-1')).rejects.toThrow(
-      'admin game detail requires resolved file_path values',
+      '管理端游戏详情需要已解析的 file_path 值',
     )
   })
 

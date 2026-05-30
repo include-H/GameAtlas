@@ -28,14 +28,6 @@ interface UseEditGameWorkflowOptions {
   closeModal: () => void
 }
 
-const slugifyMetadataName = (name: string) => {
-  return name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
 const createWorkflowStepError = (message: string, cause: unknown) => {
   const error = new Error(message) as Error & { cause?: unknown }
   error.cause = cause
@@ -70,7 +62,6 @@ const resolveSeriesSelection = async (
         const seriesName = normalizedValue
         const newSeries = await seriesService.createSeries({
           name: seriesName,
-          slug: seriesName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         })
         seriesIds = [newSeries.id]
       } catch (error) {
@@ -93,10 +84,7 @@ const resolveDevelopers = async (
       values,
       options,
       createItem: (name) =>
-        developersService.createDeveloper({
-          name,
-          slug: slugifyMetadataName(name),
-        }),
+        developersService.createDeveloper({ name }),
     })
     return result
   } catch (error) {
@@ -114,10 +102,7 @@ const resolvePublishers = async (
       values,
       options,
       createItem: (name) =>
-        publishersService.createPublisher({
-          name,
-          slug: slugifyMetadataName(name),
-        }),
+        publishersService.createPublisher({ name }),
     })
     return result
   } catch (error) {
@@ -234,7 +219,7 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       }
 
       if (!game.public_id) {
-        throw new Error('missing game public_id')
+        throw new Error('缺少游戏 public_id')
       }
       const aggregateResult = await gamesService.updateGameAggregate(game.public_id, {
         game: createUpdatePayload({

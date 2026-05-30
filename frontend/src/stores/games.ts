@@ -132,7 +132,7 @@ export const useGamesStore = defineStore('games', () => {
 
       return response
     } catch (err) {
-      listError.value = getHttpErrorMessage(err, 'Failed to fetch games')
+      listError.value = getHttpErrorMessage(err, '加载游戏列表失败')
       throw err
     } finally {
       listLoading.value = false
@@ -149,7 +149,7 @@ export const useGamesStore = defineStore('games', () => {
       currentVersions.value = mapGameVersions(game)
       return game
     } catch (err) {
-      detailError.value = getHttpErrorMessage(err, 'Failed to fetch game')
+      detailError.value = getHttpErrorMessage(err, '加载游戏详情失败')
       throw err
     } finally {
       detailLoading.value = false
@@ -163,7 +163,7 @@ export const useGamesStore = defineStore('games', () => {
       stats.value = await gamesService.getStats()
       return stats.value
     } catch (err) {
-      statsError.value = getHttpErrorMessage(err, 'Failed to fetch stats')
+      statsError.value = getHttpErrorMessage(err, '加载统计数据失败')
       throw err
     } finally {
       statsLoading.value = false
@@ -178,7 +178,7 @@ export const useGamesStore = defineStore('games', () => {
 
       return result.isFavorite
     } catch (err) {
-      favoriteError.value = getHttpErrorMessage(err, 'Failed to toggle favorite')
+      favoriteError.value = getHttpErrorMessage(err, '切换收藏失败')
       throw err
     }
   }

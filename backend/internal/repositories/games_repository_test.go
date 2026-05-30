@@ -154,7 +154,7 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	linkRepositoryGameDeveloper(t, db, privateGameID, developerID, 0)
 	linkRepositoryGamePublisher(t, db, privateGameID, publisherID, 0)
 
-	catalogRepo := NewGameCatalogRepository(repo)
+	catalogRepo := NewGameCatalogRepository(repo, NewFavoriteGamesRepository(db))
 
 	stats, err := catalogRepo.Stats(domain.GamesListParams{})
 	if err != nil {
@@ -209,7 +209,7 @@ func TestGamesRepositoryStatsIncludesPrivateFavoritesForAdmin(t *testing.T) {
 		t.Fatalf("insert private favorite game: %v", err)
 	}
 
-	catalogRepo := NewGameCatalogRepository(repo)
+	catalogRepo := NewGameCatalogRepository(repo, NewFavoriteGamesRepository(db))
 
 	stats, err := catalogRepo.Stats(domain.GamesListParams{IncludeAll: true})
 	if err != nil {
@@ -226,7 +226,7 @@ func TestGameCatalogRepositoryListFiltersFavoritesAndExposesFavoriteState(t *tes
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
-	catalogRepo := NewGameCatalogRepository(repo)
+	catalogRepo := NewGameCatalogRepository(repo, NewFavoriteGamesRepository(db))
 	favoriteID := insertRepositoryGame(t, db, "favorite-a", "Favorite A", "public")
 	otherID := insertRepositoryGame(t, db, "favorite-b", "Favorite B", "public")
 	privateFavoriteID := insertRepositoryGame(t, db, "favorite-private", "Favorite Private", "private")
@@ -295,7 +295,7 @@ func TestGameCatalogRepositoryListPendingOnlyFiltersResolvedAndIgnoredIssues(t *
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
-	catalogRepo := NewGameCatalogRepository(repo)
+	catalogRepo := NewGameCatalogRepository(repo, NewFavoriteGamesRepository(db))
 
 	visiblePendingID := insertRepositoryGame(t, db, "pending-visible", "Pending Visible", "public")
 	resolvedID := insertRepositoryGame(t, db, "pending-resolved", "Pending Resolved", "public")
@@ -407,7 +407,7 @@ func TestGameCatalogRepositoryListPendingOnlySupportsNativeSortAndFilters(t *tes
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
-	catalogRepo := NewGameCatalogRepository(repo)
+	catalogRepo := NewGameCatalogRepository(repo, NewFavoriteGamesRepository(db))
 
 	severeID := insertRepositoryGame(t, db, "pending-severe", "Pending Severe", "public")
 	recentID := insertRepositoryGame(t, db, "pending-recent", "Pending Recent", "public")
@@ -456,7 +456,7 @@ func TestGameCatalogRepositoryCountPendingGroupsUsesQueueFiltersButIgnoresIssueS
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
-	catalogRepo := NewGameCatalogRepository(repo)
+	catalogRepo := NewGameCatalogRepository(repo, NewFavoriteGamesRepository(db))
 
 	_ = insertRepositoryGame(t, db, "pending-asset", "Pending Asset", "public")
 	wikiID := insertRepositoryGame(t, db, "pending-wiki", "Pending Wiki", "public")

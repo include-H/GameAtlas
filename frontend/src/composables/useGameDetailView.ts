@@ -128,7 +128,7 @@ export const useGameDetailView = ({
 
   const navigateToUrl = (url?: string) => {
     if (!url || typeof window === 'undefined') {
-      throw new Error('Missing download URL')
+      throw new Error('缺少下载地址')
     }
     window.location.assign(url)
   }

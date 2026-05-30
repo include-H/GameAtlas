@@ -89,7 +89,7 @@
         </template>
       </a-button>
 
-      <div v-if="mediaItems.length > 1" class="screenshot-carousel__counter">
+      <div v-if="mediaItems.length > 1" class="app-glass-surface screenshot-carousel__counter">
         {{ currentIndex + 1 }} / {{ mediaItems.length }}
       </div>
     </div>
@@ -542,15 +542,11 @@ const handleImageError = (url: string) => {
   position: absolute;
   bottom: 12px;
   right: 16px;
-  background: var(--app-card-surface);
   padding: 6px 14px;
   border-radius: 20px;
   font-size: 12px;
   color: var(--color-text-1);
   font-weight: 500;
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  border: 1px solid var(--app-card-border);
-  box-shadow: var(--app-glass-shadow-rest);
   z-index: 10;
 }
 

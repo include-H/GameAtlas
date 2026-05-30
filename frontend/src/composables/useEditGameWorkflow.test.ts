@@ -100,7 +100,6 @@ const buildOptions = () => {
         release_date: undefined,
         series_id: null,
         summary: '',
-        banner_image: '',
         banners: [],
         covers: [],
         logo: null,

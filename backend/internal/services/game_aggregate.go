@@ -27,11 +27,12 @@ func NewGameAggregateService(
 	gamesRepo *repositories.GamesRepository,
 	metadataRepo *repositories.MetadataRepository,
 	catalogService *GameCatalogService,
+	assetCleanupTasksRepo *repositories.AssetCleanupTasksRepository,
 ) *GameAggregateService {
 	return &GameAggregateService{
 		gamesRepo:             gamesRepo,
 		metadataRepo:          metadataRepo,
-		assetCleanupTasksRepo: repositories.NewAssetCleanupTasksRepository(gamesRepo.DB()),
+		assetCleanupTasksRepo: assetCleanupTasksRepo,
 		fileGuard:             files.NewGuard(cfg.PrimaryROMRoot),
 		assetStore:            files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
 		catalogService:        catalogService,

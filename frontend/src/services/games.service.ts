@@ -126,7 +126,7 @@ function normalizeTimelineGame(item: TimelineGameResponse): TimelineGame {
 function readTimelinePagination(response: TimelineGamesApiResponse): TimelinePaginationApi {
   const pagination = response.pagination
   if (!pagination) {
-    throw new Error('timeline response missing pagination')
+    throw new Error('时间线响应缺少分页信息')
   }
   return pagination
 }
@@ -154,7 +154,7 @@ function normalizeAdminGameDetail(item: AdminGameDetailDto): AdminGameDetail {
   // Impact: edit flows must fail fast if auth/session state no longer yields file_path,
   // instead of silently treating a public payload as editable admin data.
   if (!isAdminGameDetail(detail)) {
-    throw new Error('admin game detail requires resolved file_path values')
+    throw new Error('管理端游戏详情需要已解析的 file_path 值')
   }
   return detail
 }

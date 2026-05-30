@@ -13,12 +13,11 @@ import (
 	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/files"
 	"github.com/hao/game/internal/repositories"
-	"github.com/jmoiron/sqlx"
+
 )
 
 type assetGameRepository interface {
 	GetByID(id int64) (*domain.Game, error)
-	DB() *sqlx.DB
 }
 
 type AssetsService struct {
@@ -33,11 +32,11 @@ type UploadResult struct {
 	AssetUID string
 }
 
-func NewAssetsService(cfg config.Config, gamesRepo assetGameRepository, assetsRepo *repositories.AssetsRepository) *AssetsService {
+func NewAssetsService(cfg config.Config, gamesRepo assetGameRepository, assetsRepo *repositories.AssetsRepository, assetCleanupTasksRepo *repositories.AssetCleanupTasksRepository) *AssetsService {
 	return &AssetsService{
 		gamesRepo:             gamesRepo,
 		assetsRepo:            assetsRepo,
-		assetCleanupTasksRepo: repositories.NewAssetCleanupTasksRepository(gamesRepo.DB()),
+		assetCleanupTasksRepo: assetCleanupTasksRepo,
 		store:                 files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
 	}
 }

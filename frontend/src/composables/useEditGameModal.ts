@@ -90,7 +90,7 @@ export const useEditGameModal = ({
     return form.value.logo || null
   })
 
-  const logoBannerSrc = computed(() => form.value.banners[0]?.path || form.value.banner_image || form.value.covers[0]?.path || '')
+  const logoBannerSrc = computed(() => form.value.banners[0]?.path || form.value.covers[0]?.path || '')
   const logoPath = computed(() => form.value.logo?.path || '')
 
   const primaryPreviewVideo = computed(() => {

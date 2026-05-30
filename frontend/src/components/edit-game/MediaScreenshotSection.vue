@@ -6,7 +6,7 @@
       class="media-frame media-frame--screenshots"
     >
       <div
-        class="media-empty-action"
+        class="app-glass-surface media-empty-action"
         role="button"
         tabindex="0"
         @click="emit('open-screenshot-selector')"
@@ -202,8 +202,6 @@ onBeforeUnmount(() => {
   border: 1px dashed rgba(255, 255, 255, 0.1);
   border-radius: calc(var(--media-panel-radius) - 2px);
   background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-3);
   display: flex;
   flex-direction: column;

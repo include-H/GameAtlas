@@ -10,11 +10,12 @@ import (
 )
 
 type GameCatalogRepository struct {
-	games *GamesRepository
+	games     *GamesRepository
+	favorites *FavoriteGamesRepository
 }
 
-func NewGameCatalogRepository(games *GamesRepository) *GameCatalogRepository {
-	return &GameCatalogRepository{games: games}
+func NewGameCatalogRepository(games *GamesRepository, favorites *FavoriteGamesRepository) *GameCatalogRepository {
+	return &GameCatalogRepository{games: games, favorites: favorites}
 }
 
 func (r *GameCatalogRepository) List(params domain.GamesListParams) ([]domain.GameListItem, int, error) {
@@ -217,7 +218,7 @@ func (r *GameCatalogRepository) Stats(params domain.GamesListParams) (*domain.Ga
 	if err != nil {
 		return nil, err
 	}
-	favoriteCount, err := NewFavoriteGamesRepository(r.games.db).Count(params.IncludeAll, params.Visibility)
+	favoriteCount, err := r.favorites.Count(params.IncludeAll, params.Visibility)
 	if err != nil {
 		return nil, err
 	}

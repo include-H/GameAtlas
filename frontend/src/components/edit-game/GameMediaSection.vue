@@ -7,7 +7,7 @@
           class="media-frame media-frame--cover"
         >
           <div
-            class="media-empty-action"
+            class="app-glass-surface media-empty-action"
             role="button"
             tabindex="0"
             @click="emit('open-cover-selector')"
@@ -87,7 +87,7 @@
           class="media-frame media-frame--banner"
         >
           <div
-            class="media-empty-action"
+            class="app-glass-surface media-empty-action"
             role="button"
             tabindex="0"
             @click="emit('open-banner-selector')"
@@ -167,7 +167,7 @@
           class="media-frame media-frame--logo"
         >
           <div
-            class="media-empty-action"
+            class="app-glass-surface media-empty-action"
             role="button"
             tabindex="0"
             @click="emit('open-logo-selector')"
@@ -258,7 +258,7 @@
           </template>
           <div
             v-else
-            class="media-empty-action"
+            class="app-glass-surface media-empty-action"
             role="button"
             tabindex="0"
             @click="emit('open-video-selector')"
@@ -429,8 +429,6 @@ defineProps<{
   border: 1px dashed rgba(255, 255, 255, 0.1);
   border-radius: calc(var(--media-panel-radius) - 2px);
   background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-3);
   display: flex;
   flex-direction: column;

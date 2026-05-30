@@ -34,6 +34,7 @@ func TestAssetsHandlerUploadVideoPersistsAsset(t *testing.T) {
 		config.Config{AssetsDir: assetsDir},
 		repositories.NewGamesRepository(db),
 		repositories.NewAssetsRepository(db),
+		repositories.NewAssetCleanupTasksRepository(db),
 	)
 	handler := NewAssetsHandler(service)
 
@@ -108,6 +109,7 @@ func TestAssetsHandlerUploadRejectsInvalidSortOrder(t *testing.T) {
 		config.Config{AssetsDir: filepath.Join(t.TempDir(), "assets")},
 		repositories.NewGamesRepository(db),
 		repositories.NewAssetsRepository(db),
+		repositories.NewAssetCleanupTasksRepository(db),
 	)
 	handler := NewAssetsHandler(service)
 
@@ -189,6 +191,7 @@ func TestAssetsHandlerUploadReturnsBadRequestWhenContentTypeInvalid(t *testing.T
 		config.Config{AssetsDir: filepath.Join(t.TempDir(), "assets")},
 		repositories.NewGamesRepository(db),
 		repositories.NewAssetsRepository(db),
+		repositories.NewAssetCleanupTasksRepository(db),
 	)
 	handler := NewAssetsHandler(service)
 
@@ -237,6 +240,7 @@ func TestAssetsHandlerUploadReturnsNotFoundWhenGameMissing(t *testing.T) {
 		config.Config{AssetsDir: filepath.Join(t.TempDir(), "assets")},
 		repositories.NewGamesRepository(db),
 		repositories.NewAssetsRepository(db),
+		repositories.NewAssetCleanupTasksRepository(db),
 	)
 	handler := NewAssetsHandler(service)
 

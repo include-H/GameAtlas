@@ -91,7 +91,7 @@
             <a-button
               v-for="entry in historyEntries"
               :key="entry.id"
-              class="app-text-action-btn wiki-edit-history-item"
+              class="app-text-action-btn app-glass-surface wiki-edit-history-item"
               :class="{ 'wiki-edit-history-item--active': selectedHistory?.id === entry.id }"
               type="text"
               @click="openHistoryPreview(entry)"
@@ -118,7 +118,7 @@
               </div>
             </div>
 
-            <div class="wiki-edit-history-preview-panel">
+            <div class="app-glass-surface wiki-edit-history-preview-panel">
               <div
                 v-if="previewHistoryContent"
                 class="wiki-edit-history-preview-surface wiki-edit-history-preview-rendered"
@@ -413,11 +413,8 @@ onActivated(() => {
   font-size: 12px;
   text-align: left;
   padding: 12px;
-  border: 1px solid var(--app-card-border);
   border-radius: 10px;
   background: color-mix(in srgb, var(--app-card-surface) 86%, transparent);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-1);
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease;
@@ -507,11 +504,8 @@ onActivated(() => {
 .wiki-edit-history-preview-panel {
   min-height: min(70vh, 720px);
   border-radius: 12px;
-  border: 1px solid var(--app-card-border);
   overflow: hidden;
   background: color-mix(in srgb, var(--app-card-surface) 92%, transparent);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .wiki-edit-history-preview-surface {

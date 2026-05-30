@@ -21,7 +21,7 @@ interface UploadedAssetLike {
 }
 
 interface UseSteamImportDownloadOptions {
-  form: Ref<Pick<EditGameForm, 'covers' | 'banners' | 'banner_image' | 'title' | 'title_alt'>>
+  form: Ref<Pick<EditGameForm, 'covers' | 'banners' | 'title' | 'title_alt'>>
   gameId: Ref<number | undefined>
   pickSteamSearchQuery: () => string
   uploadAssetFromUrl: (
@@ -320,7 +320,6 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
     try {
       const uploaded = await options.uploadAssetFromUrl(bannerSearchUrl.value, 'banner')
       options.form.value.banners.push(options.createEditableBanner(uploaded))
-      options.form.value.banner_image = options.form.value.banners[0]?.path || ''
       await options.onAssetPersisted?.()
       showBannerSelector.value = false
       bannerSearchUrl.value = ''
@@ -352,7 +351,6 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
         const uploaded = await options.uploadAssetFromUrl(bannerUrl, 'banner')
         options.form.value.banners.push(options.createEditableBanner(uploaded))
       }
-      options.form.value.banner_image = options.form.value.banners[0]?.path || ''
       await options.onAssetPersisted?.()
       showBannerSelector.value = false
       backToBannerGameSearch()

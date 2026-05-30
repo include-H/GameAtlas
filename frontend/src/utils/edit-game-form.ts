@@ -45,7 +45,6 @@ export interface EditGameForm {
   release_date: string | undefined
   series_id: string | number | null
   summary: string
-  banner_image: string
   // The first item is always the primary cover.
   covers: EditGameEditableCover[]
   // The first item is always the primary banner.
@@ -67,7 +66,6 @@ export const createEmptyEditGameForm = (): EditGameForm => ({
   release_date: undefined,
   series_id: null,
   summary: '',
-  banner_image: '',
   covers: [],
   banners: [],
   logo: null,

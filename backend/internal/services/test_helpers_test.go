@@ -86,17 +86,19 @@ func insertServicesGameFile(t *testing.T, db *sqlx.DB, gameID int64, path string
 }
 
 func newServicesAssetsService(db *sqlx.DB, assetsDir string) *AssetsService {
+	gamesRepo := repositories.NewGamesRepository(db)
 	return NewAssetsService(
 		config.Config{AssetsDir: assetsDir},
-		repositories.NewGamesRepository(db),
+		gamesRepo,
 		repositories.NewAssetsRepository(db),
+		repositories.NewAssetCleanupTasksRepository(db),
 	)
 }
 
 func newServicesCatalogService(db *sqlx.DB) *GameCatalogService {
 	gamesRepo := repositories.NewGamesRepository(db)
 	return NewGameCatalogService(
-		repositories.NewGameCatalogRepository(gamesRepo),
+		repositories.NewGameCatalogRepository(gamesRepo, repositories.NewFavoriteGamesRepository(db)),
 		repositories.NewReviewIssueOverrideRepository(db),
 	)
 }
@@ -112,7 +114,7 @@ func newServicesDetailService(db *sqlx.DB) *GameDetailService {
 
 func newServicesAggregateService(db *sqlx.DB, cfg config.Config) *GameAggregateService {
 	gamesRepo := repositories.NewGamesRepository(db)
-	catalogRepo := repositories.NewGameCatalogRepository(gamesRepo)
+	catalogRepo := repositories.NewGameCatalogRepository(gamesRepo, repositories.NewFavoriteGamesRepository(db))
 	reviewIssueOverridesRepo := repositories.NewReviewIssueOverrideRepository(db)
 	catalogService := NewGameCatalogService(catalogRepo, reviewIssueOverridesRepo)
 	return NewGameAggregateService(
@@ -120,6 +122,7 @@ func newServicesAggregateService(db *sqlx.DB, cfg config.Config) *GameAggregateS
 		gamesRepo,
 		repositories.NewMetadataRepository(db),
 		catalogService,
+		repositories.NewAssetCleanupTasksRepository(db),
 	)
 }
 
