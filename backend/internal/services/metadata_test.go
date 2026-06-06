@@ -129,7 +129,7 @@ func TestMetadataServiceListSeriesReturnsEnrichmentErrorInsteadOfSilentEmptyStat
 	}
 
 	service := NewMetadataService(repositories.NewMetadataRepository(db))
-	_, err := service.List(MetadataResource{Type: domain.MetadataSeries, ResourceName: "series"}, true, MetadataListOptions{})
+	_, err := service.List(MetadataResource{Type: domain.MetadataSeries}, true, MetadataListOptions{})
 	if err == nil {
 		t.Fatal("List returned nil error, want enrichment failure")
 	}
@@ -151,7 +151,7 @@ func TestMetadataServiceCreateDeveloperReturnsExistingBySlugWhenNameDiffers(t *t
 
 	// Try to create "Io-Interactive A/S" — name differs due to hyphen, but slug collides.
 	created, err := service.Create(
-		MetadataResource{Type: domain.MetadataDevelopers, ResourceName: "developers"},
+		MetadataResource{Type: domain.MetadataDevelopers},
 		domain.MetadataWriteInput{Name: "Io-Interactive A/S"},
 	)
 	if err != nil {

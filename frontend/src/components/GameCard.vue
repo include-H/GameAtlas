@@ -215,7 +215,7 @@ const displayImage = computed(() => {
 }
 
 .game-card--cover-only .game-card__overlay {
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.28) 0%, rgba(0, 0, 0, 0) 55%);
+  background: linear-gradient(to top, var(--app-card-overlay-start) 0%, transparent 55%);
   opacity: 1;
 }
 
@@ -244,7 +244,7 @@ const displayImage = computed(() => {
 .game-card__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0) 60%);
+  background: linear-gradient(to top, var(--app-card-overlay-end) 0%, transparent 60%);
   opacity: 0.8;
   transition: opacity var(--transition-fast);
 }

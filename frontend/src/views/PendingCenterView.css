@@ -31,13 +31,13 @@
 
 .stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+  box-shadow: var(--shadow-hover);
 }
 
 .stat-card--total {
   cursor: default;
   background:
-    linear-gradient(135deg, rgba(26, 159, 255, 0.14), rgba(0, 180, 42, 0.1)),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-primary-6) 14%, transparent), color-mix(in srgb, var(--color-success-6) 10%, transparent)),
     var(--app-card-surface);
 }
 
@@ -143,8 +143,8 @@
 
 .pending-game:hover,
 .pending-game--active {
-  border-color: rgba(22, 93, 255, 0.32);
-  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.08);
+  border-color: var(--app-glass-border-hover);
+  box-shadow: var(--shadow-hover);
   transform: translateY(-1px);
 }
 
@@ -247,8 +247,8 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(10, 14, 24, 0.2), rgba(10, 14, 24, 0.46)),
-    linear-gradient(90deg, rgba(10, 14, 24, 0.32), transparent 24%, transparent 76%, rgba(10, 14, 24, 0.32));
+    linear-gradient(180deg, color-mix(in srgb, var(--color-bg-1) 20%, transparent), color-mix(in srgb, var(--color-bg-1) 46%, transparent)),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-bg-1) 32%, transparent), transparent 24%, transparent 76%, color-mix(in srgb, var(--color-bg-1) 32%, transparent));
 }
 
 .detail-panel__hero-image {

@@ -20,8 +20,6 @@ type gameAggregateCoreUpdateRequest struct {
 	Visibility   string  `json:"visibility"`
 	Summary      *string `json:"summary"`
 	ReleaseDate  *string `json:"release_date"`
-	CoverImage   *string `json:"cover_image"`
-	BannerImage  *string `json:"banner_image"`
 	LogoVisible  *bool   `json:"logo_visible"`
 	SeriesID     *int64  `json:"series_id"`
 	DeveloperIDs []int64 `json:"developer_ids"`
@@ -89,8 +87,6 @@ func (request gameAggregateCoreUpdateRequest) toDomain() domain.GameCoreInput {
 		Visibility:  request.Visibility,
 		Summary:     request.Summary,
 		ReleaseDate: request.ReleaseDate,
-		CoverImage:  request.CoverImage,
-		BannerImage: request.BannerImage,
 		LogoVisible: request.LogoVisible,
 	}
 }

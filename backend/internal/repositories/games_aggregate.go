@@ -179,8 +179,6 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 		"visibility = ?",
 		"summary = ?",
 		"release_date = ?",
-		"cover_image = ?",
-		"banner_image = ?",
 	}
 	args := []any{
 		input.Title,
@@ -189,8 +187,6 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 		input.Visibility,
 		input.Summary,
 		input.ReleaseDate,
-		input.CoverImage,
-		input.BannerImage,
 	}
 	if input.LogoVisible != nil {
 		setClauses = append(setClauses, "logo_visible = ?")

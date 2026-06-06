@@ -206,45 +206,6 @@ describe('games service', () => {
     })
   })
 
-  it('loads all pages through getAllGames', async () => {
-    getMock
-      .mockResolvedValueOnce({
-        data: [{ ...baseGame, id: 1, public_id: 'game-1' }],
-        pagination: { page: 1, limit: 1, total: 2, totalPages: 2 },
-      })
-      .mockResolvedValueOnce({
-        data: [{ ...baseGame, id: 2, public_id: 'game-2' }],
-        pagination: { page: 2, limit: 1, total: 2, totalPages: 2 },
-      })
-
-    const result = await gamesService.getAllGames({ limit: 1 })
-
-    expect(result.map((item) => item.public_id)).toEqual(['game-1', 'game-2'])
-    expect(getMock).toHaveBeenCalledTimes(2)
-  })
-
-  it('loads all favorite games from backend pagination', async () => {
-    getMock
-      .mockResolvedValueOnce({
-        data: [
-          { ...baseGame, id: 2, public_id: 'game-2', is_favorite: true },
-        ],
-        pagination: { page: 1, limit: 1, total: 2, totalPages: 2 },
-      })
-      .mockResolvedValueOnce({
-        data: [{ ...baseGame, id: 3, public_id: 'game-3', is_favorite: true }],
-        pagination: { page: 2, limit: 1, total: 2, totalPages: 2 },
-      })
-
-    const result = await gamesService.getAllGames({
-      query: { favorite: true },
-      limit: 1,
-    })
-
-    expect(result.map((item) => item.public_id)).toEqual(['game-2', 'game-3'])
-    expect(getMock).toHaveBeenCalledTimes(2)
-  })
-
   it('rejects timeline responses that omit backend pagination metadata', async () => {
     getMock.mockResolvedValue({
       data: [],

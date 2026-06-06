@@ -14,8 +14,6 @@ func normalizeGameCoreInput(input domain.GameCoreInput) domain.GameCoreInput {
 	input.Visibility = strings.TrimSpace(input.Visibility)
 	input.Summary = trimStringPtr(input.Summary)
 	input.ReleaseDate = trimStringPtr(input.ReleaseDate)
-	input.CoverImage = trimStringPtr(input.CoverImage)
-	input.BannerImage = trimStringPtr(input.BannerImage)
 	return input
 }
 

@@ -44,11 +44,6 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   // UI state methods
-  const toggleSidebar = () => {
-    sidebarCollapsed.value = !sidebarCollapsed.value
-    safeLocalStorageSetItem('sidebarCollapsed', String(sidebarCollapsed.value))
-  }
-
   const setSidebarCollapsed = (value: boolean) => {
     sidebarCollapsed.value = value
     safeLocalStorageSetItem('sidebarCollapsed', String(value))
@@ -115,10 +110,6 @@ export const useUiStore = defineStore('ui', () => {
     }
   }
 
-  const clearAlerts = () => {
-    alerts.value = []
-  }
-
   const initializeSidebarCollapsed = () => {
     const stored = safeLocalStorageGetItem('sidebarCollapsed')
     if (stored === 'true' || stored === 'false') {
@@ -136,13 +127,11 @@ export const useUiStore = defineStore('ui', () => {
     // Actions
     setGamesViewMode,
     initializeViewMode,
-    toggleSidebar,
     setAmbientBackgroundSource,
     clearAmbientBackgroundSource,
     initializeSharedBackgroundAvailability,
     addAlert,
     removeAlert,
-    clearAlerts,
     initializeSidebarCollapsed,
     setSidebarCollapsed,
   }

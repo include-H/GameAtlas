@@ -42,8 +42,6 @@ const SUPPORTED_ROUTE_NAMES = new Set([
   'not-found',
 ])
 
-const DEFAULT_BACKGROUND =
-  'radial-gradient(circle at 18% 18%, rgba(122, 162, 199, 0.16), transparent 34%), radial-gradient(circle at 82% 12%, rgba(70, 98, 128, 0.18), transparent 28%), linear-gradient(180deg, rgba(10, 14, 21, 0.98), rgba(16, 22, 31, 0.92))'
 const APPLY_DELAY_MS = 30
 
 const layerUrls = ref<string[]>(['', ''])
@@ -66,8 +64,9 @@ const buildLayerStyle = (url: string) => {
     }
   }
 
+  // 没有实际图片时不显示暗色兜底渐变，让页面自身背景可见
   return {
-    background: DEFAULT_BACKGROUND,
+    background: 'transparent',
   }
 }
 

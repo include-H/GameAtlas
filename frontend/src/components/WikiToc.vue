@@ -270,7 +270,7 @@ onUnmounted(() => {
 
 .wiki-toc__item--active {
   color: var(--color-primary-6);
-  background: rgba(26, 159, 255, 0.1);
+  background: color-mix(in srgb, var(--color-primary-6) 10%, transparent);
   font-weight: 500;
 }
 

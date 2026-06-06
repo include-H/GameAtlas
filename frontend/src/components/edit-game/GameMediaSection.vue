@@ -426,7 +426,7 @@ defineProps<{
 .media-empty-action {
   width: 100%;
   height: 100%;
-  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border: 1px dashed var(--color-border-2);
   border-radius: calc(var(--media-panel-radius) - 2px);
   background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
   color: var(--color-text-3);
@@ -467,7 +467,7 @@ defineProps<{
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(8, 10, 16, 0.5);
+  background: var(--app-scrim);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;
@@ -562,7 +562,7 @@ defineProps<{
   border-radius: 10px;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    linear-gradient(180deg, var(--color-border-1), transparent),
     color-mix(in srgb, var(--app-card-surface) 90%, transparent);
   position: relative;
   border: 1px solid var(--app-card-border);
@@ -580,7 +580,7 @@ defineProps<{
   border-radius: 10px;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    linear-gradient(180deg, var(--color-border-1), transparent),
     color-mix(in srgb, var(--app-card-surface) 90%, transparent);
   position: relative;
   border: 1px solid var(--app-card-border);
@@ -612,7 +612,7 @@ defineProps<{
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(8, 10, 16, 0.5);
+  background: var(--app-scrim);
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -648,7 +648,7 @@ defineProps<{
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(8, 10, 16, 0.5);
+  background: var(--app-scrim);
   opacity: 0;
   transition: opacity 0.2s ease;
 }

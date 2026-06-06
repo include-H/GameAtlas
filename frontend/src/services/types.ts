@@ -163,11 +163,11 @@ export interface GameListItemDto {
   banner_image: string | null
   wiki_content: string | null
   primary_screenshot: string | null
-  screenshot_count: number
+  screenshot_count?: number
   logo_visible: boolean
-  file_count: number
-  developer_count: number
-  publisher_count: number
+  file_count?: number
+  developer_count?: number
+  publisher_count?: number
   is_favorite: boolean
   pending_issues?: PendingIssueEvaluation
   downloads: number
@@ -175,7 +175,7 @@ export interface GameListItemDto {
   updated_at: string
 }
 
-export interface GameDetailDtoBase<TFile extends GameFileEntry = GameFileEntry> extends Omit<GameListItemDto, 'primary_screenshot' | 'screenshot_count' | 'file_count' | 'developer_count' | 'publisher_count'> {
+interface GameDetailDtoBase<TFile extends GameFileEntry = GameFileEntry> extends Omit<GameListItemDto, 'primary_screenshot' | 'screenshot_count' | 'file_count' | 'developer_count' | 'publisher_count'> {
   preview_videos: VideoAssetItem[]
   screenshots: ScreenshotItem[]
   covers: CoverItem[]
@@ -187,7 +187,7 @@ export interface GameDetailDtoBase<TFile extends GameFileEntry = GameFileEntry> 
   files: TFile[]
 }
 
-export type PublicGameDetailDto = GameDetailDtoBase<PublicGameFileEntry>
+type PublicGameDetailDto = GameDetailDtoBase<PublicGameFileEntry>
 export type AdminGameDetailDto = GameDetailDtoBase<AdminGameFileEntry>
 export type GameDetailDto = PublicGameDetailDto | AdminGameDetailDto
 
@@ -205,14 +205,12 @@ export interface GameCreateRequest {
   visibility?: 'public' | 'private'
 }
 
-export interface GameAggregateCoreRequest {
+interface GameAggregateCoreRequest {
   title: string
   title_alt: string | null
   visibility: 'public' | 'private'
   summary: string | null
   release_date: string | null
-  cover_image: string | null
-  banner_image: string | null
   logo_visible: boolean
 }
 
@@ -223,7 +221,7 @@ export interface GameAggregateGameUpdateRequest extends GameAggregateCoreRequest
   publisher_ids: number[]
 }
 
-export interface GameAggregateFileRequest {
+interface GameAggregateFileRequest {
   id?: number
   file_path: string
   label?: string | null
@@ -250,7 +248,7 @@ export interface GameAggregateUpdateRequest {
   }
 }
 
-export interface LogoPosition {
+interface LogoPosition {
   asset_uid: string
   position_x: number | null
   position_y: number | null
@@ -272,11 +270,11 @@ export interface GameListQuery {
   favorite_raw?: string
 }
 
-export interface Favoritable {
+interface Favoritable {
   isFavorite: boolean
 }
 
-export type GameListItemView = Omit<GameListItemDto, 'is_favorite'> & Favoritable
+type GameListItemView = Omit<GameListItemDto, 'is_favorite'> & Favoritable
 export type GameDetailView<TFile extends GameFileEntry = GameFileEntry> = Omit<GameDetailDtoBase<TFile>, 'is_favorite'> & Favoritable
 export type GameListItem = GameListItemView
 export type PublicGameDetail = GameDetailView<PublicGameFileEntry>

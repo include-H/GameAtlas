@@ -37,7 +37,7 @@
             title="游戏总数"
             :value="totalGames"
             icon="mdi-gamepad-variant"
-            color="#1a9fff"
+            color="var(--color-primary-6)"
             :height="104"
             @click="router.push('/games')"
           />
@@ -46,7 +46,7 @@
             title="收藏"
             :value="favoriteCount"
             icon="mdi-heart"
-            color="#f53f3f"
+            color="var(--color-danger-6)"
             :height="104"
             @click="router.push('/games?favorite=true')"
           />
@@ -55,7 +55,7 @@
             title="新入库"
             :value="recentAdditions.length"
             icon="mdi-new-box"
-            color="#00b42a"
+            color="var(--color-success-6)"
             :height="104"
             @click="router.push('/games?sort=created_at&order=desc')"
           />
@@ -64,7 +64,7 @@
             title="待处理"
             :value="pendingReviews"
             icon="mdi-clock"
-            color="#ff7d00"
+            color="var(--color-warning-6)"
             :height="104"
             @click="router.push('/games/pending')"
           />

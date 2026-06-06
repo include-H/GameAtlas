@@ -122,7 +122,7 @@ const emit = defineEmits<{
   flex-shrink: 0;
   object-fit: cover;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-border-1);
 }
 
 .steam-result-placeholder {

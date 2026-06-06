@@ -29,8 +29,7 @@ type MetadataResource struct {
 	// than permanently curated master data. They can be pre-created for form
 	// input convenience and are expected to be auto-pruned once no games refer
 	// to them anymore.
-	Type         domain.MetadataType
-	ResourceName string
+	Type domain.MetadataType
 }
 
 type MetadataListOptions struct {

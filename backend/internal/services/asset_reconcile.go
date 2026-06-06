@@ -69,7 +69,8 @@ func (s *AssetReconcileService) ReconcileAllMissingAssets() (int, error) {
 	return changed, nil
 }
 
-// ReconcileGameMissingAssets remains available for explicit non-request repair callers.
+// ReconcileGameMissingAssets reconciles a single game's asset references.
+// NOTE: currently only exercised by tests; production startup uses ReconcileAllMissingAssets.
 func (s *AssetReconcileService) ReconcileGameMissingAssets(gameID int64) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

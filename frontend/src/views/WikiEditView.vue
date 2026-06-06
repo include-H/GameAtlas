@@ -249,13 +249,15 @@ watch(
     }
     resetHistoryState()
     await loadHistory(gameId)
+    syncAmbientBackground()
   },
   { immediate: true },
 )
 
+// Sync on non-ID-triggered game changes (e.g., edit modal aggregate update).
 watch(game, () => {
   syncAmbientBackground()
-}, { immediate: true })
+})
 
 onActivated(() => {
   syncAmbientBackground()
@@ -621,7 +623,7 @@ onActivated(() => {
   overflow: hidden;
   border-radius: 16px;
   background: color-mix(in srgb, var(--app-card-surface) 92%, transparent);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-float);
 }
 
 .wiki-edit-history-modal .arco-modal-header {

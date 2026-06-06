@@ -467,7 +467,7 @@ onBeforeUnmount(() => {
   position: absolute;
   width: 80px;
   height: 4px;
-  background: #2d2d2d;
+  background: var(--login-dark);
   border-radius: 999px;
   transition: all 0.2s ease-out;
 }

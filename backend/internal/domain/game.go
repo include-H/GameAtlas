@@ -190,8 +190,6 @@ type GameCoreInput struct {
 	Visibility  string
 	Summary     *string
 	ReleaseDate *string
-	CoverImage  *string
-	BannerImage *string
 	LogoVisible *bool
 }
 

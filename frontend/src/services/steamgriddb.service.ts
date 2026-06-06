@@ -1,7 +1,7 @@
 import { get } from './api'
 import type { ApiEnvelope } from './types'
 
-export interface SteamGridDBImage {
+interface SteamGridDBImage {
   id: number
   score: number
   style?: string
@@ -11,7 +11,7 @@ export interface SteamGridDBImage {
   thumb: string
 }
 
-export interface SteamGridDBGame {
+interface SteamGridDBGame {
   id: number
   name: string
   release_date: number
@@ -37,21 +37,6 @@ const steamGridDBService = {
     return response.data ?? []
   },
 
-  async getGridsBySteamAppId(appId: string): Promise<SteamGridDBImage[]> {
-    const response = await get<ApiEnvelope<SteamGridDBImage[]>>(`/steamgriddb/${appId}/grids`)
-    return response.data ?? []
-  },
-
-  async getHeroesBySteamAppId(appId: string): Promise<SteamGridDBImage[]> {
-    const response = await get<ApiEnvelope<SteamGridDBImage[]>>(`/steamgriddb/${appId}/heroes`)
-    return response.data ?? []
-  },
-
-  async getLogosBySteamAppId(appId: string): Promise<SteamGridDBImage[]> {
-    const response = await get<ApiEnvelope<SteamGridDBImage[]>>(`/steamgriddb/${appId}/logos`)
-    return response.data ?? []
-  },
-
   async getGridsByGameId(gameId: number): Promise<SteamGridDBImage[]> {
     const response = await get<ApiEnvelope<SteamGridDBImage[]>>(`/steamgriddb/game/${gameId}/grids`)
     return response.data ?? []
@@ -62,10 +47,6 @@ const steamGridDBService = {
     return response.data ?? []
   },
 
-  async getLogosByGameId(gameId: number): Promise<SteamGridDBImage[]> {
-    const response = await get<ApiEnvelope<SteamGridDBImage[]>>(`/steamgriddb/game/${gameId}/logos`)
-    return response.data ?? []
-  },
 }
 
 export default steamGridDBService

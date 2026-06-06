@@ -393,43 +393,43 @@ const renderedHtml = computed(() => {
 
 .markdown-renderer :deep(th),
 .markdown-renderer :deep(td) {
-  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.12));
+  border: 1px solid var(--color-border-2);
   padding: 0.5em 1em;
   text-align: left;
 }
 
 .markdown-renderer :deep(th) {
-  background: var(--color-table-header, rgba(0, 0, 0, 0.03));
+  background: var(--color-table-header);
   font-weight: 600;
 }
 
 .markdown-renderer :deep(hr) {
   border: none;
-  border-top: 1px solid var(--color-border, rgba(0, 0, 0, 0.1));
+  border-top: 1px solid var(--color-border-2);
   margin: 2em 0;
 }
 
 /* Dark theme overrides (app uses body[arco-theme='dark']) */
 body[arco-theme='dark'] .markdown-renderer :deep(h1),
 body[arco-theme='dark'] .markdown-renderer :deep(h2) {
-  border-bottom-color: rgba(255, 255, 255, 0.1);
+  border-bottom-color: var(--color-border-2);
 }
 
 body[arco-theme='dark'] .markdown-renderer :deep(code) {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-border-2);
 }
 
 body[arco-theme='dark'] .markdown-renderer :deep(th),
 body[arco-theme='dark'] .markdown-renderer :deep(td) {
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--color-border-3);
 }
 
 body[arco-theme='dark'] .markdown-renderer :deep(th) {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-table-header);
 }
 
 body[arco-theme='dark'] .markdown-renderer :deep(hr) {
-  border-top-color: rgba(255, 255, 255, 0.1);
+  border-top-color: var(--color-border-2);
 }
 
 @media (max-width: 768px) {

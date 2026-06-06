@@ -130,7 +130,7 @@ const loadDirectory = async (path?: string) => {
     // but surface that this response is partial so the picker does not masquerade as a complete listing.
     directoryListIncomplete.value = data.incomplete
     skippedCount.value = data.skippedCount
-  } catch (error) {
+  } catch {
     // 2026-04-08: directory read failures must not masquerade as a successful empty/current folder state.
     // Impact: initial load shows an explicit failure, while refresh failures keep stale content with a warning.
     if (currentPath.value || directoryItems.value.length > 0) {
@@ -215,14 +215,14 @@ watch(visible, async (newVal) => {
 
 .file-browser-status--warning {
   color: var(--color-status-warning-text);
-  background: rgba(255, 196, 92, 0.16);
-  border: 1px solid rgba(255, 196, 92, 0.28);
+  background: var(--color-status-warning-bg);
+  border: 1px solid var(--color-status-warning-border);
 }
 
 .file-browser-status--error {
   color: var(--color-status-error-text);
-  background: rgba(217, 45, 32, 0.12);
-  border: 1px solid rgba(217, 45, 32, 0.22);
+  background: var(--color-status-error-bg);
+  border: 1px solid var(--color-status-error-border);
 }
 
 .file-browser-header {

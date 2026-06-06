@@ -200,7 +200,6 @@ describe('useEditGameWorkflow', () => {
       game: expect.objectContaining({
         title_alt: null,
         summary: null,
-        cover_image: null,
       }),
     }))
   })

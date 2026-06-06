@@ -152,15 +152,15 @@ const handleConfirm = () => {
 .banner-crop__overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--app-scrim);
   pointer-events: none;
 }
 
 .banner-crop__window {
   position: absolute;
   top: 0;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
-  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 0 9999px var(--app-scrim);
+  border: 2px solid var(--color-text-on-dark);
   pointer-events: none;
 }
 

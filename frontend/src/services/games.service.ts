@@ -217,36 +217,6 @@ const gamesService = {
     }
   },
 
-  async getAllGames(params?: {
-    query?: Omit<GameListQuery, 'page' | 'limit'>
-    sort?: GameSortQuery
-    limit?: number
-  }): Promise<GameListItem[]> {
-    const limit = Math.max(1, Math.min(params?.limit || 100, 200))
-    const allGames: GameListItem[] = []
-    let page = 1
-
-    while (true) {
-      const response = await this.getGames({
-        query: {
-          ...params?.query,
-          page,
-          limit,
-        },
-        sort: params?.sort,
-      })
-
-      allGames.push(...response.data)
-      const totalPages = response.pagination.totalPages
-      if (page >= totalPages) {
-        break
-      }
-      page += 1
-    }
-
-    return allGames
-  },
-
   async getTimelineGames(params?: {
     limit?: number
     cursor?: string | null

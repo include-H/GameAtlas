@@ -622,7 +622,7 @@ const handleBannerCropConfirm = async (blob: Blob) => {
     if (result) {
       form.value.banners.unshift({ asset_uid: result.asset_uid, path: result.path })
     }
-  } catch (err) {
+  } catch {
     uiStore.addAlert('横幅裁剪上传失败', 'error')
   }
 }

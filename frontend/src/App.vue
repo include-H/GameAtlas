@@ -422,7 +422,7 @@ onUnmounted(() => {
   color: color-mix(in srgb, var(--color-text-1) 74%, var(--color-primary-light-2) 26%) !important;
   backdrop-filter: blur(10px) saturate(120%);
   -webkit-backdrop-filter: blur(10px) saturate(120%);
-  box-shadow: 0 10px 24px rgba(3, 8, 20, 0.28);
+  box-shadow: var(--shadow-hover);
   transition:
     background-color var(--transition-fast),
     color var(--transition-fast),
@@ -433,7 +433,7 @@ onUnmounted(() => {
 .mobile-menu-btn:hover {
   background: var(--app-sider-hover) !important;
   color: var(--color-text-1) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 10px 24px rgba(3, 8, 20, 0.28);
+  box-shadow: inset 0 1px 0 var(--color-border-1), var(--shadow-hover);
 }
 
 .mobile-menu-btn.mobile-menu-btn--active {
@@ -579,7 +579,7 @@ body {
 .app-sider :is(.arco-layout-sider-trigger, .arco-layout-sider-trigger-light):hover {
   background: var(--app-sider-hover);
   color: var(--color-text-1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 1px 0 var(--color-border-1);
 }
 
 .app-sider.arco-layout-sider-collapsed :is(.arco-layout-sider-trigger, .arco-layout-sider-trigger-light) {
@@ -608,7 +608,7 @@ body {
 }
 
 .mobile-drawer .arco-drawer-mask {
-  background: rgba(6, 10, 18, 0.46);
+  background: var(--app-scrim);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }

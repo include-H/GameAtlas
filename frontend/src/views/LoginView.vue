@@ -101,6 +101,9 @@ import {
   IconTrophy,
 } from '@arco-design/web-vue/es/icon'
 import { useAuthStore } from '@/stores/auth'
+import { useGamesStore } from '@/stores/games'
+import { useUiStore } from '@/stores/ui'
+import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
 import hitokotoService from '@/services/hitokoto.service'
 import { getHttpErrorData, getHttpErrorMessage, getHttpStatus } from '@/utils/http-error'
 import AnimatedCharacters from '@/components/login/AnimatedCharacters.vue'
@@ -113,7 +116,10 @@ interface LoginErrorData {
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const gamesStore = useGamesStore()
+const uiStore = useUiStore()
 const fallbackLoginQuote = '推开这扇门，回到你的游戏库。'
+const AMBIENT_BACKGROUND_OWNER = 'login'
 
 const password = ref('')
 const showPassword = ref(false)
@@ -289,13 +295,40 @@ const handleLogin = async () => {
   }
 }
 
-onMounted(() => {
+const syncAmbientBackground = () => {
+  const games = [
+    ...(gamesStore.stats?.recent_games ?? []),
+    ...(gamesStore.stats?.popular_games ?? []),
+  ]
+  const imageUrls = getAmbientBackgroundUrlsFromGames(games)
+  if (imageUrls.length > 0) {
+    uiStore.setAmbientBackgroundSource({
+      owner: AMBIENT_BACKGROUND_OWNER,
+      key: 'login',
+      urls: imageUrls,
+    })
+    return
+  }
+  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+}
+
+onMounted(async () => {
   void loadLoginQuote()
+  syncAmbientBackground()
+  if (!gamesStore.stats) {
+    try {
+      await gamesStore.fetchStats()
+      syncAmbientBackground()
+    } catch {
+      // no stats available — skip ambient background
+    }
+  }
 })
 
 onBeforeUnmount(() => {
   clearCooldownTimer()
   clearSceneStatusTimers()
+  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
 })
 </script>
 
@@ -304,6 +337,7 @@ onBeforeUnmount(() => {
   min-height: 100vh;
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(400px, 560px);
+  /* 品牌化渐变：色值对应 --color-sidebar-selected-bg / --color-primary-6 / --color-bg-1 */
   background:
     radial-gradient(circle at top right, rgba(122, 162, 199, 0.14), transparent 32%),
     radial-gradient(circle at bottom left, rgba(67, 87, 110, 0.16), transparent 36%),
@@ -337,22 +371,24 @@ onBeforeUnmount(() => {
   height: 42px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--color-border-2);
   border-radius: 999px;
-  background: rgba(22, 26, 37, 0.72);
+  background: var(--app-card-surface);
   color: var(--color-text-2);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-hover);
   cursor: pointer;
   transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
   padding: 0;
   min-width: 42px;
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .login-stage__close:hover {
   transform: translateY(-1px);
   color: var(--color-text-1);
-  border-color: rgba(26, 159, 255, 0.3);
-  background: rgba(28, 34, 48, 0.9);
+  border-color: var(--app-glass-border-hover);
+  background: color-mix(in srgb, var(--app-card-surface) 90%, transparent);
 }
 
 .login-stage__backdrop,
@@ -396,11 +432,11 @@ onBeforeUnmount(() => {
   place-items: center;
   overflow: hidden;
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(19, 26, 38, 0.94), rgba(10, 14, 22, 0.88));
-  border: 1px solid rgba(176, 196, 216, 0.18);
+  background: linear-gradient(180deg, var(--color-bg-3), var(--color-bg-2));
+  border: 1px solid var(--app-card-border);
   box-shadow:
-    0 22px 44px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    var(--shadow-float),
+    inset 0 1px 0 var(--color-border-1);
 }
 
 .login-stage__brand-mark::before,
@@ -413,14 +449,14 @@ onBeforeUnmount(() => {
 
 .login-stage__brand-mark::before {
   background:
-    linear-gradient(135deg, rgba(220, 231, 241, 0.24), rgba(26, 159, 255, 0.08) 42%, transparent 76%),
-    radial-gradient(circle at 28% 24%, rgba(95, 197, 255, 0.22), transparent 42%);
+    linear-gradient(135deg, color-mix(in srgb, var(--color-text-on-dark) 24%, transparent), color-mix(in srgb, var(--color-primary-6) 8%, transparent) 42%, transparent 76%),
+    radial-gradient(circle at 28% 24%, color-mix(in srgb, var(--color-primary-3) 22%, transparent), transparent 42%);
 }
 
 .login-stage__brand-mark::after {
   inset: 18px;
   border-radius: 20px;
-  background: radial-gradient(circle, rgba(95, 197, 255, 0.24), transparent 72%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-primary-3) 24%, transparent), transparent 72%);
   filter: blur(8px);
 }
 
@@ -432,18 +468,18 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   border-radius: 18px;
-  background: linear-gradient(160deg, rgba(103, 148, 196, 0.22), rgba(26, 159, 255, 0.08));
-  border: 1px solid rgba(196, 214, 230, 0.14);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--color-primary-6) 22%, transparent), color-mix(in srgb, var(--color-primary-6) 8%, transparent));
+  border: 1px solid var(--app-card-border);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 10px 24px rgba(7, 17, 30, 0.28);
+    inset 0 1px 0 var(--color-border-1),
+    0 10px 24px color-mix(in srgb, var(--color-bg-1) 28%, transparent);
 }
 
 .login-stage__brand-icon {
   font-size: 30px;
-  color: #93dbff;
+  color: var(--color-primary-3);
   transform: translateY(-1px);
-  filter: drop-shadow(0 6px 14px rgba(26, 159, 255, 0.3));
+  filter: drop-shadow(0 6px 14px color-mix(in srgb, var(--color-primary-6) 30%, transparent));
 }
 
 .login-stage__eyebrow {
@@ -452,7 +488,7 @@ onBeforeUnmount(() => {
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(219, 229, 238, 0.62);
+  color: var(--color-text-3);
 }
 
 .login-stage__title {
@@ -460,7 +496,7 @@ onBeforeUnmount(() => {
   font-size: clamp(34px, 4vw, 58px);
   line-height: 1;
   letter-spacing: -0.04em;
-  text-shadow: 0 12px 28px rgba(26, 159, 255, 0.16);
+  text-shadow: 0 12px 28px color-mix(in srgb, var(--color-primary-6) 16%, transparent);
 }
 
 .login-panel {
@@ -481,11 +517,11 @@ onBeforeUnmount(() => {
   width: min(100%, 468px);
   padding: 36px 30px 30px;
   border-radius: 28px;
-  background: rgba(22, 26, 37, 0.76);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--app-card-surface);
+  border: 1px solid var(--app-card-border);
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(var(--app-card-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .login-card__header {
@@ -525,11 +561,11 @@ onBeforeUnmount(() => {
   margin: -2px 2px 0;
   font-size: 13px;
   line-height: 1.45;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--color-text-2);
 }
 
 .login-feedback--warning {
-  color: #ffcc80;
+  color: var(--color-welcome-warning-mix);
 }
 
 .login-field {
@@ -543,15 +579,15 @@ onBeforeUnmount(() => {
   align-items: center;
   min-height: 58px;
   border-radius: 18px;
-  background: rgba(28, 34, 48, 0.84);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--app-card-surface) 84%, transparent);
+  border: 1px solid var(--app-card-border);
+  box-shadow: inset 0 1px 0 var(--color-border-1);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .login-field__shell--focus {
-  border-color: rgba(26, 159, 255, 0.42);
-  box-shadow: 0 0 0 4px rgba(26, 159, 255, 0.12);
+  border-color: var(--app-glass-border-hover);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary-6) 12%, transparent);
 }
 
 .login-field__icon,
@@ -598,13 +634,13 @@ onBeforeUnmount(() => {
   border-radius: 18px;
   font-size: 15px;
   font-weight: 600;
-  background: linear-gradient(135deg, var(--color-primary-6) 0%, #007aff 100%);
+  background: linear-gradient(135deg, var(--color-primary-6) 0%, var(--color-primary-7) 100%);
   border: 0;
-  box-shadow: 0 16px 32px rgba(26, 159, 255, 0.24);
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--color-primary-6) 24%, transparent);
 }
 
 .login-submit:hover {
-  background: linear-gradient(135deg, var(--color-primary-7) 0%, #3395ff 100%);
+  background: linear-gradient(135deg, var(--color-primary-7) 0%, var(--color-primary-6) 100%);
 }
 
 @media (max-width: 1080px) {

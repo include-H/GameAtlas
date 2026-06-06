@@ -67,9 +67,9 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	// they still point at metadata that is auto-pruned once unreferenced by any
 	// game. The lightweight MetadataResource mapping keeps the transport layer
 	// small while the actual lifecycle rule remains in aggregate-side cleanup.
-	seriesHandler := handlers.NewMetadataHandler(metadataService, services.MetadataResource{Type: domain.MetadataSeries, ResourceName: "series"})
-	developersHandler := handlers.NewMetadataHandler(metadataService, services.MetadataResource{Type: domain.MetadataDevelopers, ResourceName: "developers"})
-	publishersHandler := handlers.NewMetadataHandler(metadataService, services.MetadataResource{Type: domain.MetadataPublishers, ResourceName: "publishers"})
+	seriesHandler := handlers.NewMetadataHandler(metadataService, services.MetadataResource{Type: domain.MetadataSeries})
+	developersHandler := handlers.NewMetadataHandler(metadataService, services.MetadataResource{Type: domain.MetadataDevelopers})
+	publishersHandler := handlers.NewMetadataHandler(metadataService, services.MetadataResource{Type: domain.MetadataPublishers})
 	reviewIssueOverrideHandler := handlers.NewReviewIssueOverrideHandler(reviewIssueOverrideService)
 	pendingIssuesHandler := handlers.NewPendingIssuesHandler(pendingIssuesService)
 	steamHandler := handlers.NewSteamHandler(steamService)

@@ -57,11 +57,11 @@
                       alt=""
                     />
                     <svg class="screenshot-carousel__loader-arc" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3" />
+                      <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" style="opacity: 0.1" stroke-width="3" />
                       <circle
                         cx="50" cy="50" r="46"
                         fill="none"
-                        stroke="rgba(170,222,255,0.9)"
+                        style="stroke: var(--color-primary-3)"
                         stroke-width="3"
                         stroke-linecap="round"
                         stroke-dasharray="80 210"
@@ -370,11 +370,11 @@ const handleImageError = (url: string) => {
   min-height: 420px;
   aspect-ratio: 16 / 9;
   background:
-    radial-gradient(circle at 20% 18%, rgba(40, 52, 84, 0.36), transparent 30%),
+    radial-gradient(circle at 20% 18%, color-mix(in srgb, var(--color-primary-6) 12%, transparent), transparent 30%),
     linear-gradient(180deg, var(--color-carousel-empty-start) 0%, var(--color-carousel-empty-end) 100%);
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.34);
+  border: 1px solid var(--color-border-2);
+  box-shadow: var(--shadow-float);
 }
 
 .screenshot-carousel__empty {
@@ -386,12 +386,12 @@ const handleImageError = (url: string) => {
 }
 
 .screenshot-carousel__empty-icon {
-  color: rgba(255, 255, 255, 0.15);
+  color: var(--color-border-3);
   margin-bottom: 16px;
 }
 
 .screenshot-carousel__empty-text {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--color-text-3);
   font-size: 14px;
   margin: 0;
 }
@@ -401,11 +401,11 @@ const handleImageError = (url: string) => {
   position: relative;
   border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.38);
+  box-shadow: var(--shadow-float);
   width: 100%;
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--color-border-2);
 }
 
 /* Main Image Area */
@@ -457,7 +457,7 @@ const handleImageError = (url: string) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(5, 8, 14, 0.6);
+  background: var(--app-scrim);
   z-index: 5;
 }
 
@@ -476,7 +476,7 @@ const handleImageError = (url: string) => {
   height: 56px;
   border-radius: 50%;
   object-fit: cover;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-soft);
 }
 
 .screenshot-carousel__loader-arc {
@@ -564,7 +564,7 @@ const handleImageError = (url: string) => {
   overflow-x: auto;
   padding: 0 10px 6px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  scrollbar-color: var(--color-border-3) transparent;
 }
 
 .screenshot-carousel__filmstrip-inner::-webkit-scrollbar {
@@ -576,7 +576,7 @@ const handleImageError = (url: string) => {
 }
 
 .screenshot-carousel__filmstrip-inner::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--color-border-3);
   border-radius: 3px;
 }
 
@@ -589,11 +589,11 @@ const handleImageError = (url: string) => {
   overflow: hidden;
   cursor: pointer;
   transition: all 0.2s ease;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--color-border-2);
   flex-shrink: 0;
   background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
   opacity: 1;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 var(--color-border-1);
 }
 
 .screenshot-carousel__film img {
@@ -609,23 +609,19 @@ const handleImageError = (url: string) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.8);
-  background: linear-gradient(135deg, rgba(20, 20, 30, 0.95) 0%, rgba(35, 35, 50, 0.95) 100%);
+  color: var(--color-text-on-dark);
+  background: var(--color-bg-3);
 }
 
 .screenshot-carousel__film-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    to bottom,
-    rgba(103, 193, 245, 0) 0%,
-    rgba(103, 193, 245, 0) 100%
-  );
+  background: transparent;
   transition: all 0.2s ease;
 }
 
 .screenshot-carousel__film:hover {
-  border-color: rgba(147, 204, 255, 0.46);
+  border-color: var(--app-glass-border-hover);
   opacity: 1;
   transform: translateY(-1px);
 }
@@ -635,8 +631,8 @@ const handleImageError = (url: string) => {
 }
 
 .screenshot-carousel__film.active {
-  border-color: rgba(170, 222, 255, 0.95);
+  border-color: var(--color-primary-4);
   opacity: 1;
-  box-shadow: 0 0 0 1px rgba(170, 222, 255, 0.22), 0 10px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-4) 22%, transparent), var(--shadow-hover);
 }
 </style>

@@ -1,4 +1,4 @@
-export interface HeadingEntry {
+interface HeadingEntry {
   id: string
   text: string
   level: number

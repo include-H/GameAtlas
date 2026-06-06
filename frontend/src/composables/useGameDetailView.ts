@@ -239,7 +239,7 @@ export const useGameDetailView = ({
     hasLoadFailure.value = false
     try {
       await gamesStore.fetchGame(gameId, signal)
-    } catch (error) {
+    } catch {
       // Ignore aborted requests
       if (signal.aborted) return
       // 2026-04-07: detail routing must never keep rendering the previous game when
@@ -258,6 +258,8 @@ export const useGameDetailView = ({
       }
       showEditModal.value = false
       await loadGameDetail(gameId)
+      syncAmbientBackground()
+      void setupTopSectionObserver()
     },
     { immediate: true },
   )
@@ -307,6 +309,7 @@ export const useGameDetailView = ({
     void setupTopSectionObserver()
   })
 
+  // Sync on non-ID-triggered game changes (e.g., edit modal aggregate update).
   watch(
     game,
     () => {

@@ -167,7 +167,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
     isPreparingWikiMetadataCandidates.value = true
     try {
       prepareWikiMetadataCandidates()
-    } catch (error) {
+    } catch {
       options.addAlert('从 Wiki 提取元数据失败', 'warning')
     } finally {
       isPreparingWikiMetadataCandidates.value = false

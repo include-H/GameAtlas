@@ -556,7 +556,6 @@ func TestGamesRepositoryUpdateAggregateReplaceCoverPreservesNewPath(t *testing.T
 			GameCoreInput: domain.GameCoreInput{
 				Title:      "Replace Cover",
 				Visibility: "public",
-				CoverImage: strPtr("/assets/replace-cover/new-cover.jpg"),
 			},
 		},
 		Assets: domain.GameAggregateAssetsInput{
@@ -592,7 +591,6 @@ func TestGamesRepositoryUpdateAggregateRemoveCoverSetsNull(t *testing.T) {
 			GameCoreInput: domain.GameCoreInput{
 				Title:      "Remove Cover",
 				Visibility: "public",
-				CoverImage: nil,
 			},
 		},
 		Assets: domain.GameAggregateAssetsInput{

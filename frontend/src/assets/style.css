@@ -77,7 +77,25 @@
 
   /* File browser status */
   --color-status-warning-text: #9a6700;
+  --color-status-warning-bg: rgba(255, 196, 92, 0.16);
+  --color-status-warning-border: rgba(255, 196, 92, 0.28);
   --color-status-error-text: #b42318;
+  --color-status-error-bg: rgba(217, 45, 32, 0.12);
+  --color-status-error-border: rgba(217, 45, 32, 0.22);
+
+  /* Table */
+  --color-table-header: rgba(0, 0, 0, 0.03);
+
+  /* Overlay / scrim */
+  --app-scrim: rgba(0, 0, 0, 0.5);
+  --app-scrim-light: rgba(0, 0, 0, 0.4);
+
+  /* Card overlay gradients */
+  --app-card-overlay-start: rgba(0, 0, 0, 0.28);
+  --app-card-overlay-end: rgba(0, 0, 0, 0.7);
+
+  /* Warning (Arco orange) */
+  --color-warning-6: #ff7d00;
 
   /* -----------------------------------------------------------------------
      2. Shadows and Glows
@@ -166,6 +184,12 @@ body[arco-theme='dark'] {
   --app-footer-surface: color-mix(in srgb, var(--app-header-surface) 52%, transparent);
   --app-footer-border: color-mix(in srgb, var(--app-header-border) 82%, transparent);
   --app-footer-shadow: 0 -14px 28px rgba(2, 7, 13, 0.22);
+
+  --color-table-header: rgba(255, 255, 255, 0.05);
+  --color-status-warning-bg: rgba(255, 196, 92, 0.1);
+  --color-status-warning-border: rgba(255, 196, 92, 0.2);
+  --color-status-error-bg: rgba(217, 45, 32, 0.08);
+  --color-status-error-border: rgba(217, 45, 32, 0.15);
 }
 
 /* -----------------------------------------------------------------------

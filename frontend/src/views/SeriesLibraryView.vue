@@ -202,7 +202,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .series-library {
   --series-collage-bg: linear-gradient(135deg, rgba(12, 18, 30, 0.96), rgba(16, 20, 30, 0.82));
-  --series-placeholder-text: rgba(255, 255, 255, 0.92);
+  --series-placeholder-text: var(--color-text-on-dark);
 
   animation: fadeInUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
@@ -325,7 +325,7 @@ onBeforeUnmount(() => {
 .series-card__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(6, 12, 22, 0.02), rgba(6, 12, 22, 0.34));
+  background: linear-gradient(180deg, var(--app-card-overlay-start), var(--app-card-overlay-end));
 }
 
 .series-card__body {

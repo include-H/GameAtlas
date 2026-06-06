@@ -6,7 +6,7 @@ export interface UploadedAssetResult {
   asset_uid?: string
 }
 
-export type AssetType = 'cover' | 'banner' | 'screenshot' | 'video' | 'logo'
+type AssetType = 'cover' | 'banner' | 'screenshot' | 'video' | 'logo'
 
 export async function uploadAsset(
   assetType: AssetType,
