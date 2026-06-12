@@ -6,21 +6,23 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/hao/game/internal/domain"
 )
 
 func (s *SteamService) ProxyAssetStream(assetURL string, proxyOverride string) (string, io.ReadCloser, int64, error) {
 	parsed, err := url.Parse(strings.TrimSpace(assetURL))
 	if err != nil {
-		return "", nil, 0, ErrValidation
+		return "", nil, 0, domain.ErrValidation
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return "", nil, 0, ErrValidation
+		return "", nil, 0, domain.ErrValidation
 	}
 	if parsed.Hostname() == "" {
-		return "", nil, 0, ErrValidation
+		return "", nil, 0, domain.ErrValidation
 	}
 	if !isAllowedSteamAssetHost(parsed.Hostname()) {
-		return "", nil, 0, ErrValidation
+		return "", nil, 0, domain.ErrValidation
 	}
 
 	req, err := http.NewRequest(http.MethodGet, parsed.String(), nil)
@@ -39,7 +41,7 @@ func (s *SteamService) ProxyAssetStream(assetURL string, proxyOverride string) (
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
 		resp.Body.Close()
-		return "", nil, 0, fmt.Errorf("%w: steam request failed with status %d", ErrUpstream, resp.StatusCode)
+		return "", nil, 0, fmt.Errorf("%w: steam request failed with status %d", domain.ErrUpstream, resp.StatusCode)
 	}
 
 	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))

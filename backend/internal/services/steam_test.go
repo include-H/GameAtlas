@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/hao/game/internal/domain"
 )
 
 func TestNormalizeSteamReleaseDateSupportsCommonFormats(t *testing.T) {
@@ -102,8 +104,8 @@ func TestSteamServiceSearchReturnsErrorWhenAllLocalesFail(t *testing.T) {
 	if results != nil {
 		t.Fatalf("results = %#v, want nil on total failure", results)
 	}
-	if !errors.Is(err, ErrUpstream) {
-		t.Fatalf("error = %v, want wrapped ErrUpstream", err)
+	if !errors.Is(err, domain.ErrUpstream) {
+		t.Fatalf("error = %v, want wrapped domain.ErrUpstream", err)
 	}
 }
 
@@ -241,8 +243,8 @@ func TestSteamServiceProxyAssetReturnsErrorForUnexpectedStatus(t *testing.T) {
 	if err == nil {
 		t.Fatalf("ProxyAssetStream error = nil, want failure")
 	}
-	if !errors.Is(err, ErrUpstream) {
-		t.Fatalf("error = %q, want ErrUpstream", err.Error())
+	if !errors.Is(err, domain.ErrUpstream) {
+		t.Fatalf("error = %q, want domain.ErrUpstream", err.Error())
 	}
 }
 
@@ -250,8 +252,8 @@ func TestSteamServiceProxyAssetRejectsMissingHost(t *testing.T) {
 	service := &SteamService{}
 
 	_, _, _, err := service.ProxyAssetStream("https:///missing-host.jpg", "")
-	if err != ErrValidation {
-		t.Fatalf("error = %v, want ErrValidation", err)
+	if err != domain.ErrValidation {
+		t.Fatalf("error = %v, want domain.ErrValidation", err)
 	}
 }
 
@@ -259,8 +261,8 @@ func TestSteamServiceProxyAssetRejectsNonSteamHosts(t *testing.T) {
 	service := &SteamService{}
 
 	_, _, _, err := service.ProxyAssetStream("https://cdn.example.com/demo.jpg", "")
-	if err != ErrValidation {
-		t.Fatalf("error = %v, want ErrValidation", err)
+	if err != domain.ErrValidation {
+		t.Fatalf("error = %v, want domain.ErrValidation", err)
 	}
 }
 
@@ -359,8 +361,8 @@ func TestSteamServicePreviewAssetsReturnsUpstreamErrorWhenRequestsFail(t *testin
 	if preview != nil {
 		t.Fatalf("preview = %+v, want nil on upstream failure", preview)
 	}
-	if !errors.Is(err, ErrUpstream) {
-		t.Fatalf("error = %v, want ErrUpstream", err)
+	if !errors.Is(err, domain.ErrUpstream) {
+		t.Fatalf("error = %v, want domain.ErrUpstream", err)
 	}
 	if !strings.Contains(err.Error(), "schinese appdetails") || !strings.Contains(err.Error(), "english appdetails") {
 		t.Fatalf("error = %q, want both locale failures in message", err.Error())
@@ -385,8 +387,8 @@ func TestSteamServicePreviewAssetsReturnsNotFoundWhenAppMissingInAllLocales(t *t
 	if preview != nil {
 		t.Fatalf("preview = %+v, want nil when app is missing", preview)
 	}
-	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("error = %v, want ErrNotFound", err)
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("error = %v, want domain.ErrNotFound", err)
 	}
 }
 

@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/hao/game/internal/domain"
 )
 
 var (
@@ -120,9 +122,9 @@ func wrapSteamUpstreamError(message string, errs ...namedError) error {
 		details = append(details, fmt.Sprintf("%s: %v", item.name, item.err))
 	}
 	if len(details) == 0 {
-		return fmt.Errorf("%w: %s", ErrUpstream, message)
+		return fmt.Errorf("%w: %s", domain.ErrUpstream, message)
 	}
-	return fmt.Errorf("%w: %s (%s)", ErrUpstream, message, strings.Join(details, "; "))
+	return fmt.Errorf("%w: %s (%s)", domain.ErrUpstream, message, strings.Join(details, "; "))
 }
 
 func (s *SteamService) fetchAppDetails(appID int64, language string, proxyOverride string) (steamAppDetailsResponse, error) {
@@ -151,7 +153,7 @@ func (s *SteamService) fetchJSON(endpoint string, target any, proxyOverride stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%w: steam request failed with status %d", ErrUpstream, resp.StatusCode)
+		return fmt.Errorf("%w: steam request failed with status %d", domain.ErrUpstream, resp.StatusCode)
 	}
 
 	return json.NewDecoder(resp.Body).Decode(target)
@@ -174,7 +176,7 @@ func (s *SteamService) fetchText(endpoint string, proxyOverride string) (string,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("%w: steam request failed with status %d", ErrUpstream, resp.StatusCode)
+		return "", fmt.Errorf("%w: steam request failed with status %d", domain.ErrUpstream, resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)

@@ -147,11 +147,11 @@ func allocateAssetIdentity(assetType string) (string, string) {
 func normalizeAssetError(err error) error {
 	switch {
 	case errors.Is(err, files.ErrInvalidImageType):
-		return ErrValidation
+		return domain.ErrValidation
 	case errors.Is(err, files.ErrInvalidAssetName):
-		return ErrValidation
+		return domain.ErrValidation
 	case errors.Is(err, files.ErrInvalidRemoteURL), errors.Is(err, files.ErrBlockedRemoteURL):
-		return ErrValidation
+		return domain.ErrValidation
 	default:
 		return err
 	}

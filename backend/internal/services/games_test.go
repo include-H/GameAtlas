@@ -63,8 +63,8 @@ func TestGamesServiceGetDetailUsesFirstVideoAndRejectsPrivateGame(t *testing.T) 
 	}
 
 	_, err = service.Get(privateGameID, false)
-	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("GetDetail private error = %v, want ErrNotFound", err)
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("GetDetail private error = %v, want domain.ErrNotFound", err)
 	}
 }
 
@@ -164,8 +164,8 @@ func TestGamesServiceListRejectsUndecodedSortContract(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := service.List(tc.params)
-			if !errors.Is(err, ErrValidation) {
-				t.Fatalf("List error = %v, want ErrValidation", err)
+			if !errors.Is(err, domain.ErrValidation) {
+				t.Fatalf("List error = %v, want domain.ErrValidation", err)
 			}
 		})
 	}
@@ -362,8 +362,8 @@ func TestGamesServiceUpdateAggregateReturnsMissingConfigForFileValidation(t *tes
 			},
 		},
 	})
-	if !errors.Is(err, ErrMissingConfig) {
-		t.Fatalf("UpdateAggregate error = %v, want ErrMissingConfig", err)
+	if !errors.Is(err, domain.ErrMissingConfig) {
+		t.Fatalf("UpdateAggregate error = %v, want domain.ErrMissingConfig", err)
 	}
 }
 
@@ -495,8 +495,8 @@ func TestGamesServiceUpdateAggregateReturnsForbiddenPathForFileOutsideRoot(t *te
 			},
 		},
 	})
-	if !errors.Is(err, ErrForbiddenPath) {
-		t.Fatalf("UpdateAggregate error = %v, want ErrForbiddenPath", err)
+	if !errors.Is(err, domain.ErrForbiddenPath) {
+		t.Fatalf("UpdateAggregate error = %v, want domain.ErrForbiddenPath", err)
 	}
 }
 
@@ -565,8 +565,8 @@ func TestGamesServiceUpdateAggregateReturnsNotFoundForMissingExistingFileID(t *t
 			},
 		},
 	})
-	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("UpdateAggregate error = %v, want ErrNotFound", err)
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("UpdateAggregate error = %v, want domain.ErrNotFound", err)
 	}
 }
 
@@ -586,8 +586,8 @@ func TestGamesServiceUpdateAggregateReturnsNotFoundForMissingScreenshotReorderUI
 			ScreenshotOrderAssetUIDs: []string{"missing-shot"},
 		},
 	})
-	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("UpdateAggregate error = %v, want ErrNotFound", err)
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("UpdateAggregate error = %v, want domain.ErrNotFound", err)
 	}
 }
 
@@ -607,8 +607,8 @@ func TestGamesServiceUpdateAggregateReturnsNotFoundForMissingVideoReorderUID(t *
 			VideoOrderAssetUIDs: []string{"missing-video"},
 		},
 	})
-	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("UpdateAggregate error = %v, want ErrNotFound", err)
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("UpdateAggregate error = %v, want domain.ErrNotFound", err)
 	}
 }
 

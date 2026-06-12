@@ -86,13 +86,13 @@ func normalizeDirectoryError(err error) error {
 	case err == nil:
 		return nil
 	case err == files.ErrNoPrimaryRoot:
-		return ErrMissingConfig
+		return domain.ErrMissingConfig
 	case err == files.ErrPathOutsideRoot:
-		return ErrForbiddenPath
+		return domain.ErrForbiddenPath
 	case err == files.ErrFileNotFound:
-		return ErrNotFound
+		return domain.ErrNotFound
 	case err == files.ErrNotAFile:
-		return ErrValidation
+		return domain.ErrValidation
 	default:
 		return err
 	}

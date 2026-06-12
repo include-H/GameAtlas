@@ -20,8 +20,8 @@ func TestWikiServiceGetRejectsPrivateGameForPublicRequest(t *testing.T) {
 	)
 
 	_, err := service.Get(gameID, false)
-	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("Get error = %v, want ErrNotFound", err)
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("Get error = %v, want domain.ErrNotFound", err)
 	}
 }
 

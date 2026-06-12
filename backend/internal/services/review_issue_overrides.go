@@ -59,7 +59,7 @@ func (s *ReviewIssueOverrideService) Delete(gameID int64, issueKey string) error
 func normalizeReviewOverrideInput(issueKey string, reason *string) (string, *string, error) {
 	normalizedIssueKey := strings.TrimSpace(issueKey)
 	if !domain.IsAllowedPendingIssueDetail(normalizedIssueKey) {
-		return "", nil, ErrValidation
+		return "", nil, domain.ErrValidation
 	}
 
 	if reason == nil {

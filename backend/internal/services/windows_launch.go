@@ -14,8 +14,6 @@ import (
 	"github.com/hao/game/internal/repositories"
 )
 
-var ErrInvalidLaunchFile = errors.New("launch script only supports VHD or VHDX files")
-var ErrMissingSMBConfig = errors.New("SMB launch script configuration is incomplete")
 
 type WindowsLaunchService struct {
 	gamesRepo     gameDetailReadRepository
@@ -36,7 +34,7 @@ func NewWindowsLaunchService(cfg config.Config, gamesRepo gameDetailReadReposito
 func (s *WindowsLaunchService) BuildLaunchScript(gameID, fileID int64, includeAll bool) (string, string, error) {
 	if strings.TrimSpace(s.cfg.SMBUsername) == "" ||
 		strings.TrimSpace(s.cfg.SMBPassword) == "" {
-		return "", "", ErrMissingSMBConfig
+		return "", "", domain.ErrMissingSMBConfig
 	}
 
 	game, err := s.gamesRepo.GetByID(gameID)
@@ -44,7 +42,7 @@ func (s *WindowsLaunchService) BuildLaunchScript(gameID, fileID int64, includeAl
 		return "", "", normalizeRepoError(err)
 	}
 	if !includeAll && game.Visibility == domain.GameVisibilityPrivate {
-		return "", "", ErrNotFound
+		return "", "", domain.ErrNotFound
 	}
 
 	file, err := s.gameFilesRepo.GetByID(gameID, fileID)
@@ -59,7 +57,7 @@ func (s *WindowsLaunchService) BuildLaunchScript(gameID, fileID int64, includeAl
 
 	ext := strings.ToLower(filepath.Ext(resolved.ResolvedPath))
 	if ext != ".vhd" && ext != ".vhdx" {
-		return "", "", ErrInvalidLaunchFile
+		return "", "", domain.ErrInvalidLaunchFile
 	}
 
 	baseVHDPath, shareRoot, err := s.buildSMBMountedPath(resolved.ResolvedPath)
@@ -85,13 +83,13 @@ func (s *WindowsLaunchService) buildSMBMountedPath(resolvedPath string) (string,
 		if mappingErr == nil {
 			return base, shareRoot, nil
 		}
-		if !errors.Is(mappingErr, ErrForbiddenPath) {
+		if !errors.Is(mappingErr, domain.ErrForbiddenPath) {
 			return "", "", mappingErr
 		}
 	}
 
 	if strings.TrimSpace(s.cfg.SMBShareRoot) == "" {
-		return "", "", ErrMissingSMBConfig
+		return "", "", domain.ErrMissingSMBConfig
 	}
 
 	root := filepath.Clean(strings.TrimSpace(s.cfg.PrimaryROMRoot))
@@ -106,10 +104,10 @@ func (s *WindowsLaunchService) buildSMBMountedPath(resolvedPath string) (string,
 
 	relative, err := filepath.Rel(resolvedRoot, resolvedPath)
 	if err != nil {
-		return "", "", ErrForbiddenPath
+		return "", "", domain.ErrForbiddenPath
 	}
 	if relative == "." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || relative == ".." {
-		return "", "", ErrForbiddenPath
+		return "", "", domain.ErrForbiddenPath
 	}
 
 	relativeWindows := strings.ReplaceAll(filepath.ToSlash(relative), "/", `\`)
@@ -156,7 +154,7 @@ func (s *WindowsLaunchService) buildMappedSMBPath(resolvedPath string, mappings 
 	}
 
 	if longestPrefixLength == -1 {
-		return "", "", ErrForbiddenPath
+		return "", "", domain.ErrForbiddenPath
 	}
 
 	return selectedBase, selectedShareRoot, nil

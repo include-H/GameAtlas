@@ -1,7 +1,6 @@
 package services
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -14,7 +13,6 @@ import (
 	"github.com/hao/game/internal/domain"
 )
 
-var ErrUpstream = errors.New("upstream request failed")
 
 type cachedPreview struct {
 	preview  *domain.SteamAssetsPreview
@@ -114,7 +112,7 @@ func (s *SteamService) Search(query string, proxyOverride string) ([]domain.Stea
 	}
 
 	if len(payloads) == 0 {
-		return nil, fmt.Errorf("steam search failed: %w", ErrUpstream)
+		return nil, fmt.Errorf("steam search failed: %w", domain.ErrUpstream)
 	}
 
 	seen := make(map[int64]struct{})
@@ -326,7 +324,7 @@ func (s *SteamService) previewAssetsFromStorePage(appID int64, proxyOverride str
 	pageHTML, err := s.fetchText(storePageURL, proxyOverride)
 	if err != nil || pageHTML == "" {
 		// Store page doesn't exist either — truly not found.
-		return nil, ErrNotFound
+		return nil, domain.ErrNotFound
 	}
 
 	name := extractStorePageName(pageHTML, appID)

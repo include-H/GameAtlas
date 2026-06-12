@@ -389,7 +389,10 @@ onUnmounted(() => {
   background: var(--app-footer-surface);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  padding: 14px 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-top: 1px solid var(--app-footer-border);
   box-shadow: var(--app-footer-shadow);
   position: relative;

@@ -43,7 +43,7 @@ func (s *WikiService) Get(gameID int64, includeAll bool) (*WikiDocument, error) 
 		return nil, normalizeRepoError(err)
 	}
 	if !includeAll && game.Visibility == domain.GameVisibilityPrivate {
-		return nil, ErrNotFound
+		return nil, domain.ErrNotFound
 	}
 
 	return &WikiDocument{
@@ -80,7 +80,7 @@ func (s *WikiService) History(gameID int64, includeAll bool) ([]domain.WikiHisto
 		return nil, normalizeRepoError(err)
 	}
 	if !includeAll && game.Visibility == domain.GameVisibilityPrivate {
-		return nil, ErrNotFound
+		return nil, domain.ErrNotFound
 	}
 	items, err := s.wikiRepo.ListHistory(gameID)
 	if err != nil {

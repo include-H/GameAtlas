@@ -64,7 +64,7 @@ func TestReviewIssueOverrideServiceRejectsUnknownIssueKeyAndBlankReasonBecomesNi
 	}
 
 	_, err = service.Ignore(gameID, "not-a-real-issue", nil)
-	if !errors.Is(err, ErrValidation) {
-		t.Fatalf("Ignore error = %v, want ErrValidation", err)
+	if !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("Ignore error = %v, want domain.ErrValidation", err)
 	}
 }

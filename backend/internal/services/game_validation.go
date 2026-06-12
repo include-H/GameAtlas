@@ -21,11 +21,11 @@ func normalizeGameCoreInput(input domain.GameCoreInput) domain.GameCoreInput {
 // always-written core columns in games.update/create flows.
 func validateGameCoreInput(input domain.GameCoreInput) error {
 	if input.Title == "" {
-		return ErrValidation
+		return domain.ErrValidation
 	}
 	if input.Visibility != domain.GameVisibilityPublic &&
 		input.Visibility != domain.GameVisibilityPrivate {
-		return ErrValidation
+		return domain.ErrValidation
 	}
 	return nil
 }
@@ -37,10 +37,10 @@ func validateAndTrimGameCreateInput(input domain.GameCreateInput) (domain.GameCr
 		input.Visibility = domain.GameVisibilityPublic
 	}
 	if input.Title == "" {
-		return domain.GameCreateInput{}, ErrValidation
+		return domain.GameCreateInput{}, domain.ErrValidation
 	}
 	if input.Visibility != domain.GameVisibilityPublic && input.Visibility != domain.GameVisibilityPrivate {
-		return domain.GameCreateInput{}, ErrValidation
+		return domain.GameCreateInput{}, domain.ErrValidation
 	}
 	return input, nil
 }

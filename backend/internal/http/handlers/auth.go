@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/hao/game/internal/config"
+	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/services"
 )
 
@@ -55,7 +56,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		}
 
 		switch err {
-		case services.ErrAuthDisabled:
+		case domain.ErrAuthDisabled:
 			writeJSONError(c, http.StatusServiceUnavailable, "登录功能未配置")
 		default:
 			writeJSONError(c, http.StatusUnauthorized, "登录失败")

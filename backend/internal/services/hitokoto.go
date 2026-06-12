@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"strings"
+
+	"github.com/hao/game/internal/domain"
 )
 
 //go:embed data/hitokoto_game_sentences.json
@@ -56,14 +58,14 @@ func (s *HitokotoService) Random(query HitokotoQuery) (*HitokotoSentence, error)
 		maxLength = 30
 	}
 	if maxLength < minLength {
-		return nil, ErrValidation
+		return nil, domain.ErrValidation
 	}
 
 	categories := normalizeHitokotoCategories(query.Categories)
 	if len(query.Categories) == 0 {
 		categories = []string{"c"}
 	} else if len(categories) == 0 {
-		return nil, ErrNotFound
+		return nil, domain.ErrNotFound
 	}
 
 	targets := make([]HitokotoSentence, 0, 64)
@@ -78,7 +80,7 @@ func (s *HitokotoService) Random(query HitokotoQuery) (*HitokotoSentence, error)
 	}
 
 	if len(targets) == 0 {
-		return nil, ErrNotFound
+		return nil, domain.ErrNotFound
 	}
 
 	selected := targets[rand.IntN(len(targets))]

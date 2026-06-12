@@ -90,7 +90,7 @@ func (s *MetadataService) List(resource MetadataResource, includeAll bool, optio
 func (s *MetadataService) Create(resource MetadataResource, input domain.MetadataWriteInput) (*domain.MetadataItem, error) {
 	name := strings.TrimSpace(input.Name)
 	if name == "" {
-		return nil, ErrValidation
+		return nil, domain.ErrValidation
 	}
 
 	slug := trimStringPtr(input.Slug)
@@ -102,7 +102,7 @@ func (s *MetadataService) Create(resource MetadataResource, input domain.Metadat
 		slugValue = slugify(name)
 	}
 	if slugValue == "" {
-		return nil, ErrValidation
+		return nil, domain.ErrValidation
 	}
 
 	sortOrder := 0
@@ -154,7 +154,7 @@ func (s *MetadataService) GetSeriesDetail(id int64, includeAll bool) (*SeriesDet
 	item, err := s.repo.Get(domain.MetadataSeries, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, ErrNotFound
+			return nil, domain.ErrNotFound
 		}
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (s *MetadataService) GetSeriesDetail(id int64, includeAll bool) (*SeriesDet
 		return nil, err
 	}
 	if !includeAll && item.GameCount == 0 {
-		return nil, ErrNotFound
+		return nil, domain.ErrNotFound
 	}
 
 	games, err := s.repo.ListSeriesGames(id, includeAll)

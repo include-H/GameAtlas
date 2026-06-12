@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/hao/game/internal/services"
+	"github.com/hao/game/internal/domain"
 )
 
 func TestParseIDParam(t *testing.T) {
@@ -67,7 +67,7 @@ func TestParseGamePublicIDParamHandlesNotFound(t *testing.T) {
 	context.Params = gin.Params{{Key: "publicId", Value: "missing"}}
 
 	_, ok := parseGamePublicIDParam(context, "publicId", func(publicID string) (int64, error) {
-		return 0, services.ErrNotFound
+		return 0, domain.ErrNotFound
 	})
 	if ok {
 		t.Fatalf("expected parseGamePublicIDParam to fail")
@@ -86,12 +86,12 @@ func TestWriteServiceError(t *testing.T) {
 		status int
 		msg    string
 	}{
-		{name: "not found", err: services.ErrNotFound, status: http.StatusNotFound, msg: "资源不存在"},
-		{name: "forbidden path", err: services.ErrForbiddenPath, status: http.StatusForbidden, msg: "文件路径超出允许范围"},
-		{name: "missing file", err: services.ErrMissingFile, status: http.StatusBadRequest, msg: "注册文件不可用"},
-		{name: "validation", err: services.ErrValidation, status: http.StatusBadRequest, msg: "bad payload"},
-		{name: "upstream", err: services.ErrUpstream, status: http.StatusBadGateway, msg: "上游服务请求失败"},
-		{name: "missing config", err: services.ErrMissingConfig, status: http.StatusBadRequest, msg: "服务配置不完整"},
+		{name: "not found", err: domain.ErrNotFound, status: http.StatusNotFound, msg: "资源不存在"},
+		{name: "forbidden path", err: domain.ErrForbiddenPath, status: http.StatusForbidden, msg: "文件路径超出允许范围"},
+		{name: "missing file", err: domain.ErrMissingFile, status: http.StatusBadRequest, msg: "注册文件不可用"},
+		{name: "validation", err: domain.ErrValidation, status: http.StatusBadRequest, msg: "bad payload"},
+		{name: "upstream", err: domain.ErrUpstream, status: http.StatusBadGateway, msg: "上游服务请求失败"},
+		{name: "missing config", err: domain.ErrMissingConfig, status: http.StatusBadRequest, msg: "服务配置不完整"},
 		{name: "internal", err: errors.New("boom"), status: http.StatusInternalServerError, msg: "服务器内部错误"},
 	}
 

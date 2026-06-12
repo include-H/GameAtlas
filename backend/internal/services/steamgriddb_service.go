@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/hao/game/internal/domain"
 )
 
 type SteamGridDBService struct {
@@ -69,26 +71,26 @@ func (s *SteamGridDBService) Search(query string) ([]SteamGridDBGame, error) {
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("%w: request search: %w", ErrUpstream, err)
+		return nil, fmt.Errorf("%w: request search: %w", domain.ErrUpstream, err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("%w: read response: %w", ErrUpstream, err)
+		return nil, fmt.Errorf("%w: read response: %w", domain.ErrUpstream, err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: steamgriddb search: HTTP %d: %s", ErrUpstream, resp.StatusCode, string(body))
+		return nil, fmt.Errorf("%w: steamgriddb search: HTTP %d: %s", domain.ErrUpstream, resp.StatusCode, string(body))
 	}
 
 	var result steamGridDBSearchResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("%w: decode response: %w", ErrUpstream, err)
+		return nil, fmt.Errorf("%w: decode response: %w", domain.ErrUpstream, err)
 	}
 
 	if !result.Success {
-		return nil, fmt.Errorf("%w: steamgriddb search: api returned success=false", ErrUpstream)
+		return nil, fmt.Errorf("%w: steamgriddb search: api returned success=false", domain.ErrUpstream)
 	}
 
 	return result.Data, nil
@@ -144,26 +146,26 @@ func (s *SteamGridDBService) fetchImages(endpoint string, extra url.Values) ([]S
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("%w: request %s: %w", ErrUpstream, endpoint, err)
+		return nil, fmt.Errorf("%w: request %s: %w", domain.ErrUpstream, endpoint, err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("%w: read response: %w", ErrUpstream, err)
+		return nil, fmt.Errorf("%w: read response: %w", domain.ErrUpstream, err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: steamgriddb %s: HTTP %d: %s", ErrUpstream, endpoint, resp.StatusCode, string(body))
+		return nil, fmt.Errorf("%w: steamgriddb %s: HTTP %d: %s", domain.ErrUpstream, endpoint, resp.StatusCode, string(body))
 	}
 
 	var result steamGridDBImageResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("%w: decode response: %w", ErrUpstream, err)
+		return nil, fmt.Errorf("%w: decode response: %w", domain.ErrUpstream, err)
 	}
 
 	if !result.Success {
-		return nil, fmt.Errorf("%w: steamgriddb %s: api returned success=false", ErrUpstream, endpoint)
+		return nil, fmt.Errorf("%w: steamgriddb %s: api returned success=false", domain.ErrUpstream, endpoint)
 	}
 
 	return result.Data, nil

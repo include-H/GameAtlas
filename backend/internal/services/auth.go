@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/hao/game/internal/config"
+	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/repositories"
 )
 
@@ -25,7 +25,6 @@ import (
 // handler and route packages.
 const AuthCookieName = "gameatlas_admin"
 
-var ErrAuthDisabled = errors.New("authentication is not configured")
 
 type sessionCacheEntry struct {
 	valid         bool
@@ -143,7 +142,7 @@ func (s *AuthService) SourceKey(clientIP, userAgent string) string {
 
 func (s *AuthService) Login(password, sourceKey string) (string, error) {
 	if s.adminPassword == "" {
-		return "", ErrAuthDisabled
+		return "", domain.ErrAuthDisabled
 	}
 	if sourceKey == "" {
 		sourceKey = s.SourceKey("unknown-ip", "")

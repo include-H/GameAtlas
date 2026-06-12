@@ -25,7 +25,7 @@
     </section>
 
     <section class="login-panel">
-      <div class="login-card">
+      <div class="login-card app-glass-surface">
         <a-button
           class="app-text-action-btn login-stage__close"
           type="text"
@@ -517,11 +517,7 @@ onBeforeUnmount(() => {
   width: min(100%, 468px);
   padding: 36px 30px 30px;
   border-radius: 28px;
-  background: var(--app-card-surface);
-  border: 1px solid var(--app-card-border);
   box-shadow: var(--shadow-float);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .login-card__header {

@@ -1,6 +1,10 @@
 package services
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/hao/game/internal/domain"
+)
 
 func TestHitokotoServiceRandomReturnsGameSentenceWithinLengthRange(t *testing.T) {
 	service := NewHitokotoService()
@@ -35,8 +39,8 @@ func TestHitokotoServiceRandomRejectsInvalidLengthRange(t *testing.T) {
 		MinLength:  30,
 		MaxLength:  10,
 	})
-	if err != ErrValidation {
-		t.Fatalf("err = %v, want %v", err, ErrValidation)
+	if err != domain.ErrValidation {
+		t.Fatalf("err = %v, want %v", err, domain.ErrValidation)
 	}
 }
 
@@ -48,8 +52,8 @@ func TestHitokotoServiceRandomReturnsNotFoundForUnsupportedCategory(t *testing.T
 		MinLength:  0,
 		MaxLength:  30,
 	})
-	if err != ErrNotFound {
-		t.Fatalf("err = %v, want %v", err, ErrNotFound)
+	if err != domain.ErrNotFound {
+		t.Fatalf("err = %v, want %v", err, domain.ErrNotFound)
 	}
 }
 

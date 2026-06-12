@@ -24,21 +24,21 @@ func validateListParamsContract(params domain.GamesListParams) error {
 	// the same list contract. Reject incomplete/invalid sort+order here instead of allowing
 	// repository code to fall through into implicit defaults or malformed SQL behavior.
 	if params.Page <= 0 || params.Limit <= 0 {
-		return ErrValidation
+		return domain.ErrValidation
 	}
 
 	sort := strings.TrimSpace(params.Sort)
 	if !domain.IsAllowedGamesListSort(sort) {
-		return ErrValidation
+		return domain.ErrValidation
 	}
 
 	order := strings.TrimSpace(params.Order)
 	if !domain.IsAllowedGamesListOrder(order) {
-		return ErrValidation
+		return domain.ErrValidation
 	}
 
 	if sort == "random" && params.SortSeed <= 0 {
-		return ErrValidation
+		return domain.ErrValidation
 	}
 
 	return nil

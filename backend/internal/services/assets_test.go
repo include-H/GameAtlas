@@ -18,13 +18,13 @@ func TestAssetsServiceApplyRemoteAssetRejectsBlockedOrInvalidURLs(t *testing.T) 
 	service := newServicesAssetsService(db, t.TempDir())
 
 	_, err := service.ApplyRemoteAsset(gameID, "cover", "http://localhost/image.png", 0)
-	if !errors.Is(err, ErrValidation) {
-		t.Fatalf("ApplyRemoteAsset localhost error = %v, want ErrValidation", err)
+	if !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("ApplyRemoteAsset localhost error = %v, want domain.ErrValidation", err)
 	}
 
 	_, err = service.ApplyRemoteAsset(gameID, "cover", "not-a-url", 0)
-	if !errors.Is(err, ErrValidation) {
-		t.Fatalf("ApplyRemoteAsset invalid url error = %v, want ErrValidation", err)
+	if !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("ApplyRemoteAsset invalid url error = %v, want domain.ErrValidation", err)
 	}
 }
 
@@ -36,8 +36,8 @@ func TestAssetsServiceApplyRawAssetRejectsInvalidContentType(t *testing.T) {
 	service := newServicesAssetsService(db, t.TempDir())
 
 	_, err := service.ApplyRawAsset(gameID, "cover", []byte("not-an-image"), "text/plain", 0)
-	if !errors.Is(err, ErrValidation) {
-		t.Fatalf("ApplyRawAsset error = %v, want ErrValidation", err)
+	if !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("ApplyRawAsset error = %v, want domain.ErrValidation", err)
 	}
 }
 

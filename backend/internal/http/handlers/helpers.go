@@ -10,7 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/hao/game/internal/services"
+	"github.com/hao/game/internal/domain"
 )
 
 // Transport helpers only write the shared HTTP envelope.
@@ -60,7 +60,7 @@ func parseGamePublicIDParam(c *gin.Context, name string, resolver func(publicID 
 	if err == nil {
 		return id, true
 	}
-	if errors.Is(err, services.ErrNotFound) {
+	if errors.Is(err, domain.ErrNotFound) {
 		// 2026-05-09: 统一为中文错误信息
 		writeJSONError(c, http.StatusNotFound, "资源不存在")
 		return 0, false
@@ -73,23 +73,23 @@ func parseGamePublicIDParam(c *gin.Context, name string, resolver func(publicID 
 
 func writeServiceError(c *gin.Context, err error, validationMessage string) {
 	switch {
-	case errors.Is(err, services.ErrNotFound):
+	case errors.Is(err, domain.ErrNotFound):
 		// 2026-05-09: 统一为中文错误信息
 		writeJSONError(c, http.StatusNotFound, "资源不存在")
-	case errors.Is(err, services.ErrForbiddenPath):
+	case errors.Is(err, domain.ErrForbiddenPath):
 		// 2026-05-09: 统一为中文错误信息
 		writeJSONError(c, http.StatusForbidden, "文件路径超出允许范围")
-	case errors.Is(err, services.ErrMissingFile), errors.Is(err, services.ErrInvalidFile):
+	case errors.Is(err, domain.ErrMissingFile), errors.Is(err, domain.ErrInvalidFile):
 		// 2026-05-09: 统一为中文错误信息
 		writeJSONError(c, http.StatusBadRequest, "注册文件不可用")
-	case errors.Is(err, services.ErrValidation):
+	case errors.Is(err, domain.ErrValidation):
 		writeJSONError(c, http.StatusBadRequest, validationMessage)
-	case errors.Is(err, services.ErrUpstream):
+	case errors.Is(err, domain.ErrUpstream):
 		// 2026-05-09: 统一为中文错误信息
 		writeJSONError(c, http.StatusBadGateway, "上游服务请求失败")
-	case errors.Is(err, services.ErrMissingConfig):
+	case errors.Is(err, domain.ErrMissingConfig):
 		writeJSONError(c, http.StatusBadRequest, "服务配置不完整")
-	case errors.Is(err, services.ErrInvalidLaunchFile), errors.Is(err, services.ErrMissingSMBConfig):
+	case errors.Is(err, domain.ErrInvalidLaunchFile), errors.Is(err, domain.ErrMissingSMBConfig):
 		writeJSONError(c, http.StatusBadRequest, "启动脚本配置不完整")
 	default:
 		// 2026-05-09: 统一为中文错误信息 (internal server error)

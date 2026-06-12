@@ -13,10 +13,6 @@ import (
 	"github.com/hao/game/internal/repositories"
 )
 
-var ErrForbiddenPath = errors.New("file path is outside primary ROM root")
-var ErrMissingFile = errors.New("registered file is unavailable")
-var ErrInvalidFile = errors.New("registered path is not a file")
-var ErrMissingConfig = errors.New("PRIMARY_ROM_ROOT is not configured")
 
 type gameFilesGameRepository interface {
 	ResolveIDByPublicID(publicID string) (int64, error)
@@ -69,7 +65,7 @@ func (s *GameFilesService) List(gameID int64, includeAll bool) ([]domain.GameFil
 		return nil, normalizeRepoError(err)
 	}
 	if !includeAll && game.Visibility == domain.GameVisibilityPrivate {
-		return nil, ErrNotFound
+		return nil, domain.ErrNotFound
 	}
 	files, err := s.gameFilesRepo.ListByGameID(gameID)
 	if err != nil {
@@ -87,7 +83,7 @@ func (s *GameFilesService) GetDownloadFile(gameID, fileID int64, includeAll bool
 		return nil, normalizeRepoError(err)
 	}
 	if !includeAll && game.Visibility == domain.GameVisibilityPrivate {
-		return nil, ErrNotFound
+		return nil, domain.ErrNotFound
 	}
 
 	file, err := s.gameFilesRepo.GetByID(gameID, fileID)
@@ -145,7 +141,7 @@ func (s *GameFilesService) RecordDownload(gameID, fileID int64, includeAll bool)
 		return normalizeRepoError(err)
 	}
 	if !includeAll && game.Visibility == domain.GameVisibilityPrivate {
-		return ErrNotFound
+		return domain.ErrNotFound
 	}
 
 	if _, err := s.gameFilesRepo.GetByID(gameID, fileID); err != nil {
@@ -157,7 +153,7 @@ func (s *GameFilesService) RecordDownload(gameID, fileID int64, includeAll bool)
 
 func validateGameFileInput(input domain.GameFileWriteInput) error {
 	if strings.TrimSpace(input.FilePath) == "" {
-		return ErrValidation
+		return domain.ErrValidation
 	}
 	return nil
 }
@@ -172,13 +168,13 @@ func trimGameFileInput(input domain.GameFileWriteInput) domain.GameFileWriteInpu
 func normalizeFileError(err error) error {
 	switch {
 	case errors.Is(err, files.ErrPathOutsideRoot):
-		return ErrForbiddenPath
+		return domain.ErrForbiddenPath
 	case errors.Is(err, files.ErrFileNotFound):
-		return ErrMissingFile
+		return domain.ErrMissingFile
 	case errors.Is(err, files.ErrNotAFile):
-		return ErrInvalidFile
+		return domain.ErrInvalidFile
 	case errors.Is(err, files.ErrNoPrimaryRoot):
-		return ErrMissingConfig
+		return domain.ErrMissingConfig
 	default:
 		return err
 	}

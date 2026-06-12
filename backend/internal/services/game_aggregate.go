@@ -161,7 +161,7 @@ func (s *GameAggregateService) Delete(id int64) (*GameDeleteResult, error) {
 		return nil, err
 	}
 	if !deleted {
-		return nil, ErrNotFound
+		return nil, domain.ErrNotFound
 	}
 
 	warnings := make([]string, 0)

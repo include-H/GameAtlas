@@ -41,7 +41,7 @@ func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) 
 	}
 	if !includeAll && game.Visibility == domain.GameVisibilityPrivate {
 		// Public callers should observe private games as missing rather than leaking their existence.
-		return nil, ErrNotFound
+		return nil, domain.ErrNotFound
 	}
 
 	allAssets, err := s.gamesRepo.ListAllAssets(id)
