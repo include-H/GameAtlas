@@ -39,6 +39,43 @@ cd frontend && npm install && npm run dev
 
 ## 生产部署
 
+### 方式一：Docker（推荐）
+
+```bash
+# 拉取镜像
+docker pull hao0114/gameatlas:latest
+
+# 运行
+docker run -d \
+  --name gameatlas \
+  -p 3000:3000 \
+  -v /mnt/Docker/GameAtlas/data:/app/data \
+  -v /mnt:/mnt:ro \
+  -e ADMIN_PASSWORD=yourpassword \
+  hao0114/gameatlas:latest
+```
+
+或使用 docker-compose：
+
+```yaml
+services:
+  gameatlas:
+    image: hao0114/gameatlas:latest
+    container_name: gameatlas
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - /mnt/Docker/GameAtlas/data:/app/data
+      - /mnt:/mnt:ro
+    environment:
+      ADMIN_PASSWORD: yourpassword
+```
+
+首次启动会自动创建默认配置文件。
+
+### 方式二：二进制
+
 ```bash
 bash build-release.sh              # 输出到 release/game-release-<version>/
 bash build-release.sh v1.0.0       # 自定义版本名
@@ -49,53 +86,53 @@ bash build-release.sh v1.0.0       # 自定义版本名
 ```text
 release/game-release-<version>/
 ├── game-server
-├── start.sh
-├── .env                  # 从 backend/.env.example 复制并填写
-├── data/                 # 数据库、素材、默认 ROM 目录
-└── ROM/
+├── data/                 # 首次启动自动创建
+│   ├── .env              # 配置文件（默认密码 1234）
+│   └── gamelist/         # 素材目录
+└── ROM/                  # 游戏文件目录
 ```
 
-进入发布目录，编辑 `.env`，至少填写 `ADMIN_PASSWORD`，然后 `./start.sh`。
+进入发布目录，运行 `./game-server`，首次启动会自动创建 `data/.env`。
 
 ### GitHub Release 自动发版
 
-推送 `v*` 格式的 tag 即可触发 Actions 自动构建并上传到 GitHub Release：
+推送 `v*` 格式的 tag 即可触发 Actions 自动构建并上传到 GitHub Release + Docker Hub：
 
 ```bash
 git tag v1.0.0 && git push origin v1.0.0
 ```
 
-产物包含 `tar.gz`、`zip` 和 `sha256` 校验文件（`linux-amd64`）。
+产物包含：
+- GitHub Release：`tar.gz`、`zip` 和 `sha256` 校验文件（`linux-amd64`）
+- Docker Hub：`hao0114/gameatlas:v1.0.0`、`hao0114/gameatlas:latest`
 
 ## 配置
 
-后端读取运行目录下的 `.env`。模板见 `backend/.env.example`，每个配置项都有注释说明。
+程序首次启动会自动在 `data/` 目录创建 `.env` 配置文件（默认密码 `1234`）。
+
+配置查找优先级：
+1. `data/.env`（推荐）
+2. `./.env`（兼容）
+
+详细配置项见 `backend/.env.example`，关键配置：
 
 ```env
 # 必填
 ADMIN_PASSWORD=你的密码
 
 # 路径
-DB_PATH=data/app.db
+DB_PATH=data/db.db
 ASSETS_DIR=data/gamelist
-PRIMARY_ROM_ROOT=ROM          # 游戏文件根目录
+PRIMARY_ROM_ROOT=/mnt           # 游戏文件根目录
 
 # SMB / VHD
-SMB_SHARE_ROOT=\\192.168.1.4\Game1
+SMB_PATH_MAPPINGS=/mnt/Game=\\192.168.1.4\Game;/mnt/Gal=\\192.168.1.4\Gal
 SMB_USERNAME=game
 SMB_PASSWORD=game
-VHD_DIFF_ROOT=C:              # 客户端差分盘存放位置
+VHD_DIFF_ROOT=C:                # 客户端差分盘存放位置
 
 # 可选：SteamGridDB 在线素材搜索
-STEAMGRIDDB_API_KEY=          # 注册：https://www.steamgriddb.com/account
-```
-
-多 SMB 挂载点场景用 `SMB_PATH_MAPPINGS`（本地路径=UNC路径，分号分隔）：
-
-```env
-# 每行一条，实际写在一行，分号隔开
-/mnt/Game=\\192.168.1.4\Game
-/mnt/gal=\\192.168.1.4\Gal
+STEAMGRIDDB_API_KEY=            # 注册：https://www.steamgriddb.com/account
 ```
 
 ## VHD 远程启动
