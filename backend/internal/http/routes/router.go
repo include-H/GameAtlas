@@ -76,6 +76,8 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	steamGridDBHandler := handlers.NewSteamGridDBHandler(services.NewSteamGridDBService(cfg.SteamGridDBAPIKey))
 	wikiHandler := handlers.NewWikiHandler(wikiService)
 	hitokotoHandler := handlers.NewHitokotoHandler(hitokotoService)
+	gameScanService := services.NewGameScanService(gamesRepo, gameFilesRepo, cfg.PrimaryROMRoot)
+	gameScanHandler := handlers.NewGameScanHandler(gameScanService)
 
 	router.Use(func(c *gin.Context) {
 		session, _ := c.Cookie(services.AuthCookieName)
@@ -99,6 +101,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.POST("/games", gamesHandler.Create)
 	api.PUT("/games/:publicId/aggregate", gamesHandler.UpdateAggregate)
 	api.DELETE("/games/:publicId", gamesHandler.Delete)
+	api.POST("/games/scan", gameScanHandler.Scan)
 	api.GET("/games/:publicId/files", gameFilesHandler.List)
 	api.POST("/games/:publicId/files/:fileId/downloads", downloadsHandler.RecordDownload)
 	api.GET("/games/:publicId/files/:fileId/download", downloadsHandler.Download)

@@ -23,6 +23,13 @@
           </template>
           添加游戏
         </a-button>
+
+        <a-button v-if="isAdmin" :loading="isScanning" @click="handleScanGames">
+          <template #icon>
+            <icon-search />
+          </template>
+          扫描游戏
+        </a-button>
       </a-space>
     </div>
 
@@ -289,6 +296,8 @@ const {
   updateRoute,
   viewGame,
   viewMode,
+  handleScanGames,
+  isScanning,
 } = useGamesView({
   route,
   router,

@@ -545,6 +545,29 @@ export const useGamesView = ({
     }
   }
 
+  const isScanning = ref(false)
+
+  const handleScanGames = async () => {
+    if (isScanning.value) return
+    isScanning.value = true
+    try {
+      const result = await gamesService.scanGames()
+      uiStore.addAlert(
+        `扫描完成：总计 ${result.total} 个 VHD，新增 ${result.created} 个游戏，跳过 ${result.skipped} 个`,
+        'success'
+      )
+      try {
+        await loadGames()
+      } catch {
+        uiStore.addAlert('扫描已完成，但列表刷新失败，请稍后重试', 'warning')
+      }
+    } catch (error) {
+      uiStore.addAlert(`扫描游戏失败：${getHttpErrorMessage(error)}`, 'error')
+    } finally {
+      isScanning.value = false
+    }
+  }
+
   const toggleFavorite = async (gameRef: string) => {
     if (!gameRef) return
     isTogglingFavorite.value = true
@@ -687,5 +710,7 @@ export const useGamesView = ({
     updateRoute,
     viewGame,
     viewMode,
+    handleScanGames,
+    isScanning,
   }
 }

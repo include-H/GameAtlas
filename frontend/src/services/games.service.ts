@@ -295,6 +295,11 @@ const gamesService = {
       pending_reviews: response.data.pending_reviews,
     }
   },
+
+  async scanGames(): Promise<{ total: number; created: number; skipped: number; errors: number }> {
+    const response = await post<ApiEnvelope<{ total: number; created: number; skipped: number; errors: number }>>('/games/scan', {})
+    return response.data
+  },
 }
 
 export default gamesService
