@@ -126,6 +126,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.POST("/assets/logo", assetsHandler.Upload("logo"))
 	api.GET("/directory/default", directoryHandler.Default)
 	api.GET("/directory/list", directoryHandler.List)
+	api.GET("/directory/search", directoryHandler.Search)
 	api.GET("/steam/search", steamHandler.Search)
 	api.GET("/steam/:appId/assets", steamHandler.Preview)
 	api.GET("/steam/proxy", steamHandler.Proxy)

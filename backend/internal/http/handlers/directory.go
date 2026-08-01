@@ -47,3 +47,24 @@ func (h *DirectoryHandler) List(c *gin.Context) {
 
 	writeJSONSuccess(c, http.StatusOK, toDirectoryListResponse(result))
 }
+
+func (h *DirectoryHandler) Search(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
+
+	query := strings.TrimSpace(c.Query("q"))
+	if query == "" {
+		writeJSONSuccess(c, http.StatusOK, []interface{}{})
+		return
+	}
+
+	path := strings.TrimSpace(c.Query("path"))
+	results, err := h.service.Search(query, path)
+	if err != nil {
+		writeServiceError(c, err, "搜索失败")
+		return
+	}
+
+	writeJSONSuccess(c, http.StatusOK, results)
+}

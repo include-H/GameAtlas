@@ -14,12 +14,40 @@
       <div v-else-if="hasLoadFailure" class="file-browser-status file-browser-status--error">
         目录加载失败，请稍后重试。
       </div>
-      <div v-else-if="directoryListIncomplete" class="file-browser-status file-browser-status--warning">
+      <div v-else-if="directoryListIncomplete && !isSearchMode" class="file-browser-status file-browser-status--warning">
         本次目录列表不完整，已跳过 {{ skippedCount }} 个无法读取的条目。
       </div>
 
-      <!-- Path Navigation -->
-      <div class="file-browser-header app-glass-surface">
+      <!-- Search Bar -->
+      <div class="file-browser-search app-glass-surface">
+        <a-input-search
+          v-model="searchQuery"
+          :placeholder="`在 ${currentDirName} 中搜索...`"
+          search-button
+          :loading="isSearching"
+          @search="handleSearch"
+          @press-enter="handleSearch"
+        >
+          <template #button-icon>
+            <icon-search />
+          </template>
+        </a-input-search>
+        <a-button
+          v-if="isSearchMode"
+          class="app-text-action-btn"
+          type="text"
+          size="small"
+          @click="clearSearch"
+        >
+          <template #icon>
+            <icon-arrow-left />
+          </template>
+          返回
+        </a-button>
+      </div>
+
+      <!-- Path Navigation (only in browse mode) -->
+      <div v-if="!isSearchMode" class="file-browser-header app-glass-surface">
         <a-space>
           <a-button 
             class="app-text-action-btn app-secondary-compact"
@@ -37,9 +65,20 @@
         </a-space>
       </div>
 
+      <!-- Search Results Info -->
+      <div v-if="isSearchMode" class="search-info">
+        <span class="search-info-text">
+          在 <strong>{{ currentDirName }}</strong> 中搜索: "{{ lastSearchQuery }}"
+          <template v-if="searchResults.length > 0">
+            ({{ searchResults.length }} 个结果)
+          </template>
+        </span>
+      </div>
+
       <!-- File List - Table View -->
       <div class="file-table-container">
-        <table class="file-table" v-if="!hasLoadFailure">
+        <!-- Browse Mode -->
+        <table v-if="!isSearchMode && !hasLoadFailure" class="file-table">
           <thead>
             <tr>
               <th class="col-name">名称</th>
@@ -85,6 +124,67 @@
             </tr>
           </tbody>
         </table>
+
+        <!-- Search Mode -->
+        <table v-if="isSearchMode" class="file-table">
+          <thead>
+            <tr>
+              <th class="col-name">名称</th>
+              <th class="col-path">路径</th>
+              <th class="col-size">大小</th>
+              <th class="col-action">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="searchResults.length === 0 && !isSearching">
+              <td colspan="4" class="no-results">
+                <icon-search class="no-results-icon" />
+                <span>未找到匹配的文件或目录</span>
+              </td>
+            </tr>
+            <tr
+              v-for="item in searchResults"
+              :key="item.path"
+              :class="['file-row', item.is_directory ? 'directory' : 'file']"
+              @click="handleSearchItemClick(item)"
+            >
+              <td class="col-name">
+                <div class="file-name-cell">
+                  <icon-folder v-if="item.is_directory" class="file-icon folder" />
+                  <icon-file v-else class="file-icon file" />
+                  <span class="file-name">{{ item.name }}</span>
+                </div>
+              </td>
+              <td class="col-path">
+                <span class="item-path" :title="item.parent_path">{{ item.parent_path }}</span>
+              </td>
+              <td class="col-size">
+                <span v-if="!item.is_directory" class="file-size">{{ formatSize(item.size_bytes ?? undefined) }}</span>
+                <span v-else class="file-size dim">—</span>
+              </td>
+              <td class="col-action">
+                <a-button 
+                  v-if="!item.is_directory" 
+                  class="app-text-action-btn app-secondary-compact"
+                  type="text" 
+                  size="mini"
+                  @click.stop="selectSearchResult(item)"
+                >
+                  选择
+                </a-button>
+                <a-button
+                  v-else
+                  class="app-text-action-btn app-secondary-compact"
+                  type="text"
+                  size="mini"
+                  @click.stop="navigateToDirectory(item.parent_path)"
+                >
+                  打开
+                </a-button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </a-modal>
@@ -92,8 +192,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { IconFolder, IconFile, IconArrowUp } from '@arco-design/web-vue/es/icon'
-import { directoryService, type DirectoryItem } from '@/services/directory.service'
+import { IconFolder, IconFile, IconArrowUp, IconArrowLeft, IconSearch } from '@arco-design/web-vue/es/icon'
+import { directoryService, type DirectoryItem, type SearchResult } from '@/services/directory.service'
 import { useUiStore } from '@/stores/ui'
 
 const uiStore = useUiStore()
@@ -125,7 +225,20 @@ const loadFailedWithStaleData = ref(false)
 const directoryListIncomplete = ref(false)
 const skippedCount = ref(0)
 
+// Search state
+const searchQuery = ref('')
+const lastSearchQuery = ref('')
+const searchResults = ref<SearchResult[]>([])
+const isSearching = ref(false)
+const isSearchMode = ref(false)
+
 const canGoUp = computed(() => parentPath.value !== null)
+
+const currentDirName = computed(() => {
+  if (!currentPath.value) return '根目录'
+  const parts = currentPath.value.replace(/\\/g, '/').split('/')
+  return parts[parts.length - 1] || '根目录'
+})
 
 // Load directory content
 const loadDirectory = async (path?: string) => {
@@ -154,7 +267,7 @@ const loadDirectory = async (path?: string) => {
   }
 }
 
-// Handle item click
+// Handle item click (browse mode)
 const handleItemClick = async (item: DirectoryItem) => {
   if (item.type === 'directory') {
     await loadDirectory(item.path)
@@ -163,7 +276,7 @@ const handleItemClick = async (item: DirectoryItem) => {
   }
 }
 
-// Select file
+// Select file (browse mode)
 const selectFile = (item: DirectoryItem) => {
   emit('select', item.path)
   visible.value = false
@@ -174,6 +287,56 @@ const goToParent = async () => {
   if (parentPath.value) {
     await loadDirectory(parentPath.value)
   }
+}
+
+// Search
+const handleSearch = async () => {
+  const query = searchQuery.value.trim()
+  if (!query) return
+
+  isSearching.value = true
+  isSearchMode.value = true
+  lastSearchQuery.value = query
+
+  try {
+    searchResults.value = await directoryService.searchDirectory(query, currentPath.value)
+  } catch {
+    searchResults.value = []
+    uiStore.addAlert('搜索失败，请稍后重试', 'error')
+  } finally {
+    isSearching.value = false
+  }
+}
+
+// Clear search and return to browse mode
+const clearSearch = () => {
+  isSearchMode.value = false
+  searchQuery.value = ''
+  searchResults.value = []
+  lastSearchQuery.value = ''
+}
+
+// Handle search item click
+const handleSearchItemClick = async (item: SearchResult) => {
+  if (item.is_directory) {
+    // Navigate to the directory
+    await navigateToDirectory(item.path)
+  } else {
+    // Select the file
+    selectSearchResult(item)
+  }
+}
+
+// Select search result
+const selectSearchResult = (item: SearchResult) => {
+  emit('select', item.path)
+  visible.value = false
+}
+
+// Navigate to directory (from search result)
+const navigateToDirectory = async (path: string) => {
+  clearSearch()
+  await loadDirectory(path)
 }
 
 // Cancel
@@ -206,6 +369,7 @@ const getFileType = (filename: string) => {
 // Initialize when modal opens
 watch(visible, async (newVal) => {
   if (newVal) {
+    clearSearch()
     await loadDirectory(props.initialPath || undefined)
   }
 }, { immediate: true })
@@ -238,6 +402,18 @@ watch(visible, async (newVal) => {
   border: 1px solid var(--color-status-error-border);
 }
 
+.file-browser-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border-2);
+}
+
+.file-browser-search :deep(.arco-input-search) {
+  flex: 1;
+}
+
 .file-browser-header {
   padding: 12px 16px;
   border-bottom: 1px solid var(--color-border-2);
@@ -248,6 +424,21 @@ watch(visible, async (newVal) => {
   color: var(--color-text-2);
   word-break: break-all;
   font-family: monospace;
+}
+
+.search-info {
+  padding: 10px 16px;
+  background: var(--color-fill-1);
+  border-bottom: 1px solid var(--color-border-2);
+}
+
+.search-info-text {
+  font-size: 13px;
+  color: var(--color-text-2);
+}
+
+.search-info-text strong {
+  color: var(--color-text-1);
 }
 
 .file-table-container {
@@ -298,7 +489,11 @@ watch(visible, async (newVal) => {
 }
 
 .col-name {
-  min-width: 300px;
+  min-width: 200px;
+}
+
+.col-path {
+  min-width: 200px;
 }
 
 .col-size {
@@ -325,6 +520,16 @@ watch(visible, async (newVal) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.item-path {
+  font-size: 12px;
+  color: var(--color-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  max-width: 300px;
 }
 
 .file-size {
@@ -358,5 +563,19 @@ watch(visible, async (newVal) => {
 .action-hint {
   color: var(--color-text-4);
   font-size: 12px;
+}
+
+.no-results {
+  text-align: center;
+  padding: 40px 20px !important;
+  color: var(--color-text-3);
+}
+
+.no-results-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 </style>

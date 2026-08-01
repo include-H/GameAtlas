@@ -26,6 +26,7 @@ declare module 'vue' {
     AImage: typeof import('@arco-design/web-vue')['Image']
     AImagePreviewGroup: typeof import('@arco-design/web-vue')['ImagePreviewGroup']
     AInput: typeof import('@arco-design/web-vue')['Input']
+    AInputSearch: typeof import('@arco-design/web-vue')['InputSearch']
     ALayout: typeof import('@arco-design/web-vue')['Layout']
     ALayoutContent: typeof import('@arco-design/web-vue')['LayoutContent']
     ALayoutFooter: typeof import('@arco-design/web-vue')['LayoutFooter']

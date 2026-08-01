@@ -8,6 +8,14 @@ export interface DirectoryItem {
   size?: number | null
 }
 
+export interface SearchResult {
+  name: string
+  path: string
+  is_directory: boolean
+  size_bytes?: number | null
+  parent_path: string
+}
+
 interface DirectoryListResponse {
   currentPath: string
   parentPath: string | null
@@ -53,5 +61,13 @@ export const directoryService = {
       incomplete: res.data.incomplete,
       skippedCount: res.data.skipped_count,
     }))
+  },
+
+  searchDirectory(query: string, path?: string): Promise<SearchResult[]> {
+    const params: Record<string, string> = { q: query }
+    if (path) {
+      params.path = path
+    }
+    return get<ApiEnvelope<SearchResult[]>>('/directory/search', { params }).then((res) => res.data)
   },
 }

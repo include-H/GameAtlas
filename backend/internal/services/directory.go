@@ -81,6 +81,78 @@ func (s *DirectoryService) List(path string) (*domain.DirectoryListResponse, err
 	}, nil
 }
 
+const maxSearchResults = 100
+const fuzzyThreshold = 0.8
+
+type SearchResult struct {
+	Name        string `json:"name"`
+	Path        string `json:"path"`
+	IsDirectory bool   `json:"is_directory"`
+	SizeBytes   *int64 `json:"size_bytes,omitempty"`
+	ParentPath  string `json:"parent_path"`
+}
+
+func (s *DirectoryService) Search(query string, fromPath string) ([]SearchResult, error) {
+	// Validate and resolve the starting directory
+	dir, err := s.guard.ValidateDirectory(fromPath)
+	if err != nil {
+		return nil, normalizeDirectoryError(err)
+	}
+
+	normalizedQuery := files.NormalizeForSearch(query)
+	if normalizedQuery == "" {
+		return []SearchResult{}, nil
+	}
+
+	var results []SearchResult
+	err = filepath.Walk(dir.ResolvedPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // Skip inaccessible entries
+		}
+
+		// Skip the root directory itself
+		if path == dir.ResolvedPath {
+			return nil
+		}
+
+		// Limit results
+		if len(results) >= maxSearchResults {
+			return filepath.SkipAll
+		}
+
+		name := info.Name()
+		normalizedName := files.NormalizeForSearch(name)
+
+		// Check similarity
+		similarity := files.JaroWinkler(normalizedQuery, normalizedName)
+		if similarity >= fuzzyThreshold {
+			var sizeBytes *int64
+			if !info.IsDir() && info.Mode().IsRegular() {
+				size := info.Size()
+				sizeBytes = &size
+			}
+
+			parent := filepath.Dir(path)
+
+			results = append(results, SearchResult{
+				Name:        name,
+				Path:        path,
+				IsDirectory: info.IsDir(),
+				SizeBytes:   sizeBytes,
+				ParentPath:  parent,
+			})
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
 func normalizeDirectoryError(err error) error {
 	switch {
 	case err == nil:
