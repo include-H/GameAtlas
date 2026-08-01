@@ -7,15 +7,28 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hao/game/internal/domain"
 )
 
 type SteamGridDBService struct {
-	apiKey  string
-	baseURL string
-	client  *http.Client
+	apiKey      string
+	baseURL     string
+	client      *http.Client
+	searchCache sync.Map // query -> cachedSearchResult
+	imageCache  sync.Map // endpoint -> cachedImageResult
+}
+
+type cachedSearchResult struct {
+	data    []SteamGridDBGame
+	cachedAt time.Time
+}
+
+type cachedImageResult struct {
+	data    []SteamGridDBImage
+	cachedAt time.Time
 }
 
 type SteamGridDBImage struct {
@@ -59,6 +72,15 @@ func (s *SteamGridDBService) Available() bool {
 }
 
 func (s *SteamGridDBService) Search(query string) ([]SteamGridDBGame, error) {
+	// Check cache first
+	if cached, ok := s.searchCache.Load(query); ok {
+		entry := cached.(cachedSearchResult)
+		if time.Since(entry.cachedAt) < 1*time.Hour {
+			return entry.data, nil
+		}
+		s.searchCache.Delete(query)
+	}
+
 	endpoint := fmt.Sprintf("search/autocomplete/%s", url.PathEscape(query))
 	fullURL := fmt.Sprintf("%s/%s", s.baseURL, endpoint)
 
@@ -93,6 +115,9 @@ func (s *SteamGridDBService) Search(query string) ([]SteamGridDBGame, error) {
 		return nil, fmt.Errorf("%w: steamgriddb search: api returned success=false", domain.ErrUpstream)
 	}
 
+	// Cache the result
+	s.searchCache.Store(query, cachedSearchResult{data: result.Data, cachedAt: time.Now()})
+
 	return result.Data, nil
 }
 
@@ -125,6 +150,21 @@ func (s *SteamGridDBService) GetLogosByGameID(gameID int) ([]SteamGridDBImage, e
 }
 
 func (s *SteamGridDBService) fetchImages(endpoint string, extra url.Values) ([]SteamGridDBImage, error) {
+	// Build cache key
+	cacheKey := endpoint
+	if extra != nil {
+		cacheKey += "?" + extra.Encode()
+	}
+
+	// Check cache first
+	if cached, ok := s.imageCache.Load(cacheKey); ok {
+		entry := cached.(cachedImageResult)
+		if time.Since(entry.cachedAt) < 1*time.Hour {
+			return entry.data, nil
+		}
+		s.imageCache.Delete(cacheKey)
+	}
+
 	fullURL := fmt.Sprintf("%s/%s", s.baseURL, endpoint)
 
 	req, err := http.NewRequest(http.MethodGet, fullURL, nil)
@@ -167,6 +207,9 @@ func (s *SteamGridDBService) fetchImages(endpoint string, extra url.Values) ([]S
 	if !result.Success {
 		return nil, fmt.Errorf("%w: steamgriddb %s: api returned success=false", domain.ErrUpstream, endpoint)
 	}
+
+	// Cache the result
+	s.imageCache.Store(cacheKey, cachedImageResult{data: result.Data, cachedAt: time.Now()})
 
 	return result.Data, nil
 }
