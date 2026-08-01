@@ -13,7 +13,7 @@ COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ .
 COPY --from=frontend-builder /app/frontend/dist ./web/dist
-RUN CGO_ENABLED=1 GOOS=linux go build -trimpath -ldflags="-s -w" -o /game-server ./cmd/server
+RUN CGO_ENABLED=1 GOOS=linux go build -trimpath -ldflags=-s -w -o /game-server ./cmd/server
 
 # ---- 运行镜像 ----
 FROM alpine:3.20
