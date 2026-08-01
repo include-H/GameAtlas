@@ -15,6 +15,7 @@ import (
 
 	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/domain"
+	"github.com/hao/game/internal/files"
 	"github.com/hao/game/internal/http/handlers"
 	"github.com/hao/game/internal/repositories"
 	"github.com/hao/game/internal/services"
@@ -76,6 +77,8 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	steamGridDBHandler := handlers.NewSteamGridDBHandler(services.NewSteamGridDBService(cfg.SteamGridDBAPIKey))
 	wikiHandler := handlers.NewWikiHandler(wikiService)
 	hitokotoHandler := handlers.NewHitokotoHandler(hitokotoService)
+	gameFileRefreshService := services.NewGameFileRefreshService(gameFilesRepo, files.NewGuard(cfg.PrimaryROMRoot))
+	gameFileRefreshHandler := handlers.NewGameFileRefreshHandler(gameFileRefreshService)
 	gameScanService := services.NewGameScanService(gamesRepo, gameFilesRepo, cfg.PrimaryROMRoot)
 	gameScanHandler := handlers.NewGameScanHandler(gameScanService)
 
@@ -101,6 +104,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.POST("/games", gamesHandler.Create)
 	api.PUT("/games/:publicId/aggregate", gamesHandler.UpdateAggregate)
 	api.DELETE("/games/:publicId", gamesHandler.Delete)
+	api.POST("/games/refresh-sizes", gameFileRefreshHandler.RefreshSizes)
 	api.POST("/games/scan", gameScanHandler.Scan)
 	api.GET("/games/:publicId/files", gameFilesHandler.List)
 	api.POST("/games/:publicId/files/:fileId/downloads", downloadsHandler.RecordDownload)

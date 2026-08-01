@@ -66,3 +66,36 @@ func (r *GameFilesRepository) ListAllPaths() (map[string]bool, error) {
 	}
 	return result, nil
 }
+
+func (r *GameFilesRepository) UpdateSizeBytes(fileID int64, sizeBytes int64) error {
+	_, err := r.db.Exec(`
+		UPDATE game_files SET size_bytes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+	`, sizeBytes, fileID)
+	if err != nil {
+		return fmt.Errorf("update file size: %w", err)
+	}
+	return nil
+}
+
+func (r *GameFilesRepository) UpdateFileSizeAndDate(fileID int64, sizeBytes int64, sourceCreatedAt string) error {
+	_, err := r.db.Exec(`
+		UPDATE game_files SET size_bytes = ?, source_created_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+	`, sizeBytes, sourceCreatedAt, fileID)
+	if err != nil {
+		return fmt.Errorf("update file size and date: %w", err)
+	}
+	return nil
+}
+
+func (r *GameFilesRepository) ListFilesWithoutSize() ([]domain.GameFile, error) {
+	var files []domain.GameFile
+	err := r.db.Select(&files, `
+		SELECT id, game_id, file_path, label, notes, size_bytes, sort_order, created_at, updated_at, source_created_at
+		FROM game_files
+		WHERE size_bytes IS NULL
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list files without size: %w", err)
+	}
+	return files, nil
+}
