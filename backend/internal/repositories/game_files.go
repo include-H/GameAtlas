@@ -43,30 +43,6 @@ func (r *GameFilesRepository) GetByID(gameID, fileID int64) (*domain.GameFile, e
 	return &file, nil
 }
 
-func (r *GameFilesRepository) ExistsByPath(filePath string) (bool, error) {
-	var count int
-	err := r.db.Get(&count, `
-		SELECT COUNT(*) FROM game_files WHERE file_path = ?
-	`, filePath)
-	if err != nil {
-		return false, fmt.Errorf("check file path exists: %w", err)
-	}
-	return count > 0, nil
-}
-
-func (r *GameFilesRepository) ListAllPaths() (map[string]bool, error) {
-	var paths []string
-	err := r.db.Select(&paths, `SELECT file_path FROM game_files`)
-	if err != nil {
-		return nil, fmt.Errorf("list all file paths: %w", err)
-	}
-	result := make(map[string]bool, len(paths))
-	for _, p := range paths {
-		result[p] = true
-	}
-	return result, nil
-}
-
 func (r *GameFilesRepository) UpdateSizeBytes(fileID int64, sizeBytes int64) error {
 	_, err := r.db.Exec(`
 		UPDATE game_files SET size_bytes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?

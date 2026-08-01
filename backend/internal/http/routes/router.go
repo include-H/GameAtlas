@@ -79,8 +79,6 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	hitokotoHandler := handlers.NewHitokotoHandler(hitokotoService)
 	gameFileRefreshService := services.NewGameFileRefreshService(gameFilesRepo, files.NewGuard(cfg.PrimaryROMRoot))
 	gameFileRefreshHandler := handlers.NewGameFileRefreshHandler(gameFileRefreshService)
-	gameScanService := services.NewGameScanService(gamesRepo, gameFilesRepo, cfg.PrimaryROMRoot)
-	gameScanHandler := handlers.NewGameScanHandler(gameScanService)
 
 	router.Use(func(c *gin.Context) {
 		session, _ := c.Cookie(services.AuthCookieName)
@@ -105,7 +103,6 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.PUT("/games/:publicId/aggregate", gamesHandler.UpdateAggregate)
 	api.DELETE("/games/:publicId", gamesHandler.Delete)
 	api.POST("/games/refresh-sizes", gameFileRefreshHandler.RefreshSizes)
-	api.POST("/games/scan", gameScanHandler.Scan)
 	api.GET("/games/:publicId/files", gameFilesHandler.List)
 	api.POST("/games/:publicId/files/:fileId/downloads", downloadsHandler.RecordDownload)
 	api.GET("/games/:publicId/files/:fileId/download", downloadsHandler.Download)

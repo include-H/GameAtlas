@@ -545,26 +545,26 @@ export const useGamesView = ({
     }
   }
 
-  const isScanning = ref(false)
+  const isRefreshing = ref(false)
 
-  const handleScanGames = async () => {
-    if (isScanning.value) return
-    isScanning.value = true
+  const handleRefreshSizes = async () => {
+    if (isRefreshing.value) return
+    isRefreshing.value = true
     try {
-      const result = await gamesService.scanGames()
+      const result = await gamesService.refreshFileSizes()
       uiStore.addAlert(
-        `扫描完成：总计 ${result.total} 个 VHD，新增 ${result.created} 个游戏，跳过 ${result.skipped} 个`,
+        `刷新完成：更新 ${result.updated} 个文件，失败 ${result.errors} 个`,
         'success'
       )
       try {
         await loadGames()
       } catch {
-        uiStore.addAlert('扫描已完成，但列表刷新失败，请稍后重试', 'warning')
+        uiStore.addAlert('刷新已完成，但列表更新失败，请稍后重试', 'warning')
       }
     } catch (error) {
-      uiStore.addAlert(`扫描游戏失败：${getHttpErrorMessage(error)}`, 'error')
+      uiStore.addAlert(`刷新文件大小失败：${getHttpErrorMessage(error)}`, 'error')
     } finally {
-      isScanning.value = false
+      isRefreshing.value = false
     }
   }
 
@@ -710,7 +710,7 @@ export const useGamesView = ({
     updateRoute,
     viewGame,
     viewMode,
-    handleScanGames,
-    isScanning,
+    handleRefreshSizes,
+    isRefreshing,
   }
 }

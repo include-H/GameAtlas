@@ -176,25 +176,6 @@ Format-Volume -Partition $part -FileSystem NTFS -NewFileSystemLabel "GT4_BASE"
 3. 后台新增游戏，在"文件版本"里添加 `.vhd/.vhdx` 路径
 4. 详情页点击"开始游玩"，下载 BAT，Windows 客户端管理员运行
 
-### 批量导入游戏
-
-如果有大量 VHD 文件需要导入，可以使用扫描器：
-
-```bash
-# 安装依赖
-pip install requests
-
-# 运行扫描器
-python3 scripts/scan_games.py --dir /mnt/Game --password 1234
-```
-
-扫描器会自动：
-- 遍历目录中的所有 VHD/VHDX 文件
-- 从文件名提取游戏标题
-- 根据目录结构创建系列（如 "有系列的游戏/C 刺客信条"）
-- 跳过已存在的游戏
-- 创建游戏并关联文件路径
-
 ### 常见问题
 
 - `SMB_SHARE_ROOT` / `SMB_PATH_MAPPINGS` 配错 → 客户端连不上共享

@@ -296,8 +296,8 @@ const gamesService = {
     }
   },
 
-  async scanGames(): Promise<{ total: number; created: number; skipped: number; errors: number }> {
-    const response = await post<ApiEnvelope<{ total: number; created: number; skipped: number; errors: number }>>('/games/scan', {})
+  async refreshFileSizes(): Promise<{ updated: number; errors: number }> {
+    const response = await post<ApiEnvelope<{ updated: number; errors: number }>>('/games/refresh-sizes', {})
     return response.data
   },
 }

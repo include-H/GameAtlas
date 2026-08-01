@@ -24,11 +24,11 @@
           添加游戏
         </a-button>
 
-        <a-button v-if="isAdmin" :loading="isScanning" @click="handleScanGames">
+        <a-button v-if="isAdmin" :loading="isRefreshing" @click="handleRefreshSizes">
           <template #icon>
-            <icon-search />
+            <icon-refresh />
           </template>
-          扫描游戏
+          刷新文件大小
         </a-button>
       </a-space>
     </div>
@@ -256,7 +256,7 @@ import { useUiStore } from '@/stores/ui'
 import GameCard from '@/components/GameCard.vue'
 import AddGameModal from '@/components/AddGameModal.vue'
 import { useGamesView } from '@/composables/useGamesView'
-import { IconApps, IconHeart, IconHeartFill, IconList, IconLock, IconPlus, IconSearch, IconSort, IconTrophy } from '@arco-design/web-vue/es/icon'
+import { IconApps, IconHeart, IconHeartFill, IconList, IconLock, IconPlus, IconRefresh, IconSort, IconTrophy } from '@arco-design/web-vue/es/icon'
 
 defineOptions({
   name: 'GamesView',
@@ -296,8 +296,8 @@ const {
   updateRoute,
   viewGame,
   viewMode,
-  handleScanGames,
-  isScanning,
+  handleRefreshSizes,
+  isRefreshing,
 } = useGamesView({
   route,
   router,
