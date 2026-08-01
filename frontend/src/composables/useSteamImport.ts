@@ -196,8 +196,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
 
   const logoSteamPicker = useSteamPicker<string[]>({
     onSelect: async (game) => {
-      const logos = await steamGridDBService.getLogosBySteamAppId(game.id)
-      const images = logos.map((g) => g.url)
+      const logos = await steamGridDBService.getLogosBySteamAppId(Number(game.id))
+      const images = logos.map((g: { url: string }) => g.url)
       steamLogoImages.value = images
       selectedLogoImage.value = ''
       return images

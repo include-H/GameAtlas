@@ -38,6 +38,9 @@ if [[ ! -d "$FRONTEND_DIR/node_modules" ]]; then
   (cd "$FRONTEND_DIR" && npm install)
 fi
 
+echo "构建前端..."
+(cd "$FRONTEND_DIR" && npm run build)
+
 echo "预热 Go 依赖..."
 (
   cd "$BACKEND_DIR"

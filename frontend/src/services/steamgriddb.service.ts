@@ -47,6 +47,16 @@ const steamGridDBService = {
     return response.data ?? []
   },
 
+  async getLogosBySteamAppId(steamAppId: number): Promise<SteamGridDBImage[]> {
+    const response = await get<ApiEnvelope<SteamGridDBImage[]>>(`/steamgriddb/${steamAppId}/logos`)
+    return response.data ?? []
+  },
+
+  async getLogosByGameId(gameId: number): Promise<SteamGridDBImage[]> {
+    const response = await get<ApiEnvelope<SteamGridDBImage[]>>(`/steamgriddb/game/${gameId}/logos`)
+    return response.data ?? []
+  },
+
 }
 
 export default steamGridDBService

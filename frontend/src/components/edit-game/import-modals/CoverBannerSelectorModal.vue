@@ -24,6 +24,7 @@
           :disabled="!sgdbAvailable"
           @click="emit('source-change', 'steamgriddb')"
         >SteamGridDB</a-button>
+        <span v-if="!sgdbAvailable" class="source-selector__hint">需配置 STEAMGRIDDB_API_KEY</span>
       </div>
       <steam-search-panel
         :query="searchQuery"
@@ -193,6 +194,12 @@ const imageItemClass = computed(() => props.mode === 'banner' ? 'banner-thumb' :
   font-size: 14px;
   color: var(--color-text-2);
   flex-shrink: 0;
+}
+
+.source-selector__hint {
+  font-size: 12px;
+  color: var(--color-text-3);
+  margin-left: 4px;
 }
 
 .steam-search-title {
