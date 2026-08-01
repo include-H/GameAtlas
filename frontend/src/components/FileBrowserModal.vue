@@ -2,8 +2,9 @@
   <a-modal
     v-model:visible="visible"
     title="选择游戏文件"
-    :width="600"
+    :width="900"
     :footer="false"
+    :body-style="{ padding: '0' }"
     @cancel="handleCancel"
   >
     <div class="file-browser">
@@ -36,46 +37,55 @@
         </a-space>
       </div>
 
-      <!-- File List -->
-      <a-list
-        v-if="!hasLoadFailure"
-        class="file-list"
-        :bordered="false"
-        :data="directoryItems"
-      >
-        <template #item="{ item }">
-          <a-list-item
-            :class="['file-item', item.type]"
-            @click="handleItemClick(item)"
-          >
-            <a-list-item-meta>
-              <template #avatar>
-                <icon-folder v-if="item.type === 'directory'" class="file-icon folder" />
-                <icon-file v-else class="file-icon file" />
-              </template>
-              <template #title>
-                <span class="file-name">{{ item.name }}</span>
-              </template>
-              <template #description>
-                <span v-if="item.type === 'file'" class="file-size">
-                  {{ formatSize(item.size) }}
-                </span>
-              </template>
-            </a-list-item-meta>
-            <template #actions>
-              <a-button 
-                v-if="item.type === 'file'" 
-                class="app-text-action-btn app-secondary-compact"
-                type="text" 
-                size="small"
-                @click.stop="selectFile(item)"
-              >
-                选择
-              </a-button>
-            </template>
-          </a-list-item>
-        </template>
-      </a-list>
+      <!-- File List - Table View -->
+      <div class="file-table-container">
+        <table class="file-table" v-if="!hasLoadFailure">
+          <thead>
+            <tr>
+              <th class="col-name">名称</th>
+              <th class="col-size">大小</th>
+              <th class="col-type">类型</th>
+              <th class="col-action">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="item in directoryItems"
+              :key="item.path"
+              :class="['file-row', item.type]"
+              @click="handleItemClick(item)"
+            >
+              <td class="col-name">
+                <div class="file-name-cell">
+                  <icon-folder v-if="item.type === 'directory'" class="file-icon folder" />
+                  <icon-file v-else class="file-icon file" />
+                  <span class="file-name">{{ item.name }}</span>
+                </div>
+              </td>
+              <td class="col-size">
+                <span v-if="item.type === 'file'" class="file-size">{{ formatSize(item.size ?? undefined) }}</span>
+                <span v-else class="file-size dim">—</span>
+              </td>
+              <td class="col-type">
+                <span v-if="item.type === 'directory'" class="file-type">文件夹</span>
+                <span v-else class="file-type">{{ getFileType(item.name) }}</span>
+              </td>
+              <td class="col-action">
+                <a-button 
+                  v-if="item.type === 'file'" 
+                  class="app-text-action-btn app-secondary-compact"
+                  type="text" 
+                  size="mini"
+                  @click.stop="selectFile(item)"
+                >
+                  选择
+                </a-button>
+                <span v-else class="action-hint">打开</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </a-modal>
 </template>
@@ -126,13 +136,9 @@ const loadDirectory = async (path?: string) => {
     currentPath.value = data.currentPath
     parentPath.value = data.parentPath
     directoryItems.value = data.items
-    // 2026-04-09: keep directory browsing best-effort for transient filesystem entry failures,
-    // but surface that this response is partial so the picker does not masquerade as a complete listing.
     directoryListIncomplete.value = data.incomplete
     skippedCount.value = data.skippedCount
   } catch {
-    // 2026-04-08: directory read failures must not masquerade as a successful empty/current folder state.
-    // Impact: initial load shows an explicit failure, while refresh failures keep stale content with a warning.
     if (currentPath.value || directoryItems.value.length > 0) {
       loadFailedWithStaleData.value = true
       uiStore.addAlert('目录刷新失败，当前显示的是上次成功加载的内容', 'warning')
@@ -190,6 +196,13 @@ const formatSize = (bytes?: number) => {
   return `${size.toFixed(1)} ${units[unitIndex]}`
 }
 
+// Get file type from extension
+const getFileType = (filename: string) => {
+  const ext = filename.split('.').pop()?.toUpperCase()
+  if (!ext) return '文件'
+  return `${ext} 文件`
+}
+
 // Initialize when modal opens
 watch(visible, async (newVal) => {
   if (newVal) {
@@ -200,13 +213,13 @@ watch(visible, async (newVal) => {
 
 <style scoped>
 .file-browser {
-  max-height: 500px;
   display: flex;
   flex-direction: column;
+  min-height: 500px;
 }
 
 .file-browser-status {
-  margin-bottom: 12px;
+  margin: 12px;
   padding: 10px 12px;
   border-radius: 8px;
   font-size: 13px;
@@ -226,9 +239,8 @@ watch(visible, async (newVal) => {
 }
 
 .file-browser-header {
-  padding: 12px;
-  border-radius: 8px;
-  margin-bottom: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border-2);
 }
 
 .current-path {
@@ -238,40 +250,101 @@ watch(visible, async (newVal) => {
   font-family: monospace;
 }
 
-.file-list {
-  max-height: 400px;
+.file-table-container {
+  flex: 1;
   overflow-y: auto;
+  max-height: 500px;
 }
 
-.file-item {
+.file-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.file-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-bg-2);
+}
+
+.file-table th {
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 500;
+  color: var(--color-text-3);
+  border-bottom: 1px solid var(--color-border-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.file-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--color-border-1);
+}
+
+.file-row {
   cursor: pointer;
-  transition: background-color 0.2s, border-color 0.2s;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  margin-bottom: 4px;
+  transition: background-color 0.15s;
 }
 
-.file-item:hover {
-  background-color: color-mix(in srgb, var(--app-card-surface) 82%, transparent);
-  border-color: var(--app-card-border);
+.file-row:hover {
+  background-color: color-mix(in srgb, var(--color-primary-6) 8%, transparent);
 }
 
-.file-item.directory {
-  background-color: color-mix(in srgb, var(--app-card-surface) 74%, transparent);
-  border-color: var(--app-card-border);
+.file-row.directory {
+  font-weight: 500;
+}
+
+.col-name {
+  min-width: 300px;
+}
+
+.col-size {
+  width: 100px;
+  text-align: right;
+}
+
+.col-type {
+  width: 120px;
+}
+
+.col-action {
+  width: 80px;
+  text-align: center;
+}
+
+.file-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .file-name {
-  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file-size {
+  color: var(--color-text-2);
+  font-family: monospace;
   font-size: 12px;
+}
+
+.file-size.dim {
+  color: var(--color-text-4);
+}
+
+.file-type {
   color: var(--color-text-3);
+  font-size: 12px;
 }
 
 .file-icon {
-  font-size: 20px;
+  font-size: 18px;
+  flex-shrink: 0;
 }
 
 .file-icon.folder {
@@ -279,6 +352,11 @@ watch(visible, async (newVal) => {
 }
 
 .file-icon.file {
-  color: var(--color-text-3);
+  color: var(--color-text-4);
+}
+
+.action-hint {
+  color: var(--color-text-4);
+  font-size: 12px;
 }
 </style>
