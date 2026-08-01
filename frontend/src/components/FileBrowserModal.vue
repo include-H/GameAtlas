@@ -18,51 +18,54 @@
         本次目录列表不完整，已跳过 {{ skippedCount }} 个无法读取的条目。
       </div>
 
-      <!-- Search Bar -->
-      <div class="file-browser-search app-glass-surface">
-        <a-input-search
-          v-model="searchQuery"
-          :placeholder="`在 ${currentDirName} 中搜索...`"
-          search-button
-          :loading="isSearching"
-          @search="handleSearch"
-          @press-enter="handleSearch"
-        >
-          <template #button-icon>
-            <icon-search />
-          </template>
-        </a-input-search>
-        <a-button
-          v-if="isSearchMode"
-          class="app-text-action-btn"
-          type="text"
-          size="small"
-          @click="clearSearch"
-        >
-          <template #icon>
-            <icon-arrow-left />
-          </template>
-          返回
-        </a-button>
-      </div>
-
-      <!-- Path Navigation (only in browse mode) -->
-      <div v-if="!isSearchMode" class="file-browser-header app-glass-surface">
-        <a-space>
-          <a-button 
-            class="app-text-action-btn app-secondary-compact"
-            type="text"
-            size="small" 
-            :disabled="!canGoUp" 
-            @click="goToParent"
-          >
-            <template #icon>
-              <icon-arrow-up />
+      <!-- Top bar: breadcrumb + search -->
+      <div class="file-browser-topbar app-glass-surface">
+        <div class="topbar-breadcrumb">
+          <div class="breadcrumb-box">
+            <template v-if="isSearchMode">
+              <a-button
+                class="app-text-action-btn"
+                type="text"
+                size="small"
+                @click="clearSearch"
+              >
+                <template #icon>
+                  <icon-arrow-left />
+                </template>
+                返回
+              </a-button>
             </template>
-            上级
-          </a-button>
-          <span class="current-path">{{ currentPath }}</span>
-        </a-space>
+            <template v-else>
+              <a-button
+                class="app-text-action-btn app-secondary-compact"
+                type="text"
+                size="small"
+                :disabled="!canGoUp"
+                @click="goToParent"
+              >
+                <template #icon>
+                  <icon-arrow-up />
+                </template>
+                上级
+              </a-button>
+              <span class="current-path">{{ currentPath }}</span>
+            </template>
+          </div>
+        </div>
+        <div class="topbar-search">
+          <a-input-search
+            v-model="searchQuery"
+            :placeholder="`在 ${currentDirName} 中搜索...`"
+            search-button
+            :loading="isSearching"
+            @search="handleSearch"
+            @press-enter="handleSearch"
+          >
+            <template #button-icon>
+              <icon-search />
+            </template>
+          </a-input-search>
+        </div>
       </div>
 
       <!-- Search Results Info -->
@@ -402,21 +405,34 @@ watch(visible, async (newVal) => {
   border: 1px solid var(--color-status-error-border);
 }
 
-.file-browser-search {
+.topbar-breadcrumb {
+  flex: 7;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.breadcrumb-box {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  padding: 2px 10px;
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--border-radius-small, 4px);
+  overflow: hidden;
+}
+
+.file-browser-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--color-border-2);
 }
 
-.file-browser-search :deep(.arco-input-search) {
-  flex: 1;
-}
-
-.file-browser-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border-2);
+.topbar-search {
+  flex: 3;
 }
 
 .current-path {

@@ -522,6 +522,11 @@ body .arco-btn-text.arco-btn-status-warning:hover {
   box-shadow: var(--shadow-float);
 }
 
+.arco-modal-title-align-center {
+  text-align: left !important;
+  justify-content: flex-start !important;
+}
+
 .arco-select-dropdown,
 .arco-tree-select-popup,
 .arco-cascader-panel,

@@ -629,3 +629,9 @@ const handleBannerCropConfirm = async (blob: Blob) => {
 </script>
 
 <style scoped src="./edit-game/EditGameModal.css"></style>
+
+<style>
+.edit-game-modal .arco-modal-body {
+  padding: 2px 8px;
+}
+</style>
