@@ -218,11 +218,13 @@ type GameFileWriteInput struct {
 }
 
 type GameFileUpsertInput struct {
-	ID        *int64
-	FilePath  string
-	Label     *string
-	Notes     *string
-	SortOrder int
+	ID              *int64
+	FilePath        string
+	Label           *string
+	Notes           *string
+	SortOrder       int
+	SizeBytes       *int64
+	SourceCreatedAt *string
 }
 
 type GameAggregateUpdateInput struct {

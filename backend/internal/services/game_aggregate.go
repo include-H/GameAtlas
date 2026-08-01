@@ -96,6 +96,11 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 			Label:     trimmedFileInput.Label,
 			Notes:     trimmedFileInput.Notes,
 			SortOrder: index,
+			SizeBytes: &resolved.SizeBytes,
+			SourceCreatedAt: func() *string {
+				t := time.Unix(resolved.ModTime, 0).UTC().Format("2006-01-02 15:04:05")
+				return &t
+			}(),
 		})
 	}
 

@@ -250,9 +250,9 @@ func (r *GamesRepository) syncGameFilesTx(tx *sqlx.Tx, gameID int64, files []dom
 		if item.ID != nil && *item.ID > 0 {
 			result, err := tx.Exec(`
 				UPDATE game_files
-				SET file_path = ?, label = ?, notes = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP
+				SET file_path = ?, label = ?, notes = ?, sort_order = ?, size_bytes = ?, source_created_at = ?, updated_at = CURRENT_TIMESTAMP
 				WHERE game_id = ? AND id = ?
-			`, item.FilePath, item.Label, item.Notes, sortOrder, gameID, *item.ID)
+			`, item.FilePath, item.Label, item.Notes, sortOrder, item.SizeBytes, item.SourceCreatedAt, gameID, *item.ID)
 			if err != nil {
 				return fmt.Errorf("update game file: %w", err)
 			}
@@ -268,9 +268,9 @@ func (r *GamesRepository) syncGameFilesTx(tx *sqlx.Tx, gameID int64, files []dom
 		}
 
 		if _, err := tx.Exec(`
-			INSERT INTO game_files (game_id, file_path, label, notes, sort_order)
-			VALUES (?, ?, ?, ?, ?)
-		`, gameID, item.FilePath, item.Label, item.Notes, sortOrder); err != nil {
+			INSERT INTO game_files (game_id, file_path, label, notes, sort_order, size_bytes, source_created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`, gameID, item.FilePath, item.Label, item.Notes, sortOrder, item.SizeBytes, item.SourceCreatedAt); err != nil {
 			return fmt.Errorf("create game file: %w", err)
 		}
 	}
