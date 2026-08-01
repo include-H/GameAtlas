@@ -2,6 +2,7 @@ package config
 
 import (
 	"bufio"
+	_ "embed"
 	"errors"
 	"fmt"
 	"net/url"
@@ -11,6 +12,9 @@ import (
 	"strings"
 	"time"
 )
+
+//go:embed .env.production
+var defaultEnvTemplate string
 
 type Config struct {
 	AppEnv            string
@@ -45,21 +49,28 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	if dotEnvPath == "" && runtimeBaseDir != "" {
+		dotEnvPath = tryCreateDefaultEnv(runtimeBaseDir)
+	}
+
 	if dotEnvPath != "" {
 		if err := loadDotEnv(dotEnvPath); err != nil {
 			return Config{}, err
 		}
 	}
 
+	cwd, _ := os.Getwd()
+	pathBaseDir := cwd
+
 	proxy := getEnv("PROXY", "")
-	primaryROMRoot := resolveRuntimePath(runtimeBaseDir, getEnv("PRIMARY_ROM_ROOT", "ROM"))
+	primaryROMRoot := resolveRuntimePath(pathBaseDir, getEnv("PRIMARY_ROM_ROOT", "ROM"))
 
 	cfg := Config{
 		AppEnv:           getEnv("APP_ENV", "development"),
 		Host:             getEnv("HOST", "0.0.0.0"),
-		DBPath:           resolveRuntimePath(runtimeBaseDir, getEnv("DB_PATH", "data/db.db")),
-		StaticDir:        resolveRuntimePath(runtimeBaseDir, getEnv("STATIC_DIR", "../frontend/dist")),
-		AssetsDir:        resolveRuntimePath(runtimeBaseDir, getEnv("ASSETS_DIR", "data/gamelist")),
+		DBPath:           resolveRuntimePath(pathBaseDir, getEnv("DB_PATH", "data/db.db")),
+		StaticDir:        resolveRuntimePath(pathBaseDir, getEnv("STATIC_DIR", "../frontend/dist")),
+		AssetsDir:        resolveRuntimePath(pathBaseDir, getEnv("ASSETS_DIR", "data/gamelist")),
 		PrimaryROMRoot:   primaryROMRoot,
 		Proxy:            proxy,
 		SMBShareRoot:     getEnv("SMB_SHARE_ROOT", ""),
@@ -97,13 +108,9 @@ func detectRuntimeBaseDir() (string, string, error) {
 		return "", "", fmt.Errorf("determine current working directory: %w", err)
 	}
 
-	executablePath, err := os.Executable()
-	executableDir := ""
-	if err == nil {
-		executableDir = filepath.Dir(executablePath)
-	}
+	dataDir := filepath.Join(cwd, "data")
 
-	baseDir, dotEnvPath := chooseRuntimeBaseDir(cwd, executableDir, pathExists)
+	baseDir, dotEnvPath := chooseRuntimeBaseDir(cwd, dataDir, pathExists)
 	if baseDir == "" {
 		baseDir = cwd
 	}
@@ -111,9 +118,16 @@ func detectRuntimeBaseDir() (string, string, error) {
 	return baseDir, dotEnvPath, nil
 }
 
-func chooseRuntimeBaseDir(cwd, executableDir string, exists func(string) bool) (string, string) {
+func chooseRuntimeBaseDir(cwd, dataDir string, exists func(string) bool) (string, string) {
 	cwd = cleanOptionalPath(cwd)
-	executableDir = cleanOptionalPath(executableDir)
+	dataDir = cleanOptionalPath(dataDir)
+
+	if dataDir != "" {
+		candidate := filepath.Join(dataDir, ".env")
+		if exists(candidate) {
+			return dataDir, candidate
+		}
+	}
 
 	if cwd != "" {
 		candidate := filepath.Join(cwd, ".env")
@@ -122,19 +136,12 @@ func chooseRuntimeBaseDir(cwd, executableDir string, exists func(string) bool) (
 		}
 	}
 
-	if executableDir != "" {
-		candidate := filepath.Join(executableDir, ".env")
-		if exists(candidate) {
-			return executableDir, candidate
-		}
+	if dataDir != "" {
+		return dataDir, ""
 	}
 
-	if cwd != "" && exists(filepath.Join(cwd, "go.mod")) {
+	if cwd != "" {
 		return cwd, ""
-	}
-
-	if executableDir != "" {
-		return executableDir, ""
 	}
 
 	return cwd, ""
@@ -166,6 +173,25 @@ func pathExists(path string) bool {
 
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func tryCreateDefaultEnv(baseDir string) string {
+	envPath := filepath.Join(baseDir, ".env")
+
+	if pathExists(envPath) || defaultEnvTemplate == "" {
+		return ""
+	}
+
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		return ""
+	}
+
+	if err := os.WriteFile(envPath, []byte(defaultEnvTemplate), 0600); err != nil {
+		return ""
+	}
+
+	fmt.Printf("已自动创建默认配置: %s\n", envPath)
+	return envPath
 }
 
 func (c Config) Validate() error {

@@ -146,32 +146,32 @@ func TestLoadAggregatesConfigurationErrors(t *testing.T) {
 	}
 }
 
-func TestChooseRuntimeBaseDirPrefersDotEnvDirectory(t *testing.T) {
+func TestChooseRuntimeBaseDirPrefersDataDir(t *testing.T) {
 	cwd := filepath.Join(string(filepath.Separator), "workspace", "backend")
-	executableDir := filepath.Join(string(filepath.Separator), "release")
+	dataDir := filepath.Join(string(filepath.Separator), "workspace", "backend", "data")
 	exists := func(path string) bool {
-		return path == filepath.Join(executableDir, ".env")
+		return path == filepath.Join(dataDir, ".env")
 	}
 
-	baseDir, dotEnvPath := chooseRuntimeBaseDir(cwd, executableDir, exists)
-	if baseDir != executableDir {
-		t.Fatalf("baseDir = %q, want %q", baseDir, executableDir)
+	baseDir, dotEnvPath := chooseRuntimeBaseDir(cwd, dataDir, exists)
+	if baseDir != dataDir {
+		t.Fatalf("baseDir = %q, want %q", baseDir, dataDir)
 	}
-	if dotEnvPath != filepath.Join(executableDir, ".env") {
-		t.Fatalf("dotEnvPath = %q, want executable .env path", dotEnvPath)
+	if dotEnvPath != filepath.Join(dataDir, ".env") {
+		t.Fatalf("dotEnvPath = %q, want data .env path", dotEnvPath)
 	}
 }
 
-func TestChooseRuntimeBaseDirFallsBackToGoModuleDirectory(t *testing.T) {
+func TestChooseRuntimeBaseDirFallsBackToDataDirectory(t *testing.T) {
 	cwd := filepath.Join(string(filepath.Separator), "workspace", "backend")
-	executableDir := filepath.Join(string(filepath.Separator), "tmp", "go-build")
+	dataDir := filepath.Join(string(filepath.Separator), "workspace", "backend", "data")
 	exists := func(path string) bool {
-		return path == filepath.Join(cwd, "go.mod")
+		return false
 	}
 
-	baseDir, dotEnvPath := chooseRuntimeBaseDir(cwd, executableDir, exists)
-	if baseDir != cwd {
-		t.Fatalf("baseDir = %q, want %q", baseDir, cwd)
+	baseDir, dotEnvPath := chooseRuntimeBaseDir(cwd, dataDir, exists)
+	if baseDir != dataDir {
+		t.Fatalf("baseDir = %q, want %q", baseDir, dataDir)
 	}
 	if dotEnvPath != "" {
 		t.Fatalf("dotEnvPath = %q, want empty string", dotEnvPath)

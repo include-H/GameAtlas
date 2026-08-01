@@ -1,0 +1,21 @@
+services:
+  gameatlas:
+    image: hao0114/gameatlas:latest
+    container_name: gameatlas
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # 数据持久化
+      - ${DATA_DIR:-/mnt/Docker/GameAtlas}/data:/app/data
+      # SMB 挂载根（只读）
+      - /mnt:/mnt:ro
+    environment:
+      APP_ENV: production
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
+      PRIMARY_ROM_ROOT: /mnt
+      SMB_PATH_MAPPINGS: /mnt/Game=\\192.168.1.4\Game;/mnt/Gal=\\192.168.1.4\Gal
+      SMB_USERNAME: ${SMB_USERNAME:-}
+      SMB_PASSWORD: ${SMB_PASSWORD:-}
+      # SteamGridDB（可选）
+      # STEAMGRIDDB_API_KEY: ${STEAMGRIDDB_API_KEY:-}
