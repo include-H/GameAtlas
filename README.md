@@ -152,7 +152,7 @@ STEAMGRIDDB_API_KEY=            # 注册：https://www.steamgriddb.com/account
 
 - 游戏文件在 `PRIMARY_ROM_ROOT` 内，扩展名为 `.vhd` / `.vhdx`
 - 文件通过 SMB 共享暴露
-- `.env` 中正确配置 `SMB_SHARE_ROOT`（或 `SMB_PATH_MAPPINGS`）、`SMB_USERNAME`、`SMB_PASSWORD`、`VHD_DIFF_ROOT`
+- `.env` 中正确配置 `SMB_PATH_MAPPINGS`、`SMB_USERNAME`、`SMB_PASSWORD`、`VHD_DIFF_ROOT`
 
 ### 客户端条件
 
@@ -178,7 +178,7 @@ Format-Volume -Partition $part -FileSystem NTFS -NewFileSystemLabel "GT4_BASE"
 
 ### 常见问题
 
-- `SMB_SHARE_ROOT` / `SMB_PATH_MAPPINGS` 配错 → 客户端连不上共享
+- `SMB_PATH_MAPPINGS` 配错 → 客户端连不上共享
 - `PRIMARY_ROM_ROOT` 和 SMB 暴露目录不一致
 - 文件不在 `PRIMARY_ROM_ROOT` 内或不是 `.vhd` / `.vhdx`
 - 客户端无管理员权限 → `diskpart` 挂载失败

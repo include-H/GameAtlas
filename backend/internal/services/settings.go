@@ -42,16 +42,16 @@ type EnvEntry struct {
 }
 
 var editableEnvKeys = map[string]string{
-	"ADMIN_PASSWORD":     "管理员密码",
-	"ADMIN_DISPLAY_NAME": "管理员显示名称",
-	"PRIMARY_ROM_ROOT":   "ROM 根目录",
-	"VHD_DIFF_ROOT":      "VHD 差分盘根路径",
+	"ADMIN_PASSWORD":      "管理员密码",
+	"ADMIN_DISPLAY_NAME":  "管理员显示名称",
+	"PRIMARY_ROM_ROOT":    "ROM 根目录",
+	"VHD_DIFF_ROOT":       "VHD 差分盘根路径",
+	"PROXY":               "出站代理",
 	"STEAMGRIDDB_API_KEY": "SteamGridDB API Key",
-	"WIKI_HISTORY_LIMIT": "Wiki 历史记录上限",
+	"WIKI_HISTORY_LIMIT":  "Wiki 历史记录上限",
 }
 
 var smbEnvKeys = map[string]string{
-	"SMB_SHARE_ROOT":    "SMB 共享根路径",
 	"SMB_PATH_MAPPINGS": "SMB 路径映射",
 	"SMB_USERNAME":      "SMB 用户名",
 	"SMB_PASSWORD":      "SMB 密码",

@@ -2,7 +2,6 @@ package services
 
 import (
 	"bytes"
-	"errors"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -76,51 +75,20 @@ func (s *WindowsLaunchService) BuildLaunchScript(gameID, fileID int64, includeAl
 }
 
 func (s *WindowsLaunchService) buildSMBMountedPath(resolvedPath string) (string, string, error) {
-	if mappings, err := s.cfg.ParseSMBPathMappings(); err != nil {
+	mappings, err := s.cfg.ParseSMBPathMappings()
+	if err != nil {
 		return "", "", err
-	} else if len(mappings) > 0 {
-		base, shareRoot, mappingErr := s.buildMappedSMBPath(resolvedPath, mappings)
-		if mappingErr == nil {
-			return base, shareRoot, nil
-		}
-		if !errors.Is(mappingErr, domain.ErrForbiddenPath) {
-			return "", "", mappingErr
-		}
 	}
-
-	if strings.TrimSpace(s.cfg.SMBShareRoot) == "" {
+	if len(mappings) == 0 {
 		return "", "", domain.ErrMissingSMBConfig
 	}
 
-	root := filepath.Clean(strings.TrimSpace(s.cfg.PrimaryROMRoot))
-	if root == "" {
-		root = "ROM"
+	base, shareRoot, mappingErr := s.buildMappedSMBPath(resolvedPath, mappings)
+	if mappingErr != nil {
+		return "", "", mappingErr
 	}
 
-	resolvedRoot, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		return "", "", normalizeFileError(err)
-	}
-
-	relative, err := filepath.Rel(resolvedRoot, resolvedPath)
-	if err != nil {
-		return "", "", domain.ErrForbiddenPath
-	}
-	if relative == "." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || relative == ".." {
-		return "", "", domain.ErrForbiddenPath
-	}
-
-	relativeWindows := strings.ReplaceAll(filepath.ToSlash(relative), "/", `\`)
-	if relativeWindows == "." {
-		relativeWindows = ""
-	}
-
-	base := normalizeUNCPath(s.cfg.SMBShareRoot)
-	if relativeWindows != "" {
-		base += `\` + relativeWindows
-	}
-
-	return base, normalizeUNCPath(s.cfg.SMBShareRoot), nil
+	return base, shareRoot, nil
 }
 
 func (s *WindowsLaunchService) buildMappedSMBPath(resolvedPath string, mappings []config.SMBPathMapping) (string, string, error) {

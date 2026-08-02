@@ -77,7 +77,27 @@
                 <a-input-password
                   v-if="entry.key === 'ADMIN_PASSWORD'"
                   v-model="configForm[entry.key]"
-                  :placeholder="`请输入${entry.label}`"
+                  placeholder="管理员登录密码，必填"
+                />
+                <a-input
+                  v-else-if="entry.key === 'PRIMARY_ROM_ROOT'"
+                  v-model="configForm[entry.key]"
+                  placeholder="游戏文件根目录，如 /mnt/Game"
+                />
+                <a-input
+                  v-else-if="entry.key === 'VHD_DIFF_ROOT'"
+                  v-model="configForm[entry.key]"
+                  placeholder="客户端差分盘盘符，如 C:"
+                />
+                <a-input
+                  v-else-if="entry.key === 'PROXY'"
+                  v-model="configForm[entry.key]"
+                  placeholder="http / https / socks5，留空直连"
+                />
+                <a-input
+                  v-else-if="entry.key === 'STEAMGRIDDB_API_KEY'"
+                  v-model="configForm[entry.key]"
+                  placeholder="SteamGridDB API Key"
                 />
                 <a-input v-else v-model="configForm[entry.key]" :placeholder="`请输入${entry.label}`" />
               </a-form-item>
@@ -100,7 +120,18 @@
                 <a-input-password
                   v-if="entry.key === 'SMB_PASSWORD'"
                   v-model="configForm[entry.key]"
-                  :placeholder="`请输入${entry.label}`"
+                  placeholder="SMB 访问密码"
+                />
+                <a-textarea
+                  v-else-if="entry.key === 'SMB_PATH_MAPPINGS'"
+                  v-model="smbPathMappingsDisplay"
+                  placeholder="每行一条，如：&#10;/mnt/Game=\\192.168.1.4\Game&#10;/mnt/Gal=\\192.168.1.4\Gal"
+                  :auto-size="{ minRows: 3, maxRows: 6 }"
+                />
+                <a-input
+                  v-else-if="entry.key === 'SMB_USERNAME'"
+                  v-model="configForm[entry.key]"
+                  placeholder="SMB 访问用户名"
                 />
                 <a-input v-else v-model="configForm[entry.key]" :placeholder="`请输入${entry.label}`" />
               </a-form-item>
@@ -135,6 +166,13 @@ const generalEntries = computed(() => configEntries.value.filter((e) => e.group 
 const smbEntries = computed(() => configEntries.value.filter((e) => e.group === 'smb'))
 const configForm = ref<Record<string, string>>({})
 const configSaving = ref(false)
+
+const smbPathMappingsDisplay = computed({
+  get: () => (configForm.value['SMB_PATH_MAPPINGS'] || '').split(';').filter(Boolean).join('\n'),
+  set: (val: string) => {
+    configForm.value['SMB_PATH_MAPPINGS'] = val.split('\n').filter(Boolean).join(';')
+  },
+})
 
 const bgPreviewUrl = ref<string | null>(null)
 const bgExists = ref(false)

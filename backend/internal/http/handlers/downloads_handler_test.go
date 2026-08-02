@@ -242,11 +242,11 @@ func TestDownloadsHandlerLaunchScriptFormatsChineseContentDisposition(t *testing
 	fileID := insertDownloadsHandlerGameFile(t, db, gameID, romPath, 0)
 	service := services.NewGameFilesService(
 		config.Config{
-			PrimaryROMRoot: root,
-			SMBShareRoot:   `\\NAS\Games`,
-			SMBUsername:    "demo-user",
-			SMBPassword:    "demo-pass",
-			VHDDiffRoot:    "d:",
+			PrimaryROMRoot:  root,
+			SMBPathMappings: root + `=\\NAS\Games`,
+			SMBUsername:     "demo-user",
+			SMBPassword:     "demo-pass",
+			VHDDiffRoot:     "d:",
 		},
 		repositories.NewGamesRepository(db),
 		repositories.NewGameFilesRepository(db),
@@ -255,11 +255,11 @@ func TestDownloadsHandlerLaunchScriptFormatsChineseContentDisposition(t *testing
 		service,
 		services.NewWindowsLaunchService(
 			config.Config{
-				PrimaryROMRoot: root,
-				SMBShareRoot:   `\\NAS\Games`,
-				SMBUsername:    "demo-user",
-				SMBPassword:    "demo-pass",
-				VHDDiffRoot:    "d:",
+				PrimaryROMRoot:  root,
+				SMBPathMappings: root + `=\\NAS\Games`,
+				SMBUsername:     "demo-user",
+				SMBPassword:     "demo-pass",
+				VHDDiffRoot:     "d:",
 			},
 			repositories.NewGamesRepository(db),
 			repositories.NewGameFilesRepository(db),

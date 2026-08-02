@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -99,7 +100,58 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	if dotEnvPath != "" {
+		migrateSMBShareRoot(dotEnvPath, &cfg)
+	}
+
 	return cfg, nil
+}
+
+func migrateSMBShareRoot(dotEnvPath string, cfg *Config) {
+	smbShareRoot := strings.TrimSpace(cfg.SMBShareRoot)
+	smbPathMappings := strings.TrimSpace(cfg.SMBPathMappings)
+
+	if smbShareRoot == "" || smbPathMappings != "" {
+		return
+	}
+
+	romRoot := strings.TrimSpace(cfg.PrimaryROMRoot)
+	if romRoot == "" {
+		romRoot = "ROM"
+	}
+
+	mapping := romRoot + "=" + smbShareRoot
+	log.Printf("[config] DEPRECATED: SMB_SHARE_ROOT auto-migration (will be removed in v1.1.0)")
+	log.Printf("[config] migrating SMB_SHARE_ROOT to SMB_PATH_MAPPINGS: %s", mapping)
+
+	cfg.SMBPathMappings = mapping
+	cfg.SMBShareRoot = ""
+
+	data, err := os.ReadFile(dotEnvPath)
+	if err != nil {
+		log.Printf("[config] warning: failed to read .env for migration: %v", err)
+		return
+	}
+
+	content := string(data)
+	lines := strings.Split(content, "\n")
+	var newLines []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "SMB_SHARE_ROOT") {
+			continue
+		}
+		newLines = append(newLines, line)
+	}
+
+	newLines = append(newLines, "SMB_PATH_MAPPINGS="+mapping)
+
+	if err := os.WriteFile(dotEnvPath, []byte(strings.Join(newLines, "\n")), 0644); err != nil {
+		log.Printf("[config] warning: failed to update .env: %v", err)
+		return
+	}
+
+	log.Printf("[config] SMB_SHARE_ROOT migrated and removed from .env")
 }
 
 func detectRuntimeBaseDir() (string, string, error) {
