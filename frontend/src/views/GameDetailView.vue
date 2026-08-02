@@ -145,6 +145,14 @@
               </div>
               <div class="version-actions">
                 <a-button
+                  v-if="version.canLaunch"
+                  class="app-text-action-btn"
+                  type="text"
+                  @click.stop="handleDownloadLaunchScript(version)"
+                >
+                  开始游玩
+                </a-button>
+                <a-button
                   type="primary"
                   @click="handleDownloadVersion(version)"
                 >
@@ -152,14 +160,6 @@
                     <icon-download />
                   </template>
                   下载
-                </a-button>
-                <a-button
-                  v-if="version.canLaunch"
-                  class="app-text-action-btn"
-                  type="text"
-                  @click.stop="handleDownloadLaunchScript(version)"
-                >
-                  开始游玩
                 </a-button>
               </div>
             </div>
