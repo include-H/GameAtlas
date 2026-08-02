@@ -87,6 +87,15 @@ func JaroWinkler(s1, s2 string) float64 {
 	return jaro + float64(prefix)*0.1*(1.0-jaro)
 }
 
+// FuzzyMatch returns true if query matches target, combining substring matching
+// with JaroWinkler similarity. Substring matches (e.g. "炼金" in "炼金工房") always pass.
+func FuzzyMatch(query, target string) bool {
+	if strings.Contains(target, query) {
+		return true
+	}
+	return JaroWinkler(query, target) >= 0.8
+}
+
 // NormalizeForSearch removes special characters and converts to lowercase for fuzzy matching.
 func NormalizeForSearch(s string) string {
 	var builder strings.Builder

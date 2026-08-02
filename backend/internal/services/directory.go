@@ -124,8 +124,7 @@ func (s *DirectoryService) Search(query string, fromPath string) ([]SearchResult
 		normalizedName := files.NormalizeForSearch(name)
 
 		// Check similarity
-		similarity := files.JaroWinkler(normalizedQuery, normalizedName)
-		if similarity >= fuzzyThreshold {
+		if files.FuzzyMatch(normalizedQuery, normalizedName) {
 			var sizeBytes *int64
 			if !info.IsDir() && info.Mode().IsRegular() {
 				size := info.Size()
