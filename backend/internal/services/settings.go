@@ -49,6 +49,11 @@ var editableEnvKeys = map[string]string{
 	"PROXY":               "出站代理",
 	"STEAMGRIDDB_API_KEY": "SteamGridDB API Key",
 	"WIKI_HISTORY_LIMIT":  "Wiki 历史记录上限",
+	"AUTH_MAX_FAILS":      "登录失败次数限制",
+	"AUTH_COOLDOWN":       "限制冷却时间",
+	"AUTH_FAIL_WINDOW":    "失败计数时间窗口",
+	"AUTH_STATE_TTL":      "登录会话有效期",
+	"AUTH_TRACK_BY":       "失败追踪方式",
 }
 
 var smbEnvKeys = map[string]string{

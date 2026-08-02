@@ -99,6 +99,34 @@
                   v-model="configForm[entry.key]"
                   placeholder="SteamGridDB API Key"
                 />
+                <a-input
+                  v-else-if="entry.key === 'AUTH_MAX_FAILS'"
+                  v-model="configForm[entry.key]"
+                  placeholder="登录失败次数限制，如 5"
+                />
+                <a-input
+                  v-else-if="entry.key === 'AUTH_COOLDOWN'"
+                  v-model="configForm[entry.key]"
+                  placeholder="限制冷却时间，如 10m"
+                />
+                <a-input
+                  v-else-if="entry.key === 'AUTH_FAIL_WINDOW'"
+                  v-model="configForm[entry.key]"
+                  placeholder="失败计数时间窗口，如 30m"
+                />
+                <a-input
+                  v-else-if="entry.key === 'AUTH_STATE_TTL'"
+                  v-model="configForm[entry.key]"
+                  placeholder="登录会话有效期，如 24h"
+                />
+                <a-select
+                  v-else-if="entry.key === 'AUTH_TRACK_BY'"
+                  v-model="configForm[entry.key]"
+                  placeholder="失败追踪方式"
+                >
+                  <a-option value="ip">按 IP</a-option>
+                  <a-option value="ip_ua">按 IP + User-Agent</a-option>
+                </a-select>
                 <a-input v-else v-model="configForm[entry.key]" :placeholder="`请输入${entry.label}`" />
               </a-form-item>
             </a-col>
