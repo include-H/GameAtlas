@@ -41,6 +41,8 @@
     @select-game="emit('select-cover-game', $event)"
     @back-game-search="emit('back-cover-game-search')"
     @toggle-selection="emit('toggle-cover-selection', $event)"
+    @select-all="emit('select-all-covers')"
+    @invert-selection="emit('invert-selection-covers')"
     @download-selected-steam="emit('download-selected-steam-covers')"
     @upload-success="emit('cover-upload-success', $event)"
     @upload-error="emit('cover-upload-error')"
@@ -76,6 +78,8 @@
     @select-game="emit('select-banner-game', $event)"
     @back-game-search="emit('back-banner-game-search')"
     @toggle-selection="emit('toggle-banner-selection', $event)"
+    @select-all="emit('select-all-banners')"
+    @invert-selection="emit('invert-selection-banners')"
     @download-selected-steam="emit('download-selected-steam-banner')"
     @upload-success="emit('banner-upload-success', $event)"
     @upload-error="emit('banner-upload-error')"
@@ -107,6 +111,8 @@
     @select-screenshot-game="emit('select-screenshot-game', $event)"
     @back-screenshot-game-search="emit('back-screenshot-game-search')"
     @toggle-steam-screenshot="emit('toggle-steam-screenshot', $event)"
+    @select-all-steam-screenshots="emit('select-all-steam-screenshots')"
+    @invert-steam-screenshots="emit('invert-steam-screenshots')"
     @download-selected-steam-screenshots="emit('download-selected-steam-screenshots')"
     @screenshot-upload-success="emit('screenshot-upload-success', $event)"
     @screenshot-upload-error="emit('screenshot-upload-error')"
@@ -265,6 +271,8 @@ const emit = defineEmits<{
   'update:selected-cover-image': [value: string]
   'download-selected-steam-cover': []
   'toggle-cover-selection': [index: number]
+  'select-all-covers': []
+  'invert-selection-covers': []
   'download-selected-steam-covers': []
   'cover-upload-success': [fileItem: FileItem]
   'cover-upload-error': []
@@ -281,6 +289,8 @@ const emit = defineEmits<{
   'select-banner-game': [game: SteamGameSearchResult]
   'back-banner-game-search': []
   'toggle-banner-selection': [index: number]
+  'select-all-banners': []
+  'invert-selection-banners': []
   'download-selected-steam-banner': []
   'banner-upload-success': [fileItem: FileItem]
   'banner-upload-error': []
@@ -295,6 +305,8 @@ const emit = defineEmits<{
   'select-screenshot-game': [game: SteamGameSearchResult]
   'back-screenshot-game-search': []
   'toggle-steam-screenshot': [index: number]
+  'select-all-steam-screenshots': []
+  'invert-steam-screenshots': []
   'download-selected-steam-screenshots': []
   'screenshot-upload-success': [fileItem: FileItem]
   'screenshot-upload-error': []

@@ -301,6 +301,8 @@
       @update:selected-cover-image="selectedCoverImage = $event"
       @download-selected-steam-cover="downloadSelectedSteamCover"
       @toggle-cover-selection="toggleCoverSelection"
+      @select-all-covers="selectAllCovers"
+      @invert-selection-covers="invertSelectionCovers"
       @download-selected-steam-covers="downloadSelectedSteamCovers"
       @cover-upload-success="handleCoverUploadSuccess"
       @cover-upload-error="handleCoverUploadError"
@@ -316,6 +318,8 @@
       @select-banner-game="selectSteamBannerGame"
       @back-banner-game-search="backToBannerGameSearch"
       @toggle-banner-selection="toggleBannerSelection"
+      @select-all-banners="selectAllBanners"
+      @invert-selection-banners="invertSelectionBanners"
       @download-selected-steam-banner="downloadSelectedSteamBanner"
       @banner-upload-success="handleBannerUploadSuccess"
       @banner-upload-error="handleBannerUploadError"
@@ -329,6 +333,8 @@
       @select-screenshot-game="selectSteamScreenshotGame"
       @back-screenshot-game-search="backToScreenshotGameSearch"
       @toggle-steam-screenshot="toggleSteamScreenshot"
+      @select-all-steam-screenshots="selectAllSteamScreenshots"
+      @invert-steam-screenshots="invertSelectionSteamScreenshots"
       @download-selected-steam-screenshots="downloadSelectedSteamScreenshots"
       @screenshot-upload-success="handleScreenshotUploadSuccess"
       @screenshot-upload-error="handleScreenshotUploadError"
@@ -475,6 +481,9 @@ const {
   handleWikiMetadataCandidateSelectionChange,
   importMetadataFromWiki,
   initialPath,
+  invertSelectionBanners,
+  invertSelectionCovers,
+  invertSelectionSteamScreenshots,
   isApplyingWikiMetadata,
   isDownloadingBanner,
   isDownloadingCover,
@@ -529,6 +538,9 @@ const {
   searchSteamForLogo,
   searchSteamForScreenshots,
   searchSteamForSummary,
+  selectAllBanners,
+  selectAllCovers,
+  selectAllSteamScreenshots,
   selectSteamBannerGame,
   selectSteamCoverGame,
   selectSteamLogoGame,

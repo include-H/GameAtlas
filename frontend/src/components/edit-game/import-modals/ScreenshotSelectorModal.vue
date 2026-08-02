@@ -20,9 +20,10 @@
       >
         <div v-if="steamScreenshotsData" class="steam-screenshots-section">
           <div class="steam-game-info">
-            <img :src="steamScreenshotsData.cover" :alt="steamScreenshotsData.name" />
             <span>{{ steamScreenshotsData.name }}</span>
             <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('back-screenshot-game-search')">返回</a-button>
+            <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('select-all-steam-screenshots')">全选</a-button>
+            <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('invert-steam-screenshots')">反选</a-button>
           </div>
 
           <div v-if="steamScreenshotsData.usedFallbackAssets" class="steam-screenshot-hint">
@@ -160,6 +161,8 @@ const emit = defineEmits<{
   'back-screenshot-game-search': []
   'toggle-steam-screenshot': [index: number]
   'download-selected-steam-screenshots': []
+  'select-all-steam-screenshots': []
+  'invert-steam-screenshots': []
   'screenshot-upload-success': [fileItem: FileItem]
   'screenshot-upload-error': []
   'update:screenshot-search-url': [value: string]
@@ -187,17 +190,16 @@ const emit = defineEmits<{
   gap: 10px;
 }
 
-.steam-game-info img {
-  width: 80px;
-  height: 40px;
-  object-fit: cover;
-  border-radius: 4px;
+.steam-game-info .app-text-action-btn:first-of-type {
+  margin-left: auto;
 }
 
 .steam-screenshot-hint {
   font-size: 12px;
   color: var(--color-text-3);
 }
+
+
 
 .steam-screenshots-grid {
   display: grid;

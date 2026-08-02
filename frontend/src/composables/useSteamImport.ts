@@ -144,6 +144,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     downloadSelectedSteamCover,
     downloadSelectedSteamCovers,
     toggleCoverSelection,
+    selectAllCovers,
+    invertSelectionCovers,
     handleBannerSearchClear,
     searchSteamForBanner,
     selectSteamBannerGame,
@@ -152,6 +154,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     confirmBannerSelection,
     downloadSelectedSteamBanner,
     toggleBannerSelection,
+    selectAllBanners,
+    invertSelectionBanners,
     resetDownloadState,
   } = useSteamImportDownload({
     form: options.form,
@@ -245,6 +249,24 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     } else {
       selectedSteamScreenshots.value.add(index)
     }
+  }
+
+  const selectAllSteamScreenshots = () => {
+    if (!steamScreenshotsData.value) return
+    selectedSteamScreenshots.value = new Set(
+      steamScreenshotsData.value.screenshots.map((_, index) => index),
+    )
+  }
+
+  const invertSelectionSteamScreenshots = () => {
+    if (!steamScreenshotsData.value) return
+    const next = new Set<number>()
+    for (let index = 0; index < steamScreenshotsData.value.screenshots.length; index++) {
+      if (!selectedSteamScreenshots.value.has(index)) {
+        next.add(index)
+      }
+    }
+    selectedSteamScreenshots.value = next
   }
 
   const loadScreenshotPreview = () => {
@@ -493,6 +515,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     downloadSelectedSteamCover,
     downloadSelectedSteamCovers,
     toggleCoverSelection,
+    selectAllCovers,
+    invertSelectionCovers,
     handleBannerSearchClear,
     searchSteamForBanner,
     selectSteamBannerGame,
@@ -501,11 +525,15 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     confirmBannerSelection,
     downloadSelectedSteamBanner,
     toggleBannerSelection,
+    selectAllBanners,
+    invertSelectionBanners,
     handleScreenshotSearchClear,
     searchSteamForScreenshots,
     selectSteamScreenshotGame,
     backToScreenshotGameSearch,
     toggleSteamScreenshot,
+    selectAllSteamScreenshots,
+    invertSelectionSteamScreenshots,
     loadScreenshotPreview,
     confirmScreenshotSelection,
     downloadSelectedSteamScreenshots,

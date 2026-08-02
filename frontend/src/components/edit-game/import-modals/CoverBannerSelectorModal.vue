@@ -24,7 +24,6 @@
           :disabled="!sgdbAvailable"
           @click="emit('source-change', 'steamgriddb')"
         >SteamGridDB</a-button>
-        <span v-if="!sgdbAvailable" class="source-selector__hint">需配置 STEAMGRIDDB_API_KEY</span>
       </div>
       <steam-search-panel
         :query="searchQuery"
@@ -38,9 +37,11 @@
         @select="emit('select-game', $event)"
       >
         <div v-if="selectedGame && images.length > 0" class="steam-images-section">
-          <div class="steam-search-title">
-            {{ selectedGame.name }} 的{{ titleLabel }}
+          <div class="steam-game-info">
+            <span>{{ selectedGame.name }} 的{{ titleLabel }}</span>
             <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('back-game-search')">返回</a-button>
+            <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('select-all')">全选</a-button>
+            <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('invert-selection')">反选</a-button>
           </div>
           <div class="steam-images-grid">
             <div
@@ -160,6 +161,8 @@ const emit = defineEmits<{
   'back-game-search': []
   'toggle-selection': [index: number]
   'download-selected-steam': []
+  'select-all': []
+  'invert-selection': []
   'upload-success': [fileItem: FileItem]
   'upload-error': []
   'update:search-url': [value: string]
@@ -196,19 +199,15 @@ const imageItemClass = computed(() => props.mode === 'banner' ? 'banner-thumb' :
   flex-shrink: 0;
 }
 
-.source-selector__hint {
-  font-size: 12px;
-  color: var(--color-text-3);
-  margin-left: 4px;
-}
 
-.steam-search-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--color-text-1);
+.steam-game-info {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
+}
+
+.steam-game-info .app-text-action-btn:first-of-type {
+  margin-left: auto;
 }
 
 .steam-images-section {
@@ -216,6 +215,8 @@ const imageItemClass = computed(() => props.mode === 'banner' ? 'banner-thumb' :
   flex-direction: column;
   gap: 10px;
 }
+
+
 
 .steam-images-grid {
   display: grid;

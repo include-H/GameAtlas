@@ -382,6 +382,34 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
     }
   }
 
+  const selectAllCovers = () => {
+    selectedCovers.value = new Set(steamCoverImages.value.map((_, index) => index))
+  }
+
+  const invertSelectionCovers = () => {
+    const next = new Set<number>()
+    for (let index = 0; index < steamCoverImages.value.length; index++) {
+      if (!selectedCovers.value.has(index)) {
+        next.add(index)
+      }
+    }
+    selectedCovers.value = next
+  }
+
+  const selectAllBanners = () => {
+    selectedBanners.value = new Set(steamBannerImages.value.map((_, index) => index))
+  }
+
+  const invertSelectionBanners = () => {
+    const next = new Set<number>()
+    for (let index = 0; index < steamBannerImages.value.length; index++) {
+      if (!selectedBanners.value.has(index)) {
+        next.add(index)
+      }
+    }
+    selectedBanners.value = next
+  }
+
   // Watch selectors opening — auto-populate search query
   watch(showCoverSelector, (isOpen) => {
     if (!isOpen) return
@@ -498,6 +526,8 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
     downloadSelectedSteamCover,
     downloadSelectedSteamCovers,
     toggleCoverSelection,
+    selectAllCovers,
+    invertSelectionCovers,
     handleBannerSearchClear,
     searchSteamForBanner,
     selectSteamBannerGame,
@@ -506,6 +536,8 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
     confirmBannerSelection,
     downloadSelectedSteamBanner,
     toggleBannerSelection,
+    selectAllBanners,
+    invertSelectionBanners,
     resetDownloadState,
   }
 }
