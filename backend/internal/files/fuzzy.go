@@ -7,13 +7,16 @@ import (
 
 // JaroWinkler calculates the Jaro-Winkler similarity between two strings.
 // Returns a value between 0 and 1, where 1 means exact match.
+// Operates on runes (Unicode code points) for correct multi-byte character support.
 func JaroWinkler(s1, s2 string) float64 {
 	if s1 == s2 {
 		return 1.0
 	}
 
-	len1 := len(s1)
-	len2 := len(s2)
+	r1 := []rune(s1)
+	r2 := []rune(s2)
+	len1 := len(r1)
+	len2 := len(r2)
 
 	if len1 == 0 || len2 == 0 {
 		return 0.0
@@ -37,7 +40,7 @@ func JaroWinkler(s1, s2 string) float64 {
 		end := min(i+matchDistance+1, len2)
 
 		for j := start; j < end; j++ {
-			if s2Matches[j] || s1[i] != s2[j] {
+			if s2Matches[j] || r1[i] != r2[j] {
 				continue
 			}
 			s1Matches[i] = true
@@ -60,7 +63,7 @@ func JaroWinkler(s1, s2 string) float64 {
 		for !s2Matches[k] {
 			k++
 		}
-		if s1[i] != s2[k] {
+		if r1[i] != r2[k] {
 			transpositions++
 		}
 		k++
@@ -70,10 +73,10 @@ func JaroWinkler(s1, s2 string) float64 {
 		float64(matches)/float64(len2) +
 		(float64(matches)-float64(transpositions)/2.0)/float64(matches)) / 3.0
 
-	// Calculate common prefix (up to 4 chars)
+	// Calculate common prefix (up to 4 runes)
 	prefix := 0
 	for i := 0; i < min(4, min(len1, len2)); i++ {
-		if s1[i] == s2[i] {
+		if r1[i] == r2[i] {
 			prefix++
 		} else {
 			break

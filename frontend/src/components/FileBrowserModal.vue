@@ -302,7 +302,7 @@ const handleSearch = async () => {
   lastSearchQuery.value = query
 
   try {
-    searchResults.value = await directoryService.searchDirectory(query, currentPath.value)
+    searchResults.value = (await directoryService.searchDirectory(query, currentPath.value)) ?? []
   } catch {
     searchResults.value = []
     uiStore.addAlert('搜索失败，请稍后重试', 'error')

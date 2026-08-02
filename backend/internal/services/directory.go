@@ -104,7 +104,7 @@ func (s *DirectoryService) Search(query string, fromPath string) ([]SearchResult
 		return []SearchResult{}, nil
 	}
 
-	var results []SearchResult
+	results := make([]SearchResult, 0)
 	err = filepath.Walk(dir.ResolvedPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // Skip inaccessible entries
