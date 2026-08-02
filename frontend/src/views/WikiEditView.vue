@@ -138,7 +138,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, watch } from 'vue'
+import { computed, defineAsyncComponent, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWikiEditDocument } from '@/composables/useWikiEditDocument'
 import { useWikiEditHistory } from '@/composables/useWikiEditHistory'
@@ -146,6 +146,7 @@ import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
 import { navigateBackOrFallback } from '@/utils/navigation'
 import { formatDisplayDateTime } from '@/utils/date'
+import { getAmbientBackgroundUrlsFromGameDetail } from '@/utils/ambient-background'
 import {
   IconSave
 } from '@arco-design/web-vue/es/icon'
@@ -157,6 +158,26 @@ const gamesStore = useGamesStore()
 const uiStore = useUiStore()
 
 const MarkdownRenderer = defineAsyncComponent(() => import('@/components/MarkdownRenderer.vue'))
+
+const AMBIENT_BACKGROUND_OWNER = 'wiki-edit'
+
+const syncAmbientBackground = () => {
+  const imageUrls = getAmbientBackgroundUrlsFromGameDetail(game.value)
+  if (!game.value?.public_id || imageUrls.length === 0) {
+    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+    return
+  }
+
+  uiStore.setAmbientBackgroundSource({
+    owner: AMBIENT_BACKGROUND_OWNER,
+    key: game.value.public_id,
+    urls: imageUrls,
+  })
+}
+
+onUnmounted(() => {
+  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+})
 
 const requestedGameId = computed(() => {
   const rawValue = route.params.publicId
@@ -230,6 +251,7 @@ watch(
     if (!loaded) {
       return
     }
+    syncAmbientBackground()
     resetHistoryState()
     await loadHistory(gameId)
   },

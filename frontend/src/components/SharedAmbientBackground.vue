@@ -47,7 +47,7 @@ const SUPPORTED_ROUTE_NAMES = new Set([
 
 const GLOBAL_POOL_PAGE_LIMIT = 50
 
-const APPLY_DELAY_MS = 30
+const APPLY_DELAY_MS = 50
 
 const layerUrls = ref<string[]>(['', ''])
 const activeLayerIndex = ref(0)
@@ -59,9 +59,6 @@ const globalPoolLoading = ref(false)
 const CUSTOM_BACKGROUND_PATH = '/data/bg.jpg'
 
 const isEnabled = computed(() => SUPPORTED_ROUTE_NAMES.has(String(route.name || '')))
-const isGameDetail = computed(() => String(route.name || '') === 'game-detail')
-const isSeriesDetail = computed(() => String(route.name || '') === 'series-detail')
-const isSpecificPage = computed(() => isGameDetail.value || isSeriesDetail.value)
 const pageSpecificUrls = computed(() => ambientBackgroundSource.value?.urls || [])
 const canUseCustomBackground = computed(() => sharedBackgroundAvailability.value === 'available')
 
@@ -144,11 +141,13 @@ const pickRandomBackground = async (urls: string[], currentUrl: string) => {
 }
 
 const loadBackground = async () => {
-  if (isSpecificPage.value) {
+  // 如果有页面特定的背景源（game-detail、series-detail、wiki-edit），优先使用
+  if (ambientBackgroundSource.value) {
     if (pageSpecificUrls.value.length > 0) {
       return pickRandomBackground(pageSpecificUrls.value, layerUrls.value[activeLayerIndex.value] || '')
     }
-    return ''
+    // 有背景源但暂时没有 URL（比如正在加载中），保持当前背景
+    return layerUrls.value[activeLayerIndex.value] || ''
   }
 
   await ensureGlobalPool()
