@@ -1,0 +1,368 @@
+<template>
+  <div class="settings-view">
+    <div class="settings-view__hero page-hero">
+      <div class="page-hero__content">
+        <h1 class="page-hero__title text-gradient">设置</h1>
+        <p class="page-hero__subtitle">管理自定义背景图片与环境配置。</p>
+      </div>
+    </div>
+
+    <div class="settings-view__sections">
+      <div class="settings-top-row">
+        <a-card class="settings-card app-glass-surface" :bordered="false">
+          <template #title>自定义背景图片</template>
+          <p class="settings-card__desc">上传一张背景图片用作网站全局背景</p>
+
+          <div class="bg-preview-row">
+            <div class="bg-preview">
+              <img v-if="bgPreviewUrl" :src="bgPreviewUrl" class="bg-preview-img" />
+              <div v-else class="bg-preview-empty">
+                <icon-image :size="36" />
+                <span>未设置</span>
+              </div>
+            </div>
+            <div class="bg-actions">
+              <a-upload :auto-upload="false" accept="image/*" :show-file-list="false" @change="handleBgUpload">
+                <a-button type="primary" :loading="bgUploading">
+                  <template #icon><icon-upload /></template>
+                  上传背景图片
+                </a-button>
+              </a-upload>
+              <a-button
+                v-if="bgExists"
+                class="app-text-action-btn"
+                type="text"
+                status="danger"
+                :loading="bgRemoving"
+                @click="handleBgRemove"
+              >
+                <template #icon><icon-delete /></template>
+                删除背景
+              </a-button>
+            </div>
+          </div>
+        </a-card>
+        <a-card class="settings-card settings-card--center app-glass-surface" :bordered="false">
+          <template #title>数据维护</template>
+          <p class="settings-card__desc">扫描游戏目录并更新数据库中的文件大小信息</p>
+          <div class="settings-card__spacer"></div>
+          <div class="settings-card__action">
+            <a-button type="primary" :loading="isRefreshing" @click="handleRefreshSizes">
+              <template #icon><icon-refresh /></template>
+              刷新文件大小
+            </a-button>
+          </div>
+        </a-card>
+        <a-card class="settings-card settings-card--center app-glass-surface" :bordered="false">
+          <template #title>服务管理</template>
+          <p class="settings-card__desc">重启后端服务进程</p>
+          <div class="settings-card__spacer"></div>
+          <div class="settings-card__action">
+            <a-button type="primary" :loading="isRestarting" @click="handleRestart">
+              <template #icon><icon-refresh /></template>
+              重启服务端
+            </a-button>
+          </div>
+        </a-card>
+      </div>
+
+      <a-card class="settings-card app-glass-surface" :bordered="false">
+        <template #title>常规设置</template>
+        <p class="settings-card__desc">修改后需重启服务才能生效</p>
+
+        <a-form :model="configForm" layout="vertical">
+          <a-row :gutter="16">
+            <a-col v-for="entry in generalEntries" :key="entry.key" :xs="24" :md="12">
+              <a-form-item :label="entry.label">
+                <a-input-password
+                  v-if="entry.key === 'ADMIN_PASSWORD'"
+                  v-model="configForm[entry.key]"
+                  :placeholder="`请输入${entry.label}`"
+                />
+                <a-input v-else v-model="configForm[entry.key]" :placeholder="`请输入${entry.label}`" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-button type="primary" :loading="configSaving" @click="handleSaveConfig">
+            保存配置
+          </a-button>
+        </a-form>
+      </a-card>
+
+      <a-card class="settings-card app-glass-surface" :bordered="false">
+        <template #title>SMB 相关设置</template>
+        <p class="settings-card__desc">配置 SMB 网络共享路径及凭据</p>
+
+        <a-form :model="configForm" layout="vertical">
+          <a-row :gutter="16">
+            <a-col v-for="entry in smbEntries" :key="entry.key" :xs="24" :md="12">
+              <a-form-item :label="entry.label">
+                <a-input-password
+                  v-if="entry.key === 'SMB_PASSWORD'"
+                  v-model="configForm[entry.key]"
+                  :placeholder="`请输入${entry.label}`"
+                />
+                <a-input v-else v-model="configForm[entry.key]" :placeholder="`请输入${entry.label}`" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-button type="primary" :loading="configSaving" @click="handleSaveConfig">
+            保存配置
+          </a-button>
+        </a-form>
+      </a-card>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { settingsService, type EnvEntry } from '@/services/settings.service'
+import gamesService from '@/services/games.service'
+import { useUiStore } from '@/stores/ui'
+import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
+import {
+  IconImage,
+  IconUpload,
+  IconDelete,
+  IconRefresh,
+} from '@arco-design/web-vue/es/icon'
+
+const uiStore = useUiStore()
+
+const configEntries = ref<EnvEntry[]>([])
+const generalEntries = computed(() => configEntries.value.filter((e) => e.group === 'general'))
+const smbEntries = computed(() => configEntries.value.filter((e) => e.group === 'smb'))
+const configForm = ref<Record<string, string>>({})
+const configSaving = ref(false)
+
+const bgPreviewUrl = ref<string | null>(null)
+const bgExists = ref(false)
+const bgUploading = ref(false)
+const bgRemoving = ref(false)
+
+const CUSTOM_BG_PATH = '/data/bg.jpg'
+
+const resetBgPreview = () => {
+  bgPreviewUrl.value = `${CUSTOM_BG_PATH}?t=${Date.now()}`
+}
+
+const loadConfig = async () => {
+  try {
+    const entries = await settingsService.getConfig()
+    configEntries.value = entries
+    const form: Record<string, string> = {}
+    for (const e of entries) {
+      form[e.key] = e.value
+    }
+    configForm.value = form
+  } catch {
+    uiStore.addAlert('加载配置失败', 'error')
+  }
+}
+
+const checkBgExists = async () => {
+  try {
+    const resp = await fetch(CUSTOM_BG_PATH, { method: 'HEAD' })
+    bgExists.value = resp.ok
+    if (resp.ok) {
+      resetBgPreview()
+    }
+  } catch {
+    bgExists.value = false
+  }
+}
+
+const handleBgUpload = async (_list: FileItem[], fileItem: FileItem) => {
+  const file = fileItem?.file
+  if (!file) return
+
+  bgUploading.value = true
+  try {
+    await settingsService.uploadBackground(file)
+    uiStore.addAlert('背景图片已上传', 'success')
+    bgExists.value = true
+    resetBgPreview()
+    await uiStore.refreshSharedBackgroundAvailability()
+  } catch {
+    uiStore.addAlert('上传背景图片失败', 'error')
+  } finally {
+    bgUploading.value = false
+  }
+}
+
+const handleBgRemove = async () => {
+  bgRemoving.value = true
+  try {
+    await settingsService.removeBackground()
+    uiStore.addAlert('背景图片已删除', 'success')
+    bgExists.value = false
+    bgPreviewUrl.value = null
+    await uiStore.refreshSharedBackgroundAvailability()
+  } catch {
+    uiStore.addAlert('删除背景图片失败', 'error')
+  } finally {
+    bgRemoving.value = false
+  }
+}
+
+const handleSaveConfig = async () => {
+  configSaving.value = true
+  try {
+    const result = await settingsService.updateConfig(configForm.value)
+    uiStore.addAlert(result.message, 'success')
+  } catch {
+    uiStore.addAlert('保存配置失败', 'error')
+  } finally {
+    configSaving.value = false
+  }
+}
+
+const isRefreshing = ref(false)
+
+const handleRefreshSizes = async () => {
+  if (isRefreshing.value) return
+  isRefreshing.value = true
+  try {
+    const result = await gamesService.refreshFileSizes()
+    uiStore.addAlert(
+      `刷新完成：更新 ${result.updated} 个文件，失败 ${result.errors} 个`,
+      'success'
+    )
+  } catch {
+    uiStore.addAlert('刷新文件大小失败', 'error')
+  } finally {
+    isRefreshing.value = false
+  }
+}
+
+const isRestarting = ref(false)
+
+const handleRestart = async () => {
+  if (isRestarting.value) return
+  isRestarting.value = true
+  try {
+    const result = await settingsService.restart()
+    uiStore.addAlert(result.message, 'success')
+  } catch {
+    uiStore.addAlert('重启服务失败', 'error')
+  } finally {
+    isRestarting.value = false
+  }
+}
+
+onMounted(() => {
+  loadConfig()
+  checkBgExists()
+})
+</script>
+
+<style scoped>
+.settings-view {
+  padding-bottom: 40px;
+}
+
+.settings-view__hero {
+  margin-bottom: 20px;
+}
+
+.settings-card {
+  margin-bottom: 20px;
+  height: 100%;
+}
+
+.settings-card :deep(.arco-card-body) {
+  padding: 16px 12px;
+}
+
+.settings-top-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.settings-top-row .settings-card {
+  margin-bottom: 0;
+}
+
+@media (max-width: 767px) {
+  .settings-top-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.settings-card__desc {
+  font-size: 13px;
+  color: var(--color-text-3);
+  margin: 0 0 16px;
+}
+
+.bg-preview-row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.bg-preview {
+  width: 200px;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-2);
+  background: var(--color-fill-2);
+  flex-shrink: 0;
+}
+
+.bg-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bg-preview-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--color-text-4);
+  font-size: 13px;
+}
+
+.bg-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 25px;
+}
+
+.settings-card--center :deep(.arco-card-body) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.settings-card--center .settings-card__spacer {
+  flex: 1 0 40%;
+}
+
+.settings-card--center .settings-card__action {
+  display: flex;
+  justify-content: center;
+  margin-top: 50px;
+}
+
+@media (max-width: 768px) {
+  .bg-preview-row {
+    flex-direction: column;
+  }
+
+  .bg-preview {
+    width: 100%;
+    height: 160px;
+  }
+}
+</style>

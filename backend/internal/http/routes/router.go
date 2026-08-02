@@ -2,6 +2,7 @@ package routes
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
@@ -77,6 +78,8 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	steamGridDBHandler := handlers.NewSteamGridDBHandler(services.NewSteamGridDBService(cfg.SteamGridDBAPIKey))
 	wikiHandler := handlers.NewWikiHandler(wikiService)
 	hitokotoHandler := handlers.NewHitokotoHandler(hitokotoService)
+	settingsService := services.NewSettingsService(cfg)
+	settingsHandler := handlers.NewSettingsHandler(settingsService)
 	gameFileRefreshService := services.NewGameFileRefreshService(gameFilesRepo, files.NewGuard(cfg.PrimaryROMRoot))
 	gameFileRefreshHandler := handlers.NewGameFileRefreshHandler(gameFileRefreshService)
 
@@ -127,6 +130,11 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.GET("/directory/default", directoryHandler.Default)
 	api.GET("/directory/list", directoryHandler.List)
 	api.GET("/directory/search", directoryHandler.Search)
+	api.GET("/settings/config", settingsHandler.GetConfig)
+	api.PUT("/settings/config", settingsHandler.UpdateConfig)
+	api.POST("/settings/bg", settingsHandler.UploadBackground)
+	api.DELETE("/settings/bg", settingsHandler.RemoveBackground)
+	api.POST("/settings/restart", settingsHandler.Restart)
 	api.GET("/steam/search", steamHandler.Search)
 	api.GET("/steam/:appId/assets", steamHandler.Preview)
 	api.GET("/steam/proxy", steamHandler.Proxy)
@@ -251,7 +259,7 @@ func registerCustomDataRoutes(router *gin.Engine, dataDir string) {
 		".woff2": {},
 	}
 
-	router.GET("/data/*filepath", func(c *gin.Context) {
+	dataHandler := func(c *gin.Context) {
 		rawPath := strings.TrimPrefix(c.Param("filepath"), "/")
 		if rawPath == "" {
 			c.Status(http.StatusNotFound)
@@ -282,8 +290,14 @@ func registerCustomDataRoutes(router *gin.Engine, dataDir string) {
 			return
 		}
 
+		c.Header("Cache-Control", "no-cache, must-revalidate")
+		if strings.HasSuffix(cleanPath, "bg.jpg") {
+			fmt.Printf("[data] serving bg.jpg from: %s (exists: %v)\n", assetPath, true)
+		}
 		c.File(assetPath)
-	})
+	}
+	router.GET("/data/*filepath", dataHandler)
+	router.HEAD("/data/*filepath", dataHandler)
 }
 
 func registerStaticRoutes(router *gin.Engine, staticDir string) {

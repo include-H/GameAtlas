@@ -24,6 +24,8 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
+import gamesService from '@/services/games.service'
+import { getAmbientBackgroundUrlsFromGameListItem } from '@/utils/ambient-background'
 
 const route = useRoute()
 const uiStore = useUiStore()
@@ -40,7 +42,10 @@ const SUPPORTED_ROUTE_NAMES = new Set([
   'series-detail',
   'wiki-edit',
   'not-found',
+  'settings',
 ])
+
+const GLOBAL_POOL_PAGE_LIMIT = 50
 
 const APPLY_DELAY_MS = 30
 
@@ -48,11 +53,17 @@ const layerUrls = ref<string[]>(['', ''])
 const activeLayerIndex = ref(0)
 const hasAppliedBackground = ref(false)
 const applyRequestId = ref(0)
+const globalPoolUrls = ref<string[]>([])
+const globalPoolLoading = ref(false)
 
 const CUSTOM_BACKGROUND_PATH = '/data/bg.jpg'
 
 const isEnabled = computed(() => SUPPORTED_ROUTE_NAMES.has(String(route.name || '')))
-const currentBackgroundUrls = computed(() => ambientBackgroundSource.value?.urls || [])
+const isGameDetail = computed(() => String(route.name || '') === 'game-detail')
+const isSeriesDetail = computed(() => String(route.name || '') === 'series-detail')
+const isSpecificPage = computed(() => isGameDetail.value || isSeriesDetail.value)
+const pageSpecificUrls = computed(() => ambientBackgroundSource.value?.urls || [])
+const canUseCustomBackground = computed(() => sharedBackgroundAvailability.value === 'available')
 
 const buildLayerStyle = (url: string) => {
   if (url) {
@@ -64,7 +75,6 @@ const buildLayerStyle = (url: string) => {
     }
   }
 
-  // 没有实际图片时不显示暗色兜底渐变，让页面自身背景可见
   return {
     background: 'transparent',
   }
@@ -99,7 +109,23 @@ const wait = (ms: number) => new Promise((resolve) => {
   window.setTimeout(resolve, ms)
 })
 
-const canUseCustomBackground = computed(() => sharedBackgroundAvailability.value === 'available')
+const ensureGlobalPool = async () => {
+  if (globalPoolUrls.value.length > 0 || globalPoolLoading.value) return
+
+  globalPoolLoading.value = true
+  try {
+    const result = await gamesService.getGames({
+      query: { page: 1, limit: GLOBAL_POOL_PAGE_LIMIT },
+      sort: { field: 'created_at', order: 'desc' },
+    })
+    const urls = result.data.flatMap((game) => getAmbientBackgroundUrlsFromGameListItem(game))
+    globalPoolUrls.value = urls.filter((url, index) => url && urls.indexOf(url) === index)
+  } catch {
+    // ignore
+  } finally {
+    globalPoolLoading.value = false
+  }
+}
 
 const pickRandomBackground = async (urls: string[], currentUrl: string) => {
   const uniqueUrls = urls.filter((url, index) => url && urls.indexOf(url) === index)
@@ -118,14 +144,21 @@ const pickRandomBackground = async (urls: string[], currentUrl: string) => {
 }
 
 const loadBackground = async () => {
-  if (currentBackgroundUrls.value.length > 0) {
-    return pickRandomBackground(currentBackgroundUrls.value, layerUrls.value[activeLayerIndex.value] || '')
+  if (isSpecificPage.value) {
+    if (pageSpecificUrls.value.length > 0) {
+      return pickRandomBackground(pageSpecificUrls.value, layerUrls.value[activeLayerIndex.value] || '')
+    }
+    return ''
   }
 
+  await ensureGlobalPool()
+
   if (canUseCustomBackground.value) {
-    // Already confirmed available via HEAD at startup — skip preloadImage round-trip.
-    const currentUrl = layerUrls.value[activeLayerIndex.value] || ''
-    return currentUrl === CUSTOM_BACKGROUND_PATH ? currentUrl : CUSTOM_BACKGROUND_PATH
+    return CUSTOM_BACKGROUND_PATH
+  }
+
+  if (globalPoolUrls.value.length > 0) {
+    return pickRandomBackground(globalPoolUrls.value, layerUrls.value[activeLayerIndex.value] || '')
   }
 
   return ''
@@ -158,9 +191,10 @@ const applyBackground = async () => {
   }
 
   if (nextUrl === currentUrl) {
-    if (!currentUrl) {
-      layerUrls.value[activeLayerIndex.value] = ''
-    }
+    return
+  }
+
+  if (!nextUrl && currentUrl) {
     return
   }
 
@@ -185,7 +219,7 @@ const applyBackground = async () => {
 watch(
   [
     isEnabled,
-    () => ambientBackgroundSource.value?.owner || '',
+    () => route.name,
     () => ambientBackgroundSource.value?.key || '',
     () => (ambientBackgroundSource.value?.urls || []).join('|'),
     () => sharedBackgroundAvailability.value,

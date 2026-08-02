@@ -9,10 +9,9 @@ import type {
 import { Modal } from '@arco-design/web-vue'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import gamesService from '@/services/games.service'
-import type { GameListItem, GameListQuery, GameSort, GameSortQuery } from '@/services/types'
+import type { GameListQuery, GameSort, GameSortQuery } from '@/services/types'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
-import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
 
 type GamesViewMode = 'grid' | 'list'
 type GamesSortField = Exclude<GameSort['field'], 'pending_issue_count'>
@@ -46,7 +45,6 @@ interface BuildGamesListRequestOptions {
 // on the backend native default instead of forcing route-owned sort/order values.
 const DEFAULT_SORT = { field: 'updated_at', order: 'desc' } as const satisfies Pick<GameSort, 'field' | 'order'>
 const DEFAULT_ITEMS_PER_PAGE = 24
-const AMBIENT_BACKGROUND_OWNER = 'games'
 const ITEMS_PER_PAGE_VALUES = new Set([12, 24, 48, 96])
 
 const SORT_VALUES = new Set<GamesSortOptionValue>([
@@ -477,26 +475,11 @@ export const useGamesView = ({
         })
         return
       }
-      syncAmbientBackground(response.data, response.pagination.page)
     } catch {
       uiStore.addAlert('加载游戏失败', 'error')
     } finally {
       isLoading.value = false
     }
-  }
-
-  const syncAmbientBackground = (games: GameListItem[], page = pagination.value.page || 1) => {
-    const imageUrls = getAmbientBackgroundUrlsFromGames(games)
-    if (imageUrls.length > 0) {
-      uiStore.setAmbientBackgroundSource({
-        owner: AMBIENT_BACKGROUND_OWNER,
-        key: `${pageTitle.value}:${page}:${games.length}:${Date.now()}`,
-        urls: imageUrls,
-      })
-      return
-    }
-
-    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
   }
 
   // 2026-04-04: keep route.query as the only active-filter source of truth.
@@ -542,29 +525,6 @@ export const useGamesView = ({
       uiStore.addAlert(`添加游戏失败：${getHttpErrorMessage(error)}`, 'error')
     } finally {
       addGameSubmitting.value = false
-    }
-  }
-
-  const isRefreshing = ref(false)
-
-  const handleRefreshSizes = async () => {
-    if (isRefreshing.value) return
-    isRefreshing.value = true
-    try {
-      const result = await gamesService.refreshFileSizes()
-      uiStore.addAlert(
-        `刷新完成：更新 ${result.updated} 个文件，失败 ${result.errors} 个`,
-        'success'
-      )
-      try {
-        await loadGames()
-      } catch {
-        uiStore.addAlert('刷新已完成，但列表更新失败，请稍后重试', 'warning')
-      }
-    } catch (error) {
-      uiStore.addAlert(`刷新文件大小失败：${getHttpErrorMessage(error)}`, 'error')
-    } finally {
-      isRefreshing.value = false
     }
   }
 
@@ -710,7 +670,5 @@ export const useGamesView = ({
     updateRoute,
     viewGame,
     viewMode,
-    handleRefreshSizes,
-    isRefreshing,
   }
 }

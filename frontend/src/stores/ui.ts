@@ -61,15 +61,7 @@ export const useUiStore = defineStore('ui', () => {
     ambientBackgroundSource.value = null
   }
 
-  const BG_CACHE_KEY = 'ga:bg-availability'
-
-  const initializeSharedBackgroundAvailability = async () => {
-    const cached = sessionStorage.getItem(BG_CACHE_KEY)
-    if (cached === 'available' || cached === 'missing') {
-      sharedBackgroundAvailability.value = cached
-      return
-    }
-
+  const checkBackgroundAvailability = async () => {
     try {
       const response = await fetch(CUSTOM_BACKGROUND_PATH, {
         method: 'HEAD',
@@ -79,8 +71,14 @@ export const useUiStore = defineStore('ui', () => {
     } catch {
       sharedBackgroundAvailability.value = 'missing'
     }
+  }
 
-    sessionStorage.setItem(BG_CACHE_KEY, sharedBackgroundAvailability.value)
+  const initializeSharedBackgroundAvailability = async () => {
+    await checkBackgroundAvailability()
+  }
+
+  const refreshSharedBackgroundAvailability = async () => {
+    await checkBackgroundAvailability()
   }
 
   // Alert methods
@@ -130,6 +128,7 @@ export const useUiStore = defineStore('ui', () => {
     setAmbientBackgroundSource,
     clearAmbientBackgroundSource,
     initializeSharedBackgroundAvailability,
+    refreshSharedBackgroundAvailability,
     addAlert,
     removeAlert,
     initializeSidebarCollapsed,

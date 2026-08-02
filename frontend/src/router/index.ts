@@ -7,6 +7,7 @@ import base from './modules/base'
 import dashboard from './modules/dashboard'
 import games, { gameDetailRoute, pendingCenterRoute, timelineRoute, wikiEditRoute } from './modules/games'
 import series, { seriesDetailRoute } from './modules/series'
+import settings from './modules/settings'
 import notFound from './modules/not-found'
 
 /**
@@ -22,6 +23,7 @@ export const appRoutes: RouteRecordRaw[] = [
   gameDetailRoute,
   seriesDetailRoute,
   wikiEditRoute,
+  settings,
 ]
 
 /**
@@ -45,8 +47,8 @@ const router = createRouter({
 // 参考：https://www.cnblogs.com/misillas/p/19614838
 if (typeof window !== 'undefined' && /Edg\//.test(navigator.userAgent)) {
   const originalReplaceState = window.history.replaceState.bind(window.history)
-  window.history.replaceState = (_state: unknown, _title: string, url?: string | URL | null) => {
-    originalReplaceState(null, '', url)
+  window.history.replaceState = (state: unknown, _title: string, url?: string | URL | null) => {
+    originalReplaceState(state, '', url)
   }
 }
 

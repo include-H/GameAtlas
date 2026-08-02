@@ -9,9 +9,7 @@ node_modules/
 
 backend/.env
 backend/server
-backend/data/*
-!backend/data/bg.jpg
-!backend/data/LXGWWenKaiGBScreen.ttf
+backend/data/
 backend/ROM/
 backend/roms/
 backend/tmp/
