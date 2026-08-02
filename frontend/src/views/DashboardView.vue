@@ -152,13 +152,10 @@ import CardRow from '@/components/CardRow.vue'
 import GameCard from '@/components/GameCard.vue'
 import GameCarousel from '@/components/GameCarousel.vue'
 import type { GameListItem } from '@/services/types'
-import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
 
 defineOptions({
   name: 'DashboardView',
 })
-
-const AMBIENT_BACKGROUND_OWNER = 'dashboard'
 
 const router = useRouter()
 const gamesStore = useGamesStore()
@@ -195,20 +192,6 @@ const carouselGames = computed(() => {
     .sort(() => Math.random() - 0.5)
 })
 
-const syncAmbientBackground = () => {
-  const imageUrls = getAmbientBackgroundUrlsFromGames([...recentAdditions.value, ...mostPlayed.value])
-  if (imageUrls.length > 0) {
-    uiStore.setAmbientBackgroundSource({
-      owner: AMBIENT_BACKGROUND_OWNER,
-      key: String(gamesStore.stats?.total_games ?? 0),
-      urls: imageUrls,
-    })
-    return
-  }
-
-  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
-}
-
 const lastLoadedAt = ref(0)
 
 const viewGame = (publicId: string) => {
@@ -236,10 +219,6 @@ const loadDashboardData = async () => {
   refreshFailedWithStaleData.value = false
   try {
     await gamesStore.fetchStats()
-    // 2026-04-07: dashboard load failure must stay distinct from a truly empty library.
-    // Impact: only a successful stats response with total_games=0 renders the empty state;
-    // a failed read now surfaces as an error state instead of pretending the library is empty.
-    syncAmbientBackground()
     isDashboardReady.value = true
     lastLoadedAt.value = Date.now()
   } catch {
@@ -264,8 +243,6 @@ onActivated(async () => {
     await loadDashboardData()
     return
   }
-
-  syncAmbientBackground()
 })
 </script>
 

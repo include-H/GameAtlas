@@ -85,19 +85,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import GameCard from '@/components/GameCard.vue'
 import gamesService from '@/services/games.service'
 import type { TimelineGame } from '@/services/types'
 import { useUiStore } from '@/stores/ui'
-import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
 
 defineOptions({
   name: 'GamesTimelineView',
 })
-
-const AMBIENT_BACKGROUND_OWNER = 'games-timeline'
 
 interface TimelineMonthGroup {
   key: string
@@ -129,20 +126,6 @@ const hasMore = ref(false)
 const nextCursor = ref<string | null>(null)
 const scrollRootRef = ref<HTMLElement | null>(null)
 const hasLoadedTimeline = ref(false)
-
-const syncAmbientBackground = (games: TimelineGame[]) => {
-  const imageUrls = getAmbientBackgroundUrlsFromGames(games)
-  if (imageUrls.length > 0) {
-    uiStore.setAmbientBackgroundSource({
-      owner: AMBIENT_BACKGROUND_OWNER,
-      key: `timeline:${games.length}:${Date.now()}`,
-      urls: imageUrls,
-    })
-    return
-  }
-
-  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
-}
 
 const parseDateParts = (value?: string | null) => {
   const raw = (value || '').trim()
@@ -265,7 +248,6 @@ const loadTimeline = async () => {
     appendTimelineChunk(response.data)
     hasMore.value = response.hasMore
     nextCursor.value = response.nextCursor
-    syncAmbientBackground(response.data)
     hasLoadedTimeline.value = true
     hasLoadFailure.value = false
   } catch {
@@ -273,7 +255,6 @@ const loadTimeline = async () => {
     allGames.value = []
     hasMore.value = false
     nextCursor.value = null
-    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
     uiStore.addAlert('加载时间线失败', 'error')
   } finally {
     isLoading.value = false
@@ -293,10 +274,6 @@ onMounted(() => {
   // each "load more" request spans another two-year backend window, and automatic scroll loading
   // can quickly chain multiple requests together when the page height is still shorter than the viewport.
   loadTimeline()
-})
-
-onActivated(() => {
-  syncAmbientBackground(allGames.value)
 })
 
 onBeforeUnmount(() => {

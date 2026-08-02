@@ -101,9 +101,6 @@ import {
   IconTrophy,
 } from '@arco-design/web-vue/es/icon'
 import { useAuthStore } from '@/stores/auth'
-import { useGamesStore } from '@/stores/games'
-import { useUiStore } from '@/stores/ui'
-import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
 import hitokotoService from '@/services/hitokoto.service'
 import { getHttpErrorData, getHttpErrorMessage, getHttpStatus } from '@/utils/http-error'
 import AnimatedCharacters from '@/components/login/AnimatedCharacters.vue'
@@ -116,10 +113,7 @@ interface LoginErrorData {
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
-const gamesStore = useGamesStore()
-const uiStore = useUiStore()
 const fallbackLoginQuote = '推开这扇门，回到你的游戏库。'
-const AMBIENT_BACKGROUND_OWNER = 'login'
 
 const password = ref('')
 const showPassword = ref(false)
@@ -295,40 +289,13 @@ const handleLogin = async () => {
   }
 }
 
-const syncAmbientBackground = () => {
-  const games = [
-    ...(gamesStore.stats?.recent_games ?? []),
-    ...(gamesStore.stats?.popular_games ?? []),
-  ]
-  const imageUrls = getAmbientBackgroundUrlsFromGames(games)
-  if (imageUrls.length > 0) {
-    uiStore.setAmbientBackgroundSource({
-      owner: AMBIENT_BACKGROUND_OWNER,
-      key: 'login',
-      urls: imageUrls,
-    })
-    return
-  }
-  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
-}
-
-onMounted(async () => {
+onMounted(() => {
   void loadLoginQuote()
-  syncAmbientBackground()
-  if (!gamesStore.stats) {
-    try {
-      await gamesStore.fetchStats()
-      syncAmbientBackground()
-    } catch {
-      // no stats available — skip ambient background
-    }
-  }
 })
 
 onBeforeUnmount(() => {
   clearCooldownTimer()
   clearSceneStatusTimers()
-  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
 })
 </script>
 

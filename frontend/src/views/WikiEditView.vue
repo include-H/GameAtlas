@@ -138,7 +138,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onActivated, watch } from 'vue'
+import { computed, defineAsyncComponent, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWikiEditDocument } from '@/composables/useWikiEditDocument'
 import { useWikiEditHistory } from '@/composables/useWikiEditHistory'
@@ -146,13 +146,10 @@ import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
 import { navigateBackOrFallback } from '@/utils/navigation'
 import { formatDisplayDateTime } from '@/utils/date'
-import { getAmbientBackgroundUrlsFromGameDetail } from '@/utils/ambient-background'
 import {
   IconSave
 } from '@arco-design/web-vue/es/icon'
 import WikiEditor from '@/components/WikiEditor.vue'
-
-const AMBIENT_BACKGROUND_OWNER = 'wiki-edit'
 
 const route = useRoute()
 const router = useRouter()
@@ -223,20 +220,6 @@ const {
   formatDateTime,
 })
 
-const syncAmbientBackground = () => {
-  const imageUrls = getAmbientBackgroundUrlsFromGameDetail(game.value)
-  if (!game.value?.public_id || imageUrls.length === 0) {
-    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
-    return
-  }
-
-  uiStore.setAmbientBackgroundSource({
-    owner: AMBIENT_BACKGROUND_OWNER,
-    key: game.value.public_id,
-    urls: imageUrls,
-  })
-}
-
 watch(
   requestedGameId,
   async (gameId) => {
@@ -249,19 +232,9 @@ watch(
     }
     resetHistoryState()
     await loadHistory(gameId)
-    syncAmbientBackground()
   },
   { immediate: true },
 )
-
-// Sync on non-ID-triggered game changes (e.g., edit modal aggregate update).
-watch(game, () => {
-  syncAmbientBackground()
-})
-
-onActivated(() => {
-  syncAmbientBackground()
-})
 </script>
 
 <style scoped>

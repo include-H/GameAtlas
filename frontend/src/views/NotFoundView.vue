@@ -47,19 +47,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { navigateBackOrFallback } from '@/utils/navigation'
-import { useGamesStore } from '@/stores/games'
-import { useUiStore } from '@/stores/ui'
-import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
-
-const AMBIENT_BACKGROUND_OWNER = 'not-found'
 
 const router = useRouter()
-const gamesStore = useGamesStore()
-const uiStore = useUiStore()
-
 const goHome = () => {
   router.push('/')
 }
@@ -68,38 +59,6 @@ const goBack = () => {
   navigateBackOrFallback(router, { name: 'dashboard' })
 }
 
-const syncAmbientBackground = () => {
-  const games = [
-    ...(gamesStore.stats?.recent_games ?? []),
-    ...(gamesStore.stats?.popular_games ?? []),
-  ]
-  const imageUrls = getAmbientBackgroundUrlsFromGames(games)
-  if (imageUrls.length > 0) {
-    uiStore.setAmbientBackgroundSource({
-      owner: AMBIENT_BACKGROUND_OWNER,
-      key: '404',
-      urls: imageUrls,
-    })
-    return
-  }
-  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
-}
-
-onMounted(async () => {
-  syncAmbientBackground()
-  if (!gamesStore.stats) {
-    try {
-      await gamesStore.fetchStats()
-      syncAmbientBackground()
-    } catch {
-      // no stats available — skip ambient background
-    }
-  }
-})
-
-onUnmounted(() => {
-  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
-})
 </script>
 
 <style scoped>

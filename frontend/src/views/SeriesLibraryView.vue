@@ -92,20 +92,17 @@
 </template>
 
 <script setup lang="ts">
-import { onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { IconSearch } from '@arco-design/web-vue/es/icon'
 import { useRouter } from 'vue-router'
 import { seriesService } from '@/services/series.service'
 import type { Series } from '@/services/types'
 import { formatDisplayDate } from '@/utils/date'
 import { useUiStore } from '@/stores/ui'
-import { getAmbientBackgroundUrlsFromSeries } from '@/utils/ambient-background'
 
 defineOptions({
   name: 'SeriesLibraryView',
 })
-
-const AMBIENT_BACKGROUND_OWNER = 'series-library'
 
 interface SeriesCardItem extends Series {
   game_count: number
@@ -123,23 +120,6 @@ const searchQuery = ref('')
 const seriesCards = ref<SeriesCardItem[]>([])
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-const syncAmbientBackground = () => {
-  const imageUrls = seriesCards.value
-    .flatMap((item) => getAmbientBackgroundUrlsFromSeries(item))
-    .filter((url, index, list) => list.indexOf(url) === index)
-
-  if (imageUrls.length > 0) {
-    uiStore.setAmbientBackgroundSource({
-      owner: AMBIENT_BACKGROUND_OWNER,
-      key: seriesCards.value.map((item) => item.id).join(','),
-      urls: imageUrls,
-    })
-    return
-  }
-
-  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
-}
-
 const loadSeries = async () => {
   isLoading.value = true
   hasLoadFailure.value = false
@@ -156,13 +136,9 @@ const loadSeries = async () => {
         cover_candidates: (item.cover_candidates || []).filter((value) => value.trim().length > 0).slice(0, 4),
         latest_updated_at: item.latest_updated_at ?? null,
       }))
-    syncAmbientBackground()
   } catch {
-    // 2026-04-07: series list failures must stay distinct from an empty library result.
-    // Impact: this page no longer reuses stale cards or empty-state copy as a substitute for a failed read.
     hasLoadFailure.value = true
     seriesCards.value = []
-    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
     uiStore.addAlert('加载系列列表失败', 'error')
   } finally {
     isLoading.value = false
@@ -177,10 +153,6 @@ const formatDate = (value: string) => formatDisplayDate(value)
 
 onMounted(() => {
   loadSeries()
-})
-
-onActivated(() => {
-  syncAmbientBackground()
 })
 
 watch(searchQuery, () => {
