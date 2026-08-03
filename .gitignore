@@ -30,6 +30,7 @@ release/
 backup/
 vnite/
 Wiki/
+Game_Wiki/
 
 # Root level package files (from opencode)
 /package.json
