@@ -12,7 +12,7 @@ import { useSteamPicker } from '@/composables/useSteamPicker'
 import type { SteamGameSearchResult } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import { useSteamImportMetadata } from '@/composables/useSteamImportMetadata'
-import { useSteamImportDownload } from '@/composables/useSteamImportDownload'
+import { useSteamImportDownload, type ImportSource } from '@/composables/useSteamImportDownload'
 export type { WikiMetadataCandidateSelection } from '@/composables/useSteamImportMetadata'
 export type { ImportSource } from '@/composables/useSteamImportDownload'
 
@@ -24,11 +24,9 @@ interface UploadedAssetLike {
   path: string
 }
 
-interface SteamScreenshotsData {
+interface ScreenshotCandidatesData {
   name: string
-  cover: string
   screenshots: string[]
-  appId: string
   usedFallbackAssets: boolean
 }
 
@@ -65,9 +63,13 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const screenshotSearchUrl = ref('')
   const screenshotPreviewUrl = ref('')
   const isDownloadingScreenshot = ref(false)
-  const steamScreenshotsData = ref<SteamScreenshotsData | null>(null)
-  const selectedSteamScreenshots = ref<Set<number>>(new Set())
-  const isDownloadingSteamScreenshots = ref(false)
+  const screenshotCandidatesData = ref<ScreenshotCandidatesData | null>(null)
+  const selectedRemoteScreenshots = ref<Set<number>>(new Set())
+  const isDownloadingRemoteScreenshots = ref(false)
+  const screenshotSource = ref<ImportSource>('steam')
+  const sgdbScreenshotSearchResults = ref<SteamGameSearchResult[]>([])
+  const sgdbScreenshotThumbs = ref<Record<string, string>>({})
+  const isSearchingSgdbScreenshots = ref(false)
 
   const showLogoSelector = ref(false)
   const logoSearchUrl = ref('')
@@ -172,7 +174,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     onAssetPersisted: options.onAssetPersisted,
   })
 
-  const screenshotSteamPicker = useSteamPicker<SteamScreenshotsData>({
+  const screenshotSteamPicker = useSteamPicker<ScreenshotCandidatesData>({
     onSelect: async (game) => {
       const details = await steamService.getGameDetails(game.id)
       const screenshotCandidates = (details.screenshots || []).filter(Boolean)
@@ -188,13 +190,11 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
 
       const data = {
         name: game.name,
-        cover: game.tinyImage || '',
         screenshots: finalAssets,
-        appId: game.id,
         usedFallbackAssets: screenshotCandidates.length === 0 && finalAssets.length > 0,
       }
-      steamScreenshotsData.value = data
-      selectedSteamScreenshots.value.clear()
+      screenshotCandidatesData.value = data
+      selectedRemoteScreenshots.value.clear()
       return data
     },
     onError: (message) => {
@@ -215,9 +215,9 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     },
   })
 
-  const steamScreenshotSearchQuery = screenshotSteamPicker.query
+  const screenshotSearchQuery = screenshotSteamPicker.query
   const steamScreenshotSearchResults = screenshotSteamPicker.results
-  const selectedSteamScreenshotGame = screenshotSteamPicker.selectedGame
+  const selectedScreenshotGame = screenshotSteamPicker.selectedGame
   const isSearchingSteamScreenshots = screenshotSteamPicker.isSearching
 
   const steamLogoSearchQuery = logoSteamPicker.query
@@ -225,52 +225,123 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const selectedSteamLogoGame = logoSteamPicker.selectedGame
   const isSearchingLogo = logoSteamPicker.isSearching
 
-  const handleScreenshotSearchClear = () => {
-    screenshotSteamPicker.clear()
-    steamScreenshotsData.value = null
-    selectedSteamScreenshots.value.clear()
+  const mergeSgdbScreenshotThumbs = (results: SteamGameSearchResult[]) => {
+    const thumbs = sgdbScreenshotThumbs.value
+    return results.map((result) => (
+      thumbs[result.id] ? { ...result, tinyImage: thumbs[result.id] } : result
+    ))
   }
 
-  const searchSteamForScreenshots = async () => {
-    steamScreenshotsData.value = null
-    selectedSteamScreenshots.value.clear()
+  const searchSteamGridDBForScreenshots = async () => {
+    const games = await steamGridDBService.search(screenshotSearchQuery.value)
+    const results = games.map((game) => ({
+      id: String(game.id),
+      name: game.name,
+      releaseDate: game.release_date
+        ? new Date(game.release_date * 1000).getFullYear().toString()
+        : undefined,
+    }))
+    sgdbScreenshotSearchResults.value = results
+    sgdbScreenshotThumbs.value = {}
+
+    void Promise.allSettled(
+      results.map(async (game) => {
+        const heroes = await steamGridDBService.getHeroesByGameId(Number(game.id))
+        const thumbnail = heroes[0]?.thumb
+        if (thumbnail) {
+          sgdbScreenshotThumbs.value = {
+            ...sgdbScreenshotThumbs.value,
+            [game.id]: thumbnail,
+          }
+        }
+      }),
+    )
+  }
+
+  const handleScreenshotSearchClear = () => {
+    screenshotSteamPicker.clear()
+    screenshotCandidatesData.value = null
+    selectedRemoteScreenshots.value.clear()
+    sgdbScreenshotSearchResults.value = []
+    sgdbScreenshotThumbs.value = {}
+  }
+
+  const searchScreenshots = async () => {
+    screenshotCandidatesData.value = null
+    selectedRemoteScreenshots.value.clear()
+    if (screenshotSource.value === 'steamgriddb') {
+      isSearchingSgdbScreenshots.value = true
+      try {
+        await searchSteamGridDBForScreenshots()
+        steamScreenshotSearchResults.value = []
+        selectedScreenshotGame.value = null
+      } catch (error) {
+        options.addAlert('SteamGridDB 搜索失败：' + getHttpErrorMessage(error), 'error')
+      } finally {
+        isSearchingSgdbScreenshots.value = false
+      }
+      return
+    }
+
+    sgdbScreenshotSearchResults.value = []
+    sgdbScreenshotThumbs.value = {}
     await screenshotSteamPicker.search()
   }
 
-  const selectSteamScreenshotGame = async (game: SteamGameSearchResult) => {
+  const selectScreenshotGame = async (game: SteamGameSearchResult) => {
+    if (screenshotSource.value === 'steamgriddb') {
+      selectedScreenshotGame.value = game
+      isSearchingSgdbScreenshots.value = true
+      try {
+        const heroes = await steamGridDBService.getHeroesByGameId(Number(game.id))
+        screenshotCandidatesData.value = {
+          name: game.name,
+          screenshots: heroes.map((hero) => hero.url),
+          usedFallbackAssets: false,
+        }
+        selectedRemoteScreenshots.value = new Set()
+      } catch (error) {
+        options.addAlert('SteamGridDB 获取横幅失败：' + getHttpErrorMessage(error), 'error')
+        screenshotSteamPicker.back()
+      } finally {
+        isSearchingSgdbScreenshots.value = false
+      }
+      return
+    }
+
     await screenshotSteamPicker.select(game)
   }
 
   const backToScreenshotGameSearch = () => {
     screenshotSteamPicker.back()
-    steamScreenshotsData.value = null
-    selectedSteamScreenshots.value.clear()
+    screenshotCandidatesData.value = null
+    selectedRemoteScreenshots.value.clear()
   }
 
-  const toggleSteamScreenshot = (index: number) => {
-    if (selectedSteamScreenshots.value.has(index)) {
-      selectedSteamScreenshots.value.delete(index)
+  const toggleScreenshot = (index: number) => {
+    if (selectedRemoteScreenshots.value.has(index)) {
+      selectedRemoteScreenshots.value.delete(index)
     } else {
-      selectedSteamScreenshots.value.add(index)
+      selectedRemoteScreenshots.value.add(index)
     }
   }
 
-  const selectAllSteamScreenshots = () => {
-    if (!steamScreenshotsData.value) return
-    selectedSteamScreenshots.value = new Set(
-      steamScreenshotsData.value.screenshots.map((_, index) => index),
+  const selectAllScreenshots = () => {
+    if (!screenshotCandidatesData.value) return
+    selectedRemoteScreenshots.value = new Set(
+      screenshotCandidatesData.value.screenshots.map((_, index) => index),
     )
   }
 
-  const invertSelectionSteamScreenshots = () => {
-    if (!steamScreenshotsData.value) return
+  const invertSelectionScreenshots = () => {
+    if (!screenshotCandidatesData.value) return
     const next = new Set<number>()
-    for (let index = 0; index < steamScreenshotsData.value.screenshots.length; index++) {
-      if (!selectedSteamScreenshots.value.has(index)) {
+    for (let index = 0; index < screenshotCandidatesData.value.screenshots.length; index++) {
+      if (!selectedRemoteScreenshots.value.has(index)) {
         next.add(index)
       }
     }
-    selectedSteamScreenshots.value = next
+    selectedRemoteScreenshots.value = next
   }
 
   const loadScreenshotPreview = () => {
@@ -303,17 +374,17 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     }
   }
 
-  const downloadSelectedSteamScreenshots = async () => {
-    if (!steamScreenshotsData.value || !options.gameId.value) return
+  const downloadSelectedScreenshots = async () => {
+    if (!screenshotCandidatesData.value || !options.gameId.value) return
 
-    const indices = Array.from(selectedSteamScreenshots.value).sort((a, b) => a - b)
+    const indices = Array.from(selectedRemoteScreenshots.value).sort((a, b) => a - b)
     if (indices.length === 0) return
 
-    isDownloadingSteamScreenshots.value = true
+    isDownloadingRemoteScreenshots.value = true
     try {
       for (let i = 0; i < indices.length; i++) {
         const index = indices[i]
-        const screenshotUrl = steamScreenshotsData.value.screenshots[index]
+        const screenshotUrl = screenshotCandidatesData.value.screenshots[index]
         const currentIndex = options.form.value.screenshots.length
         const uploaded = await options.uploadAssetFromUrl(screenshotUrl, 'screenshot', currentIndex)
         options.form.value.screenshots.push(options.createEditableScreenshot(uploaded, currentIndex))
@@ -322,13 +393,13 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       await options.onAssetPersisted?.()
       showScreenshotSelector.value = false
       backToScreenshotGameSearch()
-      steamScreenshotSearchQuery.value = ''
+      screenshotSearchQuery.value = ''
       steamScreenshotSearchResults.value = []
       options.addAlert(`成功添加 ${indices.length} 张截图`, 'success')
     } catch (error) {
       options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
     } finally {
-      isDownloadingSteamScreenshots.value = false
+      isDownloadingRemoteScreenshots.value = false
     }
   }
 
@@ -403,8 +474,15 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     if (!isOpen) return
     const query = pickSteamSearchQuery()
     if (!query) return
-    steamScreenshotSearchQuery.value = query
-    searchSteamForScreenshots()
+    screenshotSearchQuery.value = query
+    searchScreenshots()
+  })
+
+  watch(screenshotSource, () => {
+    if (!showScreenshotSelector.value) return
+    const query = screenshotSearchQuery.value.trim()
+    if (!query) return
+    void searchScreenshots()
   })
 
   watch(showLogoSelector, (isOpen) => {
@@ -415,8 +493,16 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     searchSteamForLogo()
   })
 
-  const screenshotSearchResults = computed(() => steamScreenshotSearchResults.value)
-  const isSearchingScreenshots = computed(() => isSearchingSteamScreenshots.value)
+  const screenshotSearchResults = computed(() => (
+    screenshotSource.value === 'steamgriddb'
+      ? mergeSgdbScreenshotThumbs(sgdbScreenshotSearchResults.value)
+      : steamScreenshotSearchResults.value
+  ))
+  const isSearchingScreenshots = computed(() => (
+    screenshotSource.value === 'steamgriddb'
+      ? isSearchingSgdbScreenshots.value
+      : isSearchingSteamScreenshots.value
+  ))
 
   const resetSteamImportState = () => {
     showSummarySelector.value = false
@@ -426,11 +512,14 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     resetMetadataImportState()
     resetDownloadState()
 
-    steamScreenshotSearchQuery.value = ''
+    screenshotSource.value = 'steam'
+    screenshotSearchQuery.value = ''
     steamScreenshotSearchResults.value = []
-    selectedSteamScreenshotGame.value = null
-    steamScreenshotsData.value = null
-    selectedSteamScreenshots.value = new Set()
+    selectedScreenshotGame.value = null
+    screenshotCandidatesData.value = null
+    selectedRemoteScreenshots.value = new Set()
+    sgdbScreenshotSearchResults.value = []
+    sgdbScreenshotThumbs.value = {}
     screenshotSearchUrl.value = ''
     screenshotPreviewUrl.value = ''
 
@@ -469,9 +558,9 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     screenshotSearchUrl,
     screenshotPreviewUrl,
     isDownloadingScreenshot,
-    steamScreenshotsData,
-    selectedSteamScreenshots,
-    isDownloadingSteamScreenshots,
+    screenshotCandidatesData,
+    selectedRemoteScreenshots,
+    isDownloadingRemoteScreenshots,
     steamSummarySearchQuery,
     steamSummarySearchResults,
     selectedSteamSummaryGame,
@@ -484,9 +573,9 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     bannerSearchResults,
     selectedSteamBannerGame,
     isSearchingBanner,
-    steamScreenshotSearchQuery,
+    screenshotSearchQuery,
     screenshotSearchResults,
-    selectedSteamScreenshotGame,
+    selectedScreenshotGame,
     isSearchingScreenshots,
     showLogoSelector,
     logoSearchUrl,
@@ -501,6 +590,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     isSearchingLogo,
     coverSource,
     bannerSource,
+    screenshotSource,
     sgdbAvailable,
     handleSummarySearchClear,
     searchSteamForSummary,
@@ -532,15 +622,15 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     selectAllBanners,
     invertSelectionBanners,
     handleScreenshotSearchClear,
-    searchSteamForScreenshots,
-    selectSteamScreenshotGame,
+    searchScreenshots,
+    selectScreenshotGame,
     backToScreenshotGameSearch,
-    toggleSteamScreenshot,
-    selectAllSteamScreenshots,
-    invertSelectionSteamScreenshots,
+    toggleScreenshot,
+    selectAllScreenshots,
+    invertSelectionScreenshots,
     loadScreenshotPreview,
     confirmScreenshotSelection,
-    downloadSelectedSteamScreenshots,
+    downloadSelectedScreenshots,
     handleLogoSearchClear,
     searchSteamForLogo,
     selectSteamLogoGame,

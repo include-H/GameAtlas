@@ -7,39 +7,57 @@
     @update:visible="emit('update:visible', $event)"
   >
     <div class="screenshot-selector-content">
+      <div class="source-selector">
+        <span class="source-selector__label">数据源</span>
+        <a-button
+          class="app-text-action-btn"
+          :type="source === 'steam' ? 'outline' : 'text'"
+          size="small"
+          html-type="button"
+          @click="emit('source-change', 'steam')"
+        >Steam</a-button>
+        <a-button
+          class="app-text-action-btn"
+          :type="source === 'steamgriddb' ? 'outline' : 'text'"
+          size="small"
+          html-type="button"
+          :disabled="!sgdbAvailable"
+          @click="emit('source-change', 'steamgriddb')"
+        >SteamGridDB</a-button>
+      </div>
       <steam-search-panel
-        :query="steamScreenshotSearchQuery"
-        placeholder="搜索 Steam 游戏..."
+        :query="screenshotSearchQuery"
+        :placeholder="searchPlaceholder"
         :loading="isSearchingScreenshots"
         :results="screenshotSearchResults"
-        :selected-game="selectedSteamScreenshotGame"
-        @update:query="emit('update:steam-screenshot-search-query', $event)"
-        @search="emit('search-screenshot')"
-        @clear="emit('clear-screenshot')"
+        :selected-game="selectedScreenshotGame"
+        @update:query="emit('update:screenshot-search-query', $event)"
+        @search="emit('search-screenshots')"
+        @clear="emit('clear-screenshots')"
         @select="emit('select-screenshot-game', $event)"
       >
-        <div v-if="steamScreenshotsData" class="steam-screenshots-section">
+        <div v-if="screenshotCandidatesData" class="steam-screenshots-section">
           <div class="steam-game-info">
-            <span>{{ steamScreenshotsData.name }}</span>
+            <span>{{ screenshotCandidatesData.name }}</span>
             <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('back-screenshot-game-search')">返回</a-button>
-            <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('select-all-steam-screenshots')">全选</a-button>
-            <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('invert-steam-screenshots')">反选</a-button>
+            <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('select-all-screenshots')">全选</a-button>
+            <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('invert-screenshots')">反选</a-button>
           </div>
 
-          <div v-if="steamScreenshotsData.usedFallbackAssets" class="steam-screenshot-hint">
+          <div v-if="screenshotCandidatesData.usedFallbackAssets" class="steam-screenshot-hint">
             Steam 未返回截图，以下为可用商店素材
           </div>
 
-          <div v-if="steamScreenshotsData.screenshots.length > 0" class="steam-screenshots-grid">
+          <div v-if="screenshotCandidatesData.screenshots.length > 0" class="steam-screenshots-grid">
             <div
-              v-for="(screenshot, index) in steamScreenshotsData.screenshots"
+              v-for="(screenshot, index) in screenshotCandidatesData.screenshots"
               :key="index"
               class="steam-screenshot-item"
-              :class="{ 'steam-screenshot-selected': selectedSteamScreenshots.has(index) }"
-              @click="emit('toggle-steam-screenshot', index)"
+              :class="{ 'steam-screenshot-selected': selectedRemoteScreenshots.has(index) }"
+              @click="emit('toggle-screenshot', index)"
             >
               <img :src="screenshot" />
-              <div v-if="selectedSteamScreenshots.has(index)" class="steam-screenshot-check">
+              <div v-if="selectedRemoteScreenshots.has(index)" class="steam-screenshot-check">
                 <icon-check />
               </div>
             </div>
@@ -52,14 +70,14 @@
           />
 
           <a-button
-            v-if="selectedSteamScreenshots.size > 0"
+            v-if="selectedRemoteScreenshots.size > 0"
             type="primary"
             long
-            :loading="isDownloadingSteamScreenshots"
+            :loading="isDownloadingRemoteScreenshots"
             html-type="button"
-            @click="emit('download-selected-steam-screenshots')"
+            @click="emit('download-selected-screenshots')"
           >
-            下载选中的 {{ selectedSteamScreenshots.size }} 张截图
+            下载选中的 {{ selectedRemoteScreenshots.size }} 张截图
           </a-button>
         </div>
       </steam-search-panel>
@@ -120,28 +138,30 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { IconCheck, IconUpload } from '@arco-design/web-vue/es/icon'
 import SteamSearchPanel from '@/components/SteamSearchPanel.vue'
+import type { ImportSource } from '@/composables/useSteamImport'
 import type { SteamGameSearchResult } from '@/services/types'
 import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
 
-interface SteamScreenshotsData {
+interface ScreenshotCandidatesData {
   name: string
-  cover: string
   screenshots: string[]
-  appId: string
   usedFallbackAssets: boolean
 }
 
 interface Props {
   visible: boolean
-  steamScreenshotSearchQuery: string
+  source: ImportSource
+  sgdbAvailable: boolean
+  screenshotSearchQuery: string
   isSearchingScreenshots: boolean
   screenshotSearchResults: SteamGameSearchResult[]
-  selectedSteamScreenshotGame: SteamGameSearchResult | null
-  steamScreenshotsData: SteamScreenshotsData | null
-  selectedSteamScreenshots: Set<number>
-  isDownloadingSteamScreenshots: boolean
+  selectedScreenshotGame: SteamGameSearchResult | null
+  screenshotCandidatesData: ScreenshotCandidatesData | null
+  selectedRemoteScreenshots: Set<number>
+  isDownloadingRemoteScreenshots: boolean
   screenshotUploadAction: string
   screenshotUploadData: Record<string, string>
   uploadHeaders: Record<string, string>
@@ -150,25 +170,30 @@ interface Props {
   isDownloadingScreenshot: boolean
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 
 const emit = defineEmits<{
   'update:visible': [value: boolean]
-  'update:steam-screenshot-search-query': [value: string]
-  'search-screenshot': []
-  'clear-screenshot': []
+  'source-change': [source: ImportSource]
+  'update:screenshot-search-query': [value: string]
+  'search-screenshots': []
+  'clear-screenshots': []
   'select-screenshot-game': [game: SteamGameSearchResult]
   'back-screenshot-game-search': []
-  'toggle-steam-screenshot': [index: number]
-  'download-selected-steam-screenshots': []
-  'select-all-steam-screenshots': []
-  'invert-steam-screenshots': []
+  'toggle-screenshot': [index: number]
+  'download-selected-screenshots': []
+  'select-all-screenshots': []
+  'invert-screenshots': []
   'screenshot-upload-success': [fileItem: FileItem]
   'screenshot-upload-error': []
   'update:screenshot-search-url': [value: string]
   'load-screenshot-preview': []
   'confirm-screenshot-selection': []
 }>()
+
+const searchPlaceholder = computed(() =>
+  props.source === 'steamgriddb' ? '搜索 SteamGridDB...' : '搜索 Steam 游戏...'
+)
 </script>
 
 <style scoped>
@@ -176,6 +201,18 @@ const emit = defineEmits<{
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.source-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.source-selector__label {
+  font-size: 14px;
+  color: var(--color-text-2);
+  flex-shrink: 0;
 }
 
 .steam-screenshots-section {

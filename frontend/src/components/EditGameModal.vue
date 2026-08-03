@@ -50,8 +50,8 @@
                   allow-clear
                   allow-search
                   :loading="isSearchingDevelopers || isCreatingDevelopers"
-                  :remote-search="true"
-                  :on-search="handleDeveloperSearch"
+                  :filter-option="false"
+                  @search="handleDeveloperSearch"
                   @update:model-value="handleDeveloperSelection"
                 >
                   <a-option
@@ -81,8 +81,8 @@
                   allow-clear
                   allow-search
                   :loading="isSearchingPublishers || isCreatingPublishers"
-                  :remote-search="true"
-                  :on-search="handlePublisherSearch"
+                  :filter-option="false"
+                  @search="handlePublisherSearch"
                   @update:model-value="handlePublisherSelection"
                 >
                   <a-option
@@ -114,8 +114,8 @@
                   allow-clear
                   allow-search
                   :loading="isSearchingSeries || isCreatingSeries"
-                  :remote-search="true"
-                  :on-search="handleSeriesSearch"
+                  :filter-option="false"
+                  @search="handleSeriesSearch"
                   @update:model-value="handleSeriesSelection"
                 >
                   <a-option
@@ -280,13 +280,14 @@
       :banner-preview-url="bannerPreviewUrl"
       :is-downloading-banner="isDownloadingBanner"
       :show-screenshot-selector="showScreenshotSelector"
-      :steam-screenshot-search-query="steamScreenshotSearchQuery"
+      :screenshot-source="screenshotSource"
+      :screenshot-search-query="screenshotSearchQuery"
       :is-searching-screenshots="isSearchingScreenshots"
       :screenshot-search-results="screenshotSearchResults"
-      :selected-steam-screenshot-game="selectedSteamScreenshotGame"
-      :steam-screenshots-data="steamScreenshotsData"
-      :selected-steam-screenshots="selectedSteamScreenshots"
-      :is-downloading-steam-screenshots="isDownloadingSteamScreenshots"
+      :selected-screenshot-game="selectedScreenshotGame"
+      :screenshot-candidates-data="screenshotCandidatesData"
+      :selected-remote-screenshots="selectedRemoteScreenshots"
+      :is-downloading-remote-screenshots="isDownloadingRemoteScreenshots"
       :screenshot-upload-action="screenshotUploadAction"
       :screenshot-upload-data="screenshotUploadData"
       :screenshot-search-url="screenshotSearchUrl"
@@ -354,15 +355,16 @@
       @load-banner-from-url="loadBannerFromUrl"
       @confirm-banner-selection="confirmBannerSelection"
       @update:show-screenshot-selector="showScreenshotSelector = $event"
-      @update:steam-screenshot-search-query="steamScreenshotSearchQuery = $event"
-      @search-screenshot="searchSteamForScreenshots"
-      @clear-screenshot="handleScreenshotSearchClear"
-      @select-screenshot-game="selectSteamScreenshotGame"
+      @source-change-screenshot="screenshotSource = $event"
+      @update:screenshot-search-query="screenshotSearchQuery = $event"
+      @search-screenshots="searchScreenshots"
+      @clear-screenshots="handleScreenshotSearchClear"
+      @select-screenshot-game="selectScreenshotGame"
       @back-screenshot-game-search="backToScreenshotGameSearch"
-      @toggle-steam-screenshot="toggleSteamScreenshot"
-      @select-all-steam-screenshots="selectAllSteamScreenshots"
-      @invert-steam-screenshots="invertSelectionSteamScreenshots"
-      @download-selected-steam-screenshots="downloadSelectedSteamScreenshots"
+      @toggle-screenshot="toggleScreenshot"
+      @select-all-screenshots="selectAllScreenshots"
+      @invert-screenshots="invertSelectionScreenshots"
+      @download-selected-screenshots="downloadSelectedScreenshots"
       @screenshot-upload-success="handleScreenshotUploadSuccess"
       @screenshot-upload-error="handleScreenshotUploadError"
       @update:screenshot-search-url="screenshotSearchUrl = $event"
@@ -461,7 +463,7 @@ const {
   downloadSelectedSteamBanner,
   downloadSelectedSteamCover,
   downloadSelectedSteamCovers,
-  downloadSelectedSteamScreenshots,
+  downloadSelectedScreenshots,
   downloadSelectedSteamLogo,
   draggedScreenshotKey,
   dragOverScreenshotKey,
@@ -505,7 +507,7 @@ const {
   initialPath,
   invertSelectionBanners,
   invertSelectionCovers,
-  invertSelectionSteamScreenshots,
+  invertSelectionScreenshots,
   isApplyingWikiMetadata,
   isDownloadingBanner,
   isDownloadingCover,
@@ -513,7 +515,7 @@ const {
   isDownloadingScreenshot,
   isDownloadingSteamCovers,
   isDownloadingSteamLogos,
-  isDownloadingSteamScreenshots,
+  isDownloadingRemoteScreenshots,
   isCreatingDevelopers,
   isCreatingPublishers,
   isCreatingSeries,
@@ -559,15 +561,15 @@ const {
   searchSteamForBanner,
   searchSteamForCover,
   searchSteamForLogo,
-  searchSteamForScreenshots,
+  searchScreenshots,
   searchSteamForSummary,
   selectAllBanners,
   selectAllCovers,
-  selectAllSteamScreenshots,
+  selectAllScreenshots,
   selectSteamBannerGame,
   selectSteamCoverGame,
   selectSteamLogoGame,
-  selectSteamScreenshotGame,
+  selectScreenshotGame,
   selectSteamSummaryGame,
   selectedBanners,
   isDownloadingSteamBanners,
@@ -579,8 +581,8 @@ const {
   selectedSteamBannerGame,
   selectedSteamGame,
   selectedSteamLogoGame,
-  selectedSteamScreenshotGame,
-  selectedSteamScreenshots,
+  selectedScreenshotGame,
+  selectedRemoteScreenshots,
   selectedSteamSummaryGame,
   publisherSearchQuery,
   showBannerSelector,
@@ -598,14 +600,14 @@ const {
   coverSearchResults,
   steamLogoImages,
   steamLogoSearchQuery,
-  steamScreenshotSearchQuery,
+  screenshotSearchQuery,
   screenshotSearchResults,
-  steamScreenshotsData,
+  screenshotCandidatesData,
   steamSummaryPreview,
   steamSummarySearchQuery,
   steamSummarySearchResults,
   toggleCoverSelection,
-  toggleSteamScreenshot,
+  toggleScreenshot,
   uploadAction,
   uploadData,
   uploadHeaders,
@@ -616,6 +618,7 @@ const {
   wikiMetadataPickerVisible,
   coverSource,
   bannerSource,
+  screenshotSource,
   sgdbAvailable,
 } = useEditGameModal({
   props,

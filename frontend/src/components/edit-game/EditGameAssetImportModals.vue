@@ -91,13 +91,15 @@
 
   <screenshot-selector-modal
     :visible="showScreenshotSelector"
-    :steam-screenshot-search-query="steamScreenshotSearchQuery"
+    :source="screenshotSource"
+    :sgdb-available="sgdbAvailable"
+    :screenshot-search-query="screenshotSearchQuery"
     :is-searching-screenshots="isSearchingScreenshots"
     :screenshot-search-results="screenshotSearchResults"
-    :selected-steam-screenshot-game="selectedSteamScreenshotGame"
-    :steam-screenshots-data="steamScreenshotsData"
-    :selected-steam-screenshots="selectedSteamScreenshots"
-    :is-downloading-steam-screenshots="isDownloadingSteamScreenshots"
+    :selected-screenshot-game="selectedScreenshotGame"
+    :screenshot-candidates-data="screenshotCandidatesData"
+    :selected-remote-screenshots="selectedRemoteScreenshots"
+    :is-downloading-remote-screenshots="isDownloadingRemoteScreenshots"
     :screenshot-upload-action="screenshotUploadAction"
     :screenshot-upload-data="screenshotUploadData"
     :upload-headers="uploadHeaders"
@@ -105,15 +107,16 @@
     :screenshot-preview-url="screenshotPreviewUrl"
     :is-downloading-screenshot="isDownloadingScreenshot"
     @update:visible="emit('update:show-screenshot-selector', $event)"
-    @update:steam-screenshot-search-query="emit('update:steam-screenshot-search-query', $event)"
-    @search-screenshot="emit('search-screenshot')"
-    @clear-screenshot="emit('clear-screenshot')"
+    @source-change="emit('source-change-screenshot', $event)"
+    @update:screenshot-search-query="emit('update:screenshot-search-query', $event)"
+    @search-screenshots="emit('search-screenshots')"
+    @clear-screenshots="emit('clear-screenshots')"
     @select-screenshot-game="emit('select-screenshot-game', $event)"
     @back-screenshot-game-search="emit('back-screenshot-game-search')"
-    @toggle-steam-screenshot="emit('toggle-steam-screenshot', $event)"
-    @select-all-steam-screenshots="emit('select-all-steam-screenshots')"
-    @invert-steam-screenshots="emit('invert-steam-screenshots')"
-    @download-selected-steam-screenshots="emit('download-selected-steam-screenshots')"
+    @toggle-screenshot="emit('toggle-screenshot', $event)"
+    @select-all-screenshots="emit('select-all-screenshots')"
+    @invert-screenshots="emit('invert-screenshots')"
+    @download-selected-screenshots="emit('download-selected-screenshots')"
     @screenshot-upload-success="emit('screenshot-upload-success', $event)"
     @screenshot-upload-error="emit('screenshot-upload-error')"
     @update:screenshot-search-url="emit('update:screenshot-search-url', $event)"
@@ -168,11 +171,9 @@ import type { SteamGameSearchResult } from '@/services/types'
 import type { ImportSource } from '@/composables/useSteamImport'
 import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
 
-interface SteamScreenshotsData {
+interface ScreenshotCandidatesData {
   name: string
-  cover: string
   screenshots: string[]
-  appId: string
   usedFallbackAssets: boolean
 }
 
@@ -218,13 +219,14 @@ defineProps<{
   isDownloadingBanner: boolean
 
   showScreenshotSelector: boolean
-  steamScreenshotSearchQuery: string
+  screenshotSource: ImportSource
+  screenshotSearchQuery: string
   isSearchingScreenshots: boolean
   screenshotSearchResults: SteamGameSearchResult[]
-  selectedSteamScreenshotGame: SteamGameSearchResult | null
-  steamScreenshotsData: SteamScreenshotsData | null
-  selectedSteamScreenshots: Set<number>
-  isDownloadingSteamScreenshots: boolean
+  selectedScreenshotGame: SteamGameSearchResult | null
+  screenshotCandidatesData: ScreenshotCandidatesData | null
+  selectedRemoteScreenshots: Set<number>
+  isDownloadingRemoteScreenshots: boolean
   screenshotUploadAction: string
   screenshotUploadData: Record<string, string>
   screenshotSearchUrl: string
@@ -299,15 +301,16 @@ const emit = defineEmits<{
   'confirm-banner-selection': []
 
   'update:show-screenshot-selector': [value: boolean]
-  'update:steam-screenshot-search-query': [value: string]
-  'search-screenshot': []
-  'clear-screenshot': []
+  'source-change-screenshot': [source: ImportSource]
+  'update:screenshot-search-query': [value: string]
+  'search-screenshots': []
+  'clear-screenshots': []
   'select-screenshot-game': [game: SteamGameSearchResult]
   'back-screenshot-game-search': []
-  'toggle-steam-screenshot': [index: number]
-  'select-all-steam-screenshots': []
-  'invert-steam-screenshots': []
-  'download-selected-steam-screenshots': []
+  'toggle-screenshot': [index: number]
+  'select-all-screenshots': []
+  'invert-screenshots': []
+  'download-selected-screenshots': []
   'screenshot-upload-success': [fileItem: FileItem]
   'screenshot-upload-error': []
   'update:screenshot-search-url': [value: string]
