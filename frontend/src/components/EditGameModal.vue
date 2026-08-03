@@ -171,8 +171,10 @@
             :title="form.title"
             :covers="form.covers"
             :banners="form.banners"
-            :primary-preview-video="primaryPreviewVideo"
-            :preview-video-sources="previewVideoSources"
+            :preview-videos="form.preview_videos"
+            :is-uploading-video="isUploadingVideo"
+            :video-upload-progress="videoUploadProgress"
+            :video-upload-file-name="videoUploadFileName"
             :screenshots="form.screenshots"
             :dragged-screenshot-key="draggedScreenshotKey"
             :drag-over-screenshot-key="dragOverScreenshotKey"
@@ -184,7 +186,9 @@
             @open-banner-selector="showBannerSelector = true"
             @remove-banner="removeBanner"
             @set-primary-banner="handleSetPrimaryBanner"
-            @open-video-selector="openVideoSelector"
+            @video-file-change="handleVideoFileChange"
+            @reorder-video="reorderEditableVideos($event.key, $event.direction)"
+            @remove-video="removePreviewVideo"
             @open-screenshot-selector="showScreenshotSelector = true"
             @remove-screenshot="removeScreenshot"
             @screenshot-drag-start="handleScreenshotDragStart"
@@ -357,20 +361,6 @@
       @confirm-logo-position="handleLogoPositionConfirm"
     />
 
-    <edit-game-video-modal
-      :visible="showVideoSelector"
-      :is-uploading-video="isUploadingVideo"
-      :video-upload-progress="videoUploadProgress"
-      :video-upload-file-name="videoUploadFileName"
-      :preview-videos="form.preview_videos"
-      :banner-image="form.banners[0]?.path || ''"
-      :cover-image="primaryCover?.path || ''"
-      @update:visible="showVideoSelector = $event"
-      @video-file-change="handleVideoFileChange"
-      @reorder-video="reorderEditableVideos($event.key, $event.direction)"
-      @remove-video="removePreviewVideo"
-    />
-
     <edit-game-wiki-metadata-picker-modal
       :visible="wikiMetadataPickerVisible"
       :candidates="wikiMetadataCandidates"
@@ -397,7 +387,6 @@ import FileBrowserModal from '@/components/FileBrowserModal.vue'
 import GameFilePathsSection from '@/components/edit-game/GameFilePathsSection.vue'
 import GameMediaSection from '@/components/edit-game/GameMediaSection.vue'
 import EditGameAssetImportModals from '@/components/edit-game/EditGameAssetImportModals.vue'
-import EditGameVideoModal from '@/components/edit-game/EditGameVideoModal.vue'
 import EditGameWikiMetadataPickerModal from '@/components/edit-game/EditGameWikiMetadataPickerModal.vue'
 import BannerCropModal from '@/components/edit-game/BannerCropModal.vue'
 import { useEditGameModal } from '@/composables/useEditGameModal'
@@ -516,11 +505,7 @@ const {
   logoPath,
   modalWidth,
   openFileBrowser,
-  openVideoSelector,
-  previewVideoSources,
-  primaryCover,
   primaryLogo,
-  primaryPreviewVideo,
   releaseDate,
   removeBanner,
   removeCover,
@@ -568,7 +553,6 @@ const {
   showLogoSelector,
   showScreenshotSelector,
   showSummarySelector,
-  showVideoSelector,
   steamBannerImages,
   steamBannerSearchQuery,
   bannerSearchResults,

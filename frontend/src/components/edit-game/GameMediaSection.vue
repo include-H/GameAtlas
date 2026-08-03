@@ -230,50 +230,118 @@
         <div class="media-block__title-row">
           <span class="media-block__title">预告片</span>
           <a-button
-            v-if="primaryPreviewVideo"
-            class="app-text-action-btn"
-            type="text"
+            v-if="previewVideos.length > 0"
+            type="primary"
             size="mini"
             html-type="button"
-            @click.stop="emit('open-video-selector')"
+            :loading="isUploadingVideo"
+            @click="openVideoFilePicker"
           >
-            <template #icon><icon-settings /></template>
-            管理预告片
+            <template #icon><icon-upload /></template>
+            {{ isUploadingVideo ? '上传中...' : '上传预告片' }}
           </a-button>
         </div>
-        <div class="media-frame media-frame--video">
-          <template v-if="primaryPreviewVideo">
-            <video
-              class="media-video"
-              controls
-              playsinline
-              preload="metadata"
-            >
-              <source
-                v-for="src in previewVideoSources"
-                :key="src"
-                :src="src"
-              />
-            </video>
-          </template>
-          <div
-            v-else
-            class="app-glass-surface media-empty-action"
-            role="button"
-            tabindex="0"
-            @click="emit('open-video-selector')"
-          >
-            <icon-upload class="media-empty-icon" />
-            <span class="media-empty-title">未设置预告片</span>
-            <span class="media-empty-subtitle">点击上传本地视频</span>
+        <input
+          ref="videoFileInput"
+          type="file"
+          multiple
+          accept="video/mp4,video/webm"
+          class="hidden-file-input"
+          @change="emit('video-file-change', $event)"
+        />
+        <div v-if="isUploadingVideo" class="video-upload-progress">
+          <div class="video-upload-progress__meta">
+            <span>{{ videoUploadFileName || '预告片上传中' }}</span>
+            <span>{{ videoUploadProgress }}%</span>
           </div>
+          <a-progress :percent="videoUploadProgress" :show-text="false" size="small" />
+        </div>
+        <div v-if="previewVideos.length > 0" class="video-library-list">
+          <div
+            v-for="(video, index) in previewVideos"
+            :key="video.asset_uid || video.path"
+            class="video-library-item"
+            :class="{ 'is-primary': index === 0 }"
+          >
+            <div class="video-library-item__icon">
+              <icon-video-camera />
+            </div>
+            <div class="video-library-item__info">
+              <div class="video-library-item__title-row">
+                <span class="video-library-item__title">预告片 {{ index + 1 }}</span>
+                <a-tag v-if="index === 0" size="small" color="arcoblue">首个展示</a-tag>
+              </div>
+              <span class="video-library-item__name">{{ getVideoFileName(video.path) }}</span>
+            </div>
+            <div class="video-library-item__actions">
+              <a-button
+                class="app-text-action-btn"
+                type="text"
+                shape="circle"
+                size="small"
+                html-type="button"
+                title="上移"
+                :disabled="index === 0"
+                @click="emit('reorder-video', { key: video.asset_uid || video.path, direction: -1 })"
+              >
+                <icon-arrow-up />
+              </a-button>
+              <a-button
+                class="app-text-action-btn"
+                type="text"
+                shape="circle"
+                size="small"
+                html-type="button"
+                title="下移"
+                :disabled="index === previewVideos.length - 1"
+                @click="emit('reorder-video', { key: video.asset_uid || video.path, direction: 1 })"
+              >
+                <icon-arrow-down />
+              </a-button>
+              <a-button
+                class="app-text-action-btn"
+                type="text"
+                status="danger"
+                shape="circle"
+                size="small"
+                html-type="button"
+                title="删除预告片"
+                @click="emit('remove-video', video.asset_uid)"
+              >
+                <icon-delete />
+              </a-button>
+            </div>
+          </div>
+        </div>
+        <div
+          v-else
+          class="app-glass-surface media-empty-action media-empty-action--video"
+          role="button"
+          tabindex="0"
+          @click="openVideoFilePicker"
+          @keydown.enter="openVideoFilePicker"
+          @keydown.space.prevent="openVideoFilePicker"
+        >
+          <icon-video-camera class="media-empty-icon" />
+          <span class="media-empty-title">未设置预告片</span>
+          <span class="media-empty-subtitle">上传 MP4 或 WebM 视频</span>
         </div>
       </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { IconDelete, IconImage, IconSettings, IconStar, IconUpload } from '@arco-design/web-vue/es/icon'
+import { ref } from 'vue'
+import {
+  IconArrowDown,
+  IconArrowUp,
+  IconDelete,
+  IconImage,
+  IconSettings,
+  IconStar,
+  IconUpload,
+  IconVideoCamera,
+} from '@arco-design/web-vue/es/icon'
 import MediaScreenshotSection from './MediaScreenshotSection.vue'
 
 interface EditableCover {
@@ -305,7 +373,9 @@ const emit = defineEmits<{
   'open-banner-selector': []
   'remove-banner': [index: number]
   'set-primary-banner': [index: number]
-  'open-video-selector': []
+  'video-file-change': [event: Event]
+  'reorder-video': [payload: { key: string; direction: -1 | 1 }]
+  'remove-video': [assetUid?: string]
   'open-screenshot-selector': []
   'remove-screenshot': [clientKey: string]
   'screenshot-drag-start': [clientKey: string]
@@ -320,15 +390,25 @@ defineProps<{
   title: string
   covers: EditableCover[]
   banners: EditableBanner[]
-  primaryPreviewVideo: EditableVideo | null
-  previewVideoSources: string[]
+  previewVideos: EditableVideo[]
+  isUploadingVideo: boolean
+  videoUploadProgress: number
+  videoUploadFileName: string
   screenshots: EditableScreenshot[]
   draggedScreenshotKey: string | null
   dragOverScreenshotKey: string | null
   logoImage: string
 }>()
 
+const videoFileInput = ref<HTMLInputElement | null>(null)
 
+const openVideoFilePicker = () => {
+  videoFileInput.value?.click()
+}
+
+const getVideoFileName = (path: string) => {
+  return path.split(/[\\/]/).pop() || path
+}
 </script>
 
 <style scoped>
@@ -337,7 +417,6 @@ defineProps<{
   --media-panel-radius: 14px;
   --media-panel-padding: 14px;
   --media-frame-height: clamp(220px, 24vw, 300px);
-  --media-video-height: clamp(300px, 36vw, 420px);
   --media-banner-height: clamp(200px, 22vw, 280px);
 
   display: grid;
@@ -408,11 +487,6 @@ defineProps<{
   min-height: var(--media-frame-height);
 }
 
-.media-frame--video {
-  height: var(--media-video-height);
-  min-height: var(--media-video-height);
-}
-
 .media-frame--banner {
   width: 100%;
   height: 270px;
@@ -461,6 +535,103 @@ defineProps<{
   opacity: 0.75;
 }
 
+.media-empty-action--video {
+  min-height: 150px;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.video-upload-progress {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-fill-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.video-upload-progress__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+
+.video-library-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.video-library-item {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-fill-1);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.video-library-item.is-primary {
+  border-color: rgba(var(--primary-6), 0.6);
+  box-shadow: 0 0 0 1px rgba(var(--primary-6), 0.25);
+}
+
+.video-library-item__icon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 6px;
+  color: rgb(var(--primary-6));
+  background: rgba(var(--primary-6), 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-library-item__info {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.video-library-item__title-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.video-library-item__title {
+  color: var(--color-text-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.video-library-item__name {
+  min-width: 0;
+  color: var(--color-text-3);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-library-item__actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .media-overlay {
   position: absolute;
   inset: 0;
@@ -493,15 +664,6 @@ defineProps<{
 .cover-thumb:hover .cover-overlay {
   opacity: 1;
 }
-
-.media-video {
-  width: 100%;
-  height: 100%;
-  display: block;
-  background: var(--color-media-bg);
-  object-fit: contain;
-}
-
 
 .media-frame :deep(.arco-image),
 .cover-thumb :deep(.arco-image),
@@ -685,6 +847,14 @@ defineProps<{
 
   .media-frame--banner {
     aspect-ratio: 16 / 9;
+  }
+
+  .video-library-item {
+    align-items: flex-start;
+  }
+
+  .video-library-item__actions {
+    margin-left: -4px;
   }
 }
 </style>

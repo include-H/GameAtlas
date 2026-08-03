@@ -17,7 +17,6 @@ import { proxySteamAssetUrl } from '@/services/steam.service'
 import { seriesService } from '@/services/series.service'
 import { developersService } from '@/services/developers.service'
 import { publishersService } from '@/services/publishers.service'
-import { resolveAssetCandidates } from '@/utils/asset-url'
 import { getAssetFileExtension } from '@/utils/asset-file-extension'
 import { useGameFilePaths } from '@/composables/useGameFilePaths'
 import { useSteamImport } from '@/composables/useSteamImport'
@@ -75,7 +74,6 @@ export const useEditGameModal = ({
   const seriesSearchQuery = ref('')
   const developerSearchQuery = ref('')
   const publisherSearchQuery = ref('')
-  const showVideoSelector = ref(false)
   const isUploadingVideo = ref(false)
   const videoUploadProgress = ref(0)
   const videoUploadFileName = ref('')
@@ -86,22 +84,12 @@ export const useEditGameModal = ({
 
   const form = ref<EditGameForm>(createEmptyEditGameForm())
 
-  const primaryCover = computed(() => {
-    return form.value.covers[0] || null
-  })
-
   const primaryLogo = computed(() => {
     return form.value.logo || null
   })
 
   const logoBannerSrc = computed(() => form.value.banners[0]?.path || form.value.covers[0]?.path || '')
   const logoPath = computed(() => form.value.logo?.path || '')
-
-  const primaryPreviewVideo = computed(() => {
-    return form.value.preview_videos[0] || null
-  })
-
-  const previewVideoSources = computed(() => resolveAssetCandidates(primaryPreviewVideo.value?.path || ''))
 
   const modalWidth = computed(() => {
     if (viewportWidth.value <= 576) return 'calc(100vw - 24px)'
@@ -587,7 +575,6 @@ export const useEditGameModal = ({
     handleBannerUploadError,
     handleScreenshotUploadSuccess,
     handleScreenshotUploadError,
-    openVideoSelector,
     handleVideoFileChange,
     removeCover,
     removeLogo,
@@ -604,7 +591,6 @@ export const useEditGameModal = ({
     showCoverSelector,
     showBannerSelector,
     showScreenshotSelector,
-    showVideoSelector,
     showLogoSelector,
     isUploadingVideo,
     videoUploadProgress,
@@ -744,13 +730,9 @@ export const useEditGameModal = ({
     selectedSteamLogoGame,
     modalWidth,
     openFileBrowser,
-    openVideoSelector,
-    previewVideoSources,
-    primaryCover,
     primaryLogo,
     logoBannerSrc,
     logoPath,
-    primaryPreviewVideo,
     releaseDate,
     removeBanner,
     removeCover,
@@ -792,7 +774,6 @@ export const useEditGameModal = ({
     showFileBrowser,
     showScreenshotSelector,
     showSummarySelector,
-    showVideoSelector,
     showLogoSelector,
     steamBannerImages,
     steamBannerSearchQuery,

@@ -65,7 +65,6 @@ declare module 'vue' {
     CoverBannerSelectorModal: typeof import('./components/edit-game/import-modals/CoverBannerSelectorModal.vue')['default']
     EditGameAssetImportModals: typeof import('./components/edit-game/EditGameAssetImportModals.vue')['default']
     EditGameModal: typeof import('./components/EditGameModal.vue')['default']
-    EditGameVideoModal: typeof import('./components/edit-game/EditGameVideoModal.vue')['default']
     EditGameWikiMetadataPickerModal: typeof import('./components/edit-game/EditGameWikiMetadataPickerModal.vue')['default']
     EyeBall: typeof import('./components/login/EyeBall.vue')['default']
     FileBrowserModal: typeof import('./components/FileBrowserModal.vue')['default']

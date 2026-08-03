@@ -25,7 +25,6 @@ interface UseEditGameAssetsOptions {
   showCoverSelector: Ref<boolean>
   showBannerSelector: Ref<boolean>
   showScreenshotSelector: Ref<boolean>
-  showVideoSelector: Ref<boolean>
   showLogoSelector: Ref<boolean>
   isUploadingVideo: Ref<boolean>
   videoUploadProgress: Ref<number>
@@ -118,10 +117,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     options.addAlert('截图上传失败', 'error')
   }
 
-  const openVideoSelector = () => {
-    options.showVideoSelector.value = true
-  }
-
   const handleVideoFileChange = async (event: Event) => {
     const input = event.target as HTMLInputElement
     const files = input.files
@@ -209,7 +204,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
   }
 
   const resetVideoUploadState = () => {
-    options.showVideoSelector.value = false
     options.videoUploadProgress.value = 0
     options.videoUploadFileName.value = ''
     options.isUploadingVideo.value = false
@@ -224,7 +218,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     handleBannerUploadError,
     handleScreenshotUploadSuccess,
     handleScreenshotUploadError,
-    openVideoSelector,
     handleVideoFileChange,
     removeCover,
     removeLogo,
