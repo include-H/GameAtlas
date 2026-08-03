@@ -429,8 +429,13 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1080px) {
+  .animated-characters {
+    height: 460px;
+  }
+
   .animated-characters__scene {
     --scene-shift-x: 35px;
+    --scene-scale: 1;
   }
 }
 

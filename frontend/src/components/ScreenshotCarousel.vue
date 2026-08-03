@@ -94,27 +94,20 @@
       </div>
     </div>
 
-    <div v-if="mediaItems.length > 1" class="screenshot-carousel__filmstrip app-glass-surface">
-      <div class="screenshot-carousel__filmstrip-inner">
-        <div
-          v-for="(item, index) in mediaItems"
-          :key="item.key"
-          :class="['screenshot-carousel__film', { active: currentIndex === index }]"
-          @click="currentIndex = index"
+    <div v-if="videoEntries.length > 1" class="screenshot-carousel__video-list app-glass-surface">
+      <div class="screenshot-carousel__video-list-inner">
+        <button
+          v-for="(entry, i) in videoEntries"
+          :key="entry.item.key"
+          :class="['screenshot-carousel__video-item', { active: currentIndex === entry.index }]"
+          type="button"
+          @click="currentIndex = entry.index"
         >
-          <img
-            v-if="item.thumbnail"
-            :src="item.thumbnail"
-            :alt="item.type === 'video' ? 'Video thumbnail' : `Screenshot ${index + 1}`"
-            @error="item.type === 'image' ? handleImageError(item.thumbnail) : undefined"
-          />
-          <div v-else class="screenshot-carousel__film-placeholder">
-            <svg viewBox="0 0 24 24" width="24" height="24">
-              <path fill="currentColor" d="M8 5v14l11-7z"/>
-            </svg>
-          </div>
-          <div class="screenshot-carousel__film-overlay"></div>
-        </div>
+          <svg viewBox="0 0 24 24" width="16" height="16" class="screenshot-carousel__video-item-icon">
+            <path fill="currentColor" d="M8 5v14l11-7z"/>
+          </svg>
+          <span class="screenshot-carousel__video-item-label">预告片 {{ i + 1 }}</span>
+        </button>
       </div>
     </div>
   </div>
@@ -197,6 +190,12 @@ const mediaItems = computed<MediaItem[]>(() => {
     })
   })
   return items
+})
+
+const videoEntries = computed(() => {
+  return mediaItems.value
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.type === 'video')
 })
 
 const currentMedia = computed(() => {
@@ -550,89 +549,74 @@ const handleImageError = (url: string) => {
   z-index: 10;
 }
 
-/* Filmstrip (Thumbnail Navigation) - Steam Style */
-.screenshot-carousel__filmstrip {
-  padding: 10px 0 0;
+/* Video List (File-Manager Style) */
+.screenshot-carousel__video-list {
   border-radius: 16px;
   overflow: hidden;
 }
 
-.screenshot-carousel__filmstrip-inner {
+.screenshot-carousel__video-list-inner {
   display: flex;
-  gap: 8px;
-  justify-content: flex-start;
-  overflow-x: auto;
-  padding: 0 10px 6px;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 6px;
   scrollbar-width: thin;
   scrollbar-color: var(--color-border-3) transparent;
 }
 
-.screenshot-carousel__filmstrip-inner::-webkit-scrollbar {
-  height: 6px;
+.screenshot-carousel__video-list-inner::-webkit-scrollbar {
+  width: 6px;
 }
 
-.screenshot-carousel__filmstrip-inner::-webkit-scrollbar-track {
+.screenshot-carousel__video-list-inner::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.screenshot-carousel__filmstrip-inner::-webkit-scrollbar-thumb {
+.screenshot-carousel__video-list-inner::-webkit-scrollbar-thumb {
   background: var(--color-border-3);
   border-radius: 3px;
 }
 
-.screenshot-carousel__film {
-  position: relative;
-  width: auto;
-  height: 65px;
-  aspect-ratio: 16/9;
-  border-radius: 12px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: 1px solid var(--color-border-2);
-  flex-shrink: 0;
-  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
-  opacity: 1;
-  box-shadow: inset 0 1px 0 var(--color-border-1);
-}
-
-.screenshot-carousel__film img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.3s ease;
-}
-
-.screenshot-carousel__film-placeholder {
-  width: 100%;
-  height: 100%;
+.screenshot-carousel__video-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: var(--color-text-on-dark);
-  background: var(--color-bg-3);
-}
-
-.screenshot-carousel__film-overlay {
-  position: absolute;
-  inset: 0;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
   background: transparent;
-  transition: all 0.2s ease;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: var(--color-text-2);
+  font-size: 13px;
+  text-align: left;
+  font-family: inherit;
 }
 
-.screenshot-carousel__film:hover {
-  border-color: var(--app-glass-border-hover);
+.screenshot-carousel__video-item:hover {
+  background: color-mix(in srgb, var(--color-fill-2) 60%, transparent);
+  color: var(--color-text-1);
+}
+
+.screenshot-carousel__video-item.active {
+  background: color-mix(in srgb, var(--color-primary-6) 14%, transparent);
+  color: var(--color-primary-3);
+}
+
+.screenshot-carousel__video-item-icon {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.screenshot-carousel__video-item.active .screenshot-carousel__video-item-icon {
   opacity: 1;
-  transform: translateY(-1px);
 }
 
-.screenshot-carousel__film:hover img {
-  transform: scale(1.02);
-}
-
-.screenshot-carousel__film.active {
-  border-color: var(--color-primary-4);
-  opacity: 1;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-4) 22%, transparent), var(--shadow-hover);
+.screenshot-carousel__video-item-label {
+  font-weight: 500;
+  line-height: 1;
 }
 </style>

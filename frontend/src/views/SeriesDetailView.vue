@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { onActivated, ref, watch } from 'vue'
+import { onActivated, onDeactivated, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { IconLeft } from '@arco-design/web-vue/es/icon'
 import { useUiStore } from '@/stores/ui'
@@ -148,6 +148,10 @@ onActivated(() => {
   if (!Number.isNaN(id) && id > 0) {
     syncAmbientBackground(id)
   }
+})
+
+onDeactivated(() => {
+  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
 })
 </script>
 

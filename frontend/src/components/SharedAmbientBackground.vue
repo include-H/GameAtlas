@@ -150,11 +150,12 @@ const loadBackground = async () => {
     return layerUrls.value[activeLayerIndex.value] || ''
   }
 
-  await ensureGlobalPool()
-
+  // 无页面特定背景源时，检查自定义背景
   if (canUseCustomBackground.value) {
     return CUSTOM_BACKGROUND_PATH
   }
+
+  await ensureGlobalPool()
 
   if (globalPoolUrls.value.length > 0) {
     return pickRandomBackground(globalPoolUrls.value, layerUrls.value[activeLayerIndex.value] || '')

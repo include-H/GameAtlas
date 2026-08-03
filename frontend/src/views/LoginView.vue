@@ -309,7 +309,7 @@ onBeforeUnmount(() => {
     radial-gradient(circle at top right, rgba(122, 162, 199, 0.14), transparent 32%),
     radial-gradient(circle at bottom left, rgba(67, 87, 110, 0.16), transparent 36%),
     linear-gradient(180deg, rgba(6, 10, 16, 0.42), rgba(8, 12, 18, 0.58));
-  overflow: hidden;
+  overflow-x: hidden;
   position: relative;
   z-index: 1;
 }
