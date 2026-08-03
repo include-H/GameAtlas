@@ -44,14 +44,15 @@
             <a-col :span="12">
               <a-form-item label="开发商">
                 <a-select
-                  v-model="form.developer_ids"
+                  :model-value="form.developer_ids"
                   placeholder="选择开发商（可多选）"
                   multiple
                   allow-clear
                   allow-search
-                  :allow-create="canCreateDeveloperOption"
+                  :loading="isSearchingDevelopers || isCreatingDevelopers"
                   :remote-search="true"
                   :on-search="handleDeveloperSearch"
+                  @update:model-value="handleDeveloperSelection"
                 >
                   <a-option
                     v-for="d in filteredDeveloperOptions"
@@ -61,20 +62,28 @@
                   >
                     {{ d.name }}
                   </a-option>
+                  <a-option
+                    v-if="canCreateDeveloperOption"
+                    :value="CREATE_DEVELOPER_OPTION_VALUE"
+                    :label="`创建“${developerSearchQuery.trim()}”`"
+                  >
+                    创建“{{ developerSearchQuery.trim() }}”
+                  </a-option>
                 </a-select>
               </a-form-item>
             </a-col>
             <a-col :span="12">
               <a-form-item label="发行商">
                 <a-select
-                  v-model="form.publisher_ids"
+                  :model-value="form.publisher_ids"
                   placeholder="选择发行商（可多选）"
                   multiple
                   allow-clear
                   allow-search
-                  :allow-create="canCreatePublisherOption"
+                  :loading="isSearchingPublishers || isCreatingPublishers"
                   :remote-search="true"
                   :on-search="handlePublisherSearch"
+                  @update:model-value="handlePublisherSelection"
                 >
                   <a-option
                     v-for="p in filteredPublisherOptions"
@@ -83,6 +92,13 @@
                     :label="p.name"
                   >
                     {{ p.name }}
+                  </a-option>
+                  <a-option
+                    v-if="canCreatePublisherOption"
+                    :value="CREATE_PUBLISHER_OPTION_VALUE"
+                    :label="`创建“${publisherSearchQuery.trim()}”`"
+                  >
+                    创建“{{ publisherSearchQuery.trim() }}”
                   </a-option>
                 </a-select>
               </a-form-item>
@@ -93,14 +109,14 @@
             <a-col :span="8">
               <a-form-item label="系列">
                 <a-select
-                  v-model="form.series_id"
+                  :model-value="form.series_id"
                   placeholder="选择系列"
                   allow-clear
                   allow-search
-                  :allow-create="canCreateSeriesOption"
-                  :loading="isSearchingSeries"
+                  :loading="isSearchingSeries || isCreatingSeries"
                   :remote-search="true"
                   :on-search="handleSeriesSearch"
+                  @update:model-value="handleSeriesSelection"
                 >
                   <a-option
                     v-for="s in filteredSeriesOptions"
@@ -109,6 +125,13 @@
                     :label="s.name"
                   >
                     {{ s.name }}
+                  </a-option>
+                  <a-option
+                    v-if="canCreateSeriesOption"
+                    :value="CREATE_SERIES_OPTION_VALUE"
+                    :label="`创建“${seriesSearchQuery.trim()}”`"
+                  >
+                    创建“{{ seriesSearchQuery.trim() }}”
                   </a-option>
                 </a-select>
               </a-form-item>
@@ -410,6 +433,9 @@ const formRef = ref()
 const isSubmitting = ref(false)
 
 const {
+  CREATE_DEVELOPER_OPTION_VALUE,
+  CREATE_PUBLISHER_OPTION_VALUE,
+  CREATE_SERIES_OPTION_VALUE,
   addFilePath,
   applySelectedWikiMetadata,
   backToBannerGameSearch,
@@ -431,6 +457,7 @@ const {
   confirmSummaryImport,
   coverPreviewUrl,
   coverSearchUrl,
+  developerSearchQuery,
   downloadSelectedSteamBanner,
   downloadSelectedSteamCover,
   downloadSelectedSteamCovers,
@@ -456,9 +483,11 @@ const {
   handleCoverUploadError,
   handleCoverUploadSuccess,
   handleDeveloperSearch,
+  handleDeveloperSelection,
   handleFilePathItemUpdate,
   handleFileSelect,
   handlePublisherSearch,
+  handlePublisherSelection,
   handleScreenshotDragEnd,
   handleScreenshotDragEnter,
   handleScreenshotDragStart,
@@ -467,6 +496,7 @@ const {
   handleScreenshotUploadError,
   handleScreenshotUploadSuccess,
   handleSeriesSearch,
+  handleSeriesSelection,
   handleSubmit,
   handleSummarySearchClear,
   handleVideoFileChange,
@@ -484,8 +514,13 @@ const {
   isDownloadingSteamCovers,
   isDownloadingSteamLogos,
   isDownloadingSteamScreenshots,
+  isCreatingDevelopers,
+  isCreatingPublishers,
+  isCreatingSeries,
   isPreparingWikiMetadataCandidates,
   isSearchingSeries,
+  isSearchingDevelopers,
+  isSearchingPublishers,
   isSearchingBanner,
   isSearchingCover,
   isSearchingLogo,
@@ -547,12 +582,14 @@ const {
   selectedSteamScreenshotGame,
   selectedSteamScreenshots,
   selectedSteamSummaryGame,
+  publisherSearchQuery,
   showBannerSelector,
   showCoverSelector,
   showFileBrowser,
   showLogoSelector,
   showScreenshotSelector,
   showSummarySelector,
+  seriesSearchQuery,
   steamBannerImages,
   steamBannerSearchQuery,
   bannerSearchResults,

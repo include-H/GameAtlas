@@ -54,6 +54,8 @@ interface UseSteamImportOptions {
     asset: UploadedAssetLike | string,
     index: number,
   ) => EditGameEditableScreenshot
+  ensureDeveloperNames: (names: string[]) => Promise<number[]>
+  ensurePublisherNames: (names: string[]) => Promise<number[]>
   addAlert: (message: string, type: AlertType) => void
   onAssetPersisted?: () => Promise<void> | void
 }
@@ -104,6 +106,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   } = useSteamImportMetadata({
     form: options.form,
     getWikiContent: options.getWikiContent,
+    ensureDeveloperNames: options.ensureDeveloperNames,
+    ensurePublisherNames: options.ensurePublisherNames,
     addAlert: options.addAlert,
   })
 

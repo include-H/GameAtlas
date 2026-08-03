@@ -25,10 +25,11 @@ import { useEditGameAssets } from '@/composables/useEditGameAssets'
 import { useEditGameFormBootstrap } from '@/composables/useEditGameFormBootstrap'
 import { useEditGameMediaState } from '@/composables/useEditGameMediaState'
 import {
-  hasCreatableOptionName,
-  searchCreatableOptions,
-  sortCreatableOptionsByName,
-} from '@/utils/creatable-select'
+  normalizeMetadataPickerID,
+  normalizeMetadataPickerIDs,
+  useRemoteMetadataPicker,
+} from '@/composables/useRemoteMetadataPicker'
+import { sortCreatableOptionsByName } from '@/utils/creatable-select'
 import type {
   AdminGameDetail,
   BannerItem,
@@ -57,6 +58,10 @@ interface UseEditGameModalOptions {
   isSubmitting: Ref<boolean>
 }
 
+const CREATE_SERIES_OPTION_VALUE = '__create_series__'
+const CREATE_DEVELOPER_OPTION_VALUE = '__create_developer__'
+const CREATE_PUBLISHER_OPTION_VALUE = '__create_publisher__'
+
 export const useEditGameModal = ({
   props,
   emit,
@@ -65,15 +70,6 @@ export const useEditGameModal = ({
   isSubmitting,
 }: UseEditGameModalOptions) => {
   const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1280)
-  const seriesOptions = ref<Series[]>([])
-  const developerOptions = ref<Developer[]>([])
-  const publisherOptions = ref<Publisher[]>([])
-  const isSearchingSeries = ref(false)
-  const isSearchingDevelopers = ref(false)
-  const isSearchingPublishers = ref(false)
-  const seriesSearchQuery = ref('')
-  const developerSearchQuery = ref('')
-  const publisherSearchQuery = ref('')
   const isUploadingVideo = ref(false)
   const videoUploadProgress = ref(0)
   const videoUploadFileName = ref('')
@@ -83,6 +79,33 @@ export const useEditGameModal = ({
   }
 
   const form = ref<EditGameForm>(createEmptyEditGameForm())
+  const seriesPicker = useRemoteMetadataPicker<Series>({
+    selectedIds: () => form.value.series_id === null ? [] : [form.value.series_id],
+    search: (query) => seriesService.searchSeries(query),
+    create: (name) => seriesService.createSeries({ name }),
+  })
+  const developerPicker = useRemoteMetadataPicker<Developer>({
+    selectedIds: () => form.value.developer_ids,
+    search: (query) => developersService.listDevelopers({ query }),
+    create: (name) => developersService.createDeveloper({ name }),
+  })
+  const publisherPicker = useRemoteMetadataPicker<Publisher>({
+    selectedIds: () => form.value.publisher_ids,
+    search: (query) => publishersService.listPublishers({ query }),
+    create: (name) => publishersService.createPublisher({ name }),
+  })
+  const seriesOptions = seriesPicker.options
+  const developerOptions = developerPicker.options
+  const publisherOptions = publisherPicker.options
+  const isSearchingSeries = seriesPicker.isSearching
+  const isSearchingDevelopers = developerPicker.isSearching
+  const isSearchingPublishers = publisherPicker.isSearching
+  const isCreatingSeries = seriesPicker.isCreating
+  const isCreatingDevelopers = developerPicker.isCreating
+  const isCreatingPublishers = publisherPicker.isCreating
+  const canCreateSeriesOption = seriesPicker.canCreate
+  const canCreateDeveloperOption = developerPicker.canCreate
+  const canCreatePublisherOption = publisherPicker.canCreate
 
   const primaryLogo = computed(() => {
     return form.value.logo || null
@@ -113,21 +136,6 @@ export const useEditGameModal = ({
     // 2026-04-04: keep authoring pickers alphabetized for scan speed.
     // Impact: this is UI-only option ordering; do not treat it as backend metadata sort semantics.
     return sortCreatableOptionsByName(publisherOptions.value)
-  })
-
-  const canCreateSeriesOption = computed(() => {
-    const query = seriesSearchQuery.value.trim()
-    return query.length === 0 || !hasCreatableOptionName(query, seriesOptions.value)
-  })
-
-  const canCreateDeveloperOption = computed(() => {
-    const query = developerSearchQuery.value.trim()
-    return query.length === 0 || !hasCreatableOptionName(query, developerOptions.value)
-  })
-
-  const canCreatePublisherOption = computed(() => {
-    const query = publisherSearchQuery.value.trim()
-    return query.length === 0 || !hasCreatableOptionName(query, publisherOptions.value)
   })
 
   const currentGame = computed(() => props.game)
@@ -165,62 +173,84 @@ export const useEditGameModal = ({
   })
 
   const handleSeriesSearch = async (query: string) => {
-    seriesSearchQuery.value = query
-    const normalizedQuery = query.trim()
-    if (!normalizedQuery) return
-    isSearchingSeries.value = true
     try {
-      const selectedValues = form.value.series_id === null || form.value.series_id === '' ? [] : [form.value.series_id]
-      seriesOptions.value = await searchCreatableOptions({
-        query: normalizedQuery,
-        selectedValues,
-        currentOptions: seriesOptions.value,
-        search: (keyword) => seriesService.searchSeries(keyword),
-      })
+      await seriesPicker.search(query)
     } catch {
-      // 2026-04-08: picker search failures must stay distinguishable from a real empty result set.
-      // Impact: keep the last successful options visible and surface an explicit error instead of "no options".
       addAlert('系列搜索失败', 'error')
-    } finally {
-      isSearchingSeries.value = false
     }
   }
 
   const handleDeveloperSearch = async (query: string) => {
-    developerSearchQuery.value = query
-    const normalizedQuery = query.trim()
-    if (!normalizedQuery) return
-    isSearchingDevelopers.value = true
     try {
-      developerOptions.value = await searchCreatableOptions({
-        query: normalizedQuery,
-        selectedValues: form.value.developer_ids,
-        currentOptions: developerOptions.value,
-        search: (keyword) => developersService.listDevelopers({ query: keyword }),
-      })
+      await developerPicker.search(query)
     } catch {
       addAlert('开发商搜索失败', 'error')
-    } finally {
-      isSearchingDevelopers.value = false
     }
   }
 
   const handlePublisherSearch = async (query: string) => {
-    publisherSearchQuery.value = query
-    const normalizedQuery = query.trim()
-    if (!normalizedQuery) return
-    isSearchingPublishers.value = true
     try {
-      publisherOptions.value = await searchCreatableOptions({
-        query: normalizedQuery,
-        selectedValues: form.value.publisher_ids,
-        currentOptions: publisherOptions.value,
-        search: (keyword) => publishersService.listPublishers({ query: keyword }),
-      })
+      await publisherPicker.search(query)
     } catch {
       addAlert('发行商搜索失败', 'error')
-    } finally {
-      isSearchingPublishers.value = false
+    }
+  }
+
+  const createSeriesFromSearch = async () => {
+    try {
+      const item = await seriesPicker.createFromQuery()
+      if (!item) return
+      form.value.series_id = item.id
+      seriesPicker.clearSearch()
+    } catch {
+      addAlert('创建系列失败', 'error')
+    }
+  }
+
+  const createDeveloperFromSearch = async () => {
+    try {
+      const item = await developerPicker.createFromQuery()
+      if (!item) return
+      form.value.developer_ids = Array.from(new Set([...form.value.developer_ids, item.id]))
+      developerPicker.clearSearch()
+    } catch {
+      addAlert('创建开发商失败', 'error')
+    }
+  }
+
+  const createPublisherFromSearch = async () => {
+    try {
+      const item = await publisherPicker.createFromQuery()
+      if (!item) return
+      form.value.publisher_ids = Array.from(new Set([...form.value.publisher_ids, item.id]))
+      publisherPicker.clearSearch()
+    } catch {
+      addAlert('创建发行商失败', 'error')
+    }
+  }
+
+  const handleSeriesSelection = (value: unknown) => {
+    if (value === CREATE_SERIES_OPTION_VALUE) {
+      void createSeriesFromSearch()
+      return
+    }
+    form.value.series_id = normalizeMetadataPickerID(value)
+    seriesPicker.clearSearch()
+  }
+
+  const handleDeveloperSelection = (value: unknown) => {
+    const values = Array.isArray(value) ? value : []
+    form.value.developer_ids = normalizeMetadataPickerIDs(values)
+    if (values.includes(CREATE_DEVELOPER_OPTION_VALUE)) {
+      void createDeveloperFromSearch()
+    }
+  }
+
+  const handlePublisherSelection = (value: unknown) => {
+    const values = Array.isArray(value) ? value : []
+    form.value.publisher_ids = normalizeMetadataPickerIDs(values)
+    if (values.includes(CREATE_PUBLISHER_OPTION_VALUE)) {
+      void createPublisherFromSearch()
     }
   }
 
@@ -399,9 +429,6 @@ export const useEditGameModal = ({
     game: currentGame,
     form,
     isSubmitting,
-    seriesOptions,
-    developerOptions,
-    publisherOptions,
     validateForm: async () => {
       try {
         await formRef.value?.validate?.()
@@ -557,6 +584,8 @@ export const useEditGameModal = ({
     createEditableBanner,
     createEditableLogo,
     createEditableScreenshot,
+    ensureDeveloperNames: developerPicker.ensureNames,
+    ensurePublisherNames: publisherPicker.ensureNames,
     addAlert,
     onAssetPersisted: emitAssetSync,
   })
@@ -605,9 +634,9 @@ export const useEditGameModal = ({
   })
 
   const resetTransientState = () => {
-    seriesSearchQuery.value = ''
-    developerSearchQuery.value = ''
-    publisherSearchQuery.value = ''
+    seriesPicker.reset()
+    developerPicker.reset()
+    publisherPicker.reset()
     resetFileBrowserState()
     resetSteamImportState()
     resetVideoUploadState()
@@ -636,6 +665,9 @@ export const useEditGameModal = ({
   }
 
   return {
+    CREATE_DEVELOPER_OPTION_VALUE,
+    CREATE_PUBLISHER_OPTION_VALUE,
+    CREATE_SERIES_OPTION_VALUE,
     bannerUploadAction,
     bannerUploadData,
     bannerPreviewUrl,
@@ -682,9 +714,11 @@ export const useEditGameModal = ({
     handleLogoUploadError,
     handleLogoSearchClear,
     handleDeveloperSearch,
+    handleDeveloperSelection,
     handleFilePathItemUpdate,
     handleFileSelect,
     handlePublisherSearch,
+    handlePublisherSelection,
     handleScreenshotDragEnd,
     handleScreenshotDragEnter,
     handleScreenshotDragStart,
@@ -693,6 +727,7 @@ export const useEditGameModal = ({
     handleScreenshotUploadError,
     handleScreenshotUploadSuccess,
     handleSeriesSearch,
+    handleSeriesSelection,
     handleSubmit,
     handleSummarySearchClear,
     handleVideoFileChange,
@@ -707,9 +742,14 @@ export const useEditGameModal = ({
     isDownloadingSteamScreenshots,
     isDownloadingSteamLogos,
     isDownloadingLogo,
+    isCreatingDevelopers,
+    isCreatingPublishers,
+    isCreatingSeries,
     isSearchingLogo,
     isPreparingWikiMetadataCandidates,
     isSearchingSeries,
+    isSearchingDevelopers,
+    isSearchingPublishers,
     isSearchingBanner,
     isSearchingCover,
     isSearchingScreenshots,
@@ -724,6 +764,9 @@ export const useEditGameModal = ({
     logoSearchUrl,
     logoPreviewUrl,
     logoSearchResults,
+    developerSearchQuery: developerPicker.query,
+    publisherSearchQuery: publisherPicker.query,
+    seriesSearchQuery: seriesPicker.query,
     steamLogoImages,
     steamLogoSearchQuery,
     selectedLogoImage,

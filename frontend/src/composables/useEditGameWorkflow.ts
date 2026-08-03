@@ -1,37 +1,21 @@
 import { type Ref } from 'vue'
 import type { EditGameForm } from '@/utils/edit-game-form'
 import gamesService from '@/services/games.service'
-import { seriesService } from '@/services/series.service'
-import { developersService } from '@/services/developers.service'
-import { publishersService } from '@/services/publishers.service'
-import { normalizeCreatableOptionName, resolveCreatableSelections } from '@/utils/creatable-select'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import type {
   AdminGameDetail,
-  Developer,
   GameAggregateGameUpdateRequest,
   GameAggregateNewAsset,
-  Publisher,
-  Series,
 } from '@/services/types'
 
 interface UseEditGameWorkflowOptions {
   game: Ref<AdminGameDetail | null>
   form: Ref<EditGameForm>
   isSubmitting: Ref<boolean>
-  seriesOptions: Ref<Series[]>
-  developerOptions: Ref<Developer[]>
-  publisherOptions: Ref<Publisher[]>
   validateForm: () => Promise<boolean>
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
   emitSuccess: () => void
   closeModal: () => void
-}
-
-const createWorkflowStepError = (message: string, cause: unknown) => {
-  const error = new Error(message) as Error & { cause?: unknown }
-  error.cause = cause
-  return error
 }
 
 const toNullableFormText = (value: string | null | undefined) => {
@@ -41,93 +25,9 @@ const toNullableFormText = (value: string | null | undefined) => {
   return value.trim() ? value : null
 }
 
-const resolveSeriesSelection = async (
-  seriesValue: string | number | null,
-  options: Series[],
-) => {
-  const nextOptions = [...options]
-  let seriesIds: number[] | undefined
-
-  if (seriesValue === null || seriesValue === undefined || seriesValue === '') {
-    seriesIds = []
-  } else if (typeof seriesValue === 'number') {
-    seriesIds = [seriesValue]
-  } else if (typeof seriesValue === 'string' && seriesValue.trim()) {
-    const normalizedValue = seriesValue.trim()
-    const maybeId = Number(normalizedValue)
-    if (!Number.isNaN(maybeId) && normalizedValue === String(maybeId)) {
-      seriesIds = [maybeId]
-    } else {
-      const normalizedName = normalizeCreatableOptionName(normalizedValue)
-      const existingSeries = nextOptions.find((item) => normalizeCreatableOptionName(item.name) === normalizedName)
-      if (existingSeries) {
-        seriesIds = [existingSeries.id]
-        return {
-          ids: seriesIds,
-          options: nextOptions,
-        }
-      }
-      try {
-        // 2026-04-04: keep series creation inside the edit flow because game editing is a real
-        // metadata authoring entry point in this project, not a deprecated compatibility path.
-        const seriesName = normalizedValue
-        const newSeries = await seriesService.createSeries({
-          name: seriesName,
-        })
-        nextOptions.push(newSeries)
-        seriesIds = [newSeries.id]
-      } catch (error) {
-        throw createWorkflowStepError(`系列 "${seriesValue}" 处理失败`, error)
-      }
-    }
-  }
-
-  return {
-    ids: seriesIds ?? [],
-    options: nextOptions,
-  }
-}
-
-const resolveDevelopers = async (
-  values: Array<string | number>,
-  options: Developer[],
-) => {
-  try {
-    // 2026-04-04: developers can still be created from the edit form by product design.
-    // Impact: form selections may contain names until submit resolves them into persistent ids.
-    const result = await resolveCreatableSelections({
-      values,
-      options,
-      createItem: (name) =>
-        developersService.createDeveloper({ name }),
-    })
-    return result
-  } catch (error) {
-    throw createWorkflowStepError('开发商处理失败', error)
-  }
-}
-
-const resolvePublishers = async (
-  values: Array<string | number>,
-  options: Publisher[],
-) => {
-  try {
-    // 2026-04-04: publishers share the same authoring flow as developers.
-    const result = await resolveCreatableSelections({
-      values,
-      options,
-      createItem: (name) =>
-        publishersService.createPublisher({ name }),
-    })
-    return result
-  } catch (error) {
-    throw createWorkflowStepError('发行商处理失败', error)
-  }
-}
-
 const createUpdatePayload = (params: {
   form: EditGameForm
-  seriesId: number | null | undefined
+  seriesId: number | null
   developerIds: number[]
   publisherIds: number[]
 }): GameAggregateGameUpdateRequest => {
@@ -145,16 +45,6 @@ const createUpdatePayload = (params: {
 }
 
 export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
-  const refreshSeriesOptions = async () => {
-    try {
-      const popularSeries = await seriesService.getPopularSeries(50)
-      options.seriesOptions.value = popularSeries
-      return true
-    } catch {
-      return false
-    }
-  }
-
   const handleSubmit = async () => {
     const game = options.game.value
     if (!game) return
@@ -166,29 +56,9 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
     options.isSubmitting.value = true
 
     try {
-      const seriesResult = await resolveSeriesSelection(
-        options.form.value.series_id,
-        options.seriesOptions.value,
-      )
-      options.seriesOptions.value = seriesResult.options
-      const seriesId = seriesResult.ids[0] ?? null
-      options.form.value.series_id = seriesId
-
-      const developerResult = await resolveDevelopers(
-        options.form.value.developer_ids,
-        options.developerOptions.value,
-      )
-      options.developerOptions.value = developerResult.options
-      const developerIds = developerResult.ids
-      options.form.value.developer_ids = [...developerIds]
-
-      const publisherResult = await resolvePublishers(
-        options.form.value.publisher_ids,
-        options.publisherOptions.value,
-      )
-      options.publisherOptions.value = publisherResult.options
-      const publisherIds = publisherResult.ids
-      options.form.value.publisher_ids = [...publisherIds]
+      const seriesId = options.form.value.series_id
+      const developerIds = options.form.value.developer_ids
+      const publisherIds = options.form.value.publisher_ids
 
       const orderedScreenshotUids = options.form.value.screenshots
         .map((item) => item.asset_uid)
@@ -267,14 +137,7 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       if (aggregateResult.warnings.length > 0) {
         options.addAlert('部分素材文件未能物理删除，系统稍后可重试', 'warning')
       }
-      const seriesRefreshSucceeded = await refreshSeriesOptions()
-
       options.addAlert('保存成功', 'success')
-      if (!seriesRefreshSucceeded) {
-        // 2026-04-08: aggregate save success does not guarantee local picker metadata refreshed.
-        // Impact: keep the save successful, but surface that the post-save series lookup stayed stale.
-        options.addAlert('保存已生效，但系列选项刷新失败，请稍后重试', 'warning')
-      }
       options.emitSuccess()
       options.closeModal()
     } catch (error) {

@@ -17,6 +17,15 @@ cd frontend && npm run dev                # → :5173
 
 Prerequisites: Go 1.22+, Node.js, npm, curl.
 
+## Toolchain Environment
+
+Node.js and npm are managed by nvm. Non-interactive agent shells may not load nvm automatically, so initialize it before any frontend command:
+
+```bash
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+```
+
 ## Dev Commands
 
 | Task | Command | Working Dir |

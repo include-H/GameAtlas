@@ -38,12 +38,10 @@ export interface EditGameForm {
   title: string
   title_alt: string
   visibility: 'public' | 'private'
-  // 2026-04-04: these fields intentionally accept existing ids or new names.
-  // Impact: the edit modal remains the canonical place where metadata can be created during game editing.
-  developer_ids: Array<string | number>
-  publisher_ids: Array<string | number>
+  developer_ids: number[]
+  publisher_ids: number[]
   release_date: string | undefined
-  series_id: string | number | null
+  series_id: number | null
   summary: string
   // The first item is always the primary cover.
   covers: EditGameEditableCover[]

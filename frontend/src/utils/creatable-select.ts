@@ -23,6 +23,17 @@ export const hasCreatableOptionName = <T extends CreatableNamedOption>(name: str
   return normalizedName.length > 0 && options.some((item) => normalizeCreatableOptionName(item.name) === normalizedName)
 }
 
+export const canCreateRemoteSearchedOption = <T extends CreatableNamedOption>(
+  query: string,
+  resolvedQuery: string,
+  options: T[],
+) => {
+  const normalizedQuery = normalizeCreatableOptionName(query)
+  return normalizedQuery.length > 0
+    && normalizedQuery === resolvedQuery
+    && !hasCreatableOptionName(normalizedQuery, options)
+}
+
 export const dedupeCreatableOptionsByName = <T extends CreatableNamedOption>(options: T[]) => {
   const seenNames = new Set<string>()
   const deduped: T[] = []

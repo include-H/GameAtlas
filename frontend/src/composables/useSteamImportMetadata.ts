@@ -18,6 +18,8 @@ export interface WikiMetadataCandidateSelection {
 interface UseSteamImportMetadataOptions {
   form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'developer_ids' | 'publisher_ids'>>
   getWikiContent: () => string
+  ensureDeveloperNames: (names: string[]) => Promise<number[]>
+  ensurePublisherNames: (names: string[]) => Promise<number[]>
   addAlert: (message: string, type: AlertType) => void
 }
 
@@ -65,25 +67,23 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
     return options.form.value.title?.trim() || ''
   }
 
-  const applySteamMetadataToForm = (details: SteamGameDetails) => {
+  const applySteamMetadataToForm = async (details: SteamGameDetails) => {
     if (details.releaseDate) {
       options.form.value.release_date = details.releaseDate
     }
     if (details.developers && details.developers.length > 0) {
-      // 2026-04-04: Steam import writes names into the form first because the edit submit flow is
-      // responsible for resolving new metadata into persistent ids.
-      const merged = new Set<string | number>(options.form.value.developer_ids)
-      for (const name of details.developers) {
-        if (name.trim()) merged.add(name.trim())
-      }
-      options.form.value.developer_ids = Array.from(merged)
+      const ids = await options.ensureDeveloperNames(details.developers)
+      options.form.value.developer_ids = Array.from(new Set([
+        ...options.form.value.developer_ids,
+        ...ids,
+      ]))
     }
     if (details.publishers && details.publishers.length > 0) {
-      const merged = new Set<string | number>(options.form.value.publisher_ids)
-      for (const name of details.publishers) {
-        if (name.trim()) merged.add(name.trim())
-      }
-      options.form.value.publisher_ids = Array.from(merged)
+      const ids = await options.ensurePublisherNames(details.publishers)
+      options.form.value.publisher_ids = Array.from(new Set([
+        ...options.form.value.publisher_ids,
+        ...ids,
+      ]))
     }
   }
 
@@ -190,7 +190,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
     )
   }
 
-  const applySelectedWikiMetadata = () => {
+  const applySelectedWikiMetadata = async () => {
     const selected = wikiMetadataCandidates.value.filter((item) => item.selected)
     if (selected.length === 0) {
       options.addAlert('还没有选择要应用的字段', 'warning')
@@ -239,21 +239,21 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
             break
           case 'developers':
             if (metadata.developers.length > 0) {
-              const merged = new Set<string | number>(options.form.value.developer_ids)
-              for (const name of metadata.developers) {
-                merged.add(name)
-              }
-              options.form.value.developer_ids = Array.from(merged)
+              const ids = await options.ensureDeveloperNames(metadata.developers)
+              options.form.value.developer_ids = Array.from(new Set([
+                ...options.form.value.developer_ids,
+                ...ids,
+              ]))
               appliedLabels.push('开发商')
             }
             break
           case 'publishers':
             if (metadata.publishers.length > 0) {
-              const merged = new Set<string | number>(options.form.value.publisher_ids)
-              for (const name of metadata.publishers) {
-                merged.add(name)
-              }
-              options.form.value.publisher_ids = Array.from(merged)
+              const ids = await options.ensurePublisherNames(metadata.publishers)
+              options.form.value.publisher_ids = Array.from(new Set([
+                ...options.form.value.publisher_ids,
+                ...ids,
+              ]))
               appliedLabels.push('发行商')
             }
             break
@@ -268,6 +268,8 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
       }
 
       options.addAlert(`已应用 Wiki 字段：${appliedLabels.join('；')}`, 'success')
+    } catch {
+      options.addAlert('应用 Wiki 元数据失败', 'error')
     } finally {
       isApplyingWikiMetadata.value = false
     }
@@ -316,7 +318,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
     steamSummaryDetails.value = null
   }
 
-  const confirmSummaryImport = () => {
+  const confirmSummaryImport = async () => {
     const details = steamSummaryDetails.value
     const hasImportableMetadata = !!details?.releaseDate || !!details?.developers?.[0] || !!details?.publishers?.[0]
     if (!steamSummaryPreview.value && !hasImportableMetadata) {
@@ -327,8 +329,13 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
     if (steamSummaryPreview.value) {
       options.form.value.summary = steamSummaryPreview.value
     }
-    if (details) {
-      applySteamMetadataToForm(details)
+    try {
+      if (details) {
+        await applySteamMetadataToForm(details)
+      }
+    } catch {
+      options.addAlert('导入 Steam 元数据失败', 'error')
+      return
     }
     showSummarySelector.value = false
     options.addAlert(

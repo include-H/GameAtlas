@@ -1,53 +1,19 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EditGameForm } from '@/utils/edit-game-form'
-import type { AdminGameDetail, Developer, Publisher, Series } from '@/services/types'
+import type { AdminGameDetail } from '@/services/types'
 import { useEditGameWorkflow } from './useEditGameWorkflow'
 
 const {
   updateGameAggregateMock,
-  createSeriesMock,
-  getPopularSeriesMock,
-  resolveCreatableSelectionsMock,
-  createDeveloperMock,
-  createPublisherMock,
 } = vi.hoisted(() => ({
   updateGameAggregateMock: vi.fn(),
-  createSeriesMock: vi.fn(),
-  getPopularSeriesMock: vi.fn(),
-  resolveCreatableSelectionsMock: vi.fn(),
-  createDeveloperMock: vi.fn(),
-  createPublisherMock: vi.fn(),
 }))
 
 vi.mock('@/services/games.service', () => ({
   default: {
     updateGameAggregate: updateGameAggregateMock,
   },
-}))
-
-vi.mock('@/services/series.service', () => ({
-  seriesService: {
-    createSeries: createSeriesMock,
-    getPopularSeries: getPopularSeriesMock,
-  },
-}))
-
-vi.mock('@/services/developers.service', () => ({
-  developersService: {
-    createDeveloper: createDeveloperMock,
-  },
-}))
-
-vi.mock('@/services/publishers.service', () => ({
-  publishersService: {
-    createPublisher: createPublisherMock,
-  },
-}))
-
-vi.mock('@/utils/creatable-select', () => ({
-  normalizeCreatableOptionName: (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase(),
-  resolveCreatableSelections: resolveCreatableSelectionsMock,
 }))
 
 const buildOptions = () => {
@@ -110,9 +76,6 @@ const buildOptions = () => {
         file_paths: [],
       }),
       isSubmitting: ref(false),
-      seriesOptions: ref<Series[]>([]),
-      developerOptions: ref<Developer[]>([]),
-      publisherOptions: ref<Publisher[]>([]),
       validateForm: vi.fn().mockResolvedValue(true),
       addAlert,
       emitSuccess,
@@ -124,12 +87,6 @@ const buildOptions = () => {
 describe('useEditGameWorkflow', () => {
   beforeEach(() => {
     updateGameAggregateMock.mockReset()
-    createSeriesMock.mockReset()
-    getPopularSeriesMock.mockReset()
-    resolveCreatableSelectionsMock.mockReset()
-    createDeveloperMock.mockReset()
-    createPublisherMock.mockReset()
-
     updateGameAggregateMock.mockResolvedValue({
       game: {
         id: 1,
@@ -137,28 +94,6 @@ describe('useEditGameWorkflow', () => {
       },
       warnings: [],
     })
-    getPopularSeriesMock.mockResolvedValue([])
-    resolveCreatableSelectionsMock.mockImplementation(async ({ values, options }) => ({
-      ids: values.map((value: string | number) => Number(value)),
-      options,
-    }))
-  })
-
-  it('aborts submit when series resolution fails', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const { options, addAlert, emitSuccess, closeModal } = buildOptions()
-    options.form.value.series_id = 'Broken Series'
-    createSeriesMock.mockRejectedValue(new Error('boom'))
-
-    const workflow = useEditGameWorkflow(options)
-    await workflow.handleSubmit()
-
-    expect(updateGameAggregateMock).not.toHaveBeenCalled()
-    expect(addAlert).toHaveBeenCalledWith('系列 "Broken Series" 处理失败', 'error')
-    expect(emitSuccess).not.toHaveBeenCalled()
-    expect(closeModal).not.toHaveBeenCalled()
-    expect(options.isSubmitting.value).toBe(false)
-    consoleErrorSpy.mockRestore()
   })
 
   it('preserves existing file notes when aggregate save does not edit them', async () => {
@@ -189,27 +124,22 @@ describe('useEditGameWorkflow', () => {
     }))
   })
 
-  it('reuses matching series option instead of creating a duplicate', async () => {
+  it('submits the already-resolved metadata ids without another metadata request', async () => {
     const { options } = buildOptions()
-    options.form.value.series_id = ' 孤岛惊魂 '
-    options.seriesOptions.value = [{
-      id: 4,
-      name: '孤岛惊魂',
-      slug: 'far-cry',
-      sort_order: 0,
-      created_at: '2026-03-25T00:00:00Z',
-    }]
+    options.form.value.series_id = 4
+    options.form.value.developer_ids = [1, 3]
+    options.form.value.publisher_ids = [2, 5]
 
     const workflow = useEditGameWorkflow(options)
     await workflow.handleSubmit()
 
-    expect(createSeriesMock).not.toHaveBeenCalled()
     expect(updateGameAggregateMock).toHaveBeenCalledWith('game-1', expect.objectContaining({
       game: expect.objectContaining({
         series_id: 4,
+        developer_ids: [1, 3],
+        publisher_ids: [2, 5],
       }),
     }))
-    expect(options.form.value.series_id).toBe(4)
   })
 
   it('normalizes blank optional fields before aggregate submit', async () => {
@@ -228,20 +158,16 @@ describe('useEditGameWorkflow', () => {
     }))
   })
 
-  it('warns when series picker refresh fails after a successful save', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+  it('keeps a successful aggregate save successful without a metadata refresh step', async () => {
     const { options, addAlert, emitSuccess, closeModal } = buildOptions()
-    getPopularSeriesMock.mockRejectedValueOnce(new Error('series refresh failed'))
 
     const workflow = useEditGameWorkflow(options)
     await workflow.handleSubmit()
 
     expect(updateGameAggregateMock).toHaveBeenCalledTimes(1)
     expect(addAlert).toHaveBeenCalledWith('保存成功', 'success')
-    expect(addAlert).toHaveBeenCalledWith('保存已生效，但系列选项刷新失败，请稍后重试', 'warning')
     expect(emitSuccess).toHaveBeenCalledTimes(1)
     expect(closeModal).toHaveBeenCalledTimes(1)
-    consoleErrorSpy.mockRestore()
   })
 
 })

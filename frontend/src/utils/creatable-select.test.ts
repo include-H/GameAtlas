@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  canCreateRemoteSearchedOption,
   dedupeCreatableOptionsByName,
   hasCreatableOptionName,
   normalizeOptionId,
@@ -51,6 +52,15 @@ describe('creatable-select helpers', () => {
     expect(hasCreatableOptionName(' far cry ', [{ id: 1, name: 'Far  Cry' }])).toBe(true)
     expect(hasCreatableOptionName('孤岛惊魂', [{ id: 2, name: '孤岛惊魂' }])).toBe(true)
     expect(hasCreatableOptionName('孤岛惊魂4', [{ id: 2, name: '孤岛惊魂' }])).toBe(false)
+  })
+
+  it('only enables remote creation after the current query has resolved without an exact match', () => {
+    const options = [{ id: 1, name: '黑手党' }]
+
+    expect(canCreateRemoteSearchedOption('黑手党', '', options)).toBe(false)
+    expect(canCreateRemoteSearchedOption('黑手党', '黑手党', options)).toBe(false)
+    expect(canCreateRemoteSearchedOption('黑手党：新篇章', '黑手党', options)).toBe(false)
+    expect(canCreateRemoteSearchedOption('黑手党：新篇章', '黑手党：新篇章', options)).toBe(true)
   })
 
   it('merges selected options into search results and removes duplicate names', async () => {

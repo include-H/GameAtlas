@@ -128,32 +128,47 @@ func (r *MetadataRepository) FindSimpleBySlug(typ domain.MetadataType, slug stri
 	return &item, nil
 }
 
-func (r *MetadataRepository) CreateSeries(input domain.MetadataWriteInput, slug string, sortOrder int) (*domain.MetadataItem, error) {
-	var item domain.MetadataItem
-	err := r.db.Get(&item, `
-		INSERT INTO series (name, slug, sort_order)
-		VALUES (?, ?, ?)
-		RETURNING id, name, slug, sort_order, created_at
-	`, input.Name, slug, sortOrder)
-	if err != nil {
-		return nil, fmt.Errorf("create series: %w", err)
-	}
-	return &item, nil
-}
-
-func (r *MetadataRepository) CreateSimple(typ domain.MetadataType, input domain.MetadataWriteInput, slug string, sortOrder int) (*domain.MetadataItem, error) {
+func (r *MetadataRepository) CreateOrGet(
+	typ domain.MetadataType,
+	input domain.MetadataWriteInput,
+	slug string,
+	sortOrder int,
+) (*domain.MetadataItem, error) {
 	table := metadataTableName(typ)
+	if table == "" {
+		return nil, fmt.Errorf("unsupported metadata resource type: %d", typ)
+	}
+
+	var item domain.MetadataItem
 	query := fmt.Sprintf(`
 		INSERT INTO %s (name, slug, sort_order)
 		VALUES (?, ?, ?)
+		ON CONFLICT DO NOTHING
 		RETURNING id, name, slug, sort_order, created_at
 	`, table)
-
-	var item domain.MetadataItem
-	if err := r.db.Get(&item, query, input.Name, slug, sortOrder); err != nil {
+	err := r.db.Get(&item, query, input.Name, slug, sortOrder)
+	if err == nil {
+		return &item, nil
+	}
+	if err != sql.ErrNoRows {
 		return nil, fmt.Errorf("create metadata in %s: %w", table, err)
 	}
-	return &item, nil
+
+	existing, err := r.FindSimpleByName(typ, input.Name)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return existing, nil
+	}
+	existing, err = r.FindSimpleBySlug(typ, slug)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return existing, nil
+	}
+	return nil, fmt.Errorf("metadata insert conflicted but no existing %s item was found", table)
 }
 
 func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([]domain.SeriesGameSummary, error) {
