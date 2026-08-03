@@ -294,13 +294,14 @@
       :screenshot-preview-url="screenshotPreviewUrl"
       :is-downloading-screenshot="isDownloadingScreenshot"
       :show-logo-selector="showLogoSelector"
-      :steam-logo-search-query="steamLogoSearchQuery"
+      :logo-source="logoSource"
+      :logo-search-query="logoSearchQuery"
       :is-searching-logo="isSearchingLogo"
       :logo-search-results="logoSearchResults"
-      :selected-steam-logo-game="selectedSteamLogoGame"
-      :steam-logo-images="steamLogoImages"
+      :selected-logo-game="selectedLogoGame"
+      :logo-images="logoImages"
       :selected-logo-image="selectedLogoImage"
-      :is-downloading-steam-logos="isDownloadingSteamLogos"
+      :is-downloading-logos="isDownloadingLogos"
       :logo-upload-action="logoUploadAction"
       :logo-upload-data="logoUploadData"
       :logo-search-url="logoSearchUrl"
@@ -371,13 +372,14 @@
       @load-screenshot-preview="loadScreenshotPreview"
       @confirm-screenshot-selection="confirmScreenshotSelection"
       @update:show-logo-selector="showLogoSelector = $event"
-      @update:steam-logo-search-query="steamLogoSearchQuery = $event"
-      @search-logo="searchSteamForLogo"
+      @source-change-logo="logoSource = $event"
+      @update:logo-search-query="logoSearchQuery = $event"
+      @search-logo="searchLogos"
       @clear-logo="handleLogoSearchClear"
-      @select-logo-game="selectSteamLogoGame"
+      @select-logo-game="selectLogoGame"
       @back-logo-game-search="backToLogoGameSearch"
       @update:selected-logo-image="selectedLogoImage = $event"
-      @download-selected-steam-logo="downloadSelectedSteamLogo"
+      @download-selected-logo="downloadSelectedLogo"
       @logo-upload-success="handleLogoUploadSuccess"
       @logo-upload-error="handleLogoUploadError"
       @update:logo-search-url="logoSearchUrl = $event"
@@ -464,7 +466,7 @@ const {
   downloadSelectedSteamCover,
   downloadSelectedSteamCovers,
   downloadSelectedScreenshots,
-  downloadSelectedSteamLogo,
+  downloadSelectedLogo,
   draggedScreenshotKey,
   dragOverScreenshotKey,
   filteredDeveloperOptions,
@@ -514,7 +516,7 @@ const {
   isDownloadingLogo,
   isDownloadingScreenshot,
   isDownloadingSteamCovers,
-  isDownloadingSteamLogos,
+  isDownloadingLogos,
   isDownloadingRemoteScreenshots,
   isCreatingDevelopers,
   isCreatingPublishers,
@@ -560,7 +562,7 @@ const {
   screenshotUploadData,
   searchSteamForBanner,
   searchSteamForCover,
-  searchSteamForLogo,
+  searchLogos,
   searchScreenshots,
   searchSteamForSummary,
   selectAllBanners,
@@ -568,7 +570,7 @@ const {
   selectAllScreenshots,
   selectSteamBannerGame,
   selectSteamCoverGame,
-  selectSteamLogoGame,
+  selectLogoGame,
   selectScreenshotGame,
   selectSteamSummaryGame,
   selectedBanners,
@@ -580,7 +582,7 @@ const {
   selectedLogoImage,
   selectedSteamBannerGame,
   selectedSteamGame,
-  selectedSteamLogoGame,
+  selectedLogoGame,
   selectedScreenshotGame,
   selectedRemoteScreenshots,
   selectedSteamSummaryGame,
@@ -598,8 +600,8 @@ const {
   steamCoverImages,
   steamCoverSearchQuery,
   coverSearchResults,
-  steamLogoImages,
-  steamLogoSearchQuery,
+  logoImages,
+  logoSearchQuery,
   screenshotSearchQuery,
   screenshotSearchResults,
   screenshotCandidatesData,
@@ -619,6 +621,7 @@ const {
   coverSource,
   bannerSource,
   screenshotSource,
+  logoSource,
   sgdbAvailable,
 } = useEditGameModal({
   props,

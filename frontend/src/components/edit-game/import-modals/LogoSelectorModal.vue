@@ -9,25 +9,43 @@
     <a-tabs v-model:active-key="logoTabKey" type="rounded" size="small">
       <a-tab-pane key="import" title="更换">
         <div class="cover-selector-content">
+      <div class="source-selector">
+        <span class="source-selector__label">数据源</span>
+        <a-button
+          class="app-text-action-btn"
+          :type="source === 'steam' ? 'outline' : 'text'"
+          size="small"
+          html-type="button"
+          @click="emit('source-change', 'steam')"
+        >Steam</a-button>
+        <a-button
+          class="app-text-action-btn"
+          :type="source === 'steamgriddb' ? 'outline' : 'text'"
+          size="small"
+          html-type="button"
+          :disabled="!sgdbAvailable"
+          @click="emit('source-change', 'steamgriddb')"
+        >SteamGridDB</a-button>
+      </div>
       <steam-search-panel
-        :query="steamLogoSearchQuery"
-        placeholder="搜索 Steam 游戏..."
+        :query="logoSearchQuery"
+        :placeholder="searchPlaceholder"
         :loading="isSearchingLogo"
         :results="logoSearchResults"
-        :selected-game="selectedSteamLogoGame"
-        @update:query="emit('update:steam-logo-search-query', $event)"
+        :selected-game="selectedLogoGame"
+        @update:query="emit('update:logo-search-query', $event)"
         @search="emit('search-logo')"
         @clear="emit('clear-logo')"
         @select="emit('select-logo-game', $event)"
       >
-        <div v-if="selectedSteamLogoGame && steamLogoImages.length > 0" class="steam-images-section">
+        <div v-if="selectedLogoGame && logoImages.length > 0" class="steam-images-section">
           <div class="steam-search-title">
-            {{ selectedSteamLogoGame.name }} 的 Logo
+            {{ selectedLogoGame.name }} 的 Logo
             <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('back-logo-game-search')">返回</a-button>
           </div>
           <div class="steam-images-grid">
             <div
-              v-for="(image, index) in steamLogoImages"
+              v-for="(image, index) in logoImages"
               :key="index"
               class="steam-image-item"
               :class="{ 'steam-image-selected': selectedLogoImage === image }"
@@ -41,7 +59,7 @@
             v-if="selectedLogoImage"
             type="primary"
             long
-            :loading="isDownloadingSteamLogos"
+            :loading="isDownloadingLogos"
             html-type="button"
             @click="emit('download-selected-steam-logo')"
           >
@@ -50,7 +68,7 @@
         </div>
 
         <a-empty
-          v-else-if="selectedSteamLogoGame && steamLogoImages.length === 0 && !isSearchingLogo"
+          v-else-if="selectedLogoGame && logoImages.length === 0 && !isSearchingLogo"
           description="未找到可用 Logo"
           class="steam-screenshots-empty"
         />
@@ -157,18 +175,21 @@
 import { computed, ref, watch } from 'vue'
 import { IconImage, IconUpload } from '@arco-design/web-vue/es/icon'
 import SteamSearchPanel from '@/components/SteamSearchPanel.vue'
+import type { ImportSource } from '@/composables/useSteamImport'
 import type { SteamGameSearchResult } from '@/services/types'
 import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
 
 interface Props {
   visible: boolean
-  steamLogoSearchQuery: string
+  source: ImportSource
+  sgdbAvailable: boolean
+  logoSearchQuery: string
   isSearchingLogo: boolean
   logoSearchResults: SteamGameSearchResult[]
-  selectedSteamLogoGame: SteamGameSearchResult | null
-  steamLogoImages: string[]
+  selectedLogoGame: SteamGameSearchResult | null
+  logoImages: string[]
   selectedLogoImage: string
-  isDownloadingSteamLogos: boolean
+  isDownloadingLogos: boolean
   logoUploadAction: string
   logoUploadData: Record<string, string>
   uploadHeaders: Record<string, string>
@@ -187,7 +208,8 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
   'update:visible': [value: boolean]
-  'update:steam-logo-search-query': [value: string]
+  'source-change': [source: ImportSource]
+  'update:logo-search-query': [value: string]
   'search-logo': []
   'clear-logo': []
   'select-logo-game': [game: SteamGameSearchResult]
@@ -201,6 +223,10 @@ const emit = defineEmits<{
   'confirm-logo-selection': []
   'confirm-logo-position': [payload: { position_x: number; position_y: number; width_pct: number; logo_visible: boolean }]
 }>()
+
+const searchPlaceholder = computed(() =>
+  props.source === 'steamgriddb' ? '搜索 SteamGridDB...' : '搜索 Steam 游戏...'
+)
 
 // Logo position editor state (local to this component)
 const logoTabKey = ref('import')
@@ -271,6 +297,18 @@ const handleLogoPosConfirm = () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.source-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.source-selector__label {
+  font-size: 14px;
+  color: var(--color-text-2);
+  flex-shrink: 0;
 }
 
 .steam-search-title {

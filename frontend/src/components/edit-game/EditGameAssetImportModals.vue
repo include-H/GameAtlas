@@ -126,13 +126,15 @@
 
   <logo-selector-modal
     :visible="showLogoSelector"
-    :steam-logo-search-query="steamLogoSearchQuery"
+    :source="logoSource"
+    :sgdb-available="sgdbAvailable"
+    :logo-search-query="logoSearchQuery"
     :is-searching-logo="isSearchingLogo"
     :logo-search-results="logoSearchResults"
-    :selected-steam-logo-game="selectedSteamLogoGame"
-    :steam-logo-images="steamLogoImages"
+    :selected-logo-game="selectedLogoGame"
+    :logo-images="logoImages"
     :selected-logo-image="selectedLogoImage"
-    :is-downloading-steam-logos="isDownloadingSteamLogos"
+    :is-downloading-logos="isDownloadingLogos"
     :logo-upload-action="logoUploadAction"
     :logo-upload-data="logoUploadData"
     :upload-headers="uploadHeaders"
@@ -146,13 +148,14 @@
     :logo-width-pct="logoWidthPct"
     :logo-visible="logoVisible"
     @update:visible="emit('update:show-logo-selector', $event)"
-    @update:steam-logo-search-query="emit('update:steam-logo-search-query', $event)"
+    @source-change="emit('source-change-logo', $event)"
+    @update:logo-search-query="emit('update:logo-search-query', $event)"
     @search-logo="emit('search-logo')"
     @clear-logo="emit('clear-logo')"
     @select-logo-game="emit('select-logo-game', $event)"
     @back-logo-game-search="emit('back-logo-game-search')"
     @update:selected-logo-image="emit('update:selected-logo-image', $event)"
-    @download-selected-steam-logo="emit('download-selected-steam-logo')"
+    @download-selected-steam-logo="emit('download-selected-logo')"
     @logo-upload-success="emit('logo-upload-success', $event)"
     @logo-upload-error="emit('logo-upload-error')"
     @update:logo-search-url="emit('update:logo-search-url', $event)"
@@ -234,13 +237,14 @@ defineProps<{
   isDownloadingScreenshot: boolean
 
   showLogoSelector: boolean
-  steamLogoSearchQuery: string
+  logoSource: ImportSource
+  logoSearchQuery: string
   isSearchingLogo: boolean
   logoSearchResults: SteamGameSearchResult[]
-  selectedSteamLogoGame: SteamGameSearchResult | null
-  steamLogoImages: string[]
+  selectedLogoGame: SteamGameSearchResult | null
+  logoImages: string[]
   selectedLogoImage: string
-  isDownloadingSteamLogos: boolean
+  isDownloadingLogos: boolean
   logoUploadAction: string
   logoUploadData: Record<string, string>
   logoSearchUrl: string
@@ -318,13 +322,14 @@ const emit = defineEmits<{
   'confirm-screenshot-selection': []
 
   'update:show-logo-selector': [value: boolean]
-  'update:steam-logo-search-query': [value: string]
+  'source-change-logo': [source: ImportSource]
+  'update:logo-search-query': [value: string]
   'search-logo': []
   'clear-logo': []
   'select-logo-game': [game: SteamGameSearchResult]
   'back-logo-game-search': []
   'update:selected-logo-image': [value: string]
-  'download-selected-steam-logo': []
+  'download-selected-logo': []
   'logo-upload-success': [fileItem: FileItem]
   'logo-upload-error': []
   'update:logo-search-url': [value: string]

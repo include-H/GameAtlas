@@ -6,10 +6,12 @@ import { useSteamImport } from './useSteamImport'
 const {
   searchSteamGridDBMock,
   getHeroesByGameIdMock,
+  getLogosByGameIdMock,
   isSteamGridDBAvailableMock,
 } = vi.hoisted(() => ({
   searchSteamGridDBMock: vi.fn(),
   getHeroesByGameIdMock: vi.fn(),
+  getLogosByGameIdMock: vi.fn(),
   isSteamGridDBAvailableMock: vi.fn(),
 }))
 
@@ -28,7 +30,7 @@ vi.mock('@/services/steamgriddb.service', () => ({
     getGridsByGameId: vi.fn(),
     getHeroesByGameId: getHeroesByGameIdMock,
     getLogosBySteamAppId: vi.fn(),
-    getLogosByGameId: vi.fn(),
+    getLogosByGameId: getLogosByGameIdMock,
   },
 }))
 
@@ -56,6 +58,7 @@ describe('useSteamImport', () => {
     isSteamGridDBAvailableMock.mockResolvedValue(true)
     searchSteamGridDBMock.mockReset()
     getHeroesByGameIdMock.mockReset()
+    getLogosByGameIdMock.mockReset()
   })
 
   it('imports selected SteamGridDB heroes as screenshot assets', async () => {
@@ -138,5 +141,66 @@ describe('useSteamImport', () => {
       '/assets/shot-1.jpg',
       '/assets/shot-2.jpg',
     ])
+  })
+
+  it('searches SteamGridDB directly for logo candidates', async () => {
+    searchSteamGridDBMock.mockResolvedValue([
+      { id: 88, name: 'Grid Only Logo Game', release_date: 1_704_067_200 },
+    ])
+    getLogosByGameIdMock.mockResolvedValue([
+      { url: 'https://cdn.example.com/logo-1.png', thumb: 'https://cdn.example.com/logo-1-thumb.png' },
+    ])
+    const uploadAssetFromUrl = vi.fn().mockResolvedValue({
+      path: '/assets/logo-1.png',
+      asset_uid: 'logo-1',
+    })
+    const form = buildForm()
+    const steamImport = useSteamImport({
+      form,
+      gameId: ref(42),
+      getWikiContent: () => '',
+      uploadAssetFromUrl,
+      createEditableCover: (asset) => ({
+        asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
+        path: typeof asset === 'string' ? asset : asset.path,
+      }),
+      createEditableBanner: (asset) => ({
+        asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
+        path: typeof asset === 'string' ? asset : asset.path,
+      }),
+      createEditableLogo: (asset) => ({
+        asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
+        path: typeof asset === 'string' ? asset : asset.path,
+        position_x: null,
+        position_y: null,
+        width_pct: null,
+      }),
+      createEditableScreenshot: (asset, index) => ({
+        asset_uid: typeof asset === 'string' ? undefined : asset.asset_uid,
+        path: typeof asset === 'string' ? asset : asset.path,
+        client_key: `screenshot-${index}`,
+      }),
+      ensureDeveloperNames: vi.fn().mockResolvedValue([]),
+      ensurePublisherNames: vi.fn().mockResolvedValue([]),
+      addAlert: vi.fn(),
+    })
+
+    steamImport.logoSource.value = 'steamgriddb'
+    steamImport.logoSearchQuery.value = 'Grid Only Logo Game'
+    await steamImport.searchLogos()
+
+    expect(searchSteamGridDBMock).toHaveBeenCalledWith('Grid Only Logo Game')
+    expect(steamImport.logoSearchResults.value).toEqual([
+      expect.objectContaining({ id: '88', name: 'Grid Only Logo Game' }),
+    ])
+
+    await steamImport.selectLogoGame(steamImport.logoSearchResults.value[0])
+    expect(steamImport.logoImages.value).toEqual(['https://cdn.example.com/logo-1.png'])
+
+    steamImport.selectedLogoImage.value = 'https://cdn.example.com/logo-1.png'
+    await steamImport.downloadSelectedLogo()
+
+    expect(uploadAssetFromUrl).toHaveBeenCalledWith('https://cdn.example.com/logo-1.png', 'logo')
+    expect(form.value.logo?.path).toBe('/assets/logo-1.png')
   })
 })
