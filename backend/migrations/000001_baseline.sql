@@ -1,5 +1,5 @@
 -- GameAtlas baseline schema
--- Consolidated from migrations 000001–000006
+-- Consolidated baseline schema, synchronized through migration 000004.
 
 CREATE TABLE IF NOT EXISTS games (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -140,6 +140,13 @@ CREATE TABLE IF NOT EXISTS favorite_games (
     game_id INTEGER PRIMARY KEY,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Indexes

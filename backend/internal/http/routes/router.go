@@ -78,7 +78,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	steamGridDBHandler := handlers.NewSteamGridDBHandler(services.NewSteamGridDBService(cfg.SteamGridDBAPIKey))
 	wikiHandler := handlers.NewWikiHandler(wikiService)
 	hitokotoHandler := handlers.NewHitokotoHandler(hitokotoService)
-	settingsService := services.NewSettingsService(cfg)
+	settingsService := services.NewSettingsService(cfg, repositories.NewAppSettingsRepository(db))
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
 	gameFileRefreshService := services.NewGameFileRefreshService(gameFilesRepo, files.NewGuard(cfg.PrimaryROMRoot))
 	gameFileRefreshHandler := handlers.NewGameFileRefreshHandler(gameFileRefreshService)

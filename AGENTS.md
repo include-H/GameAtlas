@@ -57,8 +57,7 @@ Outputs to `release/game-release-<version>/`. The script:
 1. Builds frontend (`npm run build`)
 2. Copies frontend dist to `backend/web/dist/` for embedding
 3. Builds Go binary with `-trimpath -ldflags="-s -w"`
-4. Copies `backend/.env.example` → `.env`（自动设为 `APP_ENV=production`）
-5. Cleans up embedded web dir
+4. Cleans up embedded web dir
 
 **Do NOT commit `backend/web/dist/` contents** — they're gitignored. CI/release workflow creates a `.gitkeep` placeholder.
 
@@ -72,7 +71,7 @@ Outputs to `release/game-release-<version>/`. The script:
 - `services/` — business logic, flow orchestration, cross-repo aggregation
 - `http/handlers/` — protocol layer: param parsing, status codes, response formatting
 - `http/routes/` — Gin route registration
-- `config/` — config loading from `.env`
+- `config/` — startup defaults and DB-backed setting mapping
 - `db/` — SQLite connection initialization
 - `app/` — app bootstrap wiring
 
@@ -84,9 +83,9 @@ Outputs to `release/game-release-<version>/`. The script:
 
 **Database**: SQLite. Migrations in `backend/migrations/` (numbered `.sql` files, embedded via `//go:embed *.sql`). Auto-applied at startup, deduplicated by `schema_migrations.name`. New migrations: increment number, semantic name, forward-only SQL. **Never modify existing migration files.**
 
-**Config**: `.env` file in the *current working directory*. Dev: `backend/.env`. Release: release directory's `.env`. Template: `backend/.env.example`. `ADMIN_PASSWORD` required or server refuses to start.
+**Config**: Runtime settings live in SQLite `app_settings`. `DB_PATH` remains a bootstrap setting and defaults to `data/db.db`; it can be overridden via process environment. A legacy `.env` is imported once and automatically deleted after settings are persisted.
 
-**Frontend serving**: Backend checks `STATIC_DIR` (default `../frontend/dist`) first, falls back to embedded `web/dist`. The `STATIC_DIR` path is relative to the loaded `.env` file's directory.
+**Frontend serving**: Backend checks `STATIC_DIR` (default `../frontend/dist`) first, falls back to embedded `web/dist`.
 
 ## Frontend Architecture
 
@@ -102,7 +101,7 @@ Outputs to `release/game-release-<version>/`. The script:
 - `assets/` — styles and assets (global glass effects in `assets/style.css`)
 
 **Vite config** (`vite.config.ts`):
-- `envDir` points to `../backend/` — frontend reads backend's `.env` for env vars
+- `envDir` points to `../backend/` for optional build-time values; runtime configuration comes from the backend API
 - Dev proxy: `/api`, `/assets`, `/data` → `http://127.0.0.1:3000`
 - Arco Design components auto-imported via `unplugin-vue-components`
 - Build output: `dist/ui/` for assets
@@ -132,12 +131,11 @@ Outputs to `release/game-release-<version>/`. The script:
 
 | Variable | Purpose | Required |
 |----------|---------|----------|
-| `ADMIN_PASSWORD` | Admin password for auth | **YES** |
-| `DB_PATH` | SQLite DB path | No (default: `data/db.db` dev, `data/app.db` release) |
+| `ADMIN_PASSWORD` | Admin password for auth | No (default: `1234`, stored in DB settings) |
+| `DB_PATH` | SQLite bootstrap DB path | No (default: `data/db.db`) |
 | `STATIC_DIR` | Disk frontend dir (fallback to embedded) | No |
 | `ASSETS_DIR` | Game asset directory | No (default: `data/gamelist`) |
 | `PRIMARY_ROM_ROOT` | ROM root for file access boundaries | No (default: `ROM`) |
-| `SMB_SHARE_ROOT` | SMB UNC path for VHD launch scripts | No |
 | `VHD_DIFF_ROOT` | Client diff disk root (e.g., `C:`) | No |
 
 ## Testing
@@ -149,9 +147,9 @@ Outputs to `release/game-release-<version>/`. The script:
 ## Important Gotchas
 
 1. **`backend/web/dist/` is embedded into the Go binary** — the release build copies frontend dist here before building. CI creates a `.gitkeep` placeholder. Never commit built artifacts.
-2. **Frontend reads backend's `.env`** — `vite.config.ts` sets `envDir` to `../backend/`.
+2. **Runtime settings are DB-backed** — update configurable values through the settings page or `app_settings`; keep `DB_PATH` as the only bootstrap override when needed.
 3. **`backend/check.sh`Appends `GODEBUG=goindex=0`** — required on some Linux distros with Go 1.22.x to avoid false "not in std" errors.
-4. **`.env` is gitignored** — both root-level and `backend/.env`. Use `backend/.env.example` as template.
+4. **Legacy `.env` is one-time migration input** — after a successful DB import it is deleted; do not add new env templates or write settings back to env files.
 5. **Custom frontend lint step** — `npm run lint` includes a custom button policy check (`lint:policy`) beyond standard ESLint.
 6. **`docs/项目风格约定.md`** — the authoritative style guide. Read it before making significant changes.
 7. **`release/` directory is gitignored** — build artifacts are not committed.

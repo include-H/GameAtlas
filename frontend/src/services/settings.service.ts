@@ -5,7 +5,7 @@ export interface EnvEntry {
   key: string
   value: string
   label: string
-  group: 'general' | 'smb'
+  group: 'general' | 'smb' | 'runtime' | 'paths' | 'backup' | 'auth' | 'network'
 }
 
 export const settingsService = {

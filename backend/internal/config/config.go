@@ -2,10 +2,8 @@ package config
 
 import (
 	"bufio"
-	_ "embed"
 	"errors"
 	"fmt"
-	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -14,34 +12,37 @@ import (
 	"time"
 )
 
-//go:embed .env.production
-var defaultEnvTemplate string
-
 type Config struct {
-	AppEnv            string
-	Host              string
-	Port              int
-	DBPath            string
-	StaticDir         string
-	AssetsDir         string
-	PrimaryROMRoot    string
-	Proxy             string
-	SMBShareRoot      string
-	SMBPathMappings   string
-	SMBUsername       string
-	SMBPassword       string
-	VHDDiffRoot       string
-	WikiHistoryLimit  int
-	AdminDisplayName  string
-	AdminPassword     string
-	AuthMaxFails      int
-	AuthCooldown      time.Duration
-	AuthFailWindow    time.Duration
-	AuthStateTTL      time.Duration
-	AuthTrackBy       string
-	SteamGridDBAPIKey string
-	ReadHeaderTimeout time.Duration
-	ShutdownTimeout   time.Duration
+	AppEnv                 string
+	Host                   string
+	Port                   int
+	DBPath                 string
+	DBBackupEnabled        bool
+	DBBackupDir            string
+	DBBackupInterval       time.Duration
+	DBBackupRetentionCount int
+	StaticDir              string
+	AssetsDir              string
+	PrimaryROMRoot         string
+	Proxy                  string
+	SMBPathMappings        string
+	SMBUsername            string
+	SMBPassword            string
+	VHDDiffRoot            string
+	WikiHistoryLimit       int
+	AdminDisplayName       string
+	AdminPassword          string
+	AuthMaxFails           int
+	AuthCooldown           time.Duration
+	AuthFailWindow         time.Duration
+	AuthStateTTL           time.Duration
+	AuthTrackBy            string
+	SteamGridDBAPIKey      string
+	ReadHeaderTimeout      time.Duration
+	ShutdownTimeout        time.Duration
+	runtimeBaseDir         string
+	pathSettings           map[string]string
+	legacyDotEnvPath       string
 }
 
 func Load() (Config, error) {
@@ -50,44 +51,55 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
-	if dotEnvPath == "" && runtimeBaseDir != "" {
-		dotEnvPath = tryCreateDefaultEnv(runtimeBaseDir)
-	}
-
+	// Legacy migration path, removed in v1.1.0: existing deployments can seed
+	// app_settings from .env once. Database values take precedence after startup.
 	if dotEnvPath != "" {
 		if err := loadDotEnv(dotEnvPath); err != nil {
 			return Config{}, err
 		}
 	}
 
-	cwd, _ := os.Getwd()
-	pathBaseDir := cwd
+	pathBaseDir := runtimeBaseDir
 
 	proxy := getEnv("PROXY", "")
-	primaryROMRoot := resolveRuntimePath(pathBaseDir, getEnv("PRIMARY_ROM_ROOT", "ROM"))
+	staticDirSetting := getEnv("STATIC_DIR", "../frontend/dist")
+	assetsDirSetting := getEnv("ASSETS_DIR", "data/gamelist")
+	primaryROMRootSetting := getEnv("PRIMARY_ROM_ROOT", "/mnt")
+	backupDirSetting := getEnv("DB_BACKUP_DIR", "data/backups")
 
 	cfg := Config{
-		AppEnv:           getEnv("APP_ENV", "development"),
-		Host:             getEnv("HOST", "0.0.0.0"),
-		DBPath:           resolveRuntimePath(pathBaseDir, getEnv("DB_PATH", "data/db.db")),
-		StaticDir:        resolveRuntimePath(pathBaseDir, getEnv("STATIC_DIR", "../frontend/dist")),
-		AssetsDir:        resolveRuntimePath(pathBaseDir, getEnv("ASSETS_DIR", "data/gamelist")),
-		PrimaryROMRoot:   primaryROMRoot,
-		Proxy:            proxy,
-		SMBShareRoot:     getEnv("SMB_SHARE_ROOT", ""),
-		SMBPathMappings:  getEnv("SMB_PATH_MAPPINGS", ""),
-		SMBUsername:      getEnv("SMB_USERNAME", ""),
-		SMBPassword:      getEnv("SMB_PASSWORD", ""),
-		VHDDiffRoot:      getEnv("VHD_DIFF_ROOT", `C:`),
+		AppEnv:            getEnv("APP_ENV", "production"),
+		Host:              getEnv("HOST", "0.0.0.0"),
+		DBPath:            resolveRuntimePath(pathBaseDir, getEnv("DB_PATH", "data/db.db")),
+		DBBackupDir:       resolveRuntimePath(pathBaseDir, backupDirSetting),
+		StaticDir:         resolveRuntimePath(pathBaseDir, staticDirSetting),
+		AssetsDir:         resolveRuntimePath(pathBaseDir, assetsDirSetting),
+		PrimaryROMRoot:    resolveRuntimePath(pathBaseDir, primaryROMRootSetting),
+		Proxy:             proxy,
+		SMBPathMappings:   getEnv("SMB_PATH_MAPPINGS", ""),
+		SMBUsername:       getEnv("SMB_USERNAME", ""),
+		SMBPassword:       getEnv("SMB_PASSWORD", ""),
+		VHDDiffRoot:       getEnv("VHD_DIFF_ROOT", `C:`),
 		AdminDisplayName:  getEnv("ADMIN_DISPLAY_NAME", "Admin"),
-		AdminPassword:     getEnv("ADMIN_PASSWORD", ""),
+		AdminPassword:     getEnv("ADMIN_PASSWORD", "1234"),
 		SteamGridDBAPIKey: getEnv("STEAMGRIDDB_API_KEY", ""),
 		AuthTrackBy:       getEnv("AUTH_TRACK_BY", "ip"),
+		runtimeBaseDir:    pathBaseDir,
+		legacyDotEnvPath:  dotEnvPath,
+		pathSettings: map[string]string{
+			"STATIC_DIR":       staticDirSetting,
+			"ASSETS_DIR":       assetsDirSetting,
+			"PRIMARY_ROM_ROOT": primaryROMRootSetting,
+			"DB_BACKUP_DIR":    backupDirSetting,
+		},
 	}
 
 	var errs []error
 
 	cfg.Port, errs = appendParsedInt(errs, "PORT", 3000, &cfg.Port)
+	cfg.DBBackupEnabled, errs = appendParsedBool(errs, "DB_BACKUP_ENABLED", true, &cfg.DBBackupEnabled)
+	cfg.DBBackupInterval, errs = appendParsedDuration(errs, "DB_BACKUP_INTERVAL", 24*time.Hour, &cfg.DBBackupInterval)
+	cfg.DBBackupRetentionCount, errs = appendParsedInt(errs, "DB_BACKUP_RETENTION_COUNT", 5, &cfg.DBBackupRetentionCount)
 	cfg.WikiHistoryLimit, errs = appendParsedInt(errs, "WIKI_HISTORY_LIMIT", 100, &cfg.WikiHistoryLimit)
 	cfg.AuthMaxFails, errs = appendParsedInt(errs, "AUTH_MAX_FAILS", 5, &cfg.AuthMaxFails)
 	cfg.AuthCooldown, errs = appendParsedDuration(errs, "AUTH_COOLDOWN", 10*time.Minute, &cfg.AuthCooldown)
@@ -100,58 +112,22 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
-	if dotEnvPath != "" {
-		migrateSMBShareRoot(dotEnvPath, &cfg)
-	}
-
 	return cfg, nil
 }
 
-func migrateSMBShareRoot(dotEnvPath string, cfg *Config) {
-	smbShareRoot := strings.TrimSpace(cfg.SMBShareRoot)
-	smbPathMappings := strings.TrimSpace(cfg.SMBPathMappings)
-
-	if smbShareRoot == "" || smbPathMappings != "" {
-		return
+// RemoveLegacyDotEnv deletes the legacy source only after its settings have
+// been persisted to app_settings. The legacy import path is removed in v1.1.0.
+func (c Config) RemoveLegacyDotEnv() (string, error) {
+	path := strings.TrimSpace(c.legacyDotEnvPath)
+	if path == "" {
+		return "", nil
 	}
 
-	romRoot := strings.TrimSpace(cfg.PrimaryROMRoot)
-	if romRoot == "" {
-		romRoot = "ROM"
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("remove imported legacy .env %q: %w", path, err)
 	}
 
-	mapping := romRoot + "=" + smbShareRoot
-	log.Printf("[config] DEPRECATED: SMB_SHARE_ROOT auto-migration (will be removed in v1.1.0)")
-	log.Printf("[config] migrating SMB_SHARE_ROOT to SMB_PATH_MAPPINGS: %s", mapping)
-
-	cfg.SMBPathMappings = mapping
-	cfg.SMBShareRoot = ""
-
-	data, err := os.ReadFile(dotEnvPath)
-	if err != nil {
-		log.Printf("[config] warning: failed to read .env for migration: %v", err)
-		return
-	}
-
-	content := string(data)
-	lines := strings.Split(content, "\n")
-	var newLines []string
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "SMB_SHARE_ROOT") {
-			continue
-		}
-		newLines = append(newLines, line)
-	}
-
-	newLines = append(newLines, "SMB_PATH_MAPPINGS="+mapping)
-
-	if err := os.WriteFile(dotEnvPath, []byte(strings.Join(newLines, "\n")), 0644); err != nil {
-		log.Printf("[config] warning: failed to update .env: %v", err)
-		return
-	}
-
-	log.Printf("[config] SMB_SHARE_ROOT migrated and removed from .env")
+	return path, nil
 }
 
 func detectRuntimeBaseDir() (string, string, error) {
@@ -160,14 +136,32 @@ func detectRuntimeBaseDir() (string, string, error) {
 		return "", "", fmt.Errorf("determine current working directory: %w", err)
 	}
 
-	dataDir := filepath.Join(cwd, "data")
+	executable, err := os.Executable()
+	if err != nil {
+		executable = ""
+	}
+	baseDir := runtimeBaseDirForExecutable(cwd, executable)
+	dataDir := filepath.Join(baseDir, "data")
 
-	baseDir, dotEnvPath := chooseRuntimeBaseDir(cwd, dataDir, pathExists)
+	_, dotEnvPath := chooseRuntimeBaseDir(baseDir, dataDir, pathExists)
 	if baseDir == "" {
 		baseDir = cwd
 	}
 
 	return baseDir, dotEnvPath, nil
+}
+
+func runtimeBaseDirForExecutable(cwd, executable string) string {
+	cwd = cleanOptionalPath(cwd)
+	executable = cleanOptionalPath(executable)
+	if executable == "" || isGoRunExecutable(executable) {
+		return cwd
+	}
+	return filepath.Dir(executable)
+}
+
+func isGoRunExecutable(executable string) bool {
+	return strings.Contains(filepath.ToSlash(executable), "/go-build")
 }
 
 func chooseRuntimeBaseDir(cwd, dataDir string, exists func(string) bool) (string, string) {
@@ -227,28 +221,15 @@ func pathExists(path string) bool {
 	return err == nil
 }
 
-func tryCreateDefaultEnv(baseDir string) string {
-	envPath := filepath.Join(baseDir, ".env")
-
-	if pathExists(envPath) || defaultEnvTemplate == "" {
-		return ""
-	}
-
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
-		return ""
-	}
-
-	if err := os.WriteFile(envPath, []byte(defaultEnvTemplate), 0600); err != nil {
-		return ""
-	}
-
-	fmt.Printf("已自动创建默认配置: %s\n", envPath)
-	return envPath
-}
-
 func (c Config) Validate() error {
 	if strings.TrimSpace(c.AdminPassword) == "" {
 		return fmt.Errorf("ADMIN_PASSWORD must be configured")
+	}
+	if c.DBBackupInterval < 0 {
+		return fmt.Errorf("DB_BACKUP_INTERVAL must be zero or positive")
+	}
+	if c.DBBackupRetentionCount < 0 {
+		return fmt.Errorf("DB_BACKUP_RETENTION_COUNT must be zero or positive")
 	}
 	if _, err := parseProxyURL(c.Proxy); err != nil {
 		return err
@@ -422,6 +403,20 @@ func getEnvAsInt(key string, fallback int) (int, error) {
 	return value, nil
 }
 
+func getEnvAsBool(key string, fallback bool) (bool, error) {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback, nil
+	}
+
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("invalid %s=%q: expected boolean", key, raw)
+	}
+
+	return value, nil
+}
+
 func getEnvAsDuration(key string, fallback time.Duration) (time.Duration, error) {
 	raw := strings.TrimSpace(os.Getenv(key))
 	if raw == "" {
@@ -441,6 +436,17 @@ func appendParsedInt(errs []error, key string, fallback int, target *int) (int, 
 	if err != nil {
 		errs = append(errs, err)
 		return 0, errs
+	}
+
+	*target = value
+	return value, errs
+}
+
+func appendParsedBool(errs []error, key string, fallback bool, target *bool) (bool, []error) {
+	value, err := getEnvAsBool(key, fallback)
+	if err != nil {
+		errs = append(errs, err)
+		return false, errs
 	}
 
 	*target = value

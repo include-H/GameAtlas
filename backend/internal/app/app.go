@@ -16,16 +16,13 @@ import (
 )
 
 type App struct {
-	config config.Config
-	db     *sqlx.DB
-	server *http.Server
+	config       config.Config
+	db           *sqlx.DB
+	server       *http.Server
+	backupCancel context.CancelFunc
 }
 
 func New(cfg config.Config) (*App, error) {
-	if err := cfg.Validate(); err != nil {
-		return nil, err
-	}
-
 	sqliteDB, err := db.OpenSQLite(cfg.DBPath)
 	if err != nil {
 		return nil, err
@@ -36,7 +33,57 @@ func New(cfg config.Config) (*App, error) {
 		return nil, err
 	}
 
+	settingsRepo := repositories.NewAppSettingsRepository(sqliteDB)
+	if err := settingsRepo.EnsureDefaults(cfg.RuntimeSettings()); err != nil {
+		_ = sqliteDB.Close()
+		return nil, err
+	}
+	settings, err := settingsRepo.List()
+	if err != nil {
+		_ = sqliteDB.Close()
+		return nil, err
+	}
+	cfg, err = cfg.ApplyRuntimeSettings(settings)
+	if err != nil {
+		_ = sqliteDB.Close()
+		return nil, err
+	}
+	if normalized := cfg.NormalizeStoredRuntimePaths(); len(normalized) > 0 {
+		if err := settingsRepo.UpsertMany(normalized); err != nil {
+			_ = sqliteDB.Close()
+			return nil, err
+		}
+	}
+	if err := cfg.Validate(); err != nil {
+		_ = sqliteDB.Close()
+		return nil, err
+	}
+	if path, err := cfg.RemoveLegacyDotEnv(); err != nil {
+		_ = sqliteDB.Close()
+		return nil, err
+	} else if path != "" {
+		log.Printf("legacy .env imported into app settings and removed: %s", cfg.RuntimeRelativePath(path))
+	}
+	if cfg.Proxy == "" {
+		log.Printf("outbound proxy: disabled")
+	} else {
+		log.Printf("outbound proxy: %s", cfg.ProxyLogValue())
+	}
+
 	gamesRepo := repositories.NewGamesRepository(sqliteDB)
+	backupService := services.NewDatabaseBackupService(cfg, sqliteDB)
+	if path, err := backupService.BackupNow("startup"); err != nil {
+		_ = sqliteDB.Close()
+		return nil, err
+	} else if path != "" {
+		log.Printf("database startup backup created: %s", cfg.RuntimeRelativePath(path))
+	}
+	if removed, err := backupService.CleanupOldBackups(); err != nil {
+		log.Printf("database backup retention cleanup failed: %v", err)
+	} else if removed > 0 {
+		log.Printf("database backup retention removed %d file(s)", removed)
+	}
+
 	assetReconcileService := services.NewAssetReconcileService(cfg, sqliteDB)
 	favoriteGamesRepo := repositories.NewFavoriteGamesRepository(sqliteDB)
 	catalogRepo := repositories.NewGameCatalogRepository(gamesRepo, favoriteGamesRepo)
@@ -71,7 +118,7 @@ func New(cfg config.Config) (*App, error) {
 		if err != nil {
 			log.Printf("orphaned asset cleanup failed: %v", err)
 		} else if orphaned > 0 {
-			log.Printf("orphaned asset cleanup deleted %d file(s)", orphaned)
+			log.Printf("orphaned asset cleanup processed %d file(s)", orphaned)
 		}
 	}()
 
@@ -83,10 +130,14 @@ func New(cfg config.Config) (*App, error) {
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 	}
 
+	backupCtx, backupCancel := context.WithCancel(context.Background())
+	backupService.StartPeriodic(backupCtx)
+
 	return &App{
-		config: cfg,
-		db:     sqliteDB,
-		server: server,
+		config:       cfg,
+		db:           sqliteDB,
+		server:       server,
+		backupCancel: backupCancel,
 	}, nil
 }
 
@@ -95,10 +146,16 @@ func (a *App) Run() error {
 }
 
 func (a *App) Shutdown(ctx context.Context) error {
+	if a.backupCancel != nil {
+		a.backupCancel()
+	}
 	return a.server.Shutdown(ctx)
 }
 
 func (a *App) Close() error {
+	if a.backupCancel != nil {
+		a.backupCancel()
+	}
 	if a.db == nil {
 		return nil
 	}

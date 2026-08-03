@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -105,6 +106,34 @@ func TestLoadDotEnvRejectsMalformedLineWithLocation(t *testing.T) {
 	}
 }
 
+func TestRemoveLegacyDotEnvDeletesImportedFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(path, []byte("PORT=3000\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	removed, err := (Config{legacyDotEnvPath: path}).RemoveLegacyDotEnv()
+	if err != nil {
+		t.Fatalf("RemoveLegacyDotEnv returned error: %v", err)
+	}
+	if removed != path {
+		t.Fatalf("removed path = %q, want %q", removed, path)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("legacy .env still exists or stat failed: %v", err)
+	}
+}
+
+func TestRemoveLegacyDotEnvDoesNothingWithoutImportedFile(t *testing.T) {
+	removed, err := (Config{}).RemoveLegacyDotEnv()
+	if err != nil {
+		t.Fatalf("RemoveLegacyDotEnv returned error: %v", err)
+	}
+	if removed != "" {
+		t.Fatalf("removed path = %q, want empty", removed)
+	}
+}
+
 func TestGetEnvAsIntRejectsInvalidConfiguredValue(t *testing.T) {
 	t.Setenv("PORT", "abc")
 
@@ -117,6 +146,18 @@ func TestGetEnvAsIntRejectsInvalidConfiguredValue(t *testing.T) {
 	}
 }
 
+func TestGetEnvAsBoolRejectsInvalidConfiguredValue(t *testing.T) {
+	t.Setenv("DB_BACKUP_ENABLED", "maybe")
+
+	_, err := getEnvAsBool("DB_BACKUP_ENABLED", true)
+	if err == nil {
+		t.Fatalf("expected getEnvAsBool to return error")
+	}
+	if !strings.Contains(err.Error(), `DB_BACKUP_ENABLED="maybe"`) {
+		t.Fatalf("getEnvAsBool error = %v, want variable detail", err)
+	}
+}
+
 func TestGetEnvAsDurationRejectsInvalidConfiguredValue(t *testing.T) {
 	t.Setenv("AUTH_COOLDOWN", "10min")
 
@@ -126,6 +167,76 @@ func TestGetEnvAsDurationRejectsInvalidConfiguredValue(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `AUTH_COOLDOWN="10min"`) {
 		t.Fatalf("getEnvAsDuration error = %v, want variable detail", err)
+	}
+}
+
+func TestApplyRuntimeSettingsParsesDatabaseValues(t *testing.T) {
+	cfg := Config{
+		AdminPassword: "secret",
+		AssetsDir:     filepath.Join(string(filepath.Separator), "data", "gamelist"),
+	}
+
+	got, err := cfg.ApplyRuntimeSettings(map[string]string{
+		"PORT":                      "3001",
+		"DB_BACKUP_ENABLED":         "false",
+		"DB_BACKUP_INTERVAL":        "12h",
+		"DB_BACKUP_RETENTION_COUNT": "5",
+		"AUTH_MAX_FAILS":            "7",
+	})
+	if err != nil {
+		t.Fatalf("ApplyRuntimeSettings returned error: %v", err)
+	}
+	if got.Port != 3001 {
+		t.Fatalf("Port = %d, want 3001", got.Port)
+	}
+	if got.DBBackupEnabled {
+		t.Fatalf("DBBackupEnabled = true, want false")
+	}
+	if got.DBBackupInterval != 12*time.Hour {
+		t.Fatalf("DBBackupInterval = %s, want 12h", got.DBBackupInterval)
+	}
+	if got.DBBackupRetentionCount != 5 {
+		t.Fatalf("DBBackupRetentionCount = %d, want 5", got.DBBackupRetentionCount)
+	}
+	if got.AuthMaxFails != 7 {
+		t.Fatalf("AuthMaxFails = %d, want 7", got.AuthMaxFails)
+	}
+}
+
+func TestRuntimeBaseDirForExecutableUsesBinaryDirOutsideGoRun(t *testing.T) {
+	cwd := filepath.Join(string(filepath.Separator), "workspace", "backend")
+	binaryPath := filepath.Join(string(filepath.Separator), "opt", "gameatlas", "game-server")
+	if got := runtimeBaseDirForExecutable(cwd, binaryPath); got != filepath.Dir(binaryPath) {
+		t.Fatalf("runtimeBaseDirForExecutable() = %q, want %q", got, filepath.Dir(binaryPath))
+	}
+
+	goRunPath := filepath.Join(string(filepath.Separator), "tmp", "go-build123", "b001", "exe", "server")
+	if got := runtimeBaseDirForExecutable(cwd, goRunPath); got != cwd {
+		t.Fatalf("runtimeBaseDirForExecutable(go run) = %q, want %q", got, cwd)
+	}
+}
+
+func TestRuntimeSettingsKeepResourcePathsRelativeToRuntimeBase(t *testing.T) {
+	baseDir := filepath.Join(string(filepath.Separator), "opt", "gameatlas")
+	cfg := Config{
+		runtimeBaseDir: baseDir,
+		AssetsDir:      filepath.Join(baseDir, "data", "gamelist"),
+		DBBackupDir:    filepath.Join(baseDir, "data", "backups"),
+		pathSettings: map[string]string{
+			"ASSETS_DIR":    "data/gamelist",
+			"DB_BACKUP_DIR": "data/backups",
+		},
+	}
+
+	settings := cfg.RuntimeSettings()
+	if settings["DB_BACKUP_DIR"] != "data/backups" {
+		t.Fatalf("DB_BACKUP_DIR = %q, want relative path", settings["DB_BACKUP_DIR"])
+	}
+
+	cfg.pathSettings["DB_BACKUP_DIR"] = cfg.DBBackupDir
+	normalized := cfg.NormalizeStoredRuntimePaths()
+	if normalized["DB_BACKUP_DIR"] != "data/backups" {
+		t.Fatalf("normalized DB_BACKUP_DIR = %q, want relative path", normalized["DB_BACKUP_DIR"])
 	}
 }
 

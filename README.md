@@ -3,9 +3,10 @@
 游戏管理系统，面向 NAS / 局域网 / 家庭游戏库场景。核心能力：
 
 - 在网页里整理和浏览游戏库（封面、横幅、截图、视频、Wiki）
-- Steam / SteamGridDB 在线素材搜索与导入
+- Steam / SteamGridDB 在线素材搜索与导入，Logo 可直接搜索 SteamGridDB
 - 管理 `.vhd` / `.vhdx` 游戏文件版本
 - 通过 SMB + 差分盘方式让 Windows 客户端远程挂载并启动游戏
+- SQLite 配置管理、在线数据库备份和孤儿素材隔离保护
 
 ## 界面预览
 
@@ -69,10 +70,10 @@ services:
       - /mnt/Docker/GameAtlas/data:/app/data
       - /mnt:/mnt:ro
     environment:
-      ADMIN_PASSWORD: yourpassword
+      ADMIN_PASSWORD: yourpassword # 仅首次创建数据库时作为初始密码
 ```
 
-首次启动会自动创建默认配置文件。
+首次启动会自动创建数据库和默认配置；之后配置由数据库管理。
 
 ### 方式二：二进制
 
@@ -87,12 +88,14 @@ bash build-release.sh v1.0.0       # 自定义版本名
 release/game-release-<version>/
 ├── game-server
 ├── data/                 # 首次启动自动创建
-│   ├── .env              # 配置文件（默认密码 1234）
+│   ├── db.db             # SQLite 数据库与运行配置
+│   ├── backups/          # 在线数据库备份
+│   ├── orphaned-assets/  # 被隔离的未登记素材
 │   └── gamelist/         # 素材目录
 └── ROM/                  # 游戏文件目录
 ```
 
-进入发布目录，运行 `./game-server`，首次启动会自动创建 `data/.env`。
+进入发布目录，运行 `./game-server`，首次启动会自动创建 SQLite 数据库并写入默认配置。
 
 ### GitHub Release 自动发版
 
@@ -108,32 +111,17 @@ git tag v1.0.0 && git push origin v1.0.0
 
 ## 配置
 
-程序首次启动会自动在 `data/` 目录创建 `.env` 配置文件（默认密码 `1234`）。
+运行配置存储在 SQLite 的 `app_settings` 表中，首次启动会写入默认值（默认密码 `1234`）。
+登录后可在设置页修改管理员密码、素材目录、ROM 根目录、SMB 映射、SteamGridDB API Key、备份策略等配置，修改后重启生效。
+旧版部署若存在 `.env`，首次成功启动会将其值写入数据库后自动删除该文件。
 
-配置查找优先级：
-1. `data/.env`（推荐）
-2. `./.env`（兼容）
+`DB_PATH` 是启动引导项，默认 `data/db.db`；如需更改数据库文件位置，使用进程环境变量 `DB_PATH=/path/to/app.db ./game-server` 启动。
 
-详细配置项见 `backend/.env.example`，关键配置：
+### 数据保护
 
-```env
-# 必填
-ADMIN_PASSWORD=你的密码
-
-# 路径
-DB_PATH=data/db.db
-ASSETS_DIR=data/gamelist
-PRIMARY_ROM_ROOT=/mnt           # 游戏文件根目录
-
-# SMB / VHD
-SMB_PATH_MAPPINGS=/mnt/Game=\\192.168.1.4\Game;/mnt/Gal=\\192.168.1.4\Gal
-SMB_USERNAME=game
-SMB_PASSWORD=game
-VHD_DIFF_ROOT=C:                # 客户端差分盘存放位置
-
-# 可选：SteamGridDB 在线素材搜索
-STEAMGRIDDB_API_KEY=            # 注册：https://www.steamgriddb.com/account
-```
+- 启动时先使用 SQLite `VACUUM INTO` 创建一致性备份，之后每 24 小时备份一次，默认保留最新 5 份。
+- 启动扫描到数据库未登记的封面、截图、视频等素材时，统一移动到 `data/orphaned-assets/` 隔离，固定保留 7 天，便于在 NAS 文件管理器中排查。
+- 不会直接复制 WAL 模式下的单个 `db.db` 文件作为备份；需要手工备份时使用应用生成的备份文件或 SQLite 在线备份命令。
 
 ## VHD 远程启动
 
@@ -152,7 +140,7 @@ STEAMGRIDDB_API_KEY=            # 注册：https://www.steamgriddb.com/account
 
 - 游戏文件在 `PRIMARY_ROM_ROOT` 内，扩展名为 `.vhd` / `.vhdx`
 - 文件通过 SMB 共享暴露
-- `.env` 中正确配置 `SMB_PATH_MAPPINGS`、`SMB_USERNAME`、`SMB_PASSWORD`、`VHD_DIFF_ROOT`
+- 在设置页正确配置 `SMB_PATH_MAPPINGS`、`SMB_USERNAME`、`SMB_PASSWORD`、`VHD_DIFF_ROOT`
 
 ### 客户端条件
 

@@ -7,7 +7,6 @@ BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIR="$ROOT_DIR/frontend"
 RELEASE_ROOT="$ROOT_DIR/release"
 EMBEDDED_WEB_DIR="$BACKEND_DIR/web/dist"
-RELEASE_ENV_TEMPLATE="$BACKEND_DIR/.env.example"
 
 VERSION="${1:-$(date +%Y%m%d-%H%M%S)}"
 PACKAGE_DIR="$RELEASE_ROOT/game-release-$VERSION"
@@ -70,10 +69,6 @@ mkdir -p \
 echo "复制可选自定义资源..."
 copy_optional_runtime_data "$BACKEND_DIR/data" "$PACKAGE_DIR/data"
 
-echo "写入运行配置..."
-cp "$RELEASE_ENV_TEMPLATE" "$PACKAGE_DIR/.env"
-sed -i 's/^APP_ENV=development/APP_ENV=production/' "$PACKAGE_DIR/.env"
-
 echo "复制参考文档..."
 cp "$ROOT_DIR/README.md" "$PACKAGE_DIR/README.md"
 cp "$BACKEND_DIR/README.md" "$PACKAGE_DIR/README-backend.md"
@@ -103,5 +98,4 @@ echo "  ROM"
 echo
 echo "启动方式:"
 echo "  cd \"$PACKAGE_DIR\""
-echo "  # 先编辑 .env，至少填写 ADMIN_PASSWORD"
 echo "  ./start.sh"

@@ -16,11 +16,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("invalid configuration: %v", err)
 	}
-	if cfg.Proxy == "" {
-		log.Printf("outbound proxy: disabled")
-	} else {
-		log.Printf("outbound proxy: %s", cfg.ProxyLogValue())
-	}
 
 	application, err := app.New(cfg)
 	if err != nil {

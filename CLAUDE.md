@@ -47,7 +47,7 @@ Layer structure (`backend/internal/`):
 - `services/` — business logic, flow orchestration, cross-repo aggregation
 - `http/handlers/` — protocol layer: param parsing, status codes, response formatting
 - `http/routes/` — Gin route registration
-- `config/` — config loading from `.env`
+- `config/` — startup defaults and DB-backed setting mapping
 - `db/` — SQLite connection initialization
 - `app/` — app bootstrap wiring
 
@@ -55,9 +55,9 @@ Layer structure (`backend/internal/`):
 
 Database: SQLite with numbered forward-only migrations in `backend/migrations/`. Auto-applied at startup, deduplicated by `schema_migrations.name`. **Never modify existing migration files.** New migrations: increment number, semantic name, forward-only SQL only.
 
-Config: `.env` in current working directory. `ADMIN_PASSWORD` required or server refuses to start. Template: `backend/.env.example`.
+Config: runtime settings live in SQLite `app_settings`. `DB_PATH` remains a bootstrap setting and defaults to `data/db.db`; it can be overridden via process environment. A legacy `.env` is imported once and automatically deleted after settings are persisted.
 
-Frontend serving: Backend checks `STATIC_DIR` (default `../frontend/dist`) first, falls back to embedded `web/dist`. The `STATIC_DIR` path is relative to the loaded `.env` file's directory.
+Frontend serving: Backend checks `STATIC_DIR` (default `../frontend/dist`) first, falls back to embedded `web/dist`.
 
 ### Frontend (`frontend/`)
 
@@ -73,7 +73,7 @@ Key structure (`frontend/src/`):
 - `assets/` — styles and assets (global glass effects in `assets/style.css`)
 
 Vite config (`vite.config.ts`):
-- `envDir` points to `../backend/` — frontend reads backend's `.env` for env vars
+- `envDir` points to `../backend/` for optional build-time values; runtime configuration comes from the backend API
 - Dev proxy: `/api`, `/assets`, `/data` → `http://127.0.0.1:3000`
 - Arco Design components auto-imported via `unplugin-vue-components`
 
@@ -107,12 +107,11 @@ Vite config (`vite.config.ts`):
 
 | Variable | Purpose | Required |
 |----------|---------|----------|
-| `ADMIN_PASSWORD` | Admin password for auth | **YES** |
-| `DB_PATH` | SQLite DB path | No (default: `data/db.db` dev, `data/app.db` release) |
+| `ADMIN_PASSWORD` | Admin password for auth | No (default: `1234`, stored in DB settings) |
+| `DB_PATH` | SQLite bootstrap DB path | No (default: `data/db.db`) |
 | `STATIC_DIR` | Disk frontend dir (fallback to embedded) | No |
 | `ASSETS_DIR` | Game asset directory | No (default: `data/gamelist`) |
 | `PRIMARY_ROM_ROOT` | ROM root for file access boundaries | No (default: `ROM`) |
-| `SMB_SHARE_ROOT` | SMB UNC path for VHD launch scripts | No |
 | `STEAMGRIDDB_API_KEY` | SteamGridDB API key for online cover/banner/logo search | No |
 
 ## Testing
@@ -124,7 +123,7 @@ Vite config (`vite.config.ts`):
 ## Important Gotchas
 
 1. **`backend/web/dist/` is embedded into the Go binary** — the release build copies frontend dist here before building. Never commit built artifacts.
-2. **Frontend reads backend's `.env`** — `vite.config.ts` sets `envDir` to `../backend/`.
-3. **`.env` is gitignored** — use `backend/.env.example` as template.
+2. **Runtime settings are DB-backed** — update configurable values through the settings page or `app_settings`; keep `DB_PATH` as the only bootstrap override when needed.
+3. **Legacy `.env` is one-time migration input** — after a successful DB import it is deleted; do not add new env templates or write settings back to env files.
 4. **`docs/项目风格约定.md`** is the authoritative style guide. Read it before making significant changes.
 5. **`release/` directory is gitignored** — build artifacts are not committed.

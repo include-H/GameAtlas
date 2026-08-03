@@ -79,6 +79,11 @@
                   v-model="configForm[entry.key]"
                   placeholder="管理员登录密码，必填"
                 />
+                <a-input-password
+                  v-else-if="entry.key === 'STEAMGRIDDB_API_KEY'"
+                  v-model="configForm[entry.key]"
+                  placeholder="SteamGridDB API Key"
+                />
                 <a-input
                   v-else-if="entry.key === 'PRIMARY_ROM_ROOT'"
                   v-model="configForm[entry.key]"
@@ -93,11 +98,6 @@
                   v-else-if="entry.key === 'PROXY'"
                   v-model="configForm[entry.key]"
                   placeholder="http / https / socks5，留空直连"
-                />
-                <a-input
-                  v-else-if="entry.key === 'STEAMGRIDDB_API_KEY'"
-                  v-model="configForm[entry.key]"
-                  placeholder="SteamGridDB API Key"
                 />
                 <a-input
                   v-else-if="entry.key === 'AUTH_MAX_FAILS'"
@@ -127,7 +127,52 @@
                   <a-option value="ip">按 IP</a-option>
                   <a-option value="ip_ua">按 IP + User-Agent</a-option>
                 </a-select>
+                <a-select
+                  v-else-if="entry.key === 'APP_ENV'"
+                  v-model="configForm[entry.key]"
+                  placeholder="运行环境"
+                >
+                  <a-option value="production">生产</a-option>
+                  <a-option value="development">开发</a-option>
+                </a-select>
                 <a-input v-else v-model="configForm[entry.key]" :placeholder="`请输入${entry.label}`" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-button type="primary" :loading="configSaving" @click="handleSaveConfig">
+            保存配置
+          </a-button>
+        </a-form>
+      </a-card>
+
+      <a-card class="settings-card app-glass-surface" :bordered="false">
+        <template #title>数据保护</template>
+        <p class="settings-card__desc">默认每天备份数据库；未登记素材会移入 data/orphaned-assets 并保留 7 天</p>
+
+        <a-form :model="configForm" layout="vertical">
+          <a-row :gutter="16">
+            <a-col v-for="entry in backupEntries" :key="entry.key" :xs="24" :md="12">
+              <a-form-item :label="entry.label">
+                <a-switch
+                  v-if="entry.key === 'DB_BACKUP_ENABLED'"
+                  v-model="databaseBackupEnabled"
+                />
+                <a-input
+                  v-else-if="entry.key === 'DB_BACKUP_DIR'"
+                  v-model="configForm[entry.key]"
+                  placeholder="目录路径"
+                />
+                <a-input
+                  v-else-if="entry.key === 'DB_BACKUP_RETENTION_COUNT'"
+                  v-model="configForm[entry.key]"
+                  inputmode="numeric"
+                  placeholder="保留份数，如 5；0 表示不自动清理"
+                />
+                <a-input
+                  v-else
+                  v-model="configForm[entry.key]"
+                  placeholder="备份间隔，如 24h、72h"
+                />
               </a-form-item>
             </a-col>
           </a-row>
@@ -190,10 +235,22 @@ import {
 const uiStore = useUiStore()
 
 const configEntries = ref<EnvEntry[]>([])
-const generalEntries = computed(() => configEntries.value.filter((e) => e.group === 'general'))
+const generalEntries = computed(() =>
+  configEntries.value.filter((e) =>
+    ['general', 'auth', 'network', 'runtime', 'paths'].includes(e.group)
+  )
+)
+const backupEntries = computed(() => configEntries.value.filter((e) => e.group === 'backup'))
 const smbEntries = computed(() => configEntries.value.filter((e) => e.group === 'smb'))
 const configForm = ref<Record<string, string>>({})
 const configSaving = ref(false)
+
+const databaseBackupEnabled = computed({
+  get: () => configForm.value['DB_BACKUP_ENABLED'] === 'true',
+  set: (enabled: boolean) => {
+    configForm.value['DB_BACKUP_ENABLED'] = String(enabled)
+  },
+})
 
 const smbPathMappingsDisplay = computed({
   get: () => (configForm.value['SMB_PATH_MAPPINGS'] || '').split(';').filter(Boolean).join('\n'),

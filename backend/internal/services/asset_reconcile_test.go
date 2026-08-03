@@ -139,6 +139,70 @@ func TestCleanOrphanedAssetFilesDeletesUnreferencedFiles(t *testing.T) {
 	assertFileMissing(t, filepath.Join(assetsDir, "orphan-b", "stale-banner.png"))
 }
 
+func TestCleanOrphanedAssetFilesQuarantinesUnreferencedFilesByDefault(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	tempDir := t.TempDir()
+	assetsDir := filepath.Join(tempDir, "assets")
+	gameID := insertServicesTestGame(t, db, "quarantine", "Quarantine", domain.GameVisibilityPublic)
+	insertServicesGameAsset(t, db, gameID, "vid-1", "video", "/assets/quarantine/video.mp4", 0)
+
+	orphanPath := writeServicesAssetFile(t, assetsDir, "quarantine", "old-cover.jpg", []byte("orphan"))
+	quarantineDir := filepath.Join(tempDir, "orphaned-assets")
+
+	service := NewAssetReconcileService(config.Config{
+		AssetsDir: assetsDir,
+	}, db)
+
+	processed, err := service.CleanOrphanedAssetFiles()
+	if err != nil {
+		t.Fatalf("CleanOrphanedAssetFiles returned error: %v", err)
+	}
+	if processed != 1 {
+		t.Fatalf("processed = %d, want 1", processed)
+	}
+
+	assertFileMissing(t, orphanPath)
+	matches, err := filepath.Glob(filepath.Join(quarantineDir, "*", "quarantine", "old-cover.jpg"))
+	if err != nil {
+		t.Fatalf("Glob returned error: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("quarantined matches = %#v, want one quarantined file", matches)
+	}
+	assertFileExists(t, matches[0])
+}
+
+func TestCleanOldQuarantinedAssetsRemovesFilesAfterSevenDays(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	tempDir := t.TempDir()
+	assetsDir := filepath.Join(tempDir, "assets")
+	quarantinedPath := filepath.Join(tempDir, "orphaned-assets", "20260801-000000", "game-a", "cover.jpg")
+	if err := os.MkdirAll(filepath.Dir(quarantinedPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(quarantinedPath, []byte("orphan"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	oldTime := time.Now().Add(-8 * 24 * time.Hour)
+	if err := os.Chtimes(quarantinedPath, oldTime, oldTime); err != nil {
+		t.Fatalf("Chtimes returned error: %v", err)
+	}
+
+	service := NewAssetReconcileService(config.Config{AssetsDir: assetsDir}, db)
+	removed, err := service.cleanOldQuarantinedAssets()
+	if err != nil {
+		t.Fatalf("cleanOldQuarantinedAssets returned error: %v", err)
+	}
+	if removed != 1 {
+		t.Fatalf("removed = %d, want 1", removed)
+	}
+	assertFileMissing(t, quarantinedPath)
+}
+
 func TestCleanOrphanedAssetFilesPreservesAllReferencedFiles(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()

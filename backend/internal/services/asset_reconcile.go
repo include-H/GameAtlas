@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -14,18 +15,19 @@ import (
 
 	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/files"
-	"github.com/hao/game/internal/repositories"
 )
 
 type AssetReconcileService struct {
-	db                *sqlx.DB
-	store             *files.AssetStore
-	tasksRepo         *repositories.AssetCleanupTasksRepository
-	mu                sync.Mutex
-	lastFullSweepAt   time.Time
-	lastOrphanSweepAt time.Time
-	fullSweepCooldown time.Duration
+	db                  *sqlx.DB
+	store               *files.AssetStore
+	mu                  sync.Mutex
+	lastFullSweepAt     time.Time
+	lastOrphanSweepAt   time.Time
+	fullSweepCooldown   time.Duration
+	orphanQuarantineDir string
 }
+
+const orphanAssetQuarantineRetention = 7 * 24 * time.Hour
 
 // NewAssetReconcileService keeps DB asset references aligned with the current filesystem state.
 // 2026-04-06: this boundary is startup-only.
@@ -33,10 +35,10 @@ type AssetReconcileService struct {
 // list/stats/detail reads must stay side-effect free and never mutate DB state.
 func NewAssetReconcileService(cfg config.Config, db *sqlx.DB) *AssetReconcileService {
 	return &AssetReconcileService{
-		db:                db,
-		store:             files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
-		tasksRepo:         repositories.NewAssetCleanupTasksRepository(db),
-		fullSweepCooldown: 2 * time.Second,
+		db:                  db,
+		store:               files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
+		fullSweepCooldown:   2 * time.Second,
+		orphanQuarantineDir: filepath.Join(filepath.Dir(cfg.AssetsDir), "orphaned-assets"),
 	}
 }
 
@@ -197,9 +199,9 @@ func (s *AssetReconcileService) CleanStaging() (int, error) {
 	return s.store.CleanStaging(1 * time.Hour)
 }
 
-// CleanOrphanedAssetFiles scans the assets filesystem and deletes files not
-// referenced by any game in the database. It runs at startup after
-// ReconcileAllMissingAssets has already pruned stale DB references.
+// CleanOrphanedAssetFiles moves unreferenced assets to a fixed filesystem
+// quarantine for seven days. It intentionally has no restore workflow: the
+// directory is a short-lived investigation buffer for NAS file browsing.
 func (s *AssetReconcileService) CleanOrphanedAssetFiles() (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -207,19 +209,21 @@ func (s *AssetReconcileService) CleanOrphanedAssetFiles() (int, error) {
 	if !s.lastOrphanSweepAt.IsZero() && time.Since(s.lastOrphanSweepAt) < s.fullSweepCooldown {
 		return 0, nil
 	}
-
 	referenced, err := s.loadAllReferencedAssetPaths()
 	if err != nil {
 		return 0, err
 	}
 
-	deleted, err := s.deleteUnreferencedFiles(referenced)
+	processed, err := s.deleteUnreferencedFiles(referenced)
 	if err != nil {
-		return deleted, err
+		return processed, err
+	}
+	if _, err := s.cleanOldQuarantinedAssets(); err != nil {
+		return processed, err
 	}
 
 	s.lastOrphanSweepAt = time.Now()
-	return deleted, nil
+	return processed, nil
 }
 
 func (s *AssetReconcileService) loadAllReferencedAssetPaths() (map[string]struct{}, error) {
@@ -262,7 +266,11 @@ func (s *AssetReconcileService) deleteUnreferencedFiles(referenced map[string]st
 	}
 
 	var dirs []string
-	deleted := 0
+	processed := 0
+	sweepQuarantineDir := filepath.Join(
+		s.orphanQuarantineDir,
+		time.Now().UTC().Format("20060102-150405"),
+	)
 
 	err := filepath.WalkDir(baseDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -288,15 +296,15 @@ func (s *AssetReconcileService) deleteUnreferencedFiles(referenced map[string]st
 			return nil
 		}
 
-		if _, cleanupErr := cleanupAssetPath(s.store, s.tasksRepo, assetPath, "asset_reconcile.orphan"); cleanupErr != nil {
-			log.Printf("asset_reconcile.orphan: failed to delete %s: %v", assetPath, cleanupErr)
+		if processErr := quarantineAssetFile(baseDir, path, sweepQuarantineDir); processErr != nil {
+			log.Printf("asset_reconcile.orphan: failed to process %s: %v", assetPath, processErr)
 			return nil
 		}
-		deleted++
+		processed++
 		return nil
 	})
 	if err != nil {
-		return deleted, fmt.Errorf("walk assets directory: %w", err)
+		return processed, fmt.Errorf("walk assets directory: %w", err)
 	}
 
 	// Remove empty game directories (reverse order = deepest first).
@@ -307,7 +315,126 @@ func (s *AssetReconcileService) deleteUnreferencedFiles(referenced map[string]st
 		}
 	}
 
-	return deleted, nil
+	return processed, nil
+}
+
+func quarantineAssetFile(baseDir, sourcePath, sweepQuarantineDir string) error {
+	rel, err := filepath.Rel(baseDir, sourcePath)
+	if err != nil {
+		return err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("path %q is outside base dir", sourcePath)
+	}
+
+	targetPath := filepath.Join(sweepQuarantineDir, rel)
+	targetPath = uniqueFilePath(targetPath)
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		return fmt.Errorf("create orphan quarantine directory: %w", err)
+	}
+	if err := moveFile(sourcePath, targetPath); err != nil {
+		return fmt.Errorf("move orphan to quarantine: %w", err)
+	}
+	return nil
+}
+
+func moveFile(sourcePath, targetPath string) error {
+	if err := os.Rename(sourcePath, targetPath); err == nil {
+		return nil
+	}
+
+	input, err := os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer input.Close()
+
+	output, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		return err
+	}
+	_, copyErr := io.Copy(output, input)
+	closeErr := output.Close()
+	if copyErr != nil {
+		_ = os.Remove(targetPath)
+		return copyErr
+	}
+	if closeErr != nil {
+		_ = os.Remove(targetPath)
+		return closeErr
+	}
+	return os.Remove(sourcePath)
+}
+
+func uniqueFilePath(path string) string {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return path
+	}
+
+	ext := filepath.Ext(path)
+	base := strings.TrimSuffix(path, ext)
+	for i := 1; ; i++ {
+		candidate := fmt.Sprintf("%s-%d%s", base, i, ext)
+		if _, err := os.Stat(candidate); os.IsNotExist(err) {
+			return candidate
+		}
+	}
+}
+
+func (s *AssetReconcileService) cleanOldQuarantinedAssets() (int, error) {
+	if strings.TrimSpace(s.orphanQuarantineDir) == "" {
+		return 0, nil
+	}
+	if _, err := os.Stat(s.orphanQuarantineDir); os.IsNotExist(err) {
+		return 0, nil
+	} else if err != nil {
+		return 0, fmt.Errorf("stat orphan quarantine directory: %w", err)
+	}
+
+	cutoff := time.Now().Add(-orphanAssetQuarantineRetention)
+	removed := 0
+	err := filepath.WalkDir(s.orphanQuarantineDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		info, statErr := d.Info()
+		if statErr != nil {
+			return statErr
+		}
+		if info.ModTime().After(cutoff) {
+			return nil
+		}
+		if removeErr := os.Remove(path); removeErr != nil {
+			return removeErr
+		}
+		removed++
+		return nil
+	})
+	if err != nil {
+		return removed, fmt.Errorf("clean old quarantined assets: %w", err)
+	}
+
+	removeEmptyDirs(s.orphanQuarantineDir)
+	return removed, nil
+}
+
+func removeEmptyDirs(baseDir string) {
+	var dirs []string
+	_ = filepath.WalkDir(baseDir, func(path string, d os.DirEntry, err error) error {
+		if err == nil && d.IsDir() && path != baseDir {
+			dirs = append(dirs, path)
+		}
+		return nil
+	})
+	for i := len(dirs) - 1; i >= 0; i-- {
+		entries, readErr := os.ReadDir(dirs[i])
+		if readErr == nil && len(entries) == 0 {
+			_ = os.Remove(dirs[i])
+		}
+	}
 }
 
 // fsPathToAssetPath converts an absolute filesystem path under baseDir to the
