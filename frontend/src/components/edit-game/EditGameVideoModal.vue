@@ -192,20 +192,20 @@ const openVideoFilePicker = () => {
 .video-library-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-height: 360px;
+  gap: 4px;
+  max-height: 280px;
   overflow-y: auto;
 }
 
 .video-library-item {
   border: 1px solid var(--color-border-2);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--color-fill-1);
-  padding: 10px 12px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 8px 10px;
+  display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 8px;
   overflow: hidden;
 }
 
@@ -216,17 +216,16 @@ const openVideoFilePicker = () => {
 
 .video-library-item__preview {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   min-width: 0;
-  border-radius: 8px;
-  padding: 4px;
+  flex: 1;
 }
 
 .video-library-item__thumb {
-  width: 132px;
-  height: 74px;
-  border-radius: 8px;
+  width: 48px;
+  height: 27px;
+  border-radius: 4px;
   overflow: hidden;
   flex-shrink: 0;
   border: 1px solid var(--color-border-2);
@@ -245,7 +244,7 @@ const openVideoFilePicker = () => {
 
 .video-library-item__thumb-placeholder {
   color: var(--color-text-3);
-  font-size: 20px;
+  font-size: 14px;
 }
 
 .video-library-item__info {
@@ -259,15 +258,15 @@ const openVideoFilePicker = () => {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   width: 100%;
   overflow: hidden;
 }
 
 .video-library-item__title {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--color-text-2);
   white-space: nowrap;
 }
@@ -275,7 +274,7 @@ const openVideoFilePicker = () => {
 .video-library-item__path {
   min-width: 0;
   color: var(--color-text-3);
-  font-size: 12px;
+  font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -285,7 +284,7 @@ const openVideoFilePicker = () => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: 2px;
   flex-shrink: 0;
   min-width: fit-content;
 }
@@ -296,7 +295,7 @@ const openVideoFilePicker = () => {
 
 @media (max-width: 768px) {
   .video-library-item {
-    padding: 8px;
+    padding: 6px 8px;
   }
 
   .video-library-item__actions {
@@ -306,7 +305,7 @@ const openVideoFilePicker = () => {
 
 @media (max-width: 560px) {
   .video-library-item {
-    grid-template-columns: minmax(0, 1fr);
+    flex-direction: column;
     align-items: stretch;
   }
 

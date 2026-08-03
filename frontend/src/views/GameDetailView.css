@@ -102,8 +102,13 @@
   min-height: 420px;
 }
 
-.game-detail__main > :deep(.screenshot-carousel__video-list) {
+.game-detail__main > :deep(.screenshot-carousel__filmstrip) {
   border-radius: var(--radius-lg);
+}
+
+.game-detail__main > :deep(.screenshot-carousel__filmstrip-inner) {
+  padding-left: 12px;
+  padding-right: 12px;
 }
 
 .game-detail__card {
