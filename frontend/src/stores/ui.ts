@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { safeLocalStorageGetItem, safeLocalStorageSetItem } from '@/utils/safe-local-storage'
+import type { AmbientBackgroundPool } from '@/utils/ambient-background'
 
 type ViewMode = 'grid' | 'list'
 type AmbientBackgroundSource = {
   owner: string
   key: string
-  urls: string[]
+  pool: AmbientBackgroundPool
 } | null
 
 type SharedBackgroundAvailability = 'unknown' | 'available' | 'missing'

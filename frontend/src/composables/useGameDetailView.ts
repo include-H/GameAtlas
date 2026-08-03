@@ -8,7 +8,7 @@ import { formatDisplayDate } from '@/utils/date'
 import { navigateBackOrFallback } from '@/utils/navigation'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
-import { getAmbientBackgroundUrlsFromGameDetail } from '@/utils/ambient-background'
+import { getAmbientBackgroundPoolFromGameDetail, hasAmbientBackgroundPoolImages } from '@/utils/ambient-background'
 
 interface UseGameDetailViewOptions {
   route: RouteLocationNormalizedLoaded
@@ -215,8 +215,8 @@ export const useGameDetailView = ({
   }
 
   const syncAmbientBackground = () => {
-    const imageUrls = getAmbientBackgroundUrlsFromGameDetail(game.value)
-    if (!game.value?.public_id || imageUrls.length === 0) {
+    const pool = getAmbientBackgroundPoolFromGameDetail(game.value)
+    if (!game.value?.public_id || !hasAmbientBackgroundPoolImages(pool)) {
       uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
       return
     }
@@ -224,7 +224,7 @@ export const useGameDetailView = ({
     uiStore.setAmbientBackgroundSource({
       owner: AMBIENT_BACKGROUND_OWNER,
       key: game.value.public_id,
-      urls: imageUrls,
+      pool,
     })
   }
 
@@ -254,9 +254,11 @@ export const useGameDetailView = ({
     requestedGameId,
     async (gameId) => {
       if (!gameId) {
+        uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
         return
       }
       showEditModal.value = false
+      uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
       await loadGameDetail(gameId)
       syncAmbientBackground()
       void setupTopSectionObserver()
@@ -324,6 +326,7 @@ export const useGameDetailView = ({
       currentAbortController.abort()
       currentAbortController = null
     }
+    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
     disconnectTopSectionObserver()
     if (typeof window !== 'undefined') {
       window.removeEventListener('resize', syncTopSectionHeight)

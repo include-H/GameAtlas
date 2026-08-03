@@ -1,5 +1,10 @@
-import type { GameDetailDto, GameListItemDto, Series } from '@/services/types'
+import type { GameDetailDto, GameListItemDto } from '@/services/types'
 import { resolveAssetUrl } from '@/utils/asset-url'
+
+export interface AmbientBackgroundPool {
+  screenshots: string[]
+  banners: string[]
+}
 
 type ImageCandidateGame = {
   banner_image?: GameListItemDto['banner_image']
@@ -11,9 +16,10 @@ type ImageCandidateGameDetail = {
   screenshots?: GameDetailDto['screenshots']
 }
 
-type ImageCandidateSeries = {
-  background_candidates?: Series['background_candidates']
-}
+export const createAmbientBackgroundPool = (): AmbientBackgroundPool => ({
+  screenshots: [],
+  banners: [],
+})
 
 const pushResolved = (target: string[], value: string | null | undefined) => {
   const resolvedUrl = resolveAssetUrl(value)
@@ -22,51 +28,63 @@ const pushResolved = (target: string[], value: string | null | undefined) => {
   }
 }
 
-export const getAmbientBackgroundUrlsFromGameListItem = (game?: ImageCandidateGame | null) => {
+export const getAmbientBackgroundPoolFromGameListItem = (game?: ImageCandidateGame | null) => {
+  const pool = createAmbientBackgroundPool()
   if (!game) {
-    return []
+    return pool
   }
 
-  const urls: string[] = []
-  pushResolved(urls, game.primary_screenshot)
-  pushResolved(urls, game.banner_image)
-  return urls
+  pushResolved(pool.screenshots, game.primary_screenshot)
+  pushResolved(pool.banners, game.banner_image)
+  return pool
 }
 
-export const getAmbientBackgroundUrlsFromGameDetail = (game?: ImageCandidateGameDetail | null) => {
+export const getAmbientBackgroundPoolFromGameDetail = (game?: ImageCandidateGameDetail | null) => {
+  const pool = createAmbientBackgroundPool()
   if (!game) {
-    return []
+    return pool
   }
 
-  const urls: string[] = []
   for (const screenshot of game.screenshots || []) {
-    pushResolved(urls, screenshot.path)
+    pushResolved(pool.screenshots, screenshot.path)
   }
-  pushResolved(urls, game.banner_image)
-  return urls
+  pushResolved(pool.banners, game.banner_image)
+  return pool
 }
 
-export const getAmbientBackgroundUrlsFromGames = (games: Array<ImageCandidateGame | null | undefined>) => {
-  const urls: string[] = []
-  for (const game of games) {
-    const gameUrls = getAmbientBackgroundUrlsFromGameListItem(game)
-    for (const url of gameUrls) {
-      if (!urls.includes(url)) {
-        urls.push(url)
-      }
+export const mergeAmbientBackgroundPools = (pools: Array<AmbientBackgroundPool | null | undefined>) => {
+  const merged = createAmbientBackgroundPool()
+  for (const pool of pools) {
+    for (const screenshot of pool?.screenshots || []) {
+      pushResolved(merged.screenshots, screenshot)
+    }
+    for (const banner of pool?.banners || []) {
+      pushResolved(merged.banners, banner)
     }
   }
-  return urls
+  return merged
 }
 
-export const getAmbientBackgroundUrlsFromSeries = (series?: ImageCandidateSeries | null) => {
-  if (!series) {
+export const getAmbientBackgroundPoolFromGames = (games: Array<ImageCandidateGame | null | undefined>) => {
+  const pools: AmbientBackgroundPool[] = []
+  for (const game of games) {
+    pools.push(getAmbientBackgroundPoolFromGameListItem(game))
+  }
+  return mergeAmbientBackgroundPools(pools)
+}
+
+export const getPrioritizedAmbientBackgroundUrls = (pool?: AmbientBackgroundPool | null) => {
+  if (!pool) {
     return []
   }
 
-  const urls: string[] = []
-  for (const candidate of series.background_candidates || []) {
-    pushResolved(urls, candidate)
+  if (pool.screenshots.length > 0) {
+    return pool.screenshots
   }
-  return urls
+
+  return pool.banners
+}
+
+export const hasAmbientBackgroundPoolImages = (pool?: AmbientBackgroundPool | null) => {
+  return getPrioritizedAmbientBackgroundUrls(pool).length > 0
 }

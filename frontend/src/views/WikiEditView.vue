@@ -146,7 +146,7 @@ import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
 import { navigateBackOrFallback } from '@/utils/navigation'
 import { formatDisplayDateTime } from '@/utils/date'
-import { getAmbientBackgroundUrlsFromGameDetail } from '@/utils/ambient-background'
+import { getAmbientBackgroundPoolFromGameDetail, hasAmbientBackgroundPoolImages } from '@/utils/ambient-background'
 import {
   IconSave
 } from '@arco-design/web-vue/es/icon'
@@ -162,8 +162,8 @@ const MarkdownRenderer = defineAsyncComponent(() => import('@/components/Markdow
 const AMBIENT_BACKGROUND_OWNER = 'wiki-edit'
 
 const syncAmbientBackground = () => {
-  const imageUrls = getAmbientBackgroundUrlsFromGameDetail(game.value)
-  if (!game.value?.public_id || imageUrls.length === 0) {
+  const pool = getAmbientBackgroundPoolFromGameDetail(game.value)
+  if (!game.value?.public_id || !hasAmbientBackgroundPoolImages(pool)) {
     uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
     return
   }
@@ -171,7 +171,7 @@ const syncAmbientBackground = () => {
   uiStore.setAmbientBackgroundSource({
     owner: AMBIENT_BACKGROUND_OWNER,
     key: game.value.public_id,
-    urls: imageUrls,
+    pool,
   })
 }
 
@@ -245,8 +245,10 @@ watch(
   requestedGameId,
   async (gameId) => {
     if (!gameId) {
+      uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
       return
     }
+    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
     const loaded = await loadWikiEditorData(gameId)
     if (!loaded) {
       return

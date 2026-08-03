@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { onActivated, onDeactivated, ref, watch } from 'vue'
+import { onActivated, onDeactivated, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { IconLeft } from '@arco-design/web-vue/es/icon'
 import { useUiStore } from '@/stores/ui'
@@ -49,7 +49,7 @@ import { seriesService } from '@/services/series.service'
 import GameCard from '@/components/GameCard.vue'
 import type { GameListItem } from '@/services/types'
 import { navigateBackOrFallback } from '@/utils/navigation'
-import { getAmbientBackgroundUrlsFromGames } from '@/utils/ambient-background'
+import { getAmbientBackgroundPoolFromGames, hasAmbientBackgroundPoolImages } from '@/utils/ambient-background'
 
 defineOptions({
   name: 'SeriesDetailView',
@@ -66,14 +66,15 @@ const isLoading = ref(false)
 const hasLoadFailure = ref(false)
 const games = ref<GameListItem[]>([])
 const seriesName = ref('系列')
+let loadRequestId = 0
 
 const syncAmbientBackground = (seriesId: number) => {
-  const imageUrls = getAmbientBackgroundUrlsFromGames(games.value)
-  if (imageUrls.length > 0) {
+  const pool = getAmbientBackgroundPoolFromGames(games.value)
+  if (hasAmbientBackgroundPoolImages(pool)) {
     uiStore.setAmbientBackgroundSource({
       owner: AMBIENT_BACKGROUND_OWNER,
       key: String(seriesId),
-      urls: imageUrls,
+      pool,
     })
     return
   }
@@ -86,6 +87,8 @@ const handleGoBack = () => {
 }
 
 const loadSeriesDetail = async () => {
+  const requestId = loadRequestId + 1
+  loadRequestId = requestId
   const id = Number(route.params.id)
   if (Number.isNaN(id) || id <= 0) {
     uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
@@ -95,12 +98,19 @@ const loadSeriesDetail = async () => {
 
   isLoading.value = true
   hasLoadFailure.value = false
+  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
   try {
     const detail = await seriesService.getSeriesDetail(id)
+    if (requestId !== loadRequestId) {
+      return
+    }
     seriesName.value = detail.series.name || `系列 ${id}`
     games.value = detail.games
     syncAmbientBackground(detail.series.id || id)
   } catch {
+    if (requestId !== loadRequestId) {
+      return
+    }
     // 2026-04-07: series route changes must not keep rendering the previous series
     // when the current detail request fails. Failure is distinct from an empty series.
     hasLoadFailure.value = true
@@ -109,7 +119,9 @@ const loadSeriesDetail = async () => {
     uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
     uiStore.addAlert('加载系列详情失败', 'error')
   } finally {
-    isLoading.value = false
+    if (requestId === loadRequestId) {
+      isLoading.value = false
+    }
   }
 }
 
@@ -151,6 +163,11 @@ onActivated(() => {
 })
 
 onDeactivated(() => {
+  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+})
+
+onUnmounted(() => {
+  loadRequestId += 1
   uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
 })
 </script>

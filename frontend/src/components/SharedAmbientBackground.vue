@@ -25,7 +25,13 @@ import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import gamesService from '@/services/games.service'
-import { getAmbientBackgroundUrlsFromGameListItem } from '@/utils/ambient-background'
+import {
+  createAmbientBackgroundPool,
+  getAmbientBackgroundPoolFromGames,
+  hasAmbientBackgroundPoolImages,
+  mergeAmbientBackgroundPools,
+  type AmbientBackgroundPool,
+} from '@/utils/ambient-background'
 
 const route = useRoute()
 const uiStore = useUiStore()
@@ -45,7 +51,7 @@ const SUPPORTED_ROUTE_NAMES = new Set([
   'settings',
 ])
 
-const GLOBAL_POOL_PAGE_LIMIT = 50
+const GLOBAL_POOL_PAGE_LIMIT = 100
 
 const APPLY_DELAY_MS = 50
 
@@ -53,13 +59,13 @@ const layerUrls = ref<string[]>(['', ''])
 const activeLayerIndex = ref(0)
 const hasAppliedBackground = ref(false)
 const applyRequestId = ref(0)
-const globalPoolUrls = ref<string[]>([])
-const globalPoolLoading = ref(false)
+const globalPool = ref<AmbientBackgroundPool>(createAmbientBackgroundPool())
+const globalPoolLoaded = ref(false)
+let globalPoolRequest: Promise<void> | null = null
 
 const CUSTOM_BACKGROUND_PATH = '/data/bg.jpg'
 
 const isEnabled = computed(() => SUPPORTED_ROUTE_NAMES.has(String(route.name || '')))
-const pageSpecificUrls = computed(() => ambientBackgroundSource.value?.urls || [])
 const canUseCustomBackground = computed(() => sharedBackgroundAvailability.value === 'available')
 
 const buildLayerStyle = (url: string) => {
@@ -106,21 +112,40 @@ const wait = (ms: number) => new Promise((resolve) => {
   window.setTimeout(resolve, ms)
 })
 
-const ensureGlobalPool = async () => {
-  if (globalPoolUrls.value.length > 0 || globalPoolLoading.value) return
+const fetchGlobalPool = async () => {
+  const pools: AmbientBackgroundPool[] = []
+  let page = 1
 
-  globalPoolLoading.value = true
-  try {
+  while (true) {
     const result = await gamesService.getGames({
-      query: { page: 1, limit: GLOBAL_POOL_PAGE_LIMIT },
+      query: { page, limit: GLOBAL_POOL_PAGE_LIMIT },
       sort: { field: 'created_at', order: 'desc' },
     })
-    const urls = result.data.flatMap((game) => getAmbientBackgroundUrlsFromGameListItem(game))
-    globalPoolUrls.value = urls.filter((url, index) => url && urls.indexOf(url) === index)
+    pools.push(getAmbientBackgroundPoolFromGames(result.data))
+    const totalPages = Math.max(1, result.pagination.totalPages || 1)
+    if (page >= totalPages) {
+      break
+    }
+    page += 1
+  }
+
+  globalPool.value = mergeAmbientBackgroundPools(pools)
+  globalPoolLoaded.value = true
+}
+
+const ensureGlobalPool = async () => {
+  if (globalPoolLoaded.value) return
+
+  if (!globalPoolRequest) {
+    globalPoolRequest = fetchGlobalPool().finally(() => {
+      globalPoolRequest = null
+    })
+  }
+
+  try {
+    await globalPoolRequest
   } catch {
-    // ignore
-  } finally {
-    globalPoolLoading.value = false
+    // Keep the background non-blocking; another route change can retry the pool load.
   }
 }
 
@@ -140,25 +165,39 @@ const pickRandomBackground = async (urls: string[], currentUrl: string) => {
   return ''
 }
 
-const loadBackground = async () => {
-  // 如果有页面特定的背景源（game-detail、series-detail、wiki-edit），优先使用
-  if (ambientBackgroundSource.value) {
-    if (pageSpecificUrls.value.length > 0) {
-      return pickRandomBackground(pageSpecificUrls.value, layerUrls.value[activeLayerIndex.value] || '')
+const pickFromAmbientBackgroundPool = async (pool: AmbientBackgroundPool, currentUrl: string) => {
+  for (const urls of [pool.screenshots, pool.banners]) {
+    if (urls.length === 0) {
+      continue
     }
-    // 有背景源但暂时没有 URL（比如正在加载中），保持当前背景
-    return layerUrls.value[activeLayerIndex.value] || ''
+
+    const pickedUrl = await pickRandomBackground(urls, currentUrl)
+    if (pickedUrl) {
+      return pickedUrl
+    }
   }
 
-  // 无页面特定背景源时，检查自定义背景
+  return ''
+}
+
+const loadBackground = async () => {
+  const currentUrl = layerUrls.value[activeLayerIndex.value] || ''
+  const sourcePool = ambientBackgroundSource.value?.pool
+  if (sourcePool && hasAmbientBackgroundPoolImages(sourcePool)) {
+    const sourceUrl = await pickFromAmbientBackgroundPool(sourcePool, currentUrl)
+    if (sourceUrl) {
+      return sourceUrl
+    }
+  }
+
   if (canUseCustomBackground.value) {
     return CUSTOM_BACKGROUND_PATH
   }
 
   await ensureGlobalPool()
 
-  if (globalPoolUrls.value.length > 0) {
-    return pickRandomBackground(globalPoolUrls.value, layerUrls.value[activeLayerIndex.value] || '')
+  if (hasAmbientBackgroundPoolImages(globalPool.value)) {
+    return pickFromAmbientBackgroundPool(globalPool.value, currentUrl)
   }
 
   return ''
@@ -194,10 +233,6 @@ const applyBackground = async () => {
     return
   }
 
-  if (!nextUrl && currentUrl) {
-    return
-  }
-
   const nextLayerIndex = activeLayerIndex.value === 0 ? 1 : 0
   layerUrls.value[nextLayerIndex] = nextUrl
 
@@ -221,7 +256,11 @@ watch(
     isEnabled,
     () => route.name,
     () => ambientBackgroundSource.value?.key || '',
-    () => (ambientBackgroundSource.value?.urls || []).join('|'),
+    () => [
+      ...(ambientBackgroundSource.value?.pool.screenshots || []),
+      '::',
+      ...(ambientBackgroundSource.value?.pool.banners || []),
+    ].join('|'),
     () => sharedBackgroundAvailability.value,
   ],
   async () => {
