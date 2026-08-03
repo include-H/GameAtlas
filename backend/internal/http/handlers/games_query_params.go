@@ -18,12 +18,12 @@ func decodeGamesListParams(c *gin.Context) (domain.GamesListParams, bool) {
 	if page <= 0 {
 		page = 1
 	}
-	limit, ok := parseGamesListIntQuery(c, "limit", 20)
+	limit, ok := parseGamesListIntQuery(c, "limit", 24)
 	if !ok {
 		return domain.GamesListParams{}, false
 	}
 	if limit <= 0 {
-		limit = 20
+		limit = 24
 	}
 	if limit > 100 {
 		limit = 100

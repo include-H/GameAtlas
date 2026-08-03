@@ -29,10 +29,13 @@ export const seriesService = {
     const response = await get<ApiEnvelope<{ series: Series; games: GameListItemDto[] }>>(`/series/${id}`)
     return {
       series: response.data.series,
-      games: response.data.games.map((item): GameListItem => ({
-        ...item,
-        isFavorite: item.is_favorite,
-      })),
+      games: response.data.games.map((item): GameListItem => {
+        const { is_favorite, ...game } = item
+        return {
+          ...game,
+          isFavorite: is_favorite,
+        }
+      }),
     }
   },
 

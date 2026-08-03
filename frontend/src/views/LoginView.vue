@@ -92,7 +92,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Message } from '@arco-design/web-vue'
 import {
   IconClose,
   IconEye,
@@ -101,6 +100,7 @@ import {
   IconTrophy,
 } from '@arco-design/web-vue/es/icon'
 import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
 import hitokotoService from '@/services/hitokoto.service'
 import { getHttpErrorData, getHttpErrorMessage, getHttpStatus } from '@/utils/http-error'
 import AnimatedCharacters from '@/components/login/AnimatedCharacters.vue'
@@ -113,6 +113,7 @@ interface LoginErrorData {
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const uiStore = useUiStore()
 const fallbackLoginQuote = '推开这扇门，回到你的游戏库。'
 
 const password = ref('')
@@ -247,11 +248,11 @@ const handleLogin = async () => {
     return
   }
   if (!password.value.trim()) {
-    Message.warning('请输入访问密码')
+    uiStore.addAlert('请输入访问密码', 'warning')
     return
   }
   if (isCooldownActive.value) {
-    Message.warning(`请在冷静期结束后再试（剩余 ${cooldownLabel.value}）`)
+    uiStore.addAlert(`请在冷静期结束后再试（剩余 ${cooldownLabel.value}）`, 'warning')
     return
   }
 
@@ -283,7 +284,7 @@ const handleLogin = async () => {
       }
     }
 
-    Message.error(getHttpErrorMessage(error, '登录失败'))
+    uiStore.addAlert(getHttpErrorMessage(error, '登录失败'), 'error')
   } finally {
     isSubmitting.value = false
   }

@@ -4,6 +4,7 @@
       <div :key="String(route.name || route.path)" class="auth-route-shell">
         <shared-ambient-background />
         <component :is="Component" />
+        <alert-banner />
       </div>
     </transition>
   </router-view>
@@ -99,12 +100,15 @@
 
         <a-layout-content class="content">
           <router-view v-slot="{ Component, route }">
-            <div
-              :key="String(route.name || route.path)"
-              class="route-fade-shell"
-            >
-              <component :is="Component" />
-            </div>
+            <transition name="route-fade" mode="out-in">
+              <keep-alive include="GamesView">
+                <component
+                  :is="Component"
+                  :key="String(route.name || route.path)"
+                  class="route-fade-shell"
+                />
+              </keep-alive>
+            </transition>
           </router-view>
 
           <alert-banner />

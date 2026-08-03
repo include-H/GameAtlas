@@ -1,4 +1,4 @@
-import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import type {
   LocationQuery,
   LocationQueryRaw,
@@ -487,6 +487,9 @@ export const useGamesView = ({
   // only reflect filters that have actually reached the backend request.
   watch(() => route.query, () => {
     searchQuery.value = readSingleQueryValue(route.query.search) || ''
+    if (route.name !== 'games') {
+      return
+    }
     void loadGames()
   })
 
@@ -604,10 +607,6 @@ export const useGamesView = ({
     }
 
     searchQuery.value = readSingleQueryValue(route.query.search) || ''
-    await loadGames()
-  })
-
-  onActivated(async () => {
     await loadGames()
   })
 

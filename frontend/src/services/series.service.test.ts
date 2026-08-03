@@ -46,4 +46,27 @@ describe('series service', () => {
     const [, config] = getMock.mock.calls[0]
     expect((config.params as URLSearchParams).toString()).toBe('sort=name')
   })
+
+  it('normalizes series games without retaining the API favorite field', async () => {
+    getMock.mockResolvedValue({
+      data: {
+        series: { id: 7, name: 'Persona' },
+        games: [{
+          id: 42,
+          public_id: 'persona-5',
+          title: 'Persona 5',
+          is_favorite: true,
+        }],
+      },
+    })
+
+    const detail = await seriesService.getSeriesDetail(7)
+
+    expect(detail.games[0]).toMatchObject({
+      id: 42,
+      public_id: 'persona-5',
+      isFavorite: true,
+    })
+    expect(detail.games[0]).not.toHaveProperty('is_favorite')
+  })
 })

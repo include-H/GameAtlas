@@ -14,7 +14,7 @@ export const useGamesStore = defineStore('games', () => {
   const pagination = ref({
     total: 0,
     page: 1,
-    limit: 20,
+    limit: 24,
     totalPages: 0,
   })
 
