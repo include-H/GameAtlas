@@ -298,10 +298,16 @@ const handleLogoPosConfirm = () => {
 
 .steam-image-item {
   position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
   border: 1px solid var(--color-border-2);
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
   transition: border-color 0.2s ease, transform 0.2s ease;
 }
 
@@ -313,7 +319,7 @@ const handleLogoPosConfirm = () => {
 .steam-image-item img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
@@ -349,14 +355,24 @@ const handleLogoPosConfirm = () => {
 }
 
 .cover-preview-section {
+  min-height: 140px;
+  max-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--color-border-2);
+  background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
 }
 
 .cover-preview-img {
-  width: 100%;
+  max-width: 100%;
+  max-height: 268px;
+  width: auto;
   height: auto;
+  object-fit: contain;
   display: block;
 }
 
@@ -410,6 +426,9 @@ const handleLogoPosConfirm = () => {
 
 .logo-pos-editor__logo {
   position: absolute;
+  max-width: 90%;
+  max-height: 90%;
+  height: auto;
   object-fit: contain;
   pointer-events: auto;
   cursor: grab;

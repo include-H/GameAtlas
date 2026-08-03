@@ -118,6 +118,20 @@ func (s *MetadataService) Create(resource MetadataResource, input domain.Metadat
 
 	switch resource.Type {
 	case domain.MetadataSeries:
+		existing, err := s.repo.FindSimpleByName(resource.Type, name)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			return existing, nil
+		}
+		existing, err = s.repo.FindSimpleBySlug(resource.Type, slugValue)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			return existing, nil
+		}
 		result, err := s.repo.CreateSeries(cleanInput, slugValue, sortOrder)
 		if err != nil {
 			return nil, err

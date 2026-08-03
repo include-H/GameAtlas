@@ -49,7 +49,7 @@
                   multiple
                   allow-clear
                   allow-search
-                  allow-create
+                  :allow-create="canCreateDeveloperOption"
                   :remote-search="true"
                   :on-search="handleDeveloperSearch"
                 >
@@ -72,7 +72,7 @@
                   multiple
                   allow-clear
                   allow-search
-                  allow-create
+                  :allow-create="canCreatePublisherOption"
                   :remote-search="true"
                   :on-search="handlePublisherSearch"
                 >
@@ -97,7 +97,7 @@
                   placeholder="选择系列"
                   allow-clear
                   allow-search
-                  allow-create
+                  :allow-create="canCreateSeriesOption"
                   :loading="isSearchingSeries"
                   :remote-search="true"
                   :on-search="handleSeriesSearch"
@@ -432,6 +432,9 @@ const {
   bannerSearchUrl,
   bannerUploadAction,
   bannerUploadData,
+  canCreateDeveloperOption,
+  canCreatePublisherOption,
+  canCreateSeriesOption,
   confirmBannerSelection,
   confirmCoverSelection,
   confirmLogoSelection,

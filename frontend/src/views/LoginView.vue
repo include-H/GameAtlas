@@ -302,6 +302,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .login-page {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(400px, 560px);
   /* 品牌化渐变：色值对应 --color-sidebar-selected-bg / --color-primary-6 / --color-bg-1 */
@@ -321,6 +322,7 @@ onBeforeUnmount(() => {
 
 .login-stage {
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 48px 56px 40px;
   display: flex;
   flex-direction: column;
@@ -468,6 +470,7 @@ onBeforeUnmount(() => {
 
 .login-panel {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -609,6 +612,9 @@ onBeforeUnmount(() => {
 @media (max-width: 1080px) {
   .login-page {
     grid-template-columns: 1fr;
+    min-height: 100%;
+    align-content: start;
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
   }
 
   .login-stage {
@@ -619,6 +625,17 @@ onBeforeUnmount(() => {
   .login-panel {
     min-height: auto;
     padding-top: 0;
+  }
+}
+
+@media (max-width: 1080px) and (max-height: 960px) {
+  .login-stage {
+    padding-top: 32px;
+    padding-bottom: 8px;
+  }
+
+  .login-panel {
+    padding-bottom: 28px;
   }
 }
 

@@ -26,6 +26,7 @@ import { useEditGameAssets } from '@/composables/useEditGameAssets'
 import { useEditGameFormBootstrap } from '@/composables/useEditGameFormBootstrap'
 import { useEditGameMediaState } from '@/composables/useEditGameMediaState'
 import {
+  hasCreatableOptionName,
   searchCreatableOptions,
   sortCreatableOptionsByName,
 } from '@/utils/creatable-select'
@@ -71,6 +72,9 @@ export const useEditGameModal = ({
   const isSearchingSeries = ref(false)
   const isSearchingDevelopers = ref(false)
   const isSearchingPublishers = ref(false)
+  const seriesSearchQuery = ref('')
+  const developerSearchQuery = ref('')
+  const publisherSearchQuery = ref('')
   const showVideoSelector = ref(false)
   const isUploadingVideo = ref(false)
   const videoUploadProgress = ref(0)
@@ -108,7 +112,7 @@ export const useEditGameModal = ({
   const filteredSeriesOptions = computed(() => {
     // 2026-04-04: keep authoring pickers alphabetized for scan speed.
     // Impact: this is UI-only option ordering; do not treat it as backend metadata sort semantics.
-    return [...seriesOptions.value].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
+    return sortCreatableOptionsByName(seriesOptions.value)
   })
 
   const filteredDeveloperOptions = computed(() => {
@@ -121,6 +125,21 @@ export const useEditGameModal = ({
     // 2026-04-04: keep authoring pickers alphabetized for scan speed.
     // Impact: this is UI-only option ordering; do not treat it as backend metadata sort semantics.
     return sortCreatableOptionsByName(publisherOptions.value)
+  })
+
+  const canCreateSeriesOption = computed(() => {
+    const query = seriesSearchQuery.value.trim()
+    return query.length === 0 || !hasCreatableOptionName(query, seriesOptions.value)
+  })
+
+  const canCreateDeveloperOption = computed(() => {
+    const query = developerSearchQuery.value.trim()
+    return query.length === 0 || !hasCreatableOptionName(query, developerOptions.value)
+  })
+
+  const canCreatePublisherOption = computed(() => {
+    const query = publisherSearchQuery.value.trim()
+    return query.length === 0 || !hasCreatableOptionName(query, publisherOptions.value)
   })
 
   const currentGame = computed(() => props.game)
@@ -158,16 +177,18 @@ export const useEditGameModal = ({
   })
 
   const handleSeriesSearch = async (query: string) => {
-    if (!query) return
+    seriesSearchQuery.value = query
+    const normalizedQuery = query.trim()
+    if (!normalizedQuery) return
     isSearchingSeries.value = true
     try {
-      const results = await seriesService.searchSeries(query)
-      const currentSeriesId = form.value.series_id
-      const current = seriesOptions.value.find((item) => item.id === currentSeriesId)
-      seriesOptions.value = results
-      if (current && !results.find((item) => item.id === current.id)) {
-        seriesOptions.value.push(current)
-      }
+      const selectedValues = form.value.series_id === null || form.value.series_id === '' ? [] : [form.value.series_id]
+      seriesOptions.value = await searchCreatableOptions({
+        query: normalizedQuery,
+        selectedValues,
+        currentOptions: seriesOptions.value,
+        search: (keyword) => seriesService.searchSeries(keyword),
+      })
     } catch {
       // 2026-04-08: picker search failures must stay distinguishable from a real empty result set.
       // Impact: keep the last successful options visible and surface an explicit error instead of "no options".
@@ -178,11 +199,13 @@ export const useEditGameModal = ({
   }
 
   const handleDeveloperSearch = async (query: string) => {
-    if (!query) return
+    developerSearchQuery.value = query
+    const normalizedQuery = query.trim()
+    if (!normalizedQuery) return
     isSearchingDevelopers.value = true
     try {
       developerOptions.value = await searchCreatableOptions({
-        query,
+        query: normalizedQuery,
         selectedValues: form.value.developer_ids,
         currentOptions: developerOptions.value,
         search: (keyword) => developersService.listDevelopers({ query: keyword }),
@@ -195,11 +218,13 @@ export const useEditGameModal = ({
   }
 
   const handlePublisherSearch = async (query: string) => {
-    if (!query) return
+    publisherSearchQuery.value = query
+    const normalizedQuery = query.trim()
+    if (!normalizedQuery) return
     isSearchingPublishers.value = true
     try {
       publisherOptions.value = await searchCreatableOptions({
-        query,
+        query: normalizedQuery,
         selectedValues: form.value.publisher_ids,
         currentOptions: publisherOptions.value,
         search: (keyword) => publishersService.listPublishers({ query: keyword }),
@@ -594,6 +619,9 @@ export const useEditGameModal = ({
   })
 
   const resetTransientState = () => {
+    seriesSearchQuery.value = ''
+    developerSearchQuery.value = ''
+    publisherSearchQuery.value = ''
     resetFileBrowserState()
     resetSteamImportState()
     resetVideoUploadState()
@@ -631,6 +659,9 @@ export const useEditGameModal = ({
     backToLogoGameSearch,
     backToScreenshotGameSearch,
     backToSummarySearch,
+    canCreateDeveloperOption,
+    canCreatePublisherOption,
+    canCreateSeriesOption,
     confirmBannerSelection,
     confirmCoverSelection,
     confirmScreenshotSelection,

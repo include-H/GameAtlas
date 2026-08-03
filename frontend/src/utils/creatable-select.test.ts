@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  dedupeCreatableOptionsByName,
+  hasCreatableOptionName,
   normalizeOptionId,
   resolveCreatableSelections,
   searchCreatableOptions,
@@ -31,8 +33,31 @@ describe('creatable-select helpers', () => {
     ])
   })
 
-  it('merges selected options into search results', async () => {
-    const search = vi.fn().mockResolvedValue([{ id: 2, name: '战棋' }])
+  it('deduplicates options by normalized display name', () => {
+    expect(
+      dedupeCreatableOptionsByName([
+        { id: 1, name: '孤岛惊魂' },
+        { id: 2, name: ' 孤岛惊魂 ' },
+        { id: 3, name: 'Far  Cry' },
+        { id: 4, name: 'far cry' },
+      ]),
+    ).toEqual([
+      { id: 1, name: '孤岛惊魂' },
+      { id: 3, name: 'Far  Cry' },
+    ])
+  })
+
+  it('matches creatable option names after trimming and whitespace normalization', () => {
+    expect(hasCreatableOptionName(' far cry ', [{ id: 1, name: 'Far  Cry' }])).toBe(true)
+    expect(hasCreatableOptionName('孤岛惊魂', [{ id: 2, name: '孤岛惊魂' }])).toBe(true)
+    expect(hasCreatableOptionName('孤岛惊魂4', [{ id: 2, name: '孤岛惊魂' }])).toBe(false)
+  })
+
+  it('merges selected options into search results and removes duplicate names', async () => {
+    const search = vi.fn().mockResolvedValue([
+      { id: 2, name: '战棋' },
+      { id: 3, name: ' 战棋 ' },
+    ])
 
     const result = await searchCreatableOptions({
       query: '战',

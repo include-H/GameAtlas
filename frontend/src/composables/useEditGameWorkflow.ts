@@ -4,7 +4,7 @@ import gamesService from '@/services/games.service'
 import { seriesService } from '@/services/series.service'
 import { developersService } from '@/services/developers.service'
 import { publishersService } from '@/services/publishers.service'
-import { resolveCreatableSelections } from '@/utils/creatable-select'
+import { normalizeCreatableOptionName, resolveCreatableSelections } from '@/utils/creatable-select'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import type {
   AdminGameDetail,
@@ -43,7 +43,9 @@ const toNullableFormText = (value: string | null | undefined) => {
 
 const resolveSeriesSelection = async (
   seriesValue: string | number | null,
+  options: Series[],
 ) => {
+  const nextOptions = [...options]
   let seriesIds: number[] | undefined
 
   if (seriesValue === null || seriesValue === undefined || seriesValue === '') {
@@ -56,6 +58,15 @@ const resolveSeriesSelection = async (
     if (!Number.isNaN(maybeId) && normalizedValue === String(maybeId)) {
       seriesIds = [maybeId]
     } else {
+      const normalizedName = normalizeCreatableOptionName(normalizedValue)
+      const existingSeries = nextOptions.find((item) => normalizeCreatableOptionName(item.name) === normalizedName)
+      if (existingSeries) {
+        seriesIds = [existingSeries.id]
+        return {
+          ids: seriesIds,
+          options: nextOptions,
+        }
+      }
       try {
         // 2026-04-04: keep series creation inside the edit flow because game editing is a real
         // metadata authoring entry point in this project, not a deprecated compatibility path.
@@ -63,6 +74,7 @@ const resolveSeriesSelection = async (
         const newSeries = await seriesService.createSeries({
           name: seriesName,
         })
+        nextOptions.push(newSeries)
         seriesIds = [newSeries.id]
       } catch (error) {
         throw createWorkflowStepError(`系列 "${seriesValue}" 处理失败`, error)
@@ -70,7 +82,10 @@ const resolveSeriesSelection = async (
     }
   }
 
-  return seriesIds
+  return {
+    ids: seriesIds ?? [],
+    options: nextOptions,
+  }
 }
 
 const resolveDevelopers = async (
@@ -151,8 +166,13 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
     options.isSubmitting.value = true
 
     try {
-      const seriesIds = await resolveSeriesSelection(options.form.value.series_id)
-      const seriesId = seriesIds?.[0] ?? null
+      const seriesResult = await resolveSeriesSelection(
+        options.form.value.series_id,
+        options.seriesOptions.value,
+      )
+      options.seriesOptions.value = seriesResult.options
+      const seriesId = seriesResult.ids[0] ?? null
+      options.form.value.series_id = seriesId
 
       const developerResult = await resolveDevelopers(
         options.form.value.developer_ids,

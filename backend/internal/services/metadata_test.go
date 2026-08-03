@@ -162,6 +162,36 @@ func TestMetadataServiceCreateDeveloperReturnsExistingBySlugWhenNameDiffers(t *t
 	}
 }
 
+func TestMetadataServiceCreateSeriesReturnsExistingBySlugWhenNameDiffers(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	if _, err := db.Exec(`INSERT INTO series (name, slug, sort_order) VALUES ('Far Cry', 'far-cry', 0)`); err != nil {
+		t.Fatalf("insert series: %v", err)
+	}
+
+	service := NewMetadataService(repositories.NewMetadataRepository(db))
+
+	created, err := service.Create(
+		MetadataResource{Type: domain.MetadataSeries},
+		domain.MetadataWriteInput{Name: "Far-Cry"},
+	)
+	if err != nil {
+		t.Fatalf("Create returned error: %v", err)
+	}
+	if created.Name != "Far Cry" {
+		t.Fatalf("Create name = %q, want existing %q", created.Name, "Far Cry")
+	}
+
+	var count int
+	if err := db.Get(&count, `SELECT COUNT(*) FROM series`); err != nil {
+		t.Fatalf("count series: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("series count = %d, want 1", count)
+	}
+}
+
 func TestMetadataServiceGetSeriesDetailReturnsEnrichmentErrorInsteadOfSilentEmptyState(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()

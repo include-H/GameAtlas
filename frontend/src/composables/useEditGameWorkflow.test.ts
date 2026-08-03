@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EditGameForm } from '@/utils/edit-game-form'
-import type { AdminGameDetail } from '@/services/types'
+import type { AdminGameDetail, Developer, Publisher, Series } from '@/services/types'
 import { useEditGameWorkflow } from './useEditGameWorkflow'
 
 const {
@@ -46,6 +46,7 @@ vi.mock('@/services/publishers.service', () => ({
 }))
 
 vi.mock('@/utils/creatable-select', () => ({
+  normalizeCreatableOptionName: (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase(),
   resolveCreatableSelections: resolveCreatableSelectionsMock,
 }))
 
@@ -109,9 +110,9 @@ const buildOptions = () => {
         file_paths: [],
       }),
       isSubmitting: ref(false),
-      seriesOptions: ref([]),
-      developerOptions: ref([]),
-      publisherOptions: ref([]),
+      seriesOptions: ref<Series[]>([]),
+      developerOptions: ref<Developer[]>([]),
+      publisherOptions: ref<Publisher[]>([]),
       validateForm: vi.fn().mockResolvedValue(true),
       addAlert,
       emitSuccess,
@@ -186,6 +187,29 @@ describe('useEditGameWorkflow', () => {
         ],
       }),
     }))
+  })
+
+  it('reuses matching series option instead of creating a duplicate', async () => {
+    const { options } = buildOptions()
+    options.form.value.series_id = ' 孤岛惊魂 '
+    options.seriesOptions.value = [{
+      id: 4,
+      name: '孤岛惊魂',
+      slug: 'far-cry',
+      sort_order: 0,
+      created_at: '2026-03-25T00:00:00Z',
+    }]
+
+    const workflow = useEditGameWorkflow(options)
+    await workflow.handleSubmit()
+
+    expect(createSeriesMock).not.toHaveBeenCalled()
+    expect(updateGameAggregateMock).toHaveBeenCalledWith('game-1', expect.objectContaining({
+      game: expect.objectContaining({
+        series_id: 4,
+      }),
+    }))
+    expect(options.form.value.series_id).toBe(4)
   })
 
   it('normalizes blank optional fields before aggregate submit', async () => {

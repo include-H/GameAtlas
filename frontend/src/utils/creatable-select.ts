@@ -10,11 +10,38 @@ export const normalizeOptionId = (value: CreatableSelectionValue): number | null
   return null
 }
 
+export const normalizeCreatableOptionName = (value: string) => {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
 export const sortCreatableOptionsByName = <T extends CreatableNamedOption>(options: T[]) => {
   return [...options].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
 }
 
-const mergeSelectedOptions = <T extends { id: number }>(
+export const hasCreatableOptionName = <T extends CreatableNamedOption>(name: string, options: T[]) => {
+  const normalizedName = normalizeCreatableOptionName(name)
+  return normalizedName.length > 0 && options.some((item) => normalizeCreatableOptionName(item.name) === normalizedName)
+}
+
+export const dedupeCreatableOptionsByName = <T extends CreatableNamedOption>(options: T[]) => {
+  const seenNames = new Set<string>()
+  const deduped: T[] = []
+
+  for (const option of options) {
+    const normalizedName = normalizeCreatableOptionName(option.name)
+    if (normalizedName && seenNames.has(normalizedName)) {
+      continue
+    }
+    if (normalizedName) {
+      seenNames.add(normalizedName)
+    }
+    deduped.push(option)
+  }
+
+  return deduped
+}
+
+const mergeSelectedOptions = <T extends CreatableNamedOption>(
   results: T[],
   selectedValues: Array<string | number>,
   currentOptions: T[],
@@ -33,7 +60,7 @@ const mergeSelectedOptions = <T extends { id: number }>(
     }
   }
 
-  return merged
+  return dedupeCreatableOptionsByName(merged)
 }
 
 export const searchCreatableOptions = async <T extends CreatableNamedOption>(params: {
@@ -47,7 +74,8 @@ export const searchCreatableOptions = async <T extends CreatableNamedOption>(par
 }
 
 const defaultFindExisting = <T extends CreatableNamedOption>(name: string, options: T[]) => {
-  return options.find((item) => item.name.trim().toLowerCase() === name.toLowerCase())
+  const normalizedName = normalizeCreatableOptionName(name)
+  return options.find((item) => normalizeCreatableOptionName(item.name) === normalizedName)
 }
 
 export const resolveCreatableSelections = async <T extends CreatableNamedOption>(params: {
