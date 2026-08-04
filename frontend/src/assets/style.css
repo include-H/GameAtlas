@@ -306,6 +306,8 @@ body[arco-theme='dark'] #app {
 
 .glass-header {
   background: var(--app-header-surface) !important;
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
   border-bottom: 1px solid var(--app-header-border) !important;
   box-shadow: var(--app-header-shadow);
   position: relative;

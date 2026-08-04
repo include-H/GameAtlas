@@ -233,7 +233,7 @@
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
-  filter: saturate(1.02) brightness(0.72);
+  filter: blur(26px) saturate(1.02) brightness(0.72);
   transform: scale(1.08);
   transform-origin: center;
 }

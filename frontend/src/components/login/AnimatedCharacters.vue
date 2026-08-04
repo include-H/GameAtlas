@@ -407,6 +407,7 @@ onBeforeUnmount(() => {
 
 .animated-characters--success {
   opacity: 0.18;
+  filter: blur(4px);
   transform: scale(0.96) translateY(18px);
 }
 

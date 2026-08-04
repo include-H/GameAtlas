@@ -425,6 +425,7 @@ onBeforeUnmount(() => {
   inset: 18px;
   border-radius: 20px;
   background: radial-gradient(circle, color-mix(in srgb, var(--color-primary-3) 24%, transparent), transparent 72%);
+  filter: blur(8px);
 }
 
 .login-stage__brand-mark-core {
