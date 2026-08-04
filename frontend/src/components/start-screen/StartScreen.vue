@@ -10,7 +10,7 @@
       >
         <div class="start-screen-scrim" @click="handleClose" />
 
-        <div class="start-screen" @wheel.passive="handleWheel">
+        <div class="start-screen" @wheel.passive="handleWheel" @click.self="handleClose">
           <header class="start-screen__header">
             <div>
               <h1 class="start-screen__heading">开始</h1>
@@ -67,7 +67,12 @@
             <a-button v-else-if="canEdit" type="primary" @click="addVisible = true">添加磁贴</a-button>
           </div>
 
-          <div v-else ref="metroAreaRef" class="start-screen__metro">
+          <div
+            v-else
+            ref="metroAreaRef"
+            class="start-screen__metro"
+            @click.self="handleClose"
+          >
             <TransitionGroup
               name="metro-tile"
               tag="div"
@@ -297,8 +302,8 @@ onUnmounted(() => {
 
 <style>
 /* 开始屏幕是沉浸式品牌页特例：全屏场景色、Win8 磁贴网格与动效留在组件内，不外溢到全局 token。
-   720p（1280x720）基准：磁贴区高约 482px，单元格 110px、间距 14px → 竖着 4 行；
-   大磁贴 2x2 占 2 行，因此 720p 竖着可放 2 个大磁贴或 4 个小磁贴。 */
+   720p（1280x720）基准：单元格 110px、间距 14px，网格固定 4 行高；
+   1x1 磁贴行优先向右排列（第 N 个落在第 N 列），大磁贴 2x2 占两行高。 */
 .start-screen-wrapper {
   position: fixed;
   inset: 0;
@@ -383,7 +388,8 @@ onUnmounted(() => {
 .start-screen__metro-grid {
   display: grid;
   grid-template-rows: repeat(4, 110px);
-  grid-auto-flow: column;
+  /* 行优先：1x1 磁贴先往右排，第 N 个落在第 N 列，与源码顺序一致 */
+  grid-auto-flow: row;
   grid-auto-columns: 110px;
   gap: 14px;
   width: max-content;
