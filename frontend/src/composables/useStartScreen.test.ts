@@ -39,7 +39,7 @@ describe('useStartScreen', () => {
     expect(screen.games.value.map((game) => game.public_id)).toEqual(['a', 'b'])
   })
 
-  it('does not refetch after the first successful load', async () => {
+  it('refetches favorites every time the screen is opened', async () => {
     const fetchFavorites = vi.fn().mockResolvedValue([makeGame('a')])
     const screen = useStartScreen({
       fetchFavorites,
@@ -52,8 +52,9 @@ describe('useStartScreen', () => {
     screen.close()
     screen.open()
     await vi.waitFor(() => expect(screen.visible.value).toBe(true))
+    await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
 
-    expect(fetchFavorites).toHaveBeenCalledTimes(1)
+    expect(fetchFavorites).toHaveBeenCalledTimes(2)
   })
 
   it('alerts and keeps a retryable failure state when favorites fail to load', async () => {

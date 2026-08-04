@@ -156,6 +156,7 @@ import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import { useGamesStore } from '@/stores/games'
 import gamesService from '@/services/games.service'
+import type { GameListItem } from '@/services/types'
 import AlertBanner from '@/components/AlertBanner.vue'
 import AppNavigationMenu from '@/components/AppNavigationMenu.vue'
 import SharedAmbientBackground from '@/components/SharedAmbientBackground.vue'
@@ -188,10 +189,19 @@ const {
   unpin: unpinStartScreen,
 } = useStartScreen({
   fetchFavorites: async () => {
-    const result = await gamesService.getGames({
-      query: { favorite: true, page: 1, limit: 100 },
-    })
-    return result.data
+    const favorites: GameListItem[] = []
+    let page = 1
+    while (true) {
+      const result = await gamesService.getGames({
+        query: { favorite: true, page, limit: 100 },
+      })
+      favorites.push(...result.data)
+      if (result.data.length === 0 || favorites.length >= result.pagination.total || favorites.length >= 500) {
+        break
+      }
+      page += 1
+    }
+    return favorites
   },
   removeFavorite: async (publicId: string) => {
     await gamesStore.toggleFavorite(publicId)

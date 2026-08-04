@@ -12,14 +12,12 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
   const games = ref<GameListItem[]>([])
   const isLoading = ref(false)
   const hasLoadFailure = ref(false)
-  const loadedOnce = ref(false)
 
   const refresh = async () => {
     isLoading.value = true
     hasLoadFailure.value = false
     try {
       games.value = await options.fetchFavorites()
-      loadedOnce.value = true
     } catch {
       hasLoadFailure.value = true
       options.addAlert('开始屏幕加载失败，请稍后重试', 'error')
@@ -30,7 +28,8 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
 
   const open = () => {
     visible.value = true
-    if (!loadedOnce.value && !isLoading.value && !hasLoadFailure.value) {
+    // 每次打开都重新拉取，保证在详情页/游戏库新增或取消收藏后开始屏保持最新。
+    if (!isLoading.value) {
       void refresh()
     }
   }
