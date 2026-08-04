@@ -21,7 +21,7 @@
             </div>
 
             <div class="start-screen__header-actions">
-              <template v-if="!isEditing && canEdit">
+              <template v-if="!isEditing && canEdit && tiles.length > 0">
                 <a-button
                   class="app-text-action-btn"
                   type="text"
@@ -43,7 +43,7 @@
           </header>
 
           <p v-if="isEditing" class="start-screen__edit-hint">
-            拖动排序 · 尺寸切换 · banner 裁剪 · × 移除 · + 添加
+            拖动排序 · 尺寸切换 · banner 裁剪 · × 移除
           </p>
           <p v-if="isEditing && saveError" class="start-screen__save-error">{{ saveError }}</p>
 
@@ -60,12 +60,10 @@
 
           <div v-else-if="tiles.length === 0" class="start-screen__state">
             <icon-star />
-            <p>{{ isEditing ? '还没有磁贴，点击 + 添加' : '还没有磁贴' }}</p>
+            <p>还没有磁贴</p>
             <a-space v-if="!isEditing">
               <a-button @click="handleBrowseGames">去游戏库逛逛</a-button>
-              <a-button v-if="canEdit" type="primary" @click="emit('startEdit')">开始编辑</a-button>
             </a-space>
-            <a-button v-else-if="canEdit" type="primary" @click="addVisible = true">添加磁贴</a-button>
           </div>
 
           <div
@@ -122,15 +120,6 @@
                 </TransitionGroup>
               </div>
 
-              <div
-                v-if="isEditing && tiles.length > 0"
-                class="start-screen__add-tile"
-                title="添加磁贴"
-                @click="addVisible = true"
-              >
-                <icon-plus />
-                <span>添加</span>
-              </div>
             </div>
 
             <div
@@ -152,37 +141,6 @@
     </Transition>
   </Teleport>
 
-  <a-modal
-    :visible="addVisible"
-    :footer="false"
-    :width="520"
-    title="添加磁贴（来自收藏）"
-    @cancel="addVisible = false"
-  >
-    <div class="start-screen-add-list">
-      <p v-if="addCandidates.length === 0" class="start-screen-add-list__empty">
-        没有可添加的收藏了，先去游戏库收藏一些游戏吧
-      </p>
-      <button
-        v-for="game in addCandidates"
-        :key="game.public_id"
-        type="button"
-        class="start-screen-add-item"
-        @click="handleAdd(game)"
-      >
-        <img
-          v-if="game.cover_image"
-          :src="game.cover_image"
-          :alt="game.title"
-          class="start-screen-add-item__cover"
-          loading="lazy"
-        >
-        <span v-else class="start-screen-add-item__placeholder">{{ game.title.charAt(0) }}</span>
-        <span class="start-screen-add-item__title">{{ game.title }}</span>
-      </button>
-    </div>
-  </a-modal>
-
   <tile-crop-modal
     :visible="cropVisible"
     :image-src="cropSource"
@@ -198,25 +156,18 @@ import {
   IconDesktop,
   IconEdit,
   IconExclamationCircle,
-  IconPlus,
   IconStar,
 } from '@arco-design/web-vue/es/icon'
 import MetroTile from './MetroTile.vue'
 import TileCropModal from './TileCropModal.vue'
 import SharedAmbientBackground from '@/components/SharedAmbientBackground.vue'
-import type {
-  GameListItem,
-  StartScreenColumn,
-  StartScreenTile,
-  StartScreenTileSize,
-} from '@/services/types'
+import type { StartScreenColumn, StartScreenTile, StartScreenTileSize } from '@/services/types'
 import { packStartScreenTiles } from '@/utils/start-screen-layout'
 
 const props = defineProps<{
   visible: boolean
   tiles: StartScreenTile[]
   columns: StartScreenColumn[]
-  favoritePool: GameListItem[]
   canEdit: boolean
   isLoading: boolean
   hasLoadFailure: boolean
@@ -235,7 +186,6 @@ const emit = defineEmits<{
   resize: [gameId: number]
   remove: [gameId: number]
   applyOrder: [tiles: StartScreenTile[]]
-  add: [game: GameListItem]
   applyCrop: [gameId: number, blobs: Record<StartScreenTileSize, Blob>]
   renameColumn: [index: number, name: string]
 }>()
@@ -243,7 +193,6 @@ const emit = defineEmits<{
 const router = useRouter()
 const wrapperRef = ref<HTMLElement | null>(null)
 const metroAreaRef = ref<HTMLElement | null>(null)
-const addVisible = ref(false)
 const cropVisible = ref(false)
 const cropGameId = ref<number | null>(null)
 
@@ -262,11 +211,6 @@ let edgeScrollFrame: number | null = null
 const cropSource = computed(() => {
   const tile = props.tiles.find((item) => item.game_id === cropGameId.value)
   return tile?.banner_image || tile?.cover_image || ''
-})
-
-const addCandidates = computed(() => {
-  const pinned = new Set(props.tiles.map((tile) => tile.game_id))
-  return props.favoritePool.filter((game) => !pinned.has(game.id))
 })
 
 const draggedTile = computed(() => props.tiles.find((tile) => tile.game_id === dragState.value?.gameId) ?? null)
@@ -319,11 +263,6 @@ const handleTileSelect = (publicId: string) => {
 const handleBrowseGames = () => {
   emit('close')
   router.push({ name: 'games' })
-}
-
-const handleAdd = (game: GameListItem) => {
-  emit('add', game)
-  addVisible.value = false
 }
 
 const handleCrop = (gameId: number) => {
@@ -822,63 +761,6 @@ onUnmounted(() => {
     opacity: 1;
     transform: none;
   }
-}
-
-.start-screen-add-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.start-screen-add-list__empty {
-  margin: 0;
-  padding: 24px 0;
-  text-align: center;
-  color: var(--color-text-3);
-}
-
-.start-screen-add-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--color-text-1);
-  cursor: pointer;
-  text-align: left;
-  transition: background 120ms ease;
-}
-
-.start-screen-add-item:hover {
-  background: var(--color-fill-2);
-}
-
-.start-screen-add-item__cover,
-.start-screen-add-item__placeholder {
-  width: 44px;
-  height: 44px;
-  border-radius: 6px;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.start-screen-add-item__placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-fill-2);
-  color: var(--color-text-2);
-  font-weight: 600;
-}
-
-.start-screen-add-item__title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 @media (max-width: 768px) {

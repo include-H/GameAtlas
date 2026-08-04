@@ -83,6 +83,12 @@
               </template>
             </a-button>
             <template #content>
+              <a-doption v-if="hasAddToStartScreen" @click="handleAddToStartScreen">
+                <template #icon>
+                  <icon-apps />
+                </template>
+                添加到开始屏幕
+              </a-doption>
               <a-doption @click="handleDelete" style="color: rgb(var(--danger-6));">
                 <template #icon>
                   <icon-delete />
@@ -99,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useAttrs } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { GameListItem, TimelineGame } from '@/services/types'
 import { useAuthStore } from '@/stores/auth'
@@ -107,7 +113,8 @@ import {
   IconHeartFill,
   IconHeart,
   IconMore,
-  IconDelete
+  IconDelete,
+  IconApps,
 } from '@arco-design/web-vue/es/icon'
 
 interface Props {
@@ -123,12 +130,15 @@ const props = withDefaults(defineProps<Props>(), {
 
 const authStore = useAuthStore()
 const { isAdmin } = storeToRefs(authStore)
+const attrs = useAttrs()
+const hasAddToStartScreen = computed(() => typeof attrs.onAddToStartScreen === 'function')
 
 const emit = defineEmits<{
   view: [id: string]
   'view-series': [id: number]
   'toggle-favorite': [id: string]
   delete: [id: string]
+  'add-to-start-screen': [id: number]
 }>()
 
 const handleView = () => {
@@ -149,6 +159,10 @@ const handleViewSeries = () => {
 const handleDelete = () => {
   if (!props.game.public_id) return
   emit('delete', props.game.public_id)
+}
+
+const handleAddToStartScreen = () => {
+  emit('add-to-start-screen', props.game.id)
 }
 
 const placeholderImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23424242" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/%3E%3C/svg%3E'

@@ -35,7 +35,6 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
   const visible = ref(false)
   const tiles = ref<StartScreenTile[]>([])
   const columns = ref<StartScreenColumn[]>([])
-  const favoritePool = ref<GameListItem[]>([])
   const isLoading = ref(false)
   const hasLoadFailure = ref(false)
   const isEditing = ref(false)
@@ -111,18 +110,11 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     originalTiles.value = tiles.value.map((tile) => ({ ...tile }))
     originalColumns.value = columns.value.map((column) => ({ ...column }))
     isEditing.value = true
-    try {
-      favoritePool.value = await options.fetchFavorites()
-    } catch {
-      favoritePool.value = []
-      options.addAlert('收藏列表加载失败，暂时无法添加磁贴', 'warning')
-    }
   }
 
   const cancelEdit = () => {
     tiles.value = originalTiles.value.map((tile) => ({ ...tile }))
     columns.value = originalColumns.value.map((column) => ({ ...column }))
-    favoritePool.value = []
     saveError.value = null
     isEditing.value = false
   }
@@ -152,7 +144,6 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
         })),
       })
       applyLayout(saved)
-      favoritePool.value = []
       isEditing.value = false
       options.addAlert('开始屏幕已保存', 'success')
     } catch (error) {
@@ -187,22 +178,6 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     tiles.value = ordered.map((tile) => ({ ...tile }))
   }
 
-  const addTile = (game: GameListItem) => {
-    if (tiles.value.some((tile) => tile.game_id === game.id)) return
-    tiles.value.push({
-      game_id: game.id,
-      public_id: game.public_id,
-      title: game.title,
-      cover_image: game.cover_image,
-      banner_image: game.banner_image,
-      tile_size: 'small',
-      image_small_path: null,
-      image_wide_path: null,
-      image_large_path: null,
-      sort_order: tiles.value.length,
-    })
-  }
-
   const applyTileCrop = async (gameId: number, blobs: Record<StartScreenTileSize, Blob>) => {
     const tile = tiles.value.find((item) => item.game_id === gameId)
     if (!tile) return
@@ -225,7 +200,6 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     visible,
     tiles,
     columns,
-    favoritePool,
     isLoading,
     hasLoadFailure,
     isEditing,
@@ -243,7 +217,6 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     removeTile,
     moveTile,
     applyTileOrder,
-    addTile,
     applyTileCrop,
   }
 }

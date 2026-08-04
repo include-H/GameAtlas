@@ -164,6 +164,7 @@
             @view-series="viewSeries"
             @toggle-favorite="toggleFavorite"
             @delete="handleDelete($event, game.title)"
+            @add-to-start-screen="handleAddToStartScreen"
           />
         </div>
       </div>
@@ -182,6 +183,7 @@
             @view-series="viewSeries"
             @toggle-favorite="toggleFavorite"
             @delete="handleDelete($event, game.title)"
+            @add-to-start-screen="handleAddToStartScreen"
           />
         </a-col>
       </a-row>
@@ -251,6 +253,8 @@ import { useUiStore } from '@/stores/ui'
 import GameCard from '@/components/GameCard.vue'
 import AddGameModal from '@/components/AddGameModal.vue'
 import { useGamesView } from '@/composables/useGamesView'
+import startScreenService from '@/services/start-screen.service'
+import { getHttpErrorMessage } from '@/utils/http-error'
 import { IconApps, IconHeart, IconHeartFill, IconList, IconLock, IconPlus, IconSearch, IconSort, IconTrophy } from '@arco-design/web-vue/es/icon'
 
 defineOptions({
@@ -263,6 +267,15 @@ const gamesStore = useGamesStore()
 const authStore = useAuthStore()
 const uiStore = useUiStore()
 const { isAdmin } = storeToRefs(authStore)
+
+const handleAddToStartScreen = async (gameId: number) => {
+  try {
+    await startScreenService.addTile(gameId, 'small')
+    uiStore.addAlert('已添加到开始屏幕', 'success')
+  } catch (error) {
+    uiStore.addAlert(`添加到开始屏幕失败：${getHttpErrorMessage(error, '未知错误')}`, 'error')
+  }
+}
 
 const {
   clearFilters,

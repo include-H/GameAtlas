@@ -72,6 +72,37 @@ func (h *StartScreenTilesHandler) Update(c *gin.Context) {
 	writeJSONSuccess(c, http.StatusOK, toStartScreenLayoutResponse(result))
 }
 
+func (h *StartScreenTilesHandler) AddTile(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
+
+	var request struct {
+		GameID         int64   `json:"game_id"`
+		TileSize       string  `json:"tile_size"`
+		ImageSmallPath *string `json:"image_small_path"`
+		ImageWidePath  *string `json:"image_wide_path"`
+		ImageLargePath *string `json:"image_large_path"`
+	}
+	if err := decodeJSONStrict(c, &request); err != nil {
+		writeJSONError(c, http.StatusBadRequest, "无效的开始屏幕磁贴数据")
+		return
+	}
+
+	result, err := h.service.AddTile(domain.StartScreenTileWrite{
+		GameID:         request.GameID,
+		TileSize:       request.TileSize,
+		ImageSmallPath: request.ImageSmallPath,
+		ImageWidePath:  request.ImageWidePath,
+		ImageLargePath: request.ImageLargePath,
+	})
+	if err != nil {
+		writeServiceError(c, err, "添加到开始屏幕失败")
+		return
+	}
+	writeJSONSuccess(c, http.StatusCreated, toStartScreenLayoutResponse(result))
+}
+
 func (h *StartScreenTilesHandler) UploadImage(c *gin.Context) {
 	if !requireAdmin(c) {
 		return

@@ -23,6 +23,17 @@ const startScreenService = {
     }
   },
 
+  async addTile(gameId: number, tileSize: StartScreenTileSize = 'small'): Promise<StartScreenLayout> {
+    const response = await post<ApiEnvelope<StartScreenLayout>>('/start-screen/tiles', {
+      game_id: gameId,
+      tile_size: tileSize,
+    })
+    return {
+      columns: response.data?.columns ?? [],
+      tiles: response.data?.tiles ?? [],
+    }
+  },
+
   async uploadTileImage(file: File, size: StartScreenTileSize): Promise<string> {
     const form = new FormData()
     form.append('size', size)

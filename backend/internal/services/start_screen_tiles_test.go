@@ -158,3 +158,64 @@ func TestStartScreenTilesUpdateValidatesTileImages(t *testing.T) {
 		t.Fatalf("tiles = %+v, want image path %q", layout.Tiles, imagePath)
 	}
 }
+
+func TestStartScreenTilesAddTileAppendsAtEnd(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	firstID := insertServicesTestGame(t, db, "tile-add-a", "Tile Add A", domain.GameVisibilityPublic)
+	secondID := insertServicesTestGame(t, db, "tile-add-b", "Tile Add B", domain.GameVisibilityPublic)
+
+	service := NewStartScreenTilesService(
+		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewStartScreenColumnsRepository(db),
+		repositories.NewGamesRepository(db),
+		files.NewAssetStore(t.TempDir()),
+	)
+
+	if _, err := service.Update(
+		[]domain.StartScreenColumnWrite{{Name: "第一列"}},
+		[]domain.StartScreenTileWrite{{GameID: firstID, TileSize: "small"}},
+	); err != nil {
+		t.Fatalf("initial Update returned error: %v", err)
+	}
+
+	layout, err := service.AddTile(domain.StartScreenTileWrite{GameID: secondID, TileSize: "wide"})
+	if err != nil {
+		t.Fatalf("AddTile returned error: %v", err)
+	}
+	if len(layout.Tiles) != 2 {
+		t.Fatalf("AddTile returned %d tiles, want 2", len(layout.Tiles))
+	}
+	if layout.Tiles[1].GameID != secondID || layout.Tiles[1].TileSize != "wide" || layout.Tiles[1].SortOrder != 1 {
+		t.Fatalf("appended tile = %+v, want second game at the end", layout.Tiles[1])
+	}
+
+	// 重复添加同一游戏：幂等，不产生重复磁贴。
+	layout, err = service.AddTile(domain.StartScreenTileWrite{GameID: secondID, TileSize: "large"})
+	if err != nil {
+		t.Fatalf("duplicate AddTile returned error: %v", err)
+	}
+	if len(layout.Tiles) != 2 {
+		t.Fatalf("duplicate AddTile returned %d tiles, want 2", len(layout.Tiles))
+	}
+}
+
+func TestStartScreenTilesAddTileRejectsInvalidInput(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	service := NewStartScreenTilesService(
+		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewStartScreenColumnsRepository(db),
+		repositories.NewGamesRepository(db),
+		files.NewAssetStore(t.TempDir()),
+	)
+
+	if _, err := service.AddTile(domain.StartScreenTileWrite{GameID: 1, TileSize: "huge"}); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("invalid size error = %v, want ErrValidation", err)
+	}
+	if _, err := service.AddTile(domain.StartScreenTileWrite{GameID: 999999, TileSize: "small"}); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("missing game error = %v, want ErrNotFound", err)
+	}
+}

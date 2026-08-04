@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
@@ -63,4 +64,31 @@ func (r *StartScreenTilesRepository) Replace(tiles []domain.StartScreenTileWrite
 		return fmt.Errorf("commit start screen tiles replace: %w", err)
 	}
 	return nil
+}
+
+// Append 在末尾追加一个磁贴；game_id 已存在时不做任何修改并返回 false。
+func (r *StartScreenTilesRepository) Append(tile domain.StartScreenTileWrite) (bool, error) {
+	var maxOrder sql.NullInt64
+	if err := r.db.Get(&maxOrder, `SELECT MAX(sort_order) FROM start_screen_tiles`); err != nil {
+		return false, fmt.Errorf("read max start screen tile order: %w", err)
+	}
+	nextOrder := 0
+	if maxOrder.Valid {
+		nextOrder = int(maxOrder.Int64) + 1
+	}
+
+	result, err := r.db.Exec(`
+		INSERT OR IGNORE INTO start_screen_tiles (
+			game_id, tile_size, image_small_path, image_wide_path, image_large_path, sort_order
+		)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, tile.GameID, tile.TileSize, tile.ImageSmallPath, tile.ImageWidePath, tile.ImageLargePath, nextOrder)
+	if err != nil {
+		return false, fmt.Errorf("append start screen tile: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("read appended start screen tile rows: %w", err)
+	}
+	return rows > 0, nil
 }

@@ -63,6 +63,21 @@ func (s *StartScreenTilesService) Update(
 	return s.List()
 }
 
+// AddTile 从游戏库卡片入口追加一个磁贴到末尾；已在开始屏幕时幂等返回当前布局。
+func (s *StartScreenTilesService) AddTile(tile domain.StartScreenTileWrite) (*domain.StartScreenLayout, error) {
+	normalized, err := s.validateTiles([]domain.StartScreenTileWrite{tile})
+	if err != nil {
+		return nil, err
+	}
+	if len(normalized) == 0 {
+		return nil, domain.ErrValidation
+	}
+	if _, err := s.tilesRepo.Append(normalized[0]); err != nil {
+		return nil, err
+	}
+	return s.List()
+}
+
 func (s *StartScreenTilesService) validateColumns(columns []domain.StartScreenColumnWrite) ([]domain.StartScreenColumnWrite, error) {
 	if len(columns) > 100 {
 		return nil, domain.ErrValidation

@@ -140,7 +140,6 @@
     :visible="startScreenVisible"
     :tiles="startScreenTiles"
     :columns="startScreenColumns"
-    :favorite-pool="startScreenFavoritePool"
     :can-edit="isAdmin"
     :is-loading="startScreenLoading"
     :has-load-failure="startScreenLoadFailed"
@@ -155,7 +154,6 @@
     @resize="resizeStartScreenTile"
     @remove="removeStartScreenTile"
     @apply-order="applyStartScreenOrder"
-    @add="addStartScreenTile"
     @apply-crop="applyStartScreenCrop"
     @rename-column="renameStartScreenColumn"
   />
@@ -195,7 +193,6 @@ const {
   visible: startScreenVisible,
   tiles: startScreenTiles,
   columns: startScreenColumns,
-  favoritePool: startScreenFavoritePool,
   isLoading: startScreenLoading,
   hasLoadFailure: startScreenLoadFailed,
   isEditing: startScreenEditing,
@@ -210,7 +207,6 @@ const {
   resizeTile: resizeStartScreenTile,
   removeTile: removeStartScreenTile,
   applyTileOrder: applyStartScreenOrder,
-  addTile: addStartScreenTile,
   applyTileCrop: applyStartScreenCrop,
   renameColumn: renameStartScreenColumn,
 } = useStartScreen({
