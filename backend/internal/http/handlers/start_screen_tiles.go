@@ -18,7 +18,7 @@ func NewStartScreenTilesHandler(service *services.StartScreenTilesService) *Star
 }
 
 func (h *StartScreenTilesHandler) Get(c *gin.Context) {
-	layout, err := h.service.List()
+	layout, err := h.service.List(isAdminRequest(c))
 	if err != nil {
 		writeServiceError(c, err, "获取开始屏幕磁贴失败")
 		return

@@ -17,7 +17,11 @@ func NewStartScreenTilesRepository(db *sqlx.DB) *StartScreenTilesRepository {
 	return &StartScreenTilesRepository{db: db}
 }
 
-func (r *StartScreenTilesRepository) List() ([]domain.StartScreenTile, error) {
+func (r *StartScreenTilesRepository) List(includeAll bool) ([]domain.StartScreenTile, error) {
+	where := ""
+	if !includeAll {
+		where = "WHERE g.visibility = 'public'"
+	}
 	var tiles []domain.StartScreenTile
 	err := r.db.Select(&tiles, `
 		SELECT
@@ -26,6 +30,7 @@ func (r *StartScreenTilesRepository) List() ([]domain.StartScreenTile, error) {
 			t.sort_order, t.created_at, t.updated_at
 		FROM start_screen_tiles t
 		INNER JOIN games g ON g.id = t.game_id
+		`+where+`
 		ORDER BY t.sort_order ASC, t.id ASC
 	`)
 	if err != nil {

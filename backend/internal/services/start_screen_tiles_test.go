@@ -26,7 +26,7 @@ func openStartScreenTilesService(t *testing.T) *StartScreenTilesService {
 
 func TestStartScreenTilesListEmpty(t *testing.T) {
 	service := openStartScreenTilesService(t)
-	layout, err := service.List()
+	layout, err := service.List(true)
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
 	}
@@ -217,5 +217,45 @@ func TestStartScreenTilesAddTileRejectsInvalidInput(t *testing.T) {
 	}
 	if _, err := service.AddTile(domain.StartScreenTileWrite{GameID: 999999, TileSize: "small"}); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("missing game error = %v, want ErrNotFound", err)
+	}
+}
+
+func TestStartScreenTilesListHidesPrivateGamesForPublicCallers(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	publicID := insertServicesTestGame(t, db, "tile-public", "Tile Public", domain.GameVisibilityPublic)
+	privateID := insertServicesTestGame(t, db, "tile-private", "Tile Private", domain.GameVisibilityPrivate)
+
+	service := NewStartScreenTilesService(
+		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewStartScreenColumnsRepository(db),
+		repositories.NewGamesRepository(db),
+		files.NewAssetStore(t.TempDir()),
+	)
+	if _, err := service.Update(
+		[]domain.StartScreenColumnWrite{{Name: "列"}},
+		[]domain.StartScreenTileWrite{
+			{GameID: publicID, TileSize: "small"},
+			{GameID: privateID, TileSize: "small"},
+		},
+	); err != nil {
+		t.Fatalf("Update returned error: %v", err)
+	}
+
+	publicLayout, err := service.List(false)
+	if err != nil {
+		t.Fatalf("public List returned error: %v", err)
+	}
+	if len(publicLayout.Tiles) != 1 || publicLayout.Tiles[0].GameID != publicID {
+		t.Fatalf("public tiles = %+v, want only the public game", publicLayout.Tiles)
+	}
+
+	adminLayout, err := service.List(true)
+	if err != nil {
+		t.Fatalf("admin List returned error: %v", err)
+	}
+	if len(adminLayout.Tiles) != 2 {
+		t.Fatalf("admin tiles = %d, want 2", len(adminLayout.Tiles))
 	}
 }

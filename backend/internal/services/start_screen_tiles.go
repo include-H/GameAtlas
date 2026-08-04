@@ -30,12 +30,12 @@ func NewStartScreenTilesService(
 	}
 }
 
-func (s *StartScreenTilesService) List() (*domain.StartScreenLayout, error) {
+func (s *StartScreenTilesService) List(includeAll bool) (*domain.StartScreenLayout, error) {
 	columns, err := s.columnsRepo.List()
 	if err != nil {
 		return nil, err
 	}
-	tiles, err := s.tilesRepo.List()
+	tiles, err := s.tilesRepo.List(includeAll)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func (s *StartScreenTilesService) Update(
 	if err := s.tilesRepo.Replace(normalized); err != nil {
 		return nil, err
 	}
-	return s.List()
+	return s.List(true)
 }
 
 // AddTile 从游戏库卡片入口追加一个磁贴到末尾；已在开始屏幕时幂等返回当前布局。
@@ -75,7 +75,7 @@ func (s *StartScreenTilesService) AddTile(tile domain.StartScreenTileWrite) (*do
 	if _, err := s.tilesRepo.Append(normalized[0]); err != nil {
 		return nil, err
 	}
-	return s.List()
+	return s.List(true)
 }
 
 func (s *StartScreenTilesService) validateColumns(columns []domain.StartScreenColumnWrite) ([]domain.StartScreenColumnWrite, error) {

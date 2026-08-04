@@ -147,6 +147,28 @@
     @confirm="handleCropConfirm"
     @cancel="cropVisible = false"
   />
+
+  <a-modal
+    :visible="launchModalVisible"
+    :footer="false"
+    :width="480"
+    :title="`开始游戏：${launchTitle}`"
+    @cancel="launchModalVisible = false"
+  >
+    <div class="start-screen-launch-list">
+      <button
+        v-for="option in launchOptions"
+        :key="option.id"
+        type="button"
+        class="start-screen-launch-item"
+        @click="handleLaunchVersion(option)"
+      >
+        <icon-play-arrow />
+        <span class="start-screen-launch-item__name">{{ option.version }}</span>
+        <span class="start-screen-launch-item__action">开始游戏</span>
+      </button>
+    </div>
+  </a-modal>
 </template>
 
 <script setup lang="ts">
@@ -156,6 +178,7 @@ import {
   IconDesktop,
   IconEdit,
   IconExclamationCircle,
+  IconPlayArrow,
   IconStar,
 } from '@arco-design/web-vue/es/icon'
 import MetroTile from './MetroTile.vue'
@@ -163,6 +186,7 @@ import TileCropModal from './TileCropModal.vue'
 import SharedAmbientBackground from '@/components/SharedAmbientBackground.vue'
 import type { StartScreenColumn, StartScreenTile, StartScreenTileSize } from '@/services/types'
 import { packStartScreenTiles } from '@/utils/start-screen-layout'
+import gamesService, { mapGameVersions } from '@/services/games.service'
 
 const props = defineProps<{
   visible: boolean
@@ -195,6 +219,9 @@ const wrapperRef = ref<HTMLElement | null>(null)
 const metroAreaRef = ref<HTMLElement | null>(null)
 const cropVisible = ref(false)
 const cropGameId = ref<number | null>(null)
+const launchModalVisible = ref(false)
+const launchTitle = ref('')
+const launchOptions = ref<Array<{ id: string; version: string; url: string }>>([])
 
 interface TileDragState {
   gameId: number
@@ -255,9 +282,36 @@ const handleClose = () => {
   emit('close')
 }
 
-const handleTileSelect = (publicId: string) => {
+// 点击磁贴 = 开始游戏：单个可启动版本直接下载启动脚本，多个弹窗选择，无则回退详情页。
+const handleTileSelect = async (publicId: string) => {
   emit('close')
-  router.push({ name: 'game-detail', params: { publicId } })
+  try {
+    const detail = await gamesService.getGameDetail(publicId)
+    const launchable = mapGameVersions(detail).filter((version) => version.canLaunch && version.launchScriptUrl)
+    if (launchable.length === 0) {
+      router.push({ name: 'game-detail', params: { publicId } })
+      return
+    }
+    if (launchable.length === 1) {
+      window.location.assign(launchable[0].launchScriptUrl!)
+      return
+    }
+    launchTitle.value = detail.title
+    launchOptions.value = launchable.map((version) => ({
+      id: version.id,
+      version: version.version,
+      url: version.launchScriptUrl!,
+    }))
+    launchModalVisible.value = true
+  } catch {
+    // 拉取失败时回退到详情页，不阻塞用户。
+    router.push({ name: 'game-detail', params: { publicId } })
+  }
+}
+
+const handleLaunchVersion = (option: { id: string; version: string; url: string }) => {
+  launchModalVisible.value = false
+  window.location.assign(option.url)
 }
 
 const handleBrowseGames = () => {
@@ -599,6 +653,43 @@ onUnmounted(() => {
 .start-screen__drag-ghost--large {
   width: calc(var(--start-cell) * 2 + var(--start-gap));
   height: calc(var(--start-cell) * 2 + var(--start-gap));
+}
+
+.start-screen-launch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.start-screen-launch-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--app-card-border);
+  border-radius: 8px;
+  background: var(--color-fill-2);
+  color: var(--color-text-1);
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.start-screen-launch-item:hover {
+  background: var(--color-fill-3);
+  border-color: var(--app-glass-border-hover);
+}
+
+.start-screen-launch-item__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.start-screen-launch-item__action {
+  font-size: 13px;
+  color: var(--color-primary-6);
 }
 
 .start-screen__add-tile {
