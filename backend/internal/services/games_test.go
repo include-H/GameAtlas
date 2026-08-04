@@ -211,6 +211,60 @@ func TestGamesServiceDeleteRemovesTrackedAssetFiles(t *testing.T) {
 	assertNoAssetCleanupTasks(t, db)
 }
 
+func TestGamesServiceDeletePrunesSeriesAndInvalidatesMetadataListCache(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	gameID := insertServicesTestGame(t, db, "delete-series-cache", "Delete Series Cache", domain.GameVisibilityPublic)
+	if _, err := db.Exec(`
+		INSERT INTO series (name, slug, sort_order)
+		VALUES ('Linked Series', 'linked-series', 0), ('Loose Series', 'loose-series', 1)
+	`); err != nil {
+		t.Fatalf("insert series: %v", err)
+	}
+	var linkedSeriesID int64
+	if err := db.Get(&linkedSeriesID, `SELECT id FROM series WHERE slug = 'linked-series'`); err != nil {
+		t.Fatalf("load linked series id: %v", err)
+	}
+	if _, err := db.Exec(`UPDATE games SET series_id = ? WHERE id = ?`, linkedSeriesID, gameID); err != nil {
+		t.Fatalf("attach linked series: %v", err)
+	}
+
+	gamesRepo := repositories.NewGamesRepository(db)
+	metadataService := NewMetadataService(repositories.NewMetadataRepository(db))
+	catalogService := NewGameCatalogService(
+		repositories.NewGameCatalogRepository(gamesRepo, repositories.NewFavoriteGamesRepository(db)),
+		repositories.NewReviewIssueOverrideRepository(db),
+	)
+	service := NewGameAggregateService(
+		config.Config{},
+		gamesRepo,
+		metadataService,
+		catalogService,
+		repositories.NewAssetCleanupTasksRepository(db),
+	)
+
+	cached, err := metadataService.List(MetadataResource{Type: domain.MetadataSeries}, true, MetadataListOptions{Sort: "name"})
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if len(cached) != 2 {
+		t.Fatalf("cached series = %+v, want linked and loose rows before delete", cached)
+	}
+
+	if _, err := service.Delete(gameID); err != nil {
+		t.Fatalf("Delete returned error: %v", err)
+	}
+
+	refreshed, err := metadataService.List(MetadataResource{Type: domain.MetadataSeries}, true, MetadataListOptions{Sort: "name"})
+	if err != nil {
+		t.Fatalf("List after delete returned error: %v", err)
+	}
+	if len(refreshed) != 0 {
+		t.Fatalf("refreshed series = %+v, want no orphan series after game delete", refreshed)
+	}
+}
+
 func TestGamesServiceDeleteQueuesCleanupTaskWhenFileRemovalFails(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()

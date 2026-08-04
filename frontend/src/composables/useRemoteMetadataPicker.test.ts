@@ -96,6 +96,39 @@ describe('useRemoteMetadataPicker', () => {
     expect(picker.options.value).toEqual([{ id: 3, name: '新系列' }])
   })
 
+  it('resolves an exact query match instead of selecting the first search result', async () => {
+    const create = vi.fn()
+    const picker = useRemoteMetadataPicker({
+      selectedIds: () => [],
+      search: vi.fn().mockResolvedValue([
+        { id: 1, name: '使命召唤2' },
+        { id: 2, name: '使命召唤' },
+      ]),
+      create,
+    })
+
+    await picker.search('使命召唤')
+
+    await expect(picker.resolveQuery()).resolves.toEqual({ id: 2, name: '使命召唤' })
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('searches and creates an unresolved query when resolving directly', async () => {
+    const create = vi.fn().mockResolvedValue({ id: 3, name: '新系列' })
+    const search = vi.fn().mockResolvedValue([{ id: 1, name: '已有系列' }])
+    const picker = useRemoteMetadataPicker({
+      selectedIds: () => [],
+      search,
+      create,
+    })
+
+    picker.query.value = '新系列'
+
+    await expect(picker.resolveQuery()).resolves.toEqual({ id: 3, name: '新系列' })
+    expect(search).toHaveBeenCalledWith('新系列')
+    expect(create).toHaveBeenCalledWith('新系列')
+  })
+
   it('resolves imported names to ids without duplicating normalized options', async () => {
     const create = vi.fn().mockResolvedValue({ id: 3, name: '新开发商' })
     const picker = useRemoteMetadataPicker({

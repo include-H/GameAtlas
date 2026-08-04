@@ -49,6 +49,12 @@ func NewMetadataService(repo *repositories.MetadataRepository) *MetadataService 
 	}
 }
 
+func (s *MetadataService) invalidateListCache(types ...domain.MetadataType) {
+	for _, typ := range types {
+		s.listCache.Delete(typ)
+	}
+}
+
 func (s *MetadataService) List(resource MetadataResource, includeAll bool, options MetadataListOptions) ([]domain.MetadataItem, error) {
 	// Check cache first
 	var items []domain.MetadataItem
@@ -122,7 +128,7 @@ func (s *MetadataService) Create(resource MetadataResource, input domain.Metadat
 		if err != nil {
 			return nil, err
 		}
-		s.listCache.Delete(resource.Type)
+		s.invalidateListCache(resource.Type)
 		return result, nil
 	default:
 		return nil, fmt.Errorf("unsupported metadata resource type: %d", resource.Type)

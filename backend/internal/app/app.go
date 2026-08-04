@@ -90,10 +90,11 @@ func New(cfg config.Config) (*App, error) {
 	reviewIssueOverridesRepo := repositories.NewReviewIssueOverrideRepository(sqliteDB)
 	catalogService := services.NewGameCatalogService(catalogRepo, reviewIssueOverridesRepo)
 	assetCleanupTasksRepo := repositories.NewAssetCleanupTasksRepository(sqliteDB)
+	metadataService := services.NewMetadataService(repositories.NewMetadataRepository(sqliteDB))
 	gameAggregateService := services.NewGameAggregateService(
 		cfg,
 		gamesRepo,
-		repositories.NewMetadataRepository(sqliteDB),
+		metadataService,
 		catalogService,
 		assetCleanupTasksRepo,
 	)

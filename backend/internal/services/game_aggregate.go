@@ -12,7 +12,7 @@ import (
 
 type GameAggregateService struct {
 	gamesRepo             *repositories.GamesRepository
-	metadataRepo          *repositories.MetadataRepository
+	metadataService       *MetadataService
 	assetCleanupTasksRepo *repositories.AssetCleanupTasksRepository
 	fileGuard             *files.Guard
 	assetStore            *files.AssetStore
@@ -25,13 +25,13 @@ type GameAggregateService struct {
 func NewGameAggregateService(
 	cfg config.Config,
 	gamesRepo *repositories.GamesRepository,
-	metadataRepo *repositories.MetadataRepository,
+	metadataService *MetadataService,
 	catalogService *GameCatalogService,
 	assetCleanupTasksRepo *repositories.AssetCleanupTasksRepository,
 ) *GameAggregateService {
 	return &GameAggregateService{
 		gamesRepo:             gamesRepo,
-		metadataRepo:          metadataRepo,
+		metadataService:       metadataService,
 		assetCleanupTasksRepo: assetCleanupTasksRepo,
 		fileGuard:             files.NewGuard(cfg.PrimaryROMRoot),
 		assetStore:            files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
@@ -132,7 +132,7 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 		return nil, nil, normalizeRepoError(err)
 	}
 
-	if err := cleanupUnusedMetadata(s.metadataRepo); err != nil {
+	if err := cleanupUnusedMetadata(s.metadataService); err != nil {
 		return nil, nil, err
 	}
 
@@ -182,7 +182,7 @@ func (s *GameAggregateService) Delete(id int64) (*GameDeleteResult, error) {
 			warnings = append(warnings, path)
 		}
 	}
-	if err := cleanupUnusedMetadata(s.metadataRepo); err != nil {
+	if err := cleanupUnusedMetadata(s.metadataService); err != nil {
 		return nil, err
 	}
 

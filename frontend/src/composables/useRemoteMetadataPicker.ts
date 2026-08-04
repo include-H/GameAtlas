@@ -114,6 +114,20 @@ export const useRemoteMetadataPicker = <T extends MetadataOption>(
     }
   }
 
+  const resolveQuery = async () => {
+    const normalizedQuery = normalizeCreatableOptionName(query.value)
+    if (!normalizedQuery || isCreating.value) return null
+
+    if (isSearching.value || resolvedQuery.value !== normalizedQuery) {
+      await search(query.value)
+    }
+
+    const existing = options.value.find(
+      (item) => normalizeCreatableOptionName(item.name) === normalizedQuery,
+    )
+    return existing || createFromQuery()
+  }
+
   const clearSearch = () => {
     query.value = ''
     resolvedQuery.value = ''
@@ -136,6 +150,7 @@ export const useRemoteMetadataPicker = <T extends MetadataOption>(
     options,
     query,
     reset,
+    resolveQuery,
     search,
   }
 }

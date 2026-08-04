@@ -110,11 +110,13 @@
               <a-form-item label="系列">
                 <a-select
                   :model-value="form.series_id"
+                  v-model:input-value="seriesSearchQuery"
                   placeholder="选择系列"
                   allow-clear
                   allow-search
                   :loading="isSearchingSeries || isCreatingSeries"
                   :filter-option="false"
+                  @keydown.enter.capture.stop.prevent="handleSeriesEnter"
                   @search="handleSeriesSearch"
                   @update:model-value="handleSeriesSelection"
                 >
@@ -499,6 +501,7 @@ const {
   handleScreenshotSearchClear,
   handleScreenshotUploadError,
   handleScreenshotUploadSuccess,
+  handleSeriesEnter,
   handleSeriesSearch,
   handleSeriesSelection,
   handleSubmit,

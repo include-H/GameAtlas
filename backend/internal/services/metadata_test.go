@@ -195,6 +195,47 @@ func TestMetadataServiceCreateSeriesReturnsExistingBySlugWhenNameDiffers(t *test
 	}
 }
 
+func TestMetadataServiceCleanupUnusedGameMetadataInvalidatesSeriesListCache(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	if _, err := db.Exec(`
+		INSERT INTO series (name, slug, sort_order)
+		VALUES ('Keep Series', 'keep-series', 0), ('Drop Series', 'drop-series', 1)
+	`); err != nil {
+		t.Fatalf("insert series: %v", err)
+	}
+	var keepSeriesID int64
+	if err := db.Get(&keepSeriesID, `SELECT id FROM series WHERE slug = 'keep-series'`); err != nil {
+		t.Fatalf("load keep series id: %v", err)
+	}
+	gameID := insertServicesTestGame(t, db, "metadata-cache-keep", "Metadata Cache Keep", domain.GameVisibilityPublic)
+	if _, err := db.Exec(`UPDATE games SET series_id = ? WHERE id = ?`, keepSeriesID, gameID); err != nil {
+		t.Fatalf("attach keep series: %v", err)
+	}
+
+	service := NewMetadataService(repositories.NewMetadataRepository(db))
+	cached, err := service.List(MetadataResource{Type: domain.MetadataSeries}, true, MetadataListOptions{Sort: "name"})
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if len(cached) != 2 {
+		t.Fatalf("cached series = %+v, want both admin-visible rows before cleanup", cached)
+	}
+
+	if err := service.CleanupUnusedGameMetadata(); err != nil {
+		t.Fatalf("CleanupUnusedGameMetadata returned error: %v", err)
+	}
+
+	refreshed, err := service.List(MetadataResource{Type: domain.MetadataSeries}, true, MetadataListOptions{Sort: "name"})
+	if err != nil {
+		t.Fatalf("List after cleanup returned error: %v", err)
+	}
+	if len(refreshed) != 1 || refreshed[0].ID != keepSeriesID {
+		t.Fatalf("refreshed series = %+v, want only keep series after cache invalidation", refreshed)
+	}
+}
+
 func TestMetadataServiceCreateIsConcurrentAndIdempotent(t *testing.T) {
 	testCases := []struct {
 		name     string

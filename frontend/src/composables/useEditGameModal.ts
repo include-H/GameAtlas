@@ -207,6 +207,17 @@ export const useEditGameModal = ({
     }
   }
 
+  const handleSeriesEnter = async () => {
+    try {
+      const item = await seriesPicker.resolveQuery()
+      if (!item) return
+      form.value.series_id = item.id
+      seriesPicker.clearSearch()
+    } catch {
+      addAlert('选择或创建系列失败', 'error')
+    }
+  }
+
   const createDeveloperFromSearch = async () => {
     try {
       const item = await developerPicker.createFromQuery()
@@ -728,6 +739,7 @@ export const useEditGameModal = ({
     handleScreenshotSearchClear,
     handleScreenshotUploadError,
     handleScreenshotUploadSuccess,
+    handleSeriesEnter,
     handleSeriesSearch,
     handleSeriesSelection,
     handleSubmit,
