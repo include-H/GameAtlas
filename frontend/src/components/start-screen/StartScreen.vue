@@ -333,6 +333,12 @@ onUnmounted(() => {
   outline: none;
 }
 
+/* 开始屏幕（1500）内部会打开裁剪/添加弹窗：Arco modal 默认 1000/1001，
+   这里统一提到 1600，保证弹窗盖在开始屏幕之上、全局告警（2000）之下。 */
+.arco-modal-container {
+  z-index: 1600 !important;
+}
+
 .start-screen-scrim {
   position: absolute;
   inset: 0;
