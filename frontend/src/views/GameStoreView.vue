@@ -19,7 +19,6 @@
             class="store-poster__img"
             :src="storePosters[0]"
             alt="新到货"
-            loading="lazy"
             decoding="async"
           >
           <span class="store-poster__kicker">NEW</span>
@@ -31,7 +30,6 @@
             class="store-poster__img"
             :src="storePosters[1]"
             alt="畅销榜"
-            loading="lazy"
             decoding="async"
           >
           <span class="store-poster__kicker">BEST</span>
@@ -71,7 +69,6 @@
                   class="game-box__cover"
                   :src="cell.game.coverUrl"
                   :alt="cell.game.title"
-                  loading="lazy"
                   decoding="async"
                   draggable="false"
                 >
@@ -171,6 +168,9 @@
             <h2>{{ pickedGame.title }}</h2>
             <p>{{ pickedGame.year }} · {{ pickedGame.platform }}</p>
             <p class="store-inspect__hint">点击游戏盒打开并查看详情</p>
+            <p v-if="missingDetailNotice" class="store-inspect__hint store-inspect__hint--error">
+              本地库暂无这个游戏（当前为演示封面），暂不能查看详情
+            </p>
           </div>
           <div class="store-inspect__actions">
             <button type="button" class="store-btn store-btn--ghost" @click="putBack">放回去</button>
@@ -214,13 +214,15 @@ const crtPaused = ref(false)
 const crtVideoRef = ref<HTMLVideoElement | null>(null)
 const stageScale = ref(1)
 const storePosters = ref<string[]>([])
+const knownGameIds = ref<Set<string>>(new Set())
+const missingDetailNotice = ref(false)
 
 /**
- * 固定 1920×1080 设计稿，按窗口尺寸等比缩放整个场景，
+ * 固定 1280×720 设计稿，按窗口尺寸等比缩放整个场景，
  * 保证任何分辨率下货架/封面/电视的相对位置都不错位。
  */
-const DESIGN_WIDTH = 1920
-const DESIGN_HEIGHT = 1080
+const DESIGN_WIDTH = 1280
+const DESIGN_HEIGHT = 720
 
 const updateStageScale = () => {
   stageScale.value = Math.min(
@@ -255,6 +257,9 @@ const loadStorePosters = async () => {
         query: { page, limit: 100 },
         sort: { field: 'created_at', order: 'desc' },
       })
+      for (const game of result.data) {
+        knownGameIds.value.add(game.public_id)
+      }
       pools.push(getAmbientBackgroundPoolFromGames(result.data))
       const totalPages = Math.max(1, result.pagination.totalPages || 1)
       if (page >= totalPages) break
@@ -283,6 +288,7 @@ declare global {
     initWidget?: (config: Live2DWidgetConfig) => void
     __waifuManager?: {
       cubism2model?: {
+        gl?: unknown
         modelScaling: (factor: number) => void
         viewMatrix?: {
           getScaleX?: () => number
@@ -357,6 +363,9 @@ const initWaifu = async () => {
     await loadWaifuResource('/live2d-widget/waifu-tips.js', 'js')
   }
 
+  // 清掉旧 manager，避免上一次会话的缩放状态被误判为“已生效”
+  window.__waifuManager = undefined
+
   window.initWidget?.({
     waifuPath: '/live2d-config/waifu-tips.json',
     cdnPath: '/live2d-models/',
@@ -369,7 +378,7 @@ const initWaifu = async () => {
     showToggleAfterQuit: false,
   })
 
-  // 把看板娘挂到场景内部，跟随 1920×1080 设计稿一起缩放定位
+  // 把看板娘挂到场景内部，跟随 1280×720 设计稿一起缩放定位
   const stageElement = document.querySelector<HTMLElement>('.store-stage')
   const waifuElement = await waitForElement('#waifu')
   if (stageElement && waifuElement) {
@@ -379,7 +388,8 @@ const initWaifu = async () => {
   // 模型加载完成后把人物缩放到目标值（鼠标滚轮的缩放不会自动保存）
   const applyTargetZoom = () => {
     const model = window.__waifuManager?.cubism2model
-    if (!model) return false
+    // 必须等模型初始化完成（gl 就绪、viewMatrix 存在）再设置缩放
+    if (!model || !model.gl || !model.viewMatrix) return false
     const current = model.viewMatrix?.getScaleX?.() ?? 1
     if (Math.abs(current - WAIFU_TARGET_ZOOM) > 0.01) {
       model.modelScaling(WAIFU_TARGET_ZOOM / current)
@@ -425,7 +435,7 @@ const shelfRows = computed<ShelfCell[][]>(() => {
     const rowZ = [40, 30, 20, 10][rowIndex] ?? 10
     rows[rowIndex].push({
       game,
-      dx: ((index * 37 + 11) % 7) - 3,
+      dx: ((index * 37 + 11) % 5) - 2,
       dy: 0,
       rot: (((index * 29 + 7) % 7) - 3) / 12,
       z: rowZ + ((index * 7) % 5),
@@ -443,6 +453,7 @@ const boxStyle = (cell: ShelfCell) => ({
 
 const pickGame = (game: GameStoreMockGame) => {
   hoveredId.value = null
+  missingDetailNotice.value = false
   pickedGame.value = game
 }
 
@@ -480,6 +491,10 @@ const putBack = () => {
 
 const handleOpenCase = () => {
   if (isOpening.value || !pickedGame.value) return
+  if (!knownGameIds.value.has(pickedGame.value.publicId)) {
+    missingDetailNotice.value = true
+    return
+  }
   isOpening.value = true
   const publicId = pickedGame.value.publicId
   openCaseTimer = window.setTimeout(() => {
@@ -503,7 +518,7 @@ onMounted(() => {
   void initWaifu()
   void loadStorePosters()
 
-  // 调试工具：移动/缩放/报告看板娘位置（1920×1080 设计稿坐标）
+  // 调试工具：移动/缩放/报告看板娘位置（1280×720 设计稿坐标）
   window.__waifuTools = {
     el: () => document.getElementById('waifu'),
     move: (left, bottom) => {
@@ -522,9 +537,9 @@ onMounted(() => {
       const scale = stage ? new DOMMatrixReadOnly(getComputedStyle(stage).transform).a : 1
       const model = window.__waifuManager?.cubism2model
       const info = {
-        designLeft: rect ? (rect.left - (window.innerWidth - 1920 * scale) / 2) / scale : null,
+        designLeft: rect ? (rect.left - (window.innerWidth - 1280 * scale) / 2) / scale : null,
         designBottom: rect
-          ? (window.innerHeight - rect.bottom - (window.innerHeight - 1080 * scale) / 2) / scale
+          ? (window.innerHeight - rect.bottom - (window.innerHeight - 720 * scale) / 2) / scale
           : null,
         width: rect?.width ?? null,
         height: rect?.height ?? null,
@@ -562,11 +577,11 @@ onUnmounted(() => {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 1920px;
-  height: 1080px;
+  width: 1280px;
+  height: 720px;
   transform: translate(-50%, -50%) scale(var(--stage-scale, 1));
   transform-origin: center;
-  perspective: 1200px;
+  perspective: 800px;
 }
 
 .store-stage--dim .store-backwall,
@@ -584,13 +599,13 @@ onUnmounted(() => {
   top: 0;
   left: 0;
   right: 0;
-  height: 720px;
+  height: 480px;
   z-index: 1;
   background:
     linear-gradient(180deg, rgba(58, 44, 34, 0.55), rgba(46, 35, 27, 0) 30%),
-    repeating-linear-gradient(90deg, rgba(24, 18, 14, 0.12) 0 1px, transparent 1px 120px),
+    repeating-linear-gradient(90deg, rgba(24, 18, 14, 0.12) 0 0.67px, transparent 0.67px 80px),
     linear-gradient(180deg, #b3986f 0%, #9a7f5b 55%, #846b4b 100%);
-  box-shadow: inset 0 -18px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 -12px 20px rgba(0, 0, 0, 0.35);
 }
 
 .store-wall__paper {
@@ -599,7 +614,7 @@ onUnmounted(() => {
   opacity: 0.18;
   background:
     radial-gradient(ellipse at 50% 42%, rgba(255, 226, 170, 0.28), transparent 58%),
-    repeating-linear-gradient(0deg, rgba(255, 240, 210, 0.05) 0 2px, transparent 2px 9px);
+    repeating-linear-gradient(0deg, rgba(255, 240, 210, 0.05) 0 1.33px, transparent 1.33px 6px);
 }
 
 .store-wall__trim {
@@ -607,38 +622,38 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 14px;
+  height: 9.33px;
   background: linear-gradient(180deg, #5d4a36, #3f3024);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 2.67px 6.67px rgba(0, 0, 0, 0.45);
 }
 
 /* ---------- 海报 ---------- */
 .store-poster {
   position: absolute;
-  top: 96px;
-  width: 300px;
+  top: 64px;
+  width: 200px;
   aspect-ratio: 16 / 9;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  border-radius: 4px;
+  gap: 3.33px;
+  border-radius: 2.67px;
   overflow: hidden;
-  border: 3px solid #e8d5ad;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.42);
+  border: 2px solid #e8d5ad;
+  box-shadow: 0 6.67px 16px rgba(0, 0, 0, 0.42);
   background:
     linear-gradient(180deg, rgba(30, 22, 16, 0.72), rgba(18, 13, 9, 0.82)),
     #3a2a1c;
 }
 
 .store-poster--left {
-  left: 90px;
+  left: 60px;
   transform: rotate(-0.8deg);
 }
 
 .store-poster--right {
-  right: 90px;
+  right: 60px;
   transform: rotate(0.8deg);
 }
 
@@ -655,47 +670,47 @@ onUnmounted(() => {
 .store-poster__line {
   position: relative;
   z-index: 1;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 1.33px 5.33px rgba(0, 0, 0, 0.9);
 }
 
 .store-poster__kicker {
-  font-size: 15px;
-  letter-spacing: 3px;
+  font-size: 10px;
+  letter-spacing: 2px;
   color: #f7e9c8;
   font-weight: 700;
 }
 
 .store-poster__line {
-  font-size: 20px;
+  font-size: 13.33px;
   color: #ffe9b8;
-  letter-spacing: 4px;
+  letter-spacing: 2.67px;
 }
 
 /* ---------- 霓虹招牌 ---------- */
 .store-sign {
   position: absolute;
-  top: 14px;
+  top: 9.33px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 36px;
+  font-size: 24px;
   font-weight: 700;
-  letter-spacing: 8px;
+  letter-spacing: 5.33px;
   color: #ffd9a0;
   text-shadow:
-    0 0 6px rgba(255, 190, 110, 0.95),
-    0 0 18px rgba(255, 160, 70, 0.75),
-    0 0 42px rgba(255, 130, 40, 0.55);
+    0 0 4px rgba(255, 190, 110, 0.95),
+    0 0 12px rgba(255, 160, 70, 0.75),
+    0 0 28px rgba(255, 130, 40, 0.55);
   background: rgba(30, 20, 14, 0.35);
-  padding: 5px 22px 7px;
-  border-radius: 4px;
+  padding: 3.33px 14.67px 4.67px;
+  border-radius: 2.67px;
 }
 
 .store-sign__cord {
   position: absolute;
   top: 100%;
   left: 50%;
-  width: 2px;
-  height: 26px;
+  width: 1.33px;
+  height: 17.33px;
   background: rgba(20, 14, 10, 0.8);
 }
 
@@ -704,15 +719,15 @@ onUnmounted(() => {
   position: absolute;
   left: -4%;
   right: -4%;
-  top: 620px;
-  bottom: 300px;
+  top: 413.33px;
+  bottom: 200px;
   z-index: 1;
-  transform: perspective(700px) rotateX(32deg);
+  transform: perspective(466.67px) rotateX(32deg);
   transform-origin: top center;
   background:
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 42px),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1.33px, transparent 1.33px 28px),
     linear-gradient(180deg, #4a3525, #2b1d13 90%);
-  box-shadow: inset 0 18px 34px rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 12px 22.67px rgba(0, 0, 0, 0.5);
 }
 
 .store-floor__rug {
@@ -728,54 +743,54 @@ onUnmounted(() => {
 /* ---------- 主货架 ---------- */
 .store-shelf {
   position: absolute;
-  top: 76px;
+  top: 50.67px;
   left: 50%;
   transform: translateX(-50%);
-  width: 900px;
-  height: 720px;
+  width: 600px;
+  height: 480px;
   z-index: 2;
   background: linear-gradient(180deg, #6d5138, #543c28 18%, #462f1f 100%);
-  border: 10px solid #3d2b1d;
-  border-radius: 6px;
+  border: 6.67px solid #3d2b1d;
+  border-radius: 4px;
   box-shadow:
-    0 24px 44px rgba(0, 0, 0, 0.6),
-    inset 0 2px 0 rgba(255, 230, 190, 0.18),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.5);
+    0 16px 29.33px rgba(0, 0, 0, 0.6),
+    inset 0 1.33px 0 rgba(255, 230, 190, 0.18),
+    inset 0 -1.33px 0 rgba(0, 0, 0, 0.5);
 }
 
 .store-shelf__crown {
   position: absolute;
-  top: -10px;
-  left: -10px;
-  right: -10px;
-  height: 26px;
+  top: -6.67px;
+  left: -6.67px;
+  right: -6.67px;
+  height: 17.33px;
   background: linear-gradient(180deg, #7d5d3e, #543c28);
-  border-radius: 6px 6px 0 0;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+  border-radius: 4px 4px 0 0;
+  box-shadow: 0 2px 5.33px rgba(0, 0, 0, 0.35);
 }
 
 .store-shelf__side {
   position: absolute;
-  top: 16px;
-  bottom: 16px;
-  width: 18px;
+  top: 10.67px;
+  bottom: 10.67px;
+  width: 12px;
   background: linear-gradient(90deg, #4a3423, #2c1f14);
-  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 5.33px rgba(0, 0, 0, 0.55);
 }
 
 .store-shelf__side--left {
-  left: -10px;
-  border-radius: 4px 0 0 4px;
+  left: -6.67px;
+  border-radius: 2.67px 0 0 2.67px;
 }
 
 .store-shelf__side--right {
-  right: -10px;
-  border-radius: 0 4px 4px 0;
+  right: -6.67px;
+  border-radius: 0 2.67px 2.67px 0;
 }
 
 .store-shelf__rows {
   position: absolute;
-  inset: 16px 18px 10px;
+  inset: 10.67px 12px 6.67px;
   display: flex;
   flex-direction: column;
 }
@@ -788,7 +803,7 @@ onUnmounted(() => {
 
 .store-shelf__row-boxes {
   position: absolute;
-  inset: 0 0 14px;
+  inset: 0 0 9.33px;
   display: flex;
   justify-content: center;
   align-items: flex-end;
@@ -796,16 +811,16 @@ onUnmounted(() => {
 
 .store-shelf__plank {
   position: absolute;
-  left: -2px;
-  right: -2px;
+  left: -1.33px;
+  right: -1.33px;
   bottom: 0;
-  height: 14px;
+  height: 9.33px;
   background:
     linear-gradient(180deg, #8a6a47 0%, #6b4f33 55%, #4e3824 100%);
-  border-radius: 2px;
+  border-radius: 1.33px;
   box-shadow:
-    0 2px 5px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 230, 190, 0.22);
+    0 1.33px 3.33px rgba(0, 0, 0, 0.45),
+    inset 0 0.67px 0 rgba(255, 230, 190, 0.22);
   z-index: 5;
 }
 
@@ -814,19 +829,19 @@ onUnmounted(() => {
   top: 100%;
   left: 0;
   right: 0;
-  height: 18px;
+  height: 12px;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.5), transparent);
 }
 
 .store-shelf__base {
   position: absolute;
-  left: -10px;
-  right: -10px;
-  bottom: -18px;
-  height: 22px;
+  left: -6.67px;
+  right: -6.67px;
+  bottom: -12px;
+  height: 14.67px;
   background: linear-gradient(180deg, #543c28, #352516 70%);
-  border-radius: 0 0 5px 5px;
-  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.55);
+  border-radius: 0 0 3.33px 3.33px;
+  box-shadow: 0 6.67px 12px rgba(0, 0, 0, 0.55);
 }
 
 /* ---------- 游戏盒 ---------- */
@@ -834,11 +849,11 @@ onUnmounted(() => {
   appearance: none;
   border: 0;
   padding: 0;
-  margin: 0 22px;
+  margin: 0 14.67px;
   position: relative;
   /* 封面源图统一为 600×900（2:3），盒子按 2:3 显示，避免 cover 裁切 */
-  width: 102px;
-  height: 153px;
+  width: 68px;
+  height: 102px;
   aspect-ratio: 2 / 3;
   background: transparent;
   cursor: pointer;
@@ -865,8 +880,8 @@ onUnmounted(() => {
   display: block;
   background: #241a12;
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 5px 9px rgba(0, 0, 0, 0.42);
+    inset 0 0 0 0.67px rgba(255, 255, 255, 0.08),
+    0 3.33px 6px rgba(0, 0, 0, 0.42);
 }
 
 /* 盒脊：右侧厚度 */
@@ -875,10 +890,10 @@ onUnmounted(() => {
   position: absolute;
   top: 0;
   right: 0;
-  width: 4px;
+  width: 2.67px;
   height: 100%;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.24), rgba(0, 0, 0, 0.5));
-  border-radius: 0 2px 2px 0;
+  border-radius: 0 1.33px 1.33px 0;
   z-index: 2;
 }
 
@@ -889,9 +904,9 @@ onUnmounted(() => {
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 2px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(0, 0, 0, 0.2));
-  border-radius: 2px 2px 0 0;
+  border-radius: 1.33px 1.33px 0 0;
   z-index: 1;
 }
 
@@ -909,56 +924,56 @@ onUnmounted(() => {
 .game-box:hover {
   z-index: 60 !important;
   transform:
-    translate(calc(var(--dx) - 8px), calc(var(--dy) - 7px))
+    translate(calc(var(--dx) - 5.33px), calc(var(--dy) - 4.67px))
     rotate(var(--rot))
     scale(1.08);
-  box-shadow: 0 22px 34px rgba(0, 0, 0, 0.58);
+  box-shadow: 0 14.67px 22.67px rgba(0, 0, 0, 0.58);
   filter: brightness(1.08);
 }
 
 .game-box--hovered .game-box__cover,
 .game-box:hover .game-box__cover {
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
-    0 14px 24px rgba(0, 0, 0, 0.55);
+    inset 0 0 0 0.67px rgba(255, 255, 255, 0.14),
+    0 9.33px 16px rgba(0, 0, 0, 0.55);
 }
 
 /* ---------- CRT 电视 ---------- */
 .store-crt {
   position: absolute;
-  right: 180px;
-  bottom: 300px;
-  width: 420px;
+  right: 120px;
+  bottom: 200px;
+  width: 280px;
   z-index: 3;
   transform: none;
 }
 
 .store-crt__cabinet {
   position: relative;
-  padding: 16px 16px 12px;
-  border-radius: 18px 18px 12px 12px;
+  padding: 10.67px 10.67px 8px;
+  border-radius: 12px 12px 8px 8px;
   background:
     linear-gradient(180deg, #d8c9a8 0%, #b8a37e 34%, #8f7a5b 100%);
-  border: 2px solid #5d4a32;
+  border: 1.33px solid #5d4a32;
   box-shadow:
-    0 18px 30px rgba(0, 0, 0, 0.55),
-    inset 0 2px 0 rgba(255, 245, 220, 0.5),
-    inset 0 -6px 14px rgba(0, 0, 0, 0.28);
+    0 12px 20px rgba(0, 0, 0, 0.55),
+    inset 0 1.33px 0 rgba(255, 245, 220, 0.5),
+    inset 0 -4px 9.33px rgba(0, 0, 0, 0.28);
 }
 
 .store-crt__screen {
   position: relative;
   aspect-ratio: 16 / 9;
-  border-radius: 10px;
+  border-radius: 6.67px;
   overflow: hidden;
   background:
     radial-gradient(ellipse at 42% 36%, rgba(90, 120, 96, 0.5), rgba(12, 22, 16, 0.95) 72%),
     #08140c;
-  border: 4px solid #2c2116;
+  border: 2.67px solid #2c2116;
   box-shadow:
-    inset 0 0 26px rgba(0, 0, 0, 0.9),
-    0 0 22px rgba(190, 235, 190, 0.16),
-    0 0 60px rgba(160, 220, 160, 0.08);
+    inset 0 0 17.33px rgba(0, 0, 0, 0.9),
+    0 0 14.67px rgba(190, 235, 190, 0.16),
+    0 0 40px rgba(160, 220, 160, 0.08);
   transition: background 0.4s ease, box-shadow 0.4s ease;
 }
 
@@ -979,13 +994,13 @@ onUnmounted(() => {
   background:
     linear-gradient(118deg, rgba(255, 255, 255, 0.13) 0%, transparent 24%),
     linear-gradient(0deg, rgba(255, 255, 255, 0.05), transparent 40%);
-  box-shadow: inset 0 0 40px rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 26.67px rgba(255, 255, 255, 0.05);
   animation: crt-flicker 7s ease-in-out infinite;
 }
 
 .store-crt--off .store-crt__screen {
   background: radial-gradient(ellipse at 42% 36%, rgba(86, 86, 86, 0.26), #050505 78%), #050505;
-  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.95);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.95);
 }
 
 .store-crt--off .store-crt__video {
@@ -998,33 +1013,33 @@ onUnmounted(() => {
 }
 
 .store-crt__brand {
-  margin-top: 8px;
+  margin-top: 5.33px;
   text-align: center;
-  font-size: 9px;
-  letter-spacing: 4px;
+  font-size: 6px;
+  letter-spacing: 2.67px;
   color: #4a3824;
   font-weight: 700;
 }
 
 .store-crt__controls {
   position: absolute;
-  right: 18px;
-  bottom: 20px;
+  right: 12px;
+  bottom: 13.33px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .store-crt__knob {
   appearance: none;
   padding: 0;
   cursor: pointer;
-  width: 14px;
-  height: 14px;
+  width: 9.33px;
+  height: 9.33px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #efe3c8, #8a7556 70%);
-  border: 1px solid #4a3824;
-  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.4);
+  border: 0.67px solid #4a3824;
+  box-shadow: 0 1.33px 2px rgba(0, 0, 0, 0.4);
 }
 
 .store-crt__knob:hover {
@@ -1039,67 +1054,67 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 10px;
-  height: 10px;
+  width: 6.67px;
+  height: 6.67px;
 }
 
 .store-crt__knob--small::after {
   content: '❚❚';
-  font-size: 7px;
+  font-size: 4.67px;
   line-height: 1;
   color: rgba(30, 20, 10, 0.85);
 }
 
 .store-crt__knob--small.is-paused::after {
   content: '▶';
-  font-size: 6px;
+  font-size: 4px;
 }
 
 .store-crt__led {
-  width: 5px;
-  height: 5px;
+  width: 3.33px;
+  height: 3.33px;
   border-radius: 50%;
   background: #7be37b;
-  box-shadow: 0 0 6px #7be37b;
+  box-shadow: 0 0 4px #7be37b;
   animation: crt-breath 4.8s ease-in-out infinite;
 }
 
 .store-crt__led.is-off {
   background: #5d2222;
-  box-shadow: 0 0 4px rgba(140, 40, 40, 0.5);
+  box-shadow: 0 0 2.67px rgba(140, 40, 40, 0.5);
   animation: none;
 }
 
 .store-crt__vents {
   position: absolute;
-  left: 18px;
-  bottom: 18px;
-  width: 84px;
-  height: 10px;
-  background: repeating-linear-gradient(90deg, #6d5a3e 0 2px, transparent 2px 5px);
-  border-radius: 2px;
+  left: 12px;
+  bottom: 12px;
+  width: 56px;
+  height: 6.67px;
+  background: repeating-linear-gradient(90deg, #6d5a3e 0 1.33px, transparent 1.33px 3.33px);
+  border-radius: 1.33px;
   opacity: 0.75;
 }
 
 .store-crt__stand {
   width: 72%;
-  height: 22px;
+  height: 14.67px;
   margin: 0 auto;
   background: linear-gradient(180deg, #7d6240, #4e3824);
-  border-radius: 0 0 8px 8px;
-  box-shadow: 0 12px 18px rgba(0, 0, 0, 0.5);
+  border-radius: 0 0 5.33px 5.33px;
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.5);
 }
 
 .store-crt__cable {
   position: absolute;
   right: -10%;
-  bottom: -38px;
+  bottom: -25.33px;
   width: 60%;
-  height: 52px;
-  border: 3px solid #241a12;
+  height: 34.67px;
+  border: 2px solid #241a12;
   border-top: 0;
   border-left: 0;
-  border-radius: 0 0 60px 0;
+  border-radius: 0 0 40px 0;
   opacity: 0.85;
 }
 
@@ -1109,7 +1124,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 300px;
+  height: 200px;
   z-index: 4;
 }
 
@@ -1118,35 +1133,35 @@ onUnmounted(() => {
   top: 0;
   left: 0;
   right: 0;
-  height: 16px;
+  height: 10.67px;
   background:
     linear-gradient(180deg, #b08a5c 0%, #8d6a42 72%, #6f4f2e 100%);
   box-shadow:
-    0 6px 12px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 rgba(255, 235, 200, 0.4);
-  transform: perspective(400px) rotateX(24deg);
+    0 4px 8px rgba(0, 0, 0, 0.55),
+    inset 0 0.67px 0 rgba(255, 235, 200, 0.4);
+  transform: perspective(266.67px) rotateX(24deg);
   transform-origin: bottom center;
-  border-radius: 3px 3px 0 0;
+  border-radius: 2px 2px 0 0;
 }
 
 .store-counter__top-glow {
   position: absolute;
-  inset: 10px 0 0 0;
+  inset: 6.67px 0 0 0;
   background: linear-gradient(90deg, transparent 20%, rgba(255, 230, 170, 0.25) 50%, transparent 80%);
 }
 
 .store-counter__front {
   position: absolute;
-  top: 16px;
+  top: 10.67px;
   left: 0;
   right: 0;
   bottom: 0;
   background:
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 9px),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 0.67px, transparent 0.67px 6px),
     linear-gradient(180deg, #6f4f2e, #4a3320 78%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 235, 200, 0.16),
-    inset 0 -24px 40px rgba(0, 0, 0, 0.5);
+    inset 0 0.67px 0 rgba(255, 235, 200, 0.16),
+    inset 0 -16px 26.67px rgba(0, 0, 0, 0.5);
 }
 
 .store-counter__trim {
@@ -1154,7 +1169,7 @@ onUnmounted(() => {
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 2px;
   background: rgba(255, 235, 200, 0.14);
 }
 
@@ -1183,14 +1198,14 @@ onUnmounted(() => {
 /* ---------- 离开按钮 ---------- */
 .store-exit {
   position: absolute;
-  top: 14px;
-  left: 14px;
+  top: 16px;
+  left: 16px;
   z-index: 20;
   border: 1px solid rgba(255, 225, 180, 0.24);
   background: rgba(24, 16, 11, 0.48);
   color: rgba(255, 230, 190, 0.82);
-  font-size: 13px;
-  padding: 6px 12px;
+  font-size: 15px;
+  padding: 10px 20px;
   border-radius: 999px;
   cursor: pointer;
   backdrop-filter: blur(6px);
@@ -1213,8 +1228,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   background: rgba(8, 5, 3, 0.58);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 .store-inspect__box {
@@ -1343,6 +1358,10 @@ onUnmounted(() => {
   letter-spacing: 1px !important;
 }
 
+.store-inspect__hint--error {
+  color: rgba(255, 170, 130, 0.92) !important;
+}
+
 .store-inspect__actions {
   display: flex;
   gap: 14px;
@@ -1387,10 +1406,10 @@ onUnmounted(() => {
 /* ---------- 动画 ---------- */
 @keyframes crt-noise {
   0% { background-position: 0 0; }
-  25% { background-position: -30px 12px; }
-  50% { background-position: 18px -22px; }
-  75% { background-position: -12px -30px; }
-  100% { background-position: 24px 18px; }
+  25% { background-position: -20px 8px; }
+  50% { background-position: 12px -14.67px; }
+  75% { background-position: -8px -20px; }
+  100% { background-position: 16px 12px; }
 }
 
 @keyframes crt-flicker {
@@ -1427,6 +1446,8 @@ onUnmounted(() => {
   transform: perspective(900px) rotateY(-2deg) rotateX(1deg) scale(0.72);
   opacity: 0;
 }
+
+
 </style>
 
 <!-- 看板娘：live2d-widget 创建的是 body 级节点，需用全局样式把它定位进店内场景 -->
@@ -1434,9 +1455,9 @@ onUnmounted(() => {
 #waifu {
   position: absolute !important;
   left: 0px !important;
-  bottom: 10px !important;
-  width: 800px !important;
-  height: 800px !important;
+  bottom: 6.67px !important;
+  width: 533.33px !important;
+  height: 533.33px !important;
   transform: none !important;
   z-index: 3 !important;
   pointer-events: none !important;
@@ -1444,7 +1465,7 @@ onUnmounted(() => {
 }
 
 #waifu.waifu-active {
-  bottom: 10px !important;
+  bottom: 6.67px !important;
 }
 
 #waifu:hover {
@@ -1456,19 +1477,19 @@ onUnmounted(() => {
 }
 
 #live2d {
-  width: 800px !important;
-  height: 800px !important;
+  width: 533.33px !important;
+  height: 533.33px !important;
   pointer-events: none !important;
 }
 
 #waifu-tips {
-  left: 540px !important;
-  top: 30px !important;
+  left: 340px !important;
+  top: 20px !important;
   margin: 0 !important;
-  width: 220px !important;
-  min-height: 54px;
-  font-size: 13px;
-  line-height: 21px;
+  width: 146.67px !important;
+  min-height: 36px;
+  font-size: 8.67px;
+  line-height: 14px;
 }
 
 @media (max-width: 768px) {

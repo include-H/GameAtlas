@@ -1,4 +1,5 @@
 <template>
+  <div class="game-detail-view">
   <a-empty v-if="hasLoadFailure" class="game-detail__load-failure">
     <template #description>
       <div class="empty-description">
@@ -232,6 +233,7 @@
     @success="handleEditSuccess"
     @sync="handleEditSync"
   />
+  </div>
 
 </template>
 

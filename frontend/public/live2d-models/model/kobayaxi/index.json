@@ -1,0 +1,70 @@
+{
+	"version": "Sample 1.0.0",
+	"model": "Kobayaxi.moc",
+	"textures": [
+		"Kobayaxi.2048/texture_00.png"
+	],
+	"physics": "physics.json",
+	"pose": "pose.json",
+	"layout": {
+		"height": 1.85,
+		"center_x": 0,
+		"center_y": 0
+	},
+	"expressions": [
+		{
+			"name": "f01",
+			"file": "expressions/f01.exp.json"
+		},
+		{
+			"name": "f02",
+			"file": "expressions/f02.exp.json"
+		},
+		{
+			"name": "f03",
+			"file": "expressions/f03.exp.json"
+		}
+	],
+	"motions": {
+		"idle": [
+			{
+				"file": "motions/idle/haru_idle_01.mtn",
+				"fade_in": 500,
+				"fade_out": 500
+			},
+			{
+				"file": "motions/idle/haru_idle_02.mtn",
+				"fade_in": 500,
+				"fade_out": 500
+			},
+			{
+				"file": "motions/idle/haru_idle_03.mtn",
+				"fade_in": 500,
+				"fade_out": 500
+			}
+		],
+		"tap": [
+			{
+				"file": "motions/tap/haru_normal_01.mtn"
+			},
+			{
+				"file": "motions/tap/haru_normal_02.mtn"
+			},
+			{
+				"file": "motions/tap/haru_normal_03.mtn"
+			}
+		],
+		"tap_body": [
+			{
+				"file": "motions/tap_body/haru_m_01.mtn"
+			},
+			{
+				"file": "motions/tap_body/haru_m_02.mtn"
+			},
+			{
+				"file": "motions/tap_body/haru_m_03.mtn"
+			}
+		]
+	},
+	"name": "Kobayaxi"
+}
