@@ -1262,7 +1262,7 @@ onUnmounted(() => {
 .store-crt__controls {
   position: absolute;
   right: 12px;
-  bottom: 13.33px;
+  bottom: 8.33px;
   display: flex;
   align-items: center;
   gap: 4px;
