@@ -506,69 +506,62 @@ const pickGame = (game: GameStoreMockGame, event: MouseEvent) => {
     pickupOrigin = origin
     pickupAnimation = caseElement.animate(
       [
-        // 0%：还插在货架上
+        // 0%：还插在货架上（平面姿态，与货架盒完全对齐，避免衔接突兀）
         {
           transform:
-            `perspective(900px) translate(${origin.x}px, ${origin.y}px) ` +
-            `scale(${origin.scale}) rotate(${origin.rot}deg) rotateY(-16deg) rotateX(9deg)`,
+            `translate(${origin.x}px, ${origin.y}px) scale(${origin.scale}) ` +
+            `rotate(${origin.rot}deg) rotateY(0deg) rotateX(0deg)`,
           boxShadow: '0 6px 12px rgba(0, 0, 0, 0.32), 0 2px 5px rgba(0, 0, 0, 0.28)',
-          filter: 'brightness(0.8)',
-          easing: 'cubic-bezier(0.3, 0.9, 0.35, 1)',
+          easing: 'cubic-bezier(0.25, 0.7, 0.3, 1)',
           offset: 0,
         },
-        // 8%：手指捏住，轻微上抬并转个角度
+        // 10%：手指捏住，轻微上抬并开始转面
         {
           transform:
-            `perspective(900px) translate(${origin.x * 0.92}px, ${origin.y * 0.92 - 16}px) ` +
-            `scale(${origin.scale * 1.08}) rotate(${origin.rot * 0.9}deg) rotateY(-20deg) rotateX(12deg)`,
+            `translate(${origin.x * 0.9}px, ${origin.y * 0.9 - 14}px) ` +
+            `scale(${origin.scale * 1.06}) rotate(${origin.rot * 0.85}deg) rotateY(-8deg) rotateX(5deg)`,
           boxShadow: '0 8px 16px rgba(0, 0, 0, 0.36), 0 3px 7px rgba(0, 0, 0, 0.3)',
-          filter: 'brightness(0.84)',
           easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)',
-          offset: 0.08,
+          offset: 0.1,
         },
-        // 40%：弧线最高点，往面前带
+        // 42%：弧线最高点，往面前带（角度转得最开）
         {
           transform:
-            `perspective(900px) translate(${origin.x * 0.3}px, ${origin.y * 0.4 - 46}px) ` +
-            `scale(${origin.scale + (1 - origin.scale) * 0.55}) rotate(0deg) rotateY(-8deg) rotateX(6deg)`,
+            `translate(${origin.x * 0.3}px, ${origin.y * 0.42 - 46}px) ` +
+            `scale(${origin.scale + (1 - origin.scale) * 0.55}) rotate(0deg) rotateY(-14deg) rotateX(9deg)`,
           boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5), 0 8px 16px rgba(0, 0, 0, 0.38)',
-          filter: 'brightness(0.95)',
           easing: 'cubic-bezier(0.35, 0.05, 0.4, 1)',
-          offset: 0.4,
+          offset: 0.42,
         },
-        // 58%：减速滑到终点附近，轻微过冲
+        // 60%：减速滑到终点附近，轻微过冲（角度已固定，只动位移/缩放）
         {
           transform:
-            'perspective(900px) translate(0px, -14px) scale(1.045) rotate(0deg) rotateY(-3deg) rotateX(2.5deg)',
+            'translate(0px, -12px) scale(1.04) rotate(0deg) rotateY(-2deg) rotateX(1deg)',
           boxShadow: '0 46px 92px rgba(0, 0, 0, 0.76), 0 17px 32px rgba(0, 0, 0, 0.54)',
-          filter: 'brightness(1.06)',
           easing: 'cubic-bezier(0.25, 0.1, 0.45, 1)',
-          offset: 0.58,
+          offset: 0.6,
         },
-        // 72%：回落到正位
+        // 74%：回落到正位
         {
           transform:
-            'perspective(900px) translate(0px, 0px) scale(1) rotate(0deg) rotateY(-2deg) rotateX(1deg)',
+            'translate(0px, 0px) scale(1) rotate(0deg) rotateY(-2deg) rotateX(1deg)',
           boxShadow: '0 40px 80px rgba(0, 0, 0, 0.72), 0 14px 26px rgba(0, 0, 0, 0.5)',
-          filter: 'brightness(1)',
           easing: 'cubic-bezier(0.35, 0.2, 0.55, 1)',
-          offset: 0.72,
+          offset: 0.74,
         },
-        // 86%：极轻的一次回弹，像手停稳
+        // 87%：极轻的一次回弹，像手停稳（同样保持角度不变）
         {
           transform:
-            'perspective(900px) translate(0px, -3px) scale(1.008) rotate(0deg) rotateY(-2.2deg) rotateX(1.3deg)',
+            'translate(0px, -3px) scale(1.008) rotate(0deg) rotateY(-2deg) rotateX(1deg)',
           boxShadow: '0 42px 84px rgba(0, 0, 0, 0.74), 0 15px 28px rgba(0, 0, 0, 0.52)',
-          filter: 'brightness(1.015)',
           easing: 'cubic-bezier(0.45, 0.05, 0.5, 1)',
-          offset: 0.86,
+          offset: 0.87,
         },
         // 100%：落定
         {
           transform:
-            'perspective(900px) translate(0px, 0px) scale(1) rotate(0deg) rotateY(-2deg) rotateX(1deg)',
+            'translate(0px, 0px) scale(1) rotate(0deg) rotateY(-2deg) rotateX(1deg)',
           boxShadow: '0 40px 80px rgba(0, 0, 0, 0.72), 0 14px 26px rgba(0, 0, 0, 0.5)',
-          filter: 'brightness(1)',
           offset: 1,
         },
       ],
@@ -649,15 +642,13 @@ const putBack = (animate = true) => {
   const origin = pickupOrigin
   // 若还在飞行途中，就从盒子当前所处位置开始收回去
   let startTransform =
-    'perspective(900px) translate(0px, 0px) scale(1) rotate(0deg) rotateY(-2deg) rotateX(1deg)'
+    'translate(0px, 0px) scale(1) rotate(0deg) rotateY(-2deg) rotateX(1deg)'
   let startShadow = '0 40px 80px rgba(0, 0, 0, 0.72), 0 14px 26px rgba(0, 0, 0, 0.5)'
-  let startFilter = 'brightness(1)'
   if (pickupAnimation && pickupAnimation.playState === 'running') {
     pickupAnimation.cancel()
     const computedStyle = window.getComputedStyle(caseElement)
     startTransform = computedStyle.transform
     startShadow = computedStyle.boxShadow
-    startFilter = computedStyle.filter
   }
   const reverse = caseElement.animate(
     [
@@ -665,46 +656,41 @@ const putBack = (animate = true) => {
         // 0%：正位
         transform: startTransform,
         boxShadow: startShadow,
-        filter: startFilter,
         easing: 'cubic-bezier(0.3, 0.1, 0.45, 1)',
         offset: 0,
       },
       // 28%：临走前轻轻抬一下
       {
         transform:
-          'perspective(900px) translate(0px, -10px) scale(1.03) rotate(0deg) rotateY(-4deg) rotateX(3deg)',
+          'translate(0px, -8px) scale(1.02) rotate(0deg) rotateY(-6deg) rotateX(4deg)',
         boxShadow: '0 36px 72px rgba(0, 0, 0, 0.66), 0 12px 24px rgba(0, 0, 0, 0.46)',
-        filter: 'brightness(1.02)',
         easing: 'cubic-bezier(0.35, 0.05, 0.4, 1)',
         offset: 0.28,
       },
-      // 60%：弧线回去
+      // 58%：弧线回去
       {
         transform:
-          `perspective(900px) translate(${origin.x * 0.28}px, ${origin.y * 0.4 - 40}px) ` +
-          `scale(${origin.scale + (1 - origin.scale) * 0.5}) rotate(0deg) rotateY(-9deg) rotateX(7deg)`,
+          `translate(${origin.x * 0.3}px, ${origin.y * 0.42 - 40}px) ` +
+          `scale(${origin.scale + (1 - origin.scale) * 0.5}) rotate(0deg) rotateY(-12deg) rotateX(8deg)`,
         boxShadow: '0 18px 34px rgba(0, 0, 0, 0.45), 0 6px 12px rgba(0, 0, 0, 0.35)',
-        filter: 'brightness(0.94)',
         easing: 'cubic-bezier(0.3, 0.1, 0.45, 1)',
-        offset: 0.6,
+        offset: 0.58,
       },
-      // 84%：贴近货架，减速
+      // 84%：贴近货架，减速并转回平面姿态
       {
         transform:
-          `perspective(900px) translate(${origin.x * 0.88}px, ${origin.y * 0.88 - 5}px) ` +
-          `scale(${origin.scale * 1.06}) rotate(${origin.rot * 0.8}deg) rotateY(-15deg) rotateX(10deg)`,
+          `translate(${origin.x * 0.9}px, ${origin.y * 0.9 - 4}px) ` +
+          `scale(${origin.scale * 1.04}) rotate(${origin.rot * 0.9}deg) rotateY(-7deg) rotateX(4deg)`,
         boxShadow: '0 9px 18px rgba(0, 0, 0, 0.38), 0 3px 7px rgba(0, 0, 0, 0.3)',
-        filter: 'brightness(0.85)',
         easing: 'cubic-bezier(0.35, 0.05, 0.45, 1)',
         offset: 0.84,
       },
-      // 100%：插回货架
+      // 100%：插回货架（与货架盒完全同姿态，无痕衔接）
       {
         transform:
-          `perspective(900px) translate(${origin.x}px, ${origin.y}px) ` +
-          `scale(${origin.scale}) rotate(${origin.rot}deg) rotateY(-16deg) rotateX(9deg)`,
+          `translate(${origin.x}px, ${origin.y}px) scale(${origin.scale}) ` +
+          `rotate(${origin.rot}deg) rotateY(0deg) rotateX(0deg)`,
         boxShadow: '0 6px 12px rgba(0, 0, 0, 0.32), 0 2px 5px rgba(0, 0, 0, 0.28)',
-        filter: 'brightness(0.8)',
         offset: 1,
       },
     ],
@@ -1489,20 +1475,23 @@ onUnmounted(() => {
   align-items: center;
   gap: 20px;
   padding: 18px 26px 26px;
+  /* 透视从动画里移到父级，飞行插值不再因透视矩阵产生形变 */
+  perspective: 900px;
 }
 
 .store-inspect__case {
   position: relative;
   width: 320px;
-  aspect-ratio: 0.72;
+  /* 与货架游戏盒统一 2:3，起飞/落回时与货架盒无痕衔接 */
+  aspect-ratio: 2 / 3;
   border-radius: 4px;
   cursor: pointer;
   perspective: 1100px;
-  transform: perspective(900px) rotateY(-2deg) rotateX(1deg);
+  transform: rotateY(-2deg) rotateX(1deg);
   box-shadow:
     0 40px 80px rgba(0, 0, 0, 0.72),
     0 14px 26px rgba(0, 0, 0, 0.5);
-  will-change: transform, box-shadow, filter;
+  will-change: transform, box-shadow;
 }
 
 .store-inspect__disc {
