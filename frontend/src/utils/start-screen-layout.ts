@@ -11,14 +11,16 @@ export interface PackedStartScreenColumn {
   slots: PackedStartScreenSlot[]
 }
 
-export const START_SCREEN_COLUMN_ROWS = 5
-export const START_SCREEN_COLUMN_COLS = 4
+// 一列 = 三个"大正方形"占地纵向堆叠：大磁铁（2x2）+ 两个长磁铁（2x1 x2）+ 四个 1x1（2x2）。
+// 因此列宽 2 格、列高 6 行。
+export const START_SCREEN_COLUMN_ROWS = 6
+export const START_SCREEN_COLUMN_COLS = 2
 
-// 每列容量：1 个大（2x2）+ 2 个宽（2x1）+ 2 个小（1x1），超出即另开一列。
+// 每列容量：1 个大（2x2）+ 2 个宽（2x1）+ 4 个小（1x1），超出即另开一列。
 const COLUMN_QUOTA: Record<StartScreenTileSize, number> = {
   large: 1,
   wide: 2,
-  small: 2,
+  small: 4,
 }
 
 const SPANS: Record<StartScreenTileSize, { rows: number; cols: number }> = {
@@ -28,8 +30,8 @@ const SPANS: Record<StartScreenTileSize, { rows: number; cols: number }> = {
 }
 
 /**
- * 非固定模板：先把磁贴按容量分到各列（保持全局顺序），再在列内做行优先 first-fit 排布。
- * 1x1 优先往右填，宽/大磁贴按 2 列/2 行占位；列内放不下（理论不会发生）或配额满就往右另开一列。
+ * 先把磁贴按容量分到各列（保持全局顺序），再在列内做行优先 first-fit 排布。
+ * 满配时自然呈现：大磁铁在上，两个长磁铁在中，四个 1x1 以 2x2 在底。
  */
 export function packStartScreenTiles(tiles: StartScreenTile[]): PackedStartScreenColumn[] {
   const columns: PackedStartScreenColumn[] = []

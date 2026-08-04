@@ -314,8 +314,8 @@ onUnmounted(() => {
 
 <style>
 /* 开始屏幕是沉浸式品牌页特例：全屏场景色、Win8 磁贴网格与动效留在组件内，不外溢到全局 token。
-   列模板：一列 = 1 个大正方形（2x2）+ 2 个宽长方形（2x1）+ 4 个小正方形（1x1），
-   列高 5 行、列宽 4 格，塞满就往右另开一列，列间距 50px。 */
+   一列 = 三个大正方形占地纵向堆叠：大磁铁（2x2）+ 两个长磁铁（2x1）+ 四个 1x1（2x2），
+   列高 6 行、列宽 2 格；容量 1 大 + 2 宽 + 4 小，塞满往右另开一列，列间距 50px。 */
 .start-screen-wrapper {
   position: fixed;
   inset: 0;
@@ -343,8 +343,9 @@ onUnmounted(() => {
   flex-direction: column;
   padding: 40px 56px 28px;
   color: #fff;
-  /* 列模板：一列 5 行高（大 2 行 + 宽 2 行 + 小 1 行），行高随视口高度自适应，720p 可整列放下 */
-  --start-cell: clamp(72px, 11vh, 110px);
+  /* 一列 = 三个大正方形占地纵向堆叠（大 2x2 + 两个长 2x1 + 四个 1x1 的 2x2），
+     列高 6 行、列宽 2 格；行高随视口自适应，720p 可整列放下 */
+  --start-cell: clamp(56px, 8.5vh, 96px);
   --start-gap: clamp(8px, 1.2vh, 14px);
 }
 
@@ -409,8 +410,8 @@ onUnmounted(() => {
 
 .start-screen__column-grid {
   display: grid;
-  grid-template-columns: repeat(4, var(--start-cell));
-  grid-template-rows: repeat(5, var(--start-cell));
+  grid-template-columns: repeat(2, var(--start-cell));
+  grid-template-rows: repeat(6, var(--start-cell));
   gap: var(--start-gap);
   width: max-content;
 }
