@@ -88,10 +88,11 @@
       </div>
 
       <!-- CRT 电视 -->
-      <div class="store-crt">
+      <div class="store-crt" :class="{ 'store-crt--off': !crtPowered }">
         <div class="store-crt__cabinet">
           <div class="store-crt__screen">
             <video
+              ref="crtVideoRef"
               class="store-crt__video"
               :src="crtVideoUrl"
               autoplay
@@ -100,16 +101,25 @@
               playsinline
               preload="auto"
             />
-            <div class="store-crt__screen-static" />
-            <div class="store-crt__scanlines" />
             <div class="store-crt__glass" />
-            <div class="store-crt__glow" />
           </div>
           <div class="store-crt__brand">GAMEATRON</div>
           <div class="store-crt__controls">
-            <span class="store-crt__knob" />
-            <span class="store-crt__knob store-crt__knob--small" />
-            <span class="store-crt__led" />
+            <button
+              type="button"
+              class="store-crt__knob"
+              :class="{ 'is-off': !crtPowered }"
+              :title="crtPowered ? '关闭电视' : '打开电视'"
+              @click="toggleCrtPower"
+            />
+            <button
+              type="button"
+              class="store-crt__knob store-crt__knob--small"
+              :class="{ 'is-paused': crtPaused }"
+              :title="crtPaused ? '播放' : '暂停'"
+              @click="toggleCrtPause"
+            />
+            <span class="store-crt__led" :class="{ 'is-off': !crtPowered }" />
           </div>
           <div class="store-crt__vents" />
         </div>
@@ -123,13 +133,7 @@
           <div class="store-counter__top-glow" />
         </div>
         <div class="store-counter__front">
-          <div class="store-counter__panel store-counter__panel--left" />
-          <div class="store-counter__panel store-counter__panel--right" />
           <div class="store-counter__trim" />
-        </div>
-        <div class="store-register">
-          <div class="store-register__screen" />
-          <div class="store-register__keys" />
         </div>
       </div>
 
@@ -142,17 +146,34 @@
     <Transition name="inspect">
       <div v-if="pickedGame" class="store-inspect" @click.self="putBack">
         <div class="store-inspect__box">
-          <div class="store-inspect__case">
-            <img :src="pickedGame.coverUrl" :alt="pickedGame.title" draggable="false">
-            <span class="store-inspect__sheen" />
+          <div
+            class="store-inspect__case"
+            :class="{ 'store-inspect__case--opening': isOpening }"
+            title="打开游戏盒"
+            @click="handleOpenCase"
+          >
+            <div class="store-inspect__disc">
+              <img
+                class="store-inspect__disc-art"
+                :src="pickedGame.coverUrl"
+                alt=""
+                draggable="false"
+              >
+              <span class="store-inspect__disc-hole" />
+              <span class="store-inspect__disc-shine" />
+            </div>
+            <div class="store-inspect__cover">
+              <img :src="pickedGame.coverUrl" :alt="pickedGame.title" draggable="false">
+              <span class="store-inspect__sheen" />
+            </div>
           </div>
           <div class="store-inspect__meta">
             <h2>{{ pickedGame.title }}</h2>
             <p>{{ pickedGame.year }} · {{ pickedGame.platform }}</p>
+            <p class="store-inspect__hint">点击游戏盒打开并查看详情</p>
           </div>
           <div class="store-inspect__actions">
             <button type="button" class="store-btn store-btn--ghost" @click="putBack">放回去</button>
-            <button type="button" class="store-btn store-btn--primary" @click="openDetail">查看详情</button>
           </div>
         </div>
       </div>
@@ -186,7 +207,11 @@ interface ShelfCell {
 const router = useRouter()
 const hoveredId = ref<string | null>(null)
 const pickedGame = ref<GameStoreMockGame | null>(null)
+const isOpening = ref(false)
 const crtVideoUrl = gameStoreCrtMock.videoUrl
+const crtPowered = ref(true)
+const crtPaused = ref(false)
+const crtVideoRef = ref<HTMLVideoElement | null>(null)
 const stageScale = ref(1)
 const storePosters = ref<string[]>([])
 
@@ -276,6 +301,7 @@ declare global {
 let waifuStyleTag: HTMLLinkElement | null = null
 let waifuScriptTag: HTMLScriptElement | null = null
 let waifuZoomTimer: number | null = null
+let openCaseTimer: number | null = null
 
 const WAIFU_TARGET_ZOOM = 1.35
 
@@ -400,7 +426,7 @@ const shelfRows = computed<ShelfCell[][]>(() => {
     rows[rowIndex].push({
       game,
       dx: ((index * 37 + 11) % 7) - 3,
-      dy: ((index * 53 + 5) % 7) - 3,
+      dy: 0,
       rot: (((index * 29 + 7) % 7) - 3) / 12,
       z: rowZ + ((index * 7) % 5),
     })
@@ -420,15 +446,46 @@ const pickGame = (game: GameStoreMockGame) => {
   pickedGame.value = game
 }
 
+const toggleCrtPower = () => {
+  crtPowered.value = !crtPowered.value
+  const video = crtVideoRef.value
+  if (!video) return
+  if (crtPowered.value) {
+    void video.play().catch(() => {})
+  } else {
+    video.pause()
+  }
+}
+
+const toggleCrtPause = () => {
+  if (!crtPowered.value) return
+  crtPaused.value = !crtPaused.value
+  const video = crtVideoRef.value
+  if (!video) return
+  if (crtPaused.value) {
+    video.pause()
+  } else {
+    void video.play().catch(() => {})
+  }
+}
+
 const putBack = () => {
+  if (openCaseTimer !== null) {
+    window.clearTimeout(openCaseTimer)
+    openCaseTimer = null
+  }
+  isOpening.value = false
   pickedGame.value = null
 }
 
-const openDetail = () => {
-  if (!pickedGame.value) return
+const handleOpenCase = () => {
+  if (isOpening.value || !pickedGame.value) return
+  isOpening.value = true
   const publicId = pickedGame.value.publicId
-  putBack()
-  router.push(`/games/${publicId}`)
+  openCaseTimer = window.setTimeout(() => {
+    putBack()
+    router.push(`/games/${publicId}`)
+  }, 750)
 }
 
 const leaveStore = () => {
@@ -481,6 +538,10 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('resize', updateStageScale)
+  if (openCaseTimer !== null) {
+    window.clearTimeout(openCaseTimer)
+    openCaseTimer = null
+  }
   cleanupWaifu()
 })
 </script>
@@ -898,6 +959,7 @@ onUnmounted(() => {
     inset 0 0 26px rgba(0, 0, 0, 0.9),
     0 0 22px rgba(190, 235, 190, 0.16),
     0 0 60px rgba(160, 220, 160, 0.08);
+  transition: background 0.4s ease, box-shadow 0.4s ease;
 }
 
 .store-crt__video {
@@ -908,25 +970,7 @@ onUnmounted(() => {
   object-fit: cover;
   display: block;
   background: #08140c;
-}
-
-.store-crt__screen-static {
-  position: absolute;
-  inset: 0;
-  opacity: 0.34;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.85'/></svg>");
-  animation: crt-noise 0.42s steps(4) infinite;
-}
-
-.store-crt__scanlines {
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(0, 0, 0, 0.42) 0 1px,
-    transparent 1px 3px
-  );
-  mix-blend-mode: multiply;
+  transition: opacity 0.4s ease;
 }
 
 .store-crt__glass {
@@ -939,12 +983,18 @@ onUnmounted(() => {
   animation: crt-flicker 7s ease-in-out infinite;
 }
 
-.store-crt__glow {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(ellipse at 50% 46%, rgba(190, 240, 190, 0.16), transparent 70%);
-  animation: crt-breath 4.8s ease-in-out infinite;
+.store-crt--off .store-crt__screen {
+  background: radial-gradient(ellipse at 42% 36%, rgba(86, 86, 86, 0.26), #050505 78%), #050505;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.95);
+}
+
+.store-crt--off .store-crt__video {
+  opacity: 0;
+}
+
+.store-crt--off .store-crt__glass {
+  opacity: 0.25;
+  animation: none;
 }
 
 .store-crt__brand {
@@ -966,6 +1016,9 @@ onUnmounted(() => {
 }
 
 .store-crt__knob {
+  appearance: none;
+  padding: 0;
+  cursor: pointer;
   width: 14px;
   height: 14px;
   border-radius: 50%;
@@ -974,9 +1027,32 @@ onUnmounted(() => {
   box-shadow: 0 2px 3px rgba(0, 0, 0, 0.4);
 }
 
+.store-crt__knob:hover {
+  filter: brightness(1.12);
+}
+
+.store-crt__knob.is-off {
+  background: radial-gradient(circle at 35% 30%, #6f6a5e, #4a4238 70%);
+}
+
 .store-crt__knob--small {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 10px;
   height: 10px;
+}
+
+.store-crt__knob--small::after {
+  content: '❚❚';
+  font-size: 7px;
+  line-height: 1;
+  color: rgba(30, 20, 10, 0.85);
+}
+
+.store-crt__knob--small.is-paused::after {
+  content: '▶';
+  font-size: 6px;
 }
 
 .store-crt__led {
@@ -986,6 +1062,12 @@ onUnmounted(() => {
   background: #7be37b;
   box-shadow: 0 0 6px #7be37b;
   animation: crt-breath 4.8s ease-in-out infinite;
+}
+
+.store-crt__led.is-off {
+  background: #5d2222;
+  box-shadow: 0 0 4px rgba(140, 40, 40, 0.5);
+  animation: none;
 }
 
 .store-crt__vents {
@@ -1043,13 +1125,13 @@ onUnmounted(() => {
     0 6px 12px rgba(0, 0, 0, 0.55),
     inset 0 1px 0 rgba(255, 235, 200, 0.4);
   transform: perspective(400px) rotateX(24deg);
-  transform-origin: top center;
+  transform-origin: bottom center;
   border-radius: 3px 3px 0 0;
 }
 
 .store-counter__top-glow {
   position: absolute;
-  inset: 0;
+  inset: 10px 0 0 0;
   background: linear-gradient(90deg, transparent 20%, rgba(255, 230, 170, 0.25) 50%, transparent 80%);
 }
 
@@ -1067,24 +1149,6 @@ onUnmounted(() => {
     inset 0 -24px 40px rgba(0, 0, 0, 0.5);
 }
 
-.store-counter__panel {
-  position: absolute;
-  top: 8px;
-  bottom: 8px;
-  width: 34%;
-  border: 1px solid rgba(0, 0, 0, 0.25);
-  border-radius: 2px;
-  background: linear-gradient(180deg, rgba(255, 230, 190, 0.05), rgba(0, 0, 0, 0.12));
-}
-
-.store-counter__panel--left {
-  left: 5%;
-}
-
-.store-counter__panel--right {
-  right: 5%;
-}
-
 .store-counter__trim {
   position: absolute;
   top: 0;
@@ -1092,52 +1156,6 @@ onUnmounted(() => {
   right: 0;
   height: 3px;
   background: rgba(255, 235, 200, 0.14);
-}
-
-.store-register {
-  position: absolute;
-  right: 3%;
-  top: -22px;
-  width: 150px;
-  aspect-ratio: 1.65;
-  background: linear-gradient(180deg, #4a4a4d, #26262a);
-  border-radius: 6px;
-  box-shadow:
-    0 10px 16px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
-}
-
-.store-register__screen {
-  position: absolute;
-  top: 10px;
-  left: 14px;
-  right: 14px;
-  height: 34%;
-  background: linear-gradient(180deg, #2b3d28, #16211a);
-  border-radius: 2px;
-  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8);
-}
-
-.store-register__screen::after {
-  content: '';
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  width: 22%;
-  height: 18%;
-  background: #9fe09f;
-  box-shadow: 0 0 8px #9fe09f;
-  opacity: 0.8;
-}
-
-.store-register__keys {
-  position: absolute;
-  left: 18%;
-  right: 18%;
-  bottom: 14px;
-  height: 22%;
-  background: repeating-linear-gradient(90deg, #3a3a3e 0 6px, #202024 6px 9px);
-  border-radius: 2px;
 }
 
 /* ---------- 灯光 / 氛围 ---------- */
@@ -1212,13 +1230,76 @@ onUnmounted(() => {
   width: 320px;
   aspect-ratio: 0.72;
   border-radius: 4px;
+  cursor: pointer;
+  perspective: 1100px;
   transform: perspective(900px) rotateY(-2deg) rotateX(1deg);
   box-shadow:
     0 40px 80px rgba(0, 0, 0, 0.72),
     0 14px 26px rgba(0, 0, 0, 0.5);
 }
 
-.store-inspect__case img {
+.store-inspect__disc {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, #2b211a, #1b1410 78%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.store-inspect__disc-art {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 68%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.55);
+}
+
+.store-inspect__disc-hole {
+  position: absolute;
+  width: 15%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 45% 40%, #3a3a40, #141418 70%);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.9);
+}
+
+.store-inspect__disc-shine {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  background:
+    linear-gradient(118deg, rgba(255, 255, 255, 0.14) 0%, transparent 32%),
+    radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.18), transparent 42%);
+  pointer-events: none;
+}
+
+.store-inspect__cover {
+  position: absolute;
+  inset: 0;
+  background: #1b1410;
+  border-radius: 4px;
+  transform-origin: left center;
+  transition: transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: transform;
+}
+
+.store-inspect__case--opening .store-inspect__cover {
+  transform: rotateY(-112deg);
+}
+
+.store-inspect__cover img {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -1253,6 +1334,13 @@ onUnmounted(() => {
   font-size: 15px;
   color: rgba(255, 230, 190, 0.78);
   letter-spacing: 1px;
+}
+
+.store-inspect__hint {
+  margin-top: 10px !important;
+  font-size: 12px !important;
+  color: rgba(255, 230, 190, 0.52) !important;
+  letter-spacing: 1px !important;
 }
 
 .store-inspect__actions {
@@ -1351,6 +1439,7 @@ onUnmounted(() => {
   height: 800px !important;
   transform: none !important;
   z-index: 3 !important;
+  pointer-events: none !important;
   transition: bottom 1s ease-in-out;
 }
 
@@ -1369,10 +1458,11 @@ onUnmounted(() => {
 #live2d {
   width: 800px !important;
   height: 800px !important;
+  pointer-events: none !important;
 }
 
 #waifu-tips {
-  left: 560px !important;
+  left: 540px !important;
   top: 30px !important;
   margin: 0 !important;
   width: 220px !important;
