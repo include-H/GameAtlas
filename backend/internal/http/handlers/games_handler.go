@@ -134,6 +134,7 @@ func (h *GamesHandler) Stats(c *gin.Context) {
 		"favorite_games":         toGameListItemResponses(stats.FavoriteGames),
 		"favorite_count":         stats.FavoriteCount,
 		"pending_reviews":        stats.PendingReviews,
+		"pending_issue_counts":   toPendingIssueCountSummaryResponse(stats.PendingGroups),
 	})
 }
 

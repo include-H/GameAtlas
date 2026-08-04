@@ -164,11 +164,19 @@ func TestGamesHandlerStatsIncludesHomeFeedCollections(t *testing.T) {
 
 	firstID := insertGamesHandlerTestGame(t, db, "stats-home-a", "Stats Home A", "public", "2024-01-01")
 	secondID := insertGamesHandlerTestGame(t, db, "stats-home-b", "Stats Home B", "public", "2024-02-01")
-	if _, err := db.Exec(`UPDATE games SET updated_at = ? WHERE id = ?`, "2026-01-02 00:00:00", firstID); err != nil {
-		t.Fatalf("set first stats game updated_at: %v", err)
+	if _, err := db.Exec(`
+		UPDATE games
+		SET created_at = ?, updated_at = ?
+		WHERE id = ?
+	`, "2025-12-01 00:00:00", "2026-01-02 00:00:00", firstID); err != nil {
+		t.Fatalf("set first stats game timestamps: %v", err)
 	}
-	if _, err := db.Exec(`UPDATE games SET updated_at = ? WHERE id = ?`, "2026-01-03 00:00:00", secondID); err != nil {
-		t.Fatalf("set second stats game updated_at: %v", err)
+	if _, err := db.Exec(`
+		UPDATE games
+		SET created_at = ?, updated_at = ?
+		WHERE id = ?
+	`, "2025-12-02 00:00:00", "2026-01-03 00:00:00", secondID); err != nil {
+		t.Fatalf("set second stats game timestamps: %v", err)
 	}
 	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, secondID); err != nil {
 		t.Fatalf("insert stats favorite game: %v", err)
@@ -201,8 +209,12 @@ func TestGamesHandlerStatsIncludesHomeFeedCollections(t *testing.T) {
 			FavoriteGames []struct {
 				ID int64 `json:"id"`
 			} `json:"favorite_games"`
-			FavoriteCount  int `json:"favorite_count"`
-			PendingReviews int `json:"pending_reviews"`
+			FavoriteCount      int `json:"favorite_count"`
+			PendingReviews     int `json:"pending_reviews"`
+			PendingIssueCounts struct {
+				Groups       map[string]int `json:"groups"`
+				IgnoredTotal int            `json:"ignored_total"`
+			} `json:"pending_issue_counts"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
@@ -229,6 +241,15 @@ func TestGamesHandlerStatsIncludesHomeFeedCollections(t *testing.T) {
 	}
 	if response.Data.FavoriteCount != 1 {
 		t.Fatalf("favorite_count = %d, want 1", response.Data.FavoriteCount)
+	}
+	if response.Data.PendingIssueCounts.Groups["missing-assets"] != 2 ||
+		response.Data.PendingIssueCounts.Groups["missing-wiki"] != 2 ||
+		response.Data.PendingIssueCounts.Groups["missing-files"] != 2 ||
+		response.Data.PendingIssueCounts.Groups["missing-metadata"] != 2 {
+		t.Fatalf("pending_issue_counts = %+v, want aggregated native counts", response.Data.PendingIssueCounts)
+	}
+	if response.Data.PendingIssueCounts.IgnoredTotal != 0 {
+		t.Fatalf("pending_issue_counts.ignored_total = %d, want 0", response.Data.PendingIssueCounts.IgnoredTotal)
 	}
 }
 

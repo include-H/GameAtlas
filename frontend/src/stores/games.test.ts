@@ -54,6 +54,10 @@ describe('games store favorite sync', () => {
         { id: 1, public_id: 'game-1', title: 'Popular Game', isFavorite: false },
       ],
       favorite_games: [],
+      pending_issue_counts: {
+        groups: {},
+        ignored_total: 0,
+      },
     } as unknown as GameStats
 
     const isFavorite = await store.toggleFavorite('game-1')

@@ -176,11 +176,12 @@ func (r *GameCatalogRepository) Stats(params domain.GamesListParams) (*domain.Ga
 		return nil, fmt.Errorf("get games stats: %w", err)
 	}
 
-	loadGames := func(orderBy string, favoriteOnly bool) ([]domain.GameListItem, error) {
+	loadGames := func(orderBy string, favoriteOnly bool, extraWhere string) ([]domain.GameListItem, error) {
 		favoriteJoin := ""
 		if favoriteOnly {
 			favoriteJoin = "INNER JOIN favorite_games fg ON fg.game_id = g.id"
 		}
+		where := baseWhere + extraWhere
 		query := fmt.Sprintf(`
 			WITH stat_games AS (
 				SELECT g.id
@@ -203,7 +204,7 @@ func (r *GameCatalogRepository) Stats(params domain.GamesListParams) (*domain.Ga
 			LEFT JOIN publisher_stats ps ON ps.game_id = g.id
 			LEFT JOIN series s ON s.id = g.series_id
 			ORDER BY %s
-		`, favoriteJoin, baseWhere, orderBy, gameListItemStatsCTEs("stat_games"), gamesListItemSelectColumns(), orderBy)
+		`, favoriteJoin, where, orderBy, gameListItemStatsCTEs("stat_games"), gamesListItemSelectColumns(), orderBy)
 		stmt, queryArgs, err := sqlx.Named(query, args)
 		if err != nil {
 			return nil, fmt.Errorf("build stats games query: %w", err)
@@ -217,19 +218,24 @@ func (r *GameCatalogRepository) Stats(params domain.GamesListParams) (*domain.Ga
 		return games, nil
 	}
 
-	recentGames, err := loadGames("g.created_at DESC, g.id DESC", false)
+	recentGames, err := loadGames("g.created_at DESC, g.id DESC", false, "")
 	if err != nil {
 		return nil, err
 	}
-	recentlyUpdatedGames, err := loadGames("g.updated_at DESC, g.id DESC", false)
+	// 最近完善：只返回更新明显晚于创建（间隔超过 1 天）的游戏，避免与“最近添加”重复。
+	recentlyUpdatedGames, err := loadGames(
+		"g.updated_at DESC, g.id DESC",
+		false,
+		" AND julianday(g.updated_at) - julianday(g.created_at) > 1",
+	)
 	if err != nil {
 		return nil, err
 	}
-	popularGames, err := loadGames("g.downloads DESC, g.id DESC", false)
+	popularGames, err := loadGames("g.downloads DESC, g.id DESC", false, "")
 	if err != nil {
 		return nil, err
 	}
-	favoriteGames, err := loadGames("fg.created_at DESC, g.id DESC", true)
+	favoriteGames, err := loadGames("fg.created_at DESC, g.id DESC", true, "")
 	if err != nil {
 		return nil, err
 	}

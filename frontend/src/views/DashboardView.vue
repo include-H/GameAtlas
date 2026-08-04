@@ -156,7 +156,7 @@ import StatOverview from '@/components/dashboard/StatOverview.vue'
 import GameRowSection from '@/components/dashboard/GameRowSection.vue'
 import PendingOverview from '@/components/dashboard/PendingOverview.vue'
 import gamesService from '@/services/games.service'
-import type { GameListItem, PendingIssueCounts } from '@/services/types'
+import type { GameListItem } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import { useAuthStore } from '@/stores/auth'
 import { useGamesStore } from '@/stores/games'
@@ -180,16 +180,21 @@ const lastLoadedAt = ref(0)
 
 const showAddGameModal = ref(false)
 const addGameSubmitting = ref(false)
-const pendingGroups = ref<PendingIssueCounts | null>(null)
 
 const totalGames = computed(() => gamesStore.stats?.total_games ?? 0)
 const totalDownloads = computed(() => gamesStore.stats?.total_downloads ?? 0)
 const recentAdditions = computed(() => gamesStore.stats?.recent_games ?? [])
-const recentlyUpdated = computed(() => gamesStore.stats?.recently_updated_games ?? [])
 const mostPlayed = computed(() => gamesStore.stats?.popular_games ?? [])
 const favoriteGames = computed(() => gamesStore.stats?.favorite_games ?? [])
 const favoriteCount = computed(() => gamesStore.stats?.favorite_count ?? 0)
 const pendingReviews = computed(() => gamesStore.stats?.pending_reviews ?? 0)
+const pendingGroups = computed(() => gamesStore.stats?.pending_issue_counts ?? null)
+
+// “最近完善”与“最近添加”去重：同一款游戏优先出现在最近添加，避免两行重复。
+const recentlyUpdated = computed(() => {
+  const recentIds = new Set(recentAdditions.value.map(game => game.id))
+  return (gamesStore.stats?.recently_updated_games ?? []).filter(game => !recentIds.has(game.id))
+})
 
 const isEmpty = computed(() => totalGames.value === 0)
 
@@ -236,19 +241,6 @@ const toggleFavorite = async (gameRef: string) => {
   }
 }
 
-const loadPendingGroups = async () => {
-  if (!isAdmin.value) return
-  try {
-    const result = await gamesService.getGames({
-      query: { page: 1, limit: 1, pending: true },
-    })
-    pendingGroups.value = result.pagination.pending_issue_counts ?? null
-  } catch {
-    // 分组摘要失败不影响首页主体，仅隐藏分组明细。
-    pendingGroups.value = null
-  }
-}
-
 const loadDashboardData = async () => {
   isLoading.value = true
   isDashboardReady.value = false
@@ -258,7 +250,6 @@ const loadDashboardData = async () => {
     await gamesStore.fetchStats()
     isDashboardReady.value = true
     lastLoadedAt.value = Date.now()
-    void loadPendingGroups()
   } catch {
     uiStore.addAlert('加载数据失败', 'error')
     // 2026-04-08: dashboard refresh failures keep last good stats visible, but must not

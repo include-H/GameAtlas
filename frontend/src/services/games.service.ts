@@ -16,6 +16,7 @@ import type {
   GameSortQuery,
   GameStats,
   GameVersion,
+  PendingIssueCounts,
   TimelineGame,
   TimelineGameResponse,
 } from './types'
@@ -30,6 +31,7 @@ interface GameStatsApiResponse {
   favorite_games: GameListItemDto[]
   favorite_count: number
   pending_reviews: number
+  pending_issue_counts: PendingIssueCounts | null
 }
 
 interface TimelinePaginationApi {
@@ -297,6 +299,7 @@ const gamesService = {
       favorite_games: response.data.favorite_games.map((item) => normalizeGameListItem(item)),
       favorite_count: response.data.favorite_count,
       pending_reviews: response.data.pending_reviews,
+      pending_issue_counts: response.data.pending_issue_counts ?? null,
     }
   },
 

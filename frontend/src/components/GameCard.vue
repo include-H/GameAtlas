@@ -1,6 +1,6 @@
 <template>
   <div
-    :class="['game-card hover-lift app-glass-surface app-glass-surface--interactive', { 'game-card--list': isList, 'game-card--cover-only': coverOnly }]"
+    :class="['game-card hover-lift app-glass-surface app-glass-surface--interactive app-glass-surface--no-blur', { 'game-card--list': isList, 'game-card--cover-only': coverOnly }]"
     :title="game.title"
     @click="handleView"
   >

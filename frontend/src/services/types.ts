@@ -327,6 +327,7 @@ export interface GameStats {
   favorite_games: GameListItem[]
   favorite_count: number
   pending_reviews: number
+  pending_issue_counts: PendingIssueCounts | null
 }
 
 export interface GameSort {

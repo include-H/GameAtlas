@@ -292,6 +292,7 @@ type GameStats struct {
 	FavoriteGames        []GameListItem
 	FavoriteCount        int
 	PendingReviews       int
+	PendingGroups        *PendingIssueCountSummary
 }
 
 const (

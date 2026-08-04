@@ -110,6 +110,19 @@ func (s *GameCatalogService) Stats(params domain.GamesListParams) (*domain.GameS
 	if err != nil {
 		return nil, err
 	}
+	pendingCounts, err := s.catalogRepo.CountPendingGroups(params)
+	if err != nil {
+		return nil, err
+	}
+	stats.PendingGroups = &domain.PendingIssueCountSummary{
+		Groups: map[domain.PendingIssueKey]int{
+			domain.PendingIssueMissingAssets:   pendingCounts.MissingAssets,
+			domain.PendingIssueMissingWiki:     pendingCounts.MissingWiki,
+			domain.PendingIssueMissingFiles:    pendingCounts.MissingFiles,
+			domain.PendingIssueMissingMetadata: pendingCounts.MissingMetadata,
+		},
+		IgnoredTotal: pendingCounts.IgnoredTotal,
+	}
 	s.statsCache.Store(key, cachedStatsEntry{stats: stats, cachedAt: time.Now()})
 	return stats, nil
 }

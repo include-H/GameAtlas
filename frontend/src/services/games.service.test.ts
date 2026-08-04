@@ -415,6 +415,10 @@ describe('games service', () => {
         favorite_games: [{ ...baseGame, public_id: 'game-11', is_favorite: true }],
         favorite_count: 2,
         pending_reviews: 2,
+        pending_issue_counts: {
+          groups: { 'missing-assets': 1, 'missing-wiki': 2 },
+          ignored_total: 0,
+        },
       },
     })
 
@@ -427,6 +431,8 @@ describe('games service', () => {
     expect(result.popular_games[0]?.isFavorite).toBe(true)
     expect(result.favorite_games[0]?.public_id).toBe('game-11')
     expect(result.pending_reviews).toBe(2)
+    expect(result.pending_issue_counts?.groups['missing-assets']).toBe(1)
+    expect(result.pending_issue_counts?.groups['missing-wiki']).toBe(2)
   })
 
   it('serializes aggregate relation fields as full replacement payload', async () => {

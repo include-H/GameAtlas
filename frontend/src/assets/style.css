@@ -281,6 +281,13 @@ body[arco-theme='dark'] #app {
   box-shadow: var(--app-glass-shadow-hover);
 }
 
+/* 密集网格/列表专用：保留表面质感，但去掉逐元素 backdrop-filter。
+   大量卡片同时模糊会显著拉高滚动与悬停的合成开销（如游戏库网格）。 */
+.app-glass-surface--no-blur {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .app-input-action-row {
   display: flex;
   align-items: stretch;

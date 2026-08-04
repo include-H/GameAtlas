@@ -117,6 +117,10 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	updateRepositoryGameStats(t, db, firstGameID, 10, "2024-01-02 00:00:00")
 	updateRepositoryGameStats(t, db, secondGameID, 30, "2024-01-03 00:00:00")
 	updateRepositoryPrivateGameStats(t, db, "stats-private", 99, "2024-01-04 00:00:00")
+	// 让第二个游戏成为“最近完善”的唯一候选：updated_at 明显晚于 created_at。
+	if _, err := db.Exec(`UPDATE games SET updated_at = ? WHERE id = ?`, "2024-02-01 00:00:00", secondGameID); err != nil {
+		t.Fatalf("set stats game updated_at: %v", err)
+	}
 
 	if _, err := db.Exec(`
 		UPDATE games
@@ -181,8 +185,8 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	if len(stats.RecentGames) != 2 || stats.RecentGames[0].ID != secondGameID {
 		t.Fatalf("RecentGames = %+v, want second game first", stats.RecentGames)
 	}
-	if len(stats.RecentlyUpdatedGames) != 2 || stats.RecentlyUpdatedGames[0].ID != secondGameID {
-		t.Fatalf("RecentlyUpdatedGames = %+v, want second game first", stats.RecentlyUpdatedGames)
+	if len(stats.RecentlyUpdatedGames) != 1 || stats.RecentlyUpdatedGames[0].ID != secondGameID {
+		t.Fatalf("RecentlyUpdatedGames = %+v, want only second game", stats.RecentlyUpdatedGames)
 	}
 	if len(stats.PopularGames) != 2 || stats.PopularGames[0].ID != secondGameID {
 		t.Fatalf("PopularGames = %+v, want second game first", stats.PopularGames)
