@@ -6,7 +6,7 @@
 
     <div
       class="store-stage"
-      :class="{ 'store-stage--dim': pickedGame }"
+      :class="{ 'store-stage--dim': stageDim }"
       :style="{ '--stage-scale': String(stageScale) }"
     >
       <!-- 后墙 -->
@@ -58,12 +58,15 @@
                 :key="cell.game.publicId"
                 type="button"
                 class="game-box"
-                :class="{ 'game-box--hovered': hoveredId === cell.game.publicId }"
+                :class="{
+                  'game-box--hovered': hoveredId === cell.game.publicId,
+                  'game-box--picked': pickedGame?.publicId === cell.game.publicId,
+                }"
                 :style="boxStyle(cell)"
                 :title="cell.game.title"
                 @mouseenter="hoveredId = cell.game.publicId"
                 @mouseleave="hoveredId = null"
-                @click="pickGame(cell.game)"
+                @click="pickGame(cell.game, $event)"
               >
                 <img
                   class="game-box__cover"
@@ -141,9 +144,13 @@
 
     <!-- 拿出来的游戏盒 -->
     <Transition name="inspect">
-      <div v-if="pickedGame" class="store-inspect" @click.self="putBack">
-        <div class="store-inspect__box">
+      <div v-if="pickedGame" class="store-inspect" @click.self="putBack()">
+        <div
+          class="store-inspect__box"
+          :class="{ 'store-inspect__box--settled': inspectSettled }"
+        >
           <div
+            ref="caseRef"
             class="store-inspect__case"
             :class="{ 'store-inspect__case--opening': isOpening }"
             title="打开游戏盒"
@@ -173,7 +180,7 @@
             </p>
           </div>
           <div class="store-inspect__actions">
-            <button type="button" class="store-btn store-btn--ghost" @click="putBack">放回去</button>
+            <button type="button" class="store-btn store-btn--ghost" @click="putBack()">放回去</button>
           </div>
         </div>
       </div>
@@ -182,7 +189,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   gameStoreCrtMock,
@@ -208,6 +215,9 @@ const router = useRouter()
 const hoveredId = ref<string | null>(null)
 const pickedGame = ref<GameStoreMockGame | null>(null)
 const isOpening = ref(false)
+const caseRef = ref<HTMLElement | null>(null)
+const stageDim = ref(false)
+const inspectSettled = ref(false)
 const crtVideoUrl = gameStoreCrtMock.videoUrl
 const crtPowered = ref(true)
 const crtPaused = ref(false)
@@ -308,6 +318,19 @@ let waifuStyleTag: HTMLLinkElement | null = null
 let waifuScriptTag: HTMLScriptElement | null = null
 let waifuZoomTimer: number | null = null
 let openCaseTimer: number | null = null
+let putBackTimer: number | null = null
+let pickupSettleTimer: number | null = null
+let dimTimer: number | null = null
+let pickupAnimation: Animation | null = null
+
+interface PickupOrigin {
+  x: number
+  y: number
+  scale: number
+  rot: number
+}
+
+let pickupOrigin: PickupOrigin | null = null
 
 const WAIFU_TARGET_ZOOM = 1.35
 
@@ -451,10 +474,96 @@ const boxStyle = (cell: ShelfCell) => ({
   '--box-z': String(cell.z),
 })
 
-const pickGame = (game: GameStoreMockGame) => {
+const pickGame = (game: GameStoreMockGame, event: MouseEvent) => {
+  const button = event.currentTarget as HTMLElement | null
+  const buttonRect = button?.getBoundingClientRect()
   hoveredId.value = null
   missingDetailNotice.value = false
+  inspectSettled.value = false
+  stageDim.value = false
   pickedGame.value = game
+  if (pickupSettleTimer !== null) {
+    window.clearTimeout(pickupSettleTimer)
+    pickupSettleTimer = null
+  }
+  if (dimTimer !== null) {
+    window.clearTimeout(dimTimer)
+    dimTimer = null
+  }
+  if (!buttonRect) return
+
+  // “抓取”动画：从货架上那盒的原始位置/角度/大小飞向眼前
+  nextTick(() => {
+    const caseElement = caseRef.value
+    if (!caseElement || pickedGame.value?.publicId !== game.publicId) return
+    const caseRect = caseElement.getBoundingClientRect()
+    const origin: PickupOrigin = {
+      x: buttonRect.left + buttonRect.width / 2 - (caseRect.left + caseRect.width / 2),
+      y: buttonRect.top + buttonRect.height / 2 - (caseRect.top + caseRect.height / 2),
+      scale: buttonRect.width / caseRect.width,
+      rot: Number.parseFloat(button?.style.getPropertyValue('--rot') ?? '') || 0,
+    }
+    pickupOrigin = origin
+    pickupAnimation = caseElement.animate(
+      [
+        // 0%：还插在货架上
+        {
+          transform:
+            `perspective(900px) translate(${origin.x}px, ${origin.y}px) ` +
+            `scale(${origin.scale}) rotate(${origin.rot}deg) rotateY(-16deg) rotateX(9deg)`,
+          boxShadow: '0 6px 12px rgba(0, 0, 0, 0.32), 0 2px 5px rgba(0, 0, 0, 0.28)',
+          filter: 'brightness(0.8)',
+          offset: 0,
+        },
+        // 10%：手指捏住，轻微上抬并转个角度
+        {
+          transform:
+            `perspective(900px) translate(${origin.x * 0.92}px, ${origin.y * 0.92 - 16}px) ` +
+            `scale(${origin.scale * 1.08}) rotate(${origin.rot * 0.9}deg) rotateY(-20deg) rotateX(12deg)`,
+          boxShadow: '0 8px 16px rgba(0, 0, 0, 0.36), 0 3px 7px rgba(0, 0, 0, 0.3)',
+          filter: 'brightness(0.84)',
+          offset: 0.1,
+        },
+        // 45%：弧线最高点，往面前带
+        {
+          transform:
+            `perspective(900px) translate(${origin.x * 0.3}px, ${origin.y * 0.4 - 46}px) ` +
+            `scale(${origin.scale + (1 - origin.scale) * 0.55}) rotate(0deg) rotateY(-8deg) rotateX(6deg)`,
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5), 0 8px 16px rgba(0, 0, 0, 0.38)',
+          filter: 'brightness(0.95)',
+          offset: 0.45,
+        },
+        // 78%：就位前微过冲
+        {
+          transform:
+            'perspective(900px) translate(0px, -8px) scale(1.035) rotate(0deg) rotateY(-3deg) rotateX(2deg)',
+          boxShadow: '0 44px 88px rgba(0, 0, 0, 0.75), 0 16px 30px rgba(0, 0, 0, 0.52)',
+          filter: 'brightness(1.05)',
+          offset: 0.78,
+        },
+        // 100%：落定
+        {
+          transform:
+            'perspective(900px) translate(0px, 0px) scale(1) rotate(0deg) rotateY(-2deg) rotateX(1deg)',
+          boxShadow: '0 40px 80px rgba(0, 0, 0, 0.72), 0 14px 26px rgba(0, 0, 0, 0.5)',
+          filter: 'brightness(1)',
+          offset: 1,
+        },
+      ],
+      {
+        duration: 700,
+        easing: 'cubic-bezier(0.25, 0.75, 0.3, 1)',
+        fill: 'forwards',
+      },
+    )
+    // 盒子落定后再浮现文字与按钮，避免“信息跟着盒子一起飞”
+    dimTimer = window.setTimeout(() => {
+      stageDim.value = true
+    }, 180)
+    pickupSettleTimer = window.setTimeout(() => {
+      inspectSettled.value = true
+    }, 640)
+  })
 }
 
 const toggleCrtPower = () => {
@@ -480,13 +589,102 @@ const toggleCrtPause = () => {
   }
 }
 
-const putBack = () => {
+const finishPutBack = () => {
+  isOpening.value = false
+  pickedGame.value = null
+  pickupOrigin = null
+  pickupAnimation = null
+  inspectSettled.value = false
+  stageDim.value = false
+}
+
+const putBack = (animate = true) => {
   if (openCaseTimer !== null) {
     window.clearTimeout(openCaseTimer)
     openCaseTimer = null
   }
-  isOpening.value = false
-  pickedGame.value = null
+  if (putBackTimer !== null) {
+    window.clearTimeout(putBackTimer)
+    putBackTimer = null
+  }
+  if (pickupSettleTimer !== null) {
+    window.clearTimeout(pickupSettleTimer)
+    pickupSettleTimer = null
+  }
+  if (dimTimer !== null) {
+    window.clearTimeout(dimTimer)
+    dimTimer = null
+  }
+  inspectSettled.value = false
+  stageDim.value = false
+
+  // 已开盒或没有抓取起点时直接收起，不播反向动画
+  const caseElement = caseRef.value
+  if (!animate || isOpening.value || !pickupOrigin || !caseElement) {
+    finishPutBack()
+    return
+  }
+
+  const origin = pickupOrigin
+  // 若还在飞行途中，就从盒子当前所处位置开始收回去
+  let startTransform =
+    'perspective(900px) translate(0px, 0px) scale(1) rotate(0deg) rotateY(-2deg) rotateX(1deg)'
+  let startShadow = '0 40px 80px rgba(0, 0, 0, 0.72), 0 14px 26px rgba(0, 0, 0, 0.5)'
+  let startFilter = 'brightness(1)'
+  if (pickupAnimation && pickupAnimation.playState === 'running') {
+    pickupAnimation.cancel()
+    const computedStyle = window.getComputedStyle(caseElement)
+    startTransform = computedStyle.transform
+    startShadow = computedStyle.boxShadow
+    startFilter = computedStyle.filter
+  }
+  const reverse = caseElement.animate(
+    [
+      {
+        // 0%：正位
+        transform: startTransform,
+        boxShadow: startShadow,
+        filter: startFilter,
+        offset: 0,
+      },
+      // 30%：临走前轻轻抬一下
+      {
+        transform:
+          'perspective(900px) translate(0px, -10px) scale(1.03) rotate(0deg) rotateY(-4deg) rotateX(3deg)',
+        boxShadow: '0 36px 72px rgba(0, 0, 0, 0.66), 0 12px 24px rgba(0, 0, 0, 0.46)',
+        filter: 'brightness(1.02)',
+        offset: 0.3,
+      },
+      // 70%：弧线回去
+      {
+        transform:
+          `perspective(900px) translate(${origin.x * 0.28}px, ${origin.y * 0.4 - 40}px) ` +
+          `scale(${origin.scale + (1 - origin.scale) * 0.5}) rotate(0deg) rotateY(-9deg) rotateX(7deg)`,
+        boxShadow: '0 18px 34px rgba(0, 0, 0, 0.45), 0 6px 12px rgba(0, 0, 0, 0.35)',
+        filter: 'brightness(0.94)',
+        offset: 0.7,
+      },
+      // 100%：插回货架
+      {
+        transform:
+          `perspective(900px) translate(${origin.x}px, ${origin.y}px) ` +
+          `scale(${origin.scale}) rotate(${origin.rot}deg) rotateY(-16deg) rotateX(9deg)`,
+        boxShadow: '0 6px 12px rgba(0, 0, 0, 0.32), 0 2px 5px rgba(0, 0, 0, 0.28)',
+        filter: 'brightness(0.8)',
+        offset: 1,
+      },
+    ],
+    {
+      duration: 500,
+      easing: 'cubic-bezier(0.35, 0, 0.45, 1)',
+      fill: 'forwards',
+    },
+  )
+  reverse.onfinish = () => finishPutBack()
+  // 兜底：动画被中断时也能收场
+  putBackTimer = window.setTimeout(() => {
+    if (pickedGame.value) finishPutBack()
+  }, 800)
 }
 
 const handleOpenCase = () => {
@@ -551,11 +749,25 @@ onMounted(() => {
   }
 })
 onUnmounted(() => {
+  pickupAnimation?.cancel()
+  pickupAnimation = null
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('resize', updateStageScale)
   if (openCaseTimer !== null) {
     window.clearTimeout(openCaseTimer)
     openCaseTimer = null
+  }
+  if (putBackTimer !== null) {
+    window.clearTimeout(putBackTimer)
+    putBackTimer = null
+  }
+  if (pickupSettleTimer !== null) {
+    window.clearTimeout(pickupSettleTimer)
+    pickupSettleTimer = null
+  }
+  if (dimTimer !== null) {
+    window.clearTimeout(dimTimer)
+    dimTimer = null
   }
   cleanupWaifu()
 })
@@ -938,6 +1150,12 @@ onUnmounted(() => {
     0 9.33px 16px rgba(0, 0, 0, 0.55);
 }
 
+/* 已拿在手里的那盒：货架上原位置留空，模拟“盒子在我手上” */
+.game-box--picked {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* ---------- CRT 电视 ---------- */
 .store-crt {
   position: absolute;
@@ -1251,6 +1469,7 @@ onUnmounted(() => {
   box-shadow:
     0 40px 80px rgba(0, 0, 0, 0.72),
     0 14px 26px rgba(0, 0, 0, 0.5);
+  will-change: transform, box-shadow, filter;
 }
 
 .store-inspect__disc {
@@ -1367,6 +1586,22 @@ onUnmounted(() => {
   gap: 14px;
 }
 
+/* 盒子落定后文字与按钮再浮现，避免跟着飞行动画一起“生硬弹入” */
+.store-inspect__meta,
+.store-inspect__actions {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.45s ease,
+    transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.store-inspect__box--settled .store-inspect__meta,
+.store-inspect__box--settled .store-inspect__actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .store-btn {
   appearance: none;
   border: 0;
@@ -1436,14 +1671,16 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-.inspect-enter-active .store-inspect__case,
+.inspect-enter-active .store-inspect__case {
+  transition: opacity 0.18s ease;
+}
+
 .inspect-leave-active .store-inspect__case {
-  transition: transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.28s ease;
+  transition: opacity 0.24s ease;
 }
 
 .inspect-enter-from .store-inspect__case,
 .inspect-leave-to .store-inspect__case {
-  transform: perspective(900px) rotateY(-2deg) rotateX(1deg) scale(0.72);
   opacity: 0;
 }
 
