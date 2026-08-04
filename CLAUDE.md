@@ -55,7 +55,7 @@ Layer structure (`backend/internal/`):
 
 Database: SQLite with numbered forward-only migrations in `backend/migrations/`. Auto-applied at startup, deduplicated by `schema_migrations.name`. **Never modify existing migration files.** New migrations: increment number, semantic name, forward-only SQL only.
 
-Config: runtime settings live in SQLite `app_settings`. `DB_PATH` remains a bootstrap setting and defaults to `data/db.db`; it can be overridden via process environment. A legacy `.env` is imported once and automatically deleted after settings are persisted.
+Config: runtime settings live in SQLite `app_settings`. `DB_PATH` remains a bootstrap setting and defaults to `data/db.db`; it can be overridden via process environment. Process environment variables can provide initial runtime values; `.env` files are not read or written by the application.
 
 Frontend serving: Backend checks `STATIC_DIR` (default `../frontend/dist`) first, falls back to embedded `web/dist`.
 
@@ -124,6 +124,5 @@ Vite config (`vite.config.ts`):
 
 1. **`backend/web/dist/` is embedded into the Go binary** — the release build copies frontend dist here before building. Never commit built artifacts.
 2. **Runtime settings are DB-backed** — update configurable values through the settings page or `app_settings`; keep `DB_PATH` as the only bootstrap override when needed.
-3. **Legacy `.env` is one-time migration input** — after a successful DB import it is deleted; do not add new env templates or write settings back to env files.
 4. **`docs/项目风格约定.md`** is the authoritative style guide. Read it before making significant changes.
 5. **`release/` directory is gitignored** — build artifacts are not committed.

@@ -13,7 +13,7 @@ bash check.sh               # go test + go vet（自动设置 GODEBUG=goindex=0�
 
 入口：`cmd/server/main.go`，启动流程：
 
-1. `config.Load()` — 解析环境变量；若 `data/.env` 存在则仅作一次性导入（v1.1.0 移除 .env 写入）
+1. `config.Load()` — 解析进程环境变量
 2. `app.New(cfg)`:
    - `db.OpenSQLite`（PRAGMA: `foreign_keys=ON`, `journal_mode=WAL`, `busy_timeout=5000`, `synchronous=NORMAL`, `cache_size=-8000`；`SetMaxOpenConns(1)`）
    - `RunMigrations`（嵌入迁移，`schema_migrations` 去重）
@@ -41,7 +41,7 @@ backend/
 │   └── services/            # 业务逻辑、跨 repo 聚合 + services/data/hitokoto_game_sentences.json
 ├── migrations/              # 000001..000004 + embed.go
 ├── web/                     # embed.go（go:embed all:dist）+ dist/.gitkeep
-├── data/                    # 本地运行时数据（db.db、bg.jpg、gamelist/、.env 旧版）
+├── data/                    # 本地运行时数据（db.db、bg.jpg、gamelist/）
 ├── check.sh
 ├── go.mod / go.sum
 └── README.md
@@ -90,7 +90,7 @@ backend/
 | `READ_HEADER_TIMEOUT` | HTTP 读头超时 | `5s` |
 | `SHUTDOWN_TIMEOUT` | 优雅关闭超时 | `10s` |
 
-旧版本的 `.env` 如果仍存在，会在启动时作为初次导入来源；新版本不再创建或写回 `.env`。
+旧版部署中的 `.env` 不再被自动读取、导入或删除；运行时配置请通过设置页录入。
 
 ## 认证
 

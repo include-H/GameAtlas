@@ -83,7 +83,7 @@ Outputs to `release/game-release-<version>/`. The script:
 
 **Database**: SQLite. Migrations in `backend/migrations/` (numbered `.sql` files, embedded via `//go:embed *.sql`). Auto-applied at startup, deduplicated by `schema_migrations.name`. New migrations: increment number, semantic name, forward-only SQL. **Never modify existing migration files.**
 
-**Config**: Runtime settings live in SQLite `app_settings`. `DB_PATH` remains a bootstrap setting and defaults to `data/db.db`; it can be overridden via process environment. A legacy `.env` is imported once and automatically deleted after settings are persisted.
+**Config**: Runtime settings live in SQLite `app_settings`. `DB_PATH` remains a bootstrap setting and defaults to `data/db.db`; it can be overridden via process environment. Process environment variables can provide initial runtime values; `.env` files are not read or written by the application.
 
 **Frontend serving**: Backend checks `STATIC_DIR` (default `../frontend/dist`) first, falls back to embedded `web/dist`.
 
@@ -149,7 +149,6 @@ Outputs to `release/game-release-<version>/`. The script:
 1. **`backend/web/dist/` is embedded into the Go binary** — the release build copies frontend dist here before building. CI creates a `.gitkeep` placeholder. Never commit built artifacts.
 2. **Runtime settings are DB-backed** — update configurable values through the settings page or `app_settings`; keep `DB_PATH` as the only bootstrap override when needed.
 3. **`backend/check.sh`Appends `GODEBUG=goindex=0`** — required on some Linux distros with Go 1.22.x to avoid false "not in std" errors.
-4. **Legacy `.env` is one-time migration input** — after a successful DB import it is deleted; do not add new env templates or write settings back to env files.
-5. **Custom frontend lint step** — `npm run lint` includes a custom button policy check (`lint:policy`) beyond standard ESLint.
-6. **`docs/项目风格约定.md`** — the authoritative style guide. Read it before making significant changes.
-7. **`release/` directory is gitignored** — build artifacts are not committed.
+4. **Custom frontend lint step** — `npm run lint` includes a custom button policy check (`lint:policy`) beyond standard ESLint.
+5. **`docs/项目风格约定.md`** — the authoritative style guide. Read it before making significant changes.
+6. **`release/` directory is gitignored** — build artifacts are not committed.

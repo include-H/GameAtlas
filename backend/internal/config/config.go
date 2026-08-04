@@ -1,7 +1,6 @@
 package config
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"net/url"
@@ -42,21 +41,12 @@ type Config struct {
 	ShutdownTimeout        time.Duration
 	runtimeBaseDir         string
 	pathSettings           map[string]string
-	legacyDotEnvPath       string
 }
 
 func Load() (Config, error) {
-	runtimeBaseDir, dotEnvPath, err := detectRuntimeBaseDir()
+	runtimeBaseDir, err := detectRuntimeBaseDir()
 	if err != nil {
 		return Config{}, err
-	}
-
-	// Legacy migration path, removed in v1.1.0: existing deployments can seed
-	// app_settings from .env once. Database values take precedence after startup.
-	if dotEnvPath != "" {
-		if err := loadDotEnv(dotEnvPath); err != nil {
-			return Config{}, err
-		}
 	}
 
 	pathBaseDir := runtimeBaseDir
@@ -85,7 +75,6 @@ func Load() (Config, error) {
 		SteamGridDBAPIKey: getEnv("STEAMGRIDDB_API_KEY", ""),
 		AuthTrackBy:       getEnv("AUTH_TRACK_BY", "ip"),
 		runtimeBaseDir:    pathBaseDir,
-		legacyDotEnvPath:  dotEnvPath,
 		pathSettings: map[string]string{
 			"STATIC_DIR":       staticDirSetting,
 			"ASSETS_DIR":       assetsDirSetting,
@@ -115,25 +104,10 @@ func Load() (Config, error) {
 	return cfg, nil
 }
 
-// RemoveLegacyDotEnv deletes the legacy source only after its settings have
-// been persisted to app_settings. The legacy import path is removed in v1.1.0.
-func (c Config) RemoveLegacyDotEnv() (string, error) {
-	path := strings.TrimSpace(c.legacyDotEnvPath)
-	if path == "" {
-		return "", nil
-	}
-
-	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return "", fmt.Errorf("remove imported legacy .env %q: %w", path, err)
-	}
-
-	return path, nil
-}
-
-func detectRuntimeBaseDir() (string, string, error) {
+func detectRuntimeBaseDir() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return "", "", fmt.Errorf("determine current working directory: %w", err)
+		return "", fmt.Errorf("determine current working directory: %w", err)
 	}
 
 	executable, err := os.Executable()
@@ -141,14 +115,11 @@ func detectRuntimeBaseDir() (string, string, error) {
 		executable = ""
 	}
 	baseDir := runtimeBaseDirForExecutable(cwd, executable)
-	dataDir := filepath.Join(baseDir, "data")
-
-	_, dotEnvPath := chooseRuntimeBaseDir(baseDir, dataDir, pathExists)
 	if baseDir == "" {
 		baseDir = cwd
 	}
 
-	return baseDir, dotEnvPath, nil
+	return baseDir, nil
 }
 
 func runtimeBaseDirForExecutable(cwd, executable string) string {
@@ -162,35 +133,6 @@ func runtimeBaseDirForExecutable(cwd, executable string) string {
 
 func isGoRunExecutable(executable string) bool {
 	return strings.Contains(filepath.ToSlash(executable), "/go-build")
-}
-
-func chooseRuntimeBaseDir(cwd, dataDir string, exists func(string) bool) (string, string) {
-	cwd = cleanOptionalPath(cwd)
-	dataDir = cleanOptionalPath(dataDir)
-
-	if dataDir != "" {
-		candidate := filepath.Join(dataDir, ".env")
-		if exists(candidate) {
-			return dataDir, candidate
-		}
-	}
-
-	if cwd != "" {
-		candidate := filepath.Join(cwd, ".env")
-		if exists(candidate) {
-			return cwd, candidate
-		}
-	}
-
-	if dataDir != "" {
-		return dataDir, ""
-	}
-
-	if cwd != "" {
-		return cwd, ""
-	}
-
-	return cwd, ""
 }
 
 func cleanOptionalPath(path string) string {
@@ -210,15 +152,6 @@ func resolveRuntimePath(baseDir, value string) string {
 		return cleaned
 	}
 	return filepath.Join(baseDir, cleaned)
-}
-
-func pathExists(path string) bool {
-	if strings.TrimSpace(path) == "" {
-		return false
-	}
-
-	_, err := os.Stat(path)
-	return err == nil
 }
 
 func (c Config) Validate() error {
@@ -295,64 +228,6 @@ func (c Config) ProxyLogValue() string {
 	}
 
 	return parsed.String()
-}
-
-func loadDotEnv(path string) error {
-	file, err := os.Open(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return fmt.Errorf("open %s: %w", path, err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	lineNo := 0
-	for scanner.Scan() {
-		lineNo++
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		key, value, ok := strings.Cut(line, "=")
-		if !ok {
-			return fmt.Errorf("invalid %s:%d: expected KEY=VALUE", path, lineNo)
-		}
-
-		key = strings.TrimSpace(key)
-		if key == "" {
-			return fmt.Errorf("invalid %s:%d: empty variable name", path, lineNo)
-		}
-		if _, exists := os.LookupEnv(key); exists {
-			continue
-		}
-
-		value = normalizeEnvValue(strings.TrimSpace(value))
-		if err := os.Setenv(key, value); err != nil {
-			return fmt.Errorf("set %s from %s:%d: %w", key, path, lineNo, err)
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("read %s: %w", path, err)
-	}
-
-	return nil
-}
-
-func normalizeEnvValue(value string) string {
-	if len(value) >= 2 {
-		if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") {
-			return strings.Trim(value, "\"")
-		}
-		if strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'") {
-			return strings.Trim(value, "'")
-		}
-	}
-
-	return value
 }
 
 func getEnv(key, fallback string) string {

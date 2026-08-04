@@ -113,7 +113,7 @@ git tag v1.0.0 && git push origin v1.0.0
 
 运行配置存储在 SQLite 的 `app_settings` 表中，首次启动会写入默认值（默认密码 `1234`）。
 登录后可在设置页修改管理员密码、素材目录、ROM 根目录、SMB 映射、SteamGridDB API Key、备份策略等配置，修改后重启生效。
-旧版部署若存在 `.env`，首次成功启动会将其值写入数据库后自动删除该文件。
+旧版部署中的 `.env` 不再被自动读取、导入或删除；运行时配置请通过设置页录入。
 
 `DB_PATH` 是启动引导项，默认 `data/db.db`；如需更改数据库文件位置，使用进程环境变量 `DB_PATH=/path/to/app.db ./game-server` 启动。
 

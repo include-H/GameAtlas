@@ -1,8 +1,6 @@
 package config
 
 import (
-	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -48,89 +46,6 @@ func TestProxyLogValueMasksPassword(t *testing.T) {
 	}
 	if !strings.Contains(got, "alice:") || !strings.Contains(got, "@example.com:8080") {
 		t.Fatalf("ProxyLogValue() = %q, want masked userinfo and original host", got)
-	}
-}
-
-func TestNormalizeEnvValueStripsQuotes(t *testing.T) {
-	cases := map[string]string{
-		`"hello"`: "hello",
-		`'world'`: "world",
-		"plain":   "plain",
-	}
-
-	for input, want := range cases {
-		if got := normalizeEnvValue(input); got != want {
-			t.Fatalf("normalizeEnvValue(%q) = %q, want %q", input, got, want)
-		}
-	}
-}
-
-func TestLoadDotEnvDoesNotOverrideExistingVariables(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, ".env")
-	content := "EXISTING=from_file\nQUOTED=\"quoted value\"\nSINGLE='single value'\nINVALID_LINE\n"
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatalf("WriteFile returned error: %v", err)
-	}
-
-	t.Setenv("EXISTING", "from_env")
-	if err := loadDotEnv(path); err == nil {
-		t.Fatalf("expected loadDotEnv to reject invalid line")
-	}
-
-	if got := os.Getenv("EXISTING"); got != "from_env" {
-		t.Fatalf("EXISTING = %q, want from_env", got)
-	}
-	if got := os.Getenv("QUOTED"); got != "quoted value" {
-		t.Fatalf("QUOTED = %q, want quoted value", got)
-	}
-	if got := os.Getenv("SINGLE"); got != "single value" {
-		t.Fatalf("SINGLE = %q, want single value", got)
-	}
-}
-
-func TestLoadDotEnvRejectsMalformedLineWithLocation(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, ".env")
-	content := "GOOD=value\nBROKEN_LINE\n"
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatalf("WriteFile returned error: %v", err)
-	}
-
-	err := loadDotEnv(path)
-	if err == nil {
-		t.Fatalf("expected loadDotEnv to return error")
-	}
-	if !strings.Contains(err.Error(), ".env:2") {
-		t.Fatalf("loadDotEnv error = %v, want line number", err)
-	}
-}
-
-func TestRemoveLegacyDotEnvDeletesImportedFile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(path, []byte("PORT=3000\n"), 0o600); err != nil {
-		t.Fatalf("WriteFile returned error: %v", err)
-	}
-
-	removed, err := (Config{legacyDotEnvPath: path}).RemoveLegacyDotEnv()
-	if err != nil {
-		t.Fatalf("RemoveLegacyDotEnv returned error: %v", err)
-	}
-	if removed != path {
-		t.Fatalf("removed path = %q, want %q", removed, path)
-	}
-	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("legacy .env still exists or stat failed: %v", err)
-	}
-}
-
-func TestRemoveLegacyDotEnvDoesNothingWithoutImportedFile(t *testing.T) {
-	removed, err := (Config{}).RemoveLegacyDotEnv()
-	if err != nil {
-		t.Fatalf("RemoveLegacyDotEnv returned error: %v", err)
-	}
-	if removed != "" {
-		t.Fatalf("removed path = %q, want empty", removed)
 	}
 }
 
@@ -254,38 +169,6 @@ func TestLoadAggregatesConfigurationErrors(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `AUTH_COOLDOWN="10min"`) {
 		t.Fatalf("Load error = %v, want AUTH_COOLDOWN parse failure", err)
-	}
-}
-
-func TestChooseRuntimeBaseDirPrefersDataDir(t *testing.T) {
-	cwd := filepath.Join(string(filepath.Separator), "workspace", "backend")
-	dataDir := filepath.Join(string(filepath.Separator), "workspace", "backend", "data")
-	exists := func(path string) bool {
-		return path == filepath.Join(dataDir, ".env")
-	}
-
-	baseDir, dotEnvPath := chooseRuntimeBaseDir(cwd, dataDir, exists)
-	if baseDir != dataDir {
-		t.Fatalf("baseDir = %q, want %q", baseDir, dataDir)
-	}
-	if dotEnvPath != filepath.Join(dataDir, ".env") {
-		t.Fatalf("dotEnvPath = %q, want data .env path", dotEnvPath)
-	}
-}
-
-func TestChooseRuntimeBaseDirFallsBackToDataDirectory(t *testing.T) {
-	cwd := filepath.Join(string(filepath.Separator), "workspace", "backend")
-	dataDir := filepath.Join(string(filepath.Separator), "workspace", "backend", "data")
-	exists := func(path string) bool {
-		return false
-	}
-
-	baseDir, dotEnvPath := chooseRuntimeBaseDir(cwd, dataDir, exists)
-	if baseDir != dataDir {
-		t.Fatalf("baseDir = %q, want %q", baseDir, dataDir)
-	}
-	if dotEnvPath != "" {
-		t.Fatalf("dotEnvPath = %q, want empty string", dotEnvPath)
 	}
 }
 

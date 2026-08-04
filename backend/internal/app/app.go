@@ -58,12 +58,6 @@ func New(cfg config.Config) (*App, error) {
 		_ = sqliteDB.Close()
 		return nil, err
 	}
-	if path, err := cfg.RemoveLegacyDotEnv(); err != nil {
-		_ = sqliteDB.Close()
-		return nil, err
-	} else if path != "" {
-		log.Printf("legacy .env imported into app settings and removed: %s", cfg.RuntimeRelativePath(path))
-	}
 	if cfg.Proxy == "" {
 		log.Printf("outbound proxy: disabled")
 	} else {
