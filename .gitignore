@@ -3,6 +3,7 @@ bin/
 node_modules/
 .DS_Store
 .codex
+.omo/
 
 .env
 *.log
@@ -25,6 +26,8 @@ frontend/dist/
 frontend/_codex_restore/
 frontend/src_rebuild_backup/
 frontend/src_ui_modified_backup/
+frontend/public/live2d-widget/
+frontend/public/live2d-models/model/
 
 release/
 backup/

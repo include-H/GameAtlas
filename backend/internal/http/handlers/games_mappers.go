@@ -55,6 +55,26 @@ func toGameListItemResponses(games []domain.GameListItem) []gameListItemResponse
 	return result
 }
 
+func toGamePreviewVideosResponses(bundles []services.GamePreviewVideoBundle) []gamePreviewVideosResponse {
+	result := make([]gamePreviewVideosResponse, 0, len(bundles))
+	for _, bundle := range bundles {
+		videos := make([]gameAssetResponse, 0, len(bundle.PreviewVideos))
+		for _, asset := range bundle.PreviewVideos {
+			videos = append(videos, gameAssetResponse{
+				ID:        asset.ID,
+				AssetUID:  asset.AssetUID,
+				Path:      asset.Path,
+				SortOrder: asset.SortOrder,
+			})
+		}
+		result = append(result, gamePreviewVideosResponse{
+			PublicID:      bundle.PublicID,
+			PreviewVideos: videos,
+		})
+	}
+	return result
+}
+
 // 2026-05-09: toGameSummaryResponse intentionally reuses gameListItemResponse
 // but only populates core fields. Aggregate counts (screenshot_count,
 // file_count, etc.) are zero-valued because create/update responses return the
@@ -80,11 +100,10 @@ func toGameSummaryResponse(game domain.Game) gameListItemResponse {
 	}
 }
 
-// 2026-05-09: toSeriesGameSummaryResponses maps series-scoped game summaries
-// into the shared gameListItemResponse type. Aggregate count fields are omitted
-// because series views do not need them and the SeriesGameSummary domain struct
-// does not carry those values.
-func toSeriesGameSummaryResponses(games []domain.SeriesGameSummary) []gameListItemResponse {
+// toMetadataGameSummaryResponses maps metadata-scoped game summaries into the
+// shared gameListItemResponse type. Aggregate count fields are omitted because
+// grouped views do not need them and the summary domain struct does not carry them.
+func toMetadataGameSummaryResponses(games []domain.MetadataGameSummary) []gameListItemResponse {
 	result := make([]gameListItemResponse, 0, len(games))
 	for _, game := range games {
 		result = append(result, gameListItemResponse{

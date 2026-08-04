@@ -38,3 +38,11 @@ type GameDetail struct {
 	Publishers    []domain.MetadataItem
 	Files         []domain.GameFile
 }
+
+// GamePreviewVideoBundle is the batch preview-video read model: one game's video
+// assets keyed by its public id, used by the game store session to fetch trailers
+// for many games in a single round trip.
+type GamePreviewVideoBundle struct {
+	PublicID     string
+	PreviewVideos []domain.GameAsset
+}

@@ -1,6 +1,8 @@
 package services
 
 import (
+	"strings"
+
 	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/repositories"
 )
@@ -92,4 +94,42 @@ func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) 
 		Publishers:    emptyMetadata(publishers),
 		Files:         emptyFiles(files),
 	}, nil
+}
+
+// ListPreviewVideos returns video assets for the given public ids in one round trip,
+// filtering out private games unless includeAll is set. Games without videos are omitted.
+func (s *GameDetailService) ListPreviewVideos(publicIDs []string, includeAll bool) ([]GamePreviewVideoBundle, error) {
+	normalized := make([]string, 0, len(publicIDs))
+	for _, id := range publicIDs {
+		trimmed := strings.TrimSpace(id)
+		if trimmed == "" {
+			continue
+		}
+		normalized = append(normalized, strings.ToLower(trimmed))
+	}
+	if len(normalized) == 0 {
+		return nil, domain.ErrValidation
+	}
+
+	rows, err := s.gamesRepo.ListVideosByPublicIDs(normalized)
+	if err != nil {
+		return nil, err
+	}
+
+	bundlesByID := make(map[string]int, len(normalized))
+	bundles := make([]GamePreviewVideoBundle, 0, len(normalized))
+	for _, row := range rows {
+		if !includeAll && row.Visibility == domain.GameVisibilityPrivate {
+			continue
+		}
+		idx, ok := bundlesByID[row.PublicID]
+		if !ok {
+			idx = len(bundles)
+			bundlesByID[row.PublicID] = idx
+			bundles = append(bundles, GamePreviewVideoBundle{PublicID: row.PublicID})
+		}
+		bundles[idx].PreviewVideos = append(bundles[idx].PreviewVideos, row.GameAsset)
+	}
+
+	return bundles, nil
 }

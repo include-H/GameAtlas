@@ -1,0 +1,1389 @@
+<template>
+  <div class="game-store">
+    <button type="button" class="store-exit" title="离开游戏店" @click="leaveStore">
+      ← 离开
+    </button>
+
+    <div
+      class="store-stage"
+      :class="{ 'store-stage--dim': pickedGame }"
+      :style="{ '--stage-scale': String(stageScale) }"
+    >
+      <!-- 后墙 -->
+      <div class="store-backwall">
+        <div class="store-wall__paper" />
+        <div class="store-wall__trim" />
+        <div class="store-poster store-poster--left">
+          <img
+            v-if="storePosters[0]"
+            class="store-poster__img"
+            :src="storePosters[0]"
+            alt="新到货"
+            loading="lazy"
+            decoding="async"
+          >
+          <span class="store-poster__kicker">NEW</span>
+          <span class="store-poster__line">新到货</span>
+        </div>
+        <div class="store-poster store-poster--right">
+          <img
+            v-if="storePosters[1]"
+            class="store-poster__img"
+            :src="storePosters[1]"
+            alt="畅销榜"
+            loading="lazy"
+            decoding="async"
+          >
+          <span class="store-poster__kicker">BEST</span>
+          <span class="store-poster__line">畅销榜</span>
+        </div>
+        <div class="store-sign">GAME&nbsp;STORE</div>
+        <div class="store-sign__cord" />
+      </div>
+
+      <!-- 地面 -->
+      <div class="store-floor">
+        <div class="store-floor__rug" />
+      </div>
+
+      <!-- 后方主货架 -->
+      <div class="store-shelf">
+        <div class="store-shelf__crown" />
+        <div class="store-shelf__side store-shelf__side--left" />
+        <div class="store-shelf__side store-shelf__side--right" />
+
+        <div class="store-shelf__rows">
+          <div v-for="(row, rowIndex) in shelfRows" :key="rowIndex" class="store-shelf__row">
+            <div class="store-shelf__row-boxes">
+              <button
+                v-for="cell in row"
+                :key="cell.game.publicId"
+                type="button"
+                class="game-box"
+                :class="{ 'game-box--hovered': hoveredId === cell.game.publicId }"
+                :style="boxStyle(cell)"
+                :title="cell.game.title"
+                @mouseenter="hoveredId = cell.game.publicId"
+                @mouseleave="hoveredId = null"
+                @click="pickGame(cell.game)"
+              >
+                <img
+                  class="game-box__cover"
+                  :src="cell.game.coverUrl"
+                  :alt="cell.game.title"
+                  loading="lazy"
+                  decoding="async"
+                  draggable="false"
+                >
+                <span class="game-box__sheen" />
+              </button>
+            </div>
+            <div class="store-shelf__plank">
+              <div class="store-shelf__plank-shadow" />
+            </div>
+          </div>
+        </div>
+
+        <div class="store-shelf__base" />
+      </div>
+
+      <!-- CRT 电视 -->
+      <div class="store-crt">
+        <div class="store-crt__cabinet">
+          <div class="store-crt__screen">
+            <video
+              class="store-crt__video"
+              :src="crtVideoUrl"
+              autoplay
+              muted
+              loop
+              playsinline
+              preload="auto"
+            />
+            <div class="store-crt__screen-static" />
+            <div class="store-crt__scanlines" />
+            <div class="store-crt__glass" />
+            <div class="store-crt__glow" />
+          </div>
+          <div class="store-crt__brand">GAMEATRON</div>
+          <div class="store-crt__controls">
+            <span class="store-crt__knob" />
+            <span class="store-crt__knob store-crt__knob--small" />
+            <span class="store-crt__led" />
+          </div>
+          <div class="store-crt__vents" />
+        </div>
+        <div class="store-crt__stand" />
+        <div class="store-crt__cable" />
+      </div>
+
+      <!-- 前台 / 游戏吧 -->
+      <div class="store-counter">
+        <div class="store-counter__top">
+          <div class="store-counter__top-glow" />
+        </div>
+        <div class="store-counter__front">
+          <div class="store-counter__panel store-counter__panel--left" />
+          <div class="store-counter__panel store-counter__panel--right" />
+          <div class="store-counter__trim" />
+        </div>
+        <div class="store-register">
+          <div class="store-register__screen" />
+          <div class="store-register__keys" />
+        </div>
+      </div>
+
+      <!-- 灯光 / 氛围 -->
+      <div class="store-light" />
+      <div class="store-vignette" />
+    </div>
+
+    <!-- 拿出来的游戏盒 -->
+    <Transition name="inspect">
+      <div v-if="pickedGame" class="store-inspect" @click.self="putBack">
+        <div class="store-inspect__box">
+          <div class="store-inspect__case">
+            <img :src="pickedGame.coverUrl" :alt="pickedGame.title" draggable="false">
+            <span class="store-inspect__sheen" />
+          </div>
+          <div class="store-inspect__meta">
+            <h2>{{ pickedGame.title }}</h2>
+            <p>{{ pickedGame.year }} · {{ pickedGame.platform }}</p>
+          </div>
+          <div class="store-inspect__actions">
+            <button type="button" class="store-btn store-btn--ghost" @click="putBack">放回去</button>
+            <button type="button" class="store-btn store-btn--primary" @click="openDetail">查看详情</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import {
+  gameStoreCrtMock,
+  gameStoreSessionGames,
+  type GameStoreMockGame,
+} from './game-store/mock-session'
+import gamesService from '@/services/games.service'
+import {
+  getAmbientBackgroundPoolFromGames,
+  mergeAmbientBackgroundPools,
+  type AmbientBackgroundPool,
+} from '@/utils/ambient-background'
+
+interface ShelfCell {
+  game: GameStoreMockGame
+  dx: number
+  dy: number
+  rot: number
+  z: number
+}
+
+const router = useRouter()
+const hoveredId = ref<string | null>(null)
+const pickedGame = ref<GameStoreMockGame | null>(null)
+const crtVideoUrl = gameStoreCrtMock.videoUrl
+const stageScale = ref(1)
+const storePosters = ref<string[]>([])
+
+/**
+ * 固定 1920×1080 设计稿，按窗口尺寸等比缩放整个场景，
+ * 保证任何分辨率下货架/封面/电视的相对位置都不错位。
+ */
+const DESIGN_WIDTH = 1920
+const DESIGN_HEIGHT = 1080
+
+const updateStageScale = () => {
+  stageScale.value = Math.min(
+    window.innerWidth / DESIGN_WIDTH,
+    window.innerHeight / DESIGN_HEIGHT,
+  )
+}
+
+const pickPosterImages = (pool: AmbientBackgroundPool): string[] => {
+  const picks: string[] = []
+  const add = (url: string | undefined | null) => {
+    if (url && !picks.includes(url)) picks.push(url)
+  }
+  add(pool.screenshots[Math.floor(Math.random() * pool.screenshots.length)])
+  add(pool.banners[Math.floor(Math.random() * pool.banners.length)])
+  if (picks.length < 2) {
+    const rest = [...pool.screenshots, ...pool.banners].filter((url) => !picks.includes(url))
+    if (rest.length > 0) {
+      add(rest[Math.floor(Math.random() * rest.length)])
+    }
+  }
+  return picks
+}
+
+const loadStorePosters = async () => {
+  try {
+    // 与全局抽卡池同一数据源：遍历游戏列表收集 banner 与截图
+    const pools: AmbientBackgroundPool[] = []
+    let page = 1
+    while (true) {
+      const result = await gamesService.getGames({
+        query: { page, limit: 100 },
+        sort: { field: 'created_at', order: 'desc' },
+      })
+      pools.push(getAmbientBackgroundPoolFromGames(result.data))
+      const totalPages = Math.max(1, result.pagination.totalPages || 1)
+      if (page >= totalPages) break
+      page += 1
+    }
+    storePosters.value = pickPosterImages(mergeAmbientBackgroundPools(pools))
+  } catch {
+    // 拉取失败时保留纯色海报兜底
+  }
+}
+
+interface Live2DWidgetConfig {
+  waifuPath: string
+  cdnPath: string
+  cubism2Path: string
+  cubism5Path: string
+  tools: string[]
+  drag: boolean
+  logLevel: string
+  modelId: number
+  showToggleAfterQuit: boolean
+}
+
+declare global {
+  interface Window {
+    initWidget?: (config: Live2DWidgetConfig) => void
+    __waifuManager?: {
+      cubism2model?: {
+        modelScaling: (factor: number) => void
+        viewMatrix?: {
+          getScaleX?: () => number
+        }
+      }
+    }
+    __waifuTools?: {
+      el: () => HTMLElement | null
+      move: (left: number, bottom: number) => void
+      zoom: (factor: number) => void
+      report: () => Record<string, number | null>
+    }
+  }
+}
+
+let waifuStyleTag: HTMLLinkElement | null = null
+let waifuScriptTag: HTMLScriptElement | null = null
+let waifuZoomTimer: number | null = null
+
+const WAIFU_TARGET_ZOOM = 1.35
+
+const loadWaifuResource = (url: string, type: 'css' | 'js'): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (type === 'css') {
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = url
+      link.onload = () => resolve()
+      link.onerror = () => reject(new Error(`看板娘样式加载失败：${url}`))
+      document.head.appendChild(link)
+      waifuStyleTag = link
+      return
+    }
+    const script = document.createElement('script')
+    script.type = 'module'
+    script.src = url
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error(`看板娘脚本加载失败：${url}`))
+    document.head.appendChild(script)
+    waifuScriptTag = script
+  })
+}
+
+const waitForElement = (selector: string, timeoutMs = 8000): Promise<HTMLElement | null> => {
+  const existing = document.querySelector<HTMLElement>(selector)
+  if (existing) return Promise.resolve(existing)
+  return new Promise((resolve) => {
+    const startedAt = Date.now()
+    const timer = window.setInterval(() => {
+      const element = document.querySelector<HTMLElement>(selector)
+      if (element) {
+        window.clearInterval(timer)
+        resolve(element)
+        return
+      }
+      if (Date.now() - startedAt > timeoutMs) {
+        window.clearInterval(timer)
+        resolve(null)
+      }
+    }, 100)
+  })
+}
+
+const initWaifu = async () => {
+  // 热更新或重复挂载时先清掉旧的看板娘节点
+  document.getElementById('waifu')?.remove()
+  document.getElementById('waifu-toggle')?.remove()
+
+  await loadWaifuResource('/live2d-widget/waifu.css', 'css')
+  if (!window.initWidget) {
+    await loadWaifuResource('/live2d-widget/waifu-tips.js', 'js')
+  }
+
+  window.initWidget?.({
+    waifuPath: '/live2d-config/waifu-tips.json',
+    cdnPath: '/live2d-models/',
+    cubism2Path: '/live2d-widget/live2d.min.js',
+    cubism5Path: '',
+    tools: [],
+    drag: false,
+    logLevel: 'warn',
+    modelId: 0,
+    showToggleAfterQuit: false,
+  })
+
+  // 把看板娘挂到场景内部，跟随 1920×1080 设计稿一起缩放定位
+  const stageElement = document.querySelector<HTMLElement>('.store-stage')
+  const waifuElement = await waitForElement('#waifu')
+  if (stageElement && waifuElement) {
+    stageElement.appendChild(waifuElement)
+  }
+
+  // 模型加载完成后把人物缩放到目标值（鼠标滚轮的缩放不会自动保存）
+  const applyTargetZoom = () => {
+    const model = window.__waifuManager?.cubism2model
+    if (!model) return false
+    const current = model.viewMatrix?.getScaleX?.() ?? 1
+    if (Math.abs(current - WAIFU_TARGET_ZOOM) > 0.01) {
+      model.modelScaling(WAIFU_TARGET_ZOOM / current)
+    }
+    return true
+  }
+  if (!applyTargetZoom()) {
+    const startedAt = Date.now()
+    waifuZoomTimer = window.setInterval(() => {
+      if (applyTargetZoom() || Date.now() - startedAt > 15000) {
+        if (waifuZoomTimer !== null) {
+          window.clearInterval(waifuZoomTimer)
+          waifuZoomTimer = null
+        }
+      }
+    }, 200)
+  }
+}
+
+const cleanupWaifu = () => {
+  if (waifuZoomTimer !== null) {
+    window.clearInterval(waifuZoomTimer)
+    waifuZoomTimer = null
+  }
+  document.getElementById('waifu')?.remove()
+  document.getElementById('waifu-toggle')?.remove()
+  waifuScriptTag?.remove()
+  waifuStyleTag?.remove()
+  waifuScriptTag = null
+  waifuStyleTag = null
+}
+
+/**
+ * 确定性伪随机摆放：每次进入页面结果一致，
+ * 但每盒都有少量位置偏移与角度变化，避免“像素级整齐”。
+ */
+const shelfRows = computed<ShelfCell[][]>(() => {
+  const rows: ShelfCell[][] = []
+  gameStoreSessionGames.forEach((game, index) => {
+    const rowIndex = Math.floor(index / 5)
+    if (!rows[rowIndex]) rows[rowIndex] = []
+    // 上层货架在前：row0 最前，row3 最后，避免下层盒子顶部穿到上层时遮挡关系错误
+    const rowZ = [40, 30, 20, 10][rowIndex] ?? 10
+    rows[rowIndex].push({
+      game,
+      dx: ((index * 37 + 11) % 7) - 3,
+      dy: ((index * 53 + 5) % 7) - 3,
+      rot: (((index * 29 + 7) % 7) - 3) / 12,
+      z: rowZ + ((index * 7) % 5),
+    })
+  })
+  return rows
+})
+
+const boxStyle = (cell: ShelfCell) => ({
+  '--dx': `${cell.dx}px`,
+  '--dy': `${cell.dy}px`,
+  '--rot': `${cell.rot}deg`,
+  '--box-z': String(cell.z),
+})
+
+const pickGame = (game: GameStoreMockGame) => {
+  hoveredId.value = null
+  pickedGame.value = game
+}
+
+const putBack = () => {
+  pickedGame.value = null
+}
+
+const openDetail = () => {
+  if (!pickedGame.value) return
+  const publicId = pickedGame.value.publicId
+  putBack()
+  router.push(`/games/${publicId}`)
+}
+
+const leaveStore = () => {
+  router.push({ name: 'games' })
+}
+
+const handleKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') putBack()
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('resize', updateStageScale)
+  updateStageScale()
+  void initWaifu()
+  void loadStorePosters()
+
+  // 调试工具：移动/缩放/报告看板娘位置（1920×1080 设计稿坐标）
+  window.__waifuTools = {
+    el: () => document.getElementById('waifu'),
+    move: (left, bottom) => {
+      const element = document.getElementById('waifu')
+      if (!element) return
+      element.style.setProperty('left', `${left}px`, 'important')
+      element.style.setProperty('bottom', `${bottom}px`, 'important')
+    },
+    zoom: (factor) => {
+      window.__waifuManager?.cubism2model?.modelScaling(factor)
+    },
+    report: () => {
+      const element = document.getElementById('waifu')
+      const rect = element?.getBoundingClientRect()
+      const stage = document.querySelector<HTMLElement>('.store-stage')
+      const scale = stage ? new DOMMatrixReadOnly(getComputedStyle(stage).transform).a : 1
+      const model = window.__waifuManager?.cubism2model
+      const info = {
+        designLeft: rect ? (rect.left - (window.innerWidth - 1920 * scale) / 2) / scale : null,
+        designBottom: rect
+          ? (window.innerHeight - rect.bottom - (window.innerHeight - 1080 * scale) / 2) / scale
+          : null,
+        width: rect?.width ?? null,
+        height: rect?.height ?? null,
+        viewScale: model?.viewMatrix?.getScaleX?.() ?? null,
+      }
+      console.log(JSON.stringify(info, null, 2))
+      return info
+    },
+  }
+})
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('resize', updateStageScale)
+  cleanupWaifu()
+})
+</script>
+
+<style scoped>
+.game-store {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #17110d;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: 'LXGW WenKai GB Screen', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+}
+
+/* ---------- 场景透视 ---------- */
+.store-stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1920px;
+  height: 1080px;
+  transform: translate(-50%, -50%) scale(var(--stage-scale, 1));
+  transform-origin: center;
+  perspective: 1200px;
+}
+
+.store-stage--dim .store-backwall,
+.store-stage--dim .store-shelf,
+.store-stage--dim .store-crt,
+.store-stage--dim .store-counter,
+.store-stage--dim .store-floor {
+  filter: brightness(0.45) saturate(0.8);
+  transition: filter 0.35s ease;
+}
+
+/* ---------- 后墙 ---------- */
+.store-backwall {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 720px;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, rgba(58, 44, 34, 0.55), rgba(46, 35, 27, 0) 30%),
+    repeating-linear-gradient(90deg, rgba(24, 18, 14, 0.12) 0 1px, transparent 1px 120px),
+    linear-gradient(180deg, #b3986f 0%, #9a7f5b 55%, #846b4b 100%);
+  box-shadow: inset 0 -18px 30px rgba(0, 0, 0, 0.35);
+}
+
+.store-wall__paper {
+  position: absolute;
+  inset: 0;
+  opacity: 0.18;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(255, 226, 170, 0.28), transparent 58%),
+    repeating-linear-gradient(0deg, rgba(255, 240, 210, 0.05) 0 2px, transparent 2px 9px);
+}
+
+.store-wall__trim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 14px;
+  background: linear-gradient(180deg, #5d4a36, #3f3024);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+}
+
+/* ---------- 海报 ---------- */
+.store-poster {
+  position: absolute;
+  top: 96px;
+  width: 300px;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 3px solid #e8d5ad;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.42);
+  background:
+    linear-gradient(180deg, rgba(30, 22, 16, 0.72), rgba(18, 13, 9, 0.82)),
+    #3a2a1c;
+}
+
+.store-poster--left {
+  left: 90px;
+  transform: rotate(-0.8deg);
+}
+
+.store-poster--right {
+  right: 90px;
+  transform: rotate(0.8deg);
+}
+
+.store-poster__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.store-poster__kicker,
+.store-poster__line {
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+
+.store-poster__kicker {
+  font-size: 15px;
+  letter-spacing: 3px;
+  color: #f7e9c8;
+  font-weight: 700;
+}
+
+.store-poster__line {
+  font-size: 20px;
+  color: #ffe9b8;
+  letter-spacing: 4px;
+}
+
+/* ---------- 霓虹招牌 ---------- */
+.store-sign {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  color: #ffd9a0;
+  text-shadow:
+    0 0 6px rgba(255, 190, 110, 0.95),
+    0 0 18px rgba(255, 160, 70, 0.75),
+    0 0 42px rgba(255, 130, 40, 0.55);
+  background: rgba(30, 20, 14, 0.35);
+  padding: 5px 22px 7px;
+  border-radius: 4px;
+}
+
+.store-sign__cord {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 2px;
+  height: 26px;
+  background: rgba(20, 14, 10, 0.8);
+}
+
+/* ---------- 地面 ---------- */
+.store-floor {
+  position: absolute;
+  left: -4%;
+  right: -4%;
+  top: 620px;
+  bottom: 300px;
+  z-index: 1;
+  transform: perspective(700px) rotateX(32deg);
+  transform-origin: top center;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 42px),
+    linear-gradient(180deg, #4a3525, #2b1d13 90%);
+  box-shadow: inset 0 18px 34px rgba(0, 0, 0, 0.5);
+}
+
+.store-floor__rug {
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  width: 46%;
+  height: 46%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at 50% 30%, rgba(130, 52, 42, 0.55), rgba(70, 28, 24, 0.18) 70%, transparent 72%);
+}
+
+/* ---------- 主货架 ---------- */
+.store-shelf {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 900px;
+  height: 720px;
+  z-index: 2;
+  background: linear-gradient(180deg, #6d5138, #543c28 18%, #462f1f 100%);
+  border: 10px solid #3d2b1d;
+  border-radius: 6px;
+  box-shadow:
+    0 24px 44px rgba(0, 0, 0, 0.6),
+    inset 0 2px 0 rgba(255, 230, 190, 0.18),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.5);
+}
+
+.store-shelf__crown {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  height: 26px;
+  background: linear-gradient(180deg, #7d5d3e, #543c28);
+  border-radius: 6px 6px 0 0;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+}
+
+.store-shelf__side {
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  width: 18px;
+  background: linear-gradient(90deg, #4a3423, #2c1f14);
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.55);
+}
+
+.store-shelf__side--left {
+  left: -10px;
+  border-radius: 4px 0 0 4px;
+}
+
+.store-shelf__side--right {
+  right: -10px;
+  border-radius: 0 4px 4px 0;
+}
+
+.store-shelf__rows {
+  position: absolute;
+  inset: 16px 18px 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.store-shelf__row {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.store-shelf__row-boxes {
+  position: absolute;
+  inset: 0 0 14px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+.store-shelf__plank {
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  bottom: 0;
+  height: 14px;
+  background:
+    linear-gradient(180deg, #8a6a47 0%, #6b4f33 55%, #4e3824 100%);
+  border-radius: 2px;
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 230, 190, 0.22);
+  z-index: 5;
+}
+
+.store-shelf__plank-shadow {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 18px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.5), transparent);
+}
+
+.store-shelf__base {
+  position: absolute;
+  left: -10px;
+  right: -10px;
+  bottom: -18px;
+  height: 22px;
+  background: linear-gradient(180deg, #543c28, #352516 70%);
+  border-radius: 0 0 5px 5px;
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------- 游戏盒 ---------- */
+.game-box {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0 22px;
+  position: relative;
+  /* 封面源图统一为 600×900（2:3），盒子按 2:3 显示，避免 cover 裁切 */
+  width: 102px;
+  height: 153px;
+  aspect-ratio: 2 / 3;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  overflow: hidden;
+  transform:
+    translate(var(--dx), var(--dy))
+    rotate(var(--rot));
+  transform-style: preserve-3d;
+  z-index: var(--box-z, 10);
+  transition:
+    transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1),
+    box-shadow 0.3s ease,
+    filter 0.3s ease;
+  filter: brightness(0.94);
+}
+
+.game-box__cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #241a12;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 5px 9px rgba(0, 0, 0, 0.42);
+}
+
+/* 盒脊：右侧厚度 */
+.game-box::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.24), rgba(0, 0, 0, 0.5));
+  border-radius: 0 2px 2px 0;
+  z-index: 2;
+}
+
+/* 盒顶厚度 */
+.game-box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(0, 0, 0, 0.2));
+  border-radius: 2px 2px 0 0;
+  z-index: 1;
+}
+
+.game-box__sheen {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.16) 0%, transparent 26%),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.28), transparent 34%);
+}
+
+.game-box--hovered,
+.game-box:hover {
+  z-index: 60 !important;
+  transform:
+    translate(calc(var(--dx) - 8px), calc(var(--dy) - 7px))
+    rotate(var(--rot))
+    scale(1.08);
+  box-shadow: 0 22px 34px rgba(0, 0, 0, 0.58);
+  filter: brightness(1.08);
+}
+
+.game-box--hovered .game-box__cover,
+.game-box:hover .game-box__cover {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 14px 24px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------- CRT 电视 ---------- */
+.store-crt {
+  position: absolute;
+  right: 180px;
+  bottom: 300px;
+  width: 420px;
+  z-index: 3;
+  transform: none;
+}
+
+.store-crt__cabinet {
+  position: relative;
+  padding: 16px 16px 12px;
+  border-radius: 18px 18px 12px 12px;
+  background:
+    linear-gradient(180deg, #d8c9a8 0%, #b8a37e 34%, #8f7a5b 100%);
+  border: 2px solid #5d4a32;
+  box-shadow:
+    0 18px 30px rgba(0, 0, 0, 0.55),
+    inset 0 2px 0 rgba(255, 245, 220, 0.5),
+    inset 0 -6px 14px rgba(0, 0, 0, 0.28);
+}
+
+.store-crt__screen {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 42% 36%, rgba(90, 120, 96, 0.5), rgba(12, 22, 16, 0.95) 72%),
+    #08140c;
+  border: 4px solid #2c2116;
+  box-shadow:
+    inset 0 0 26px rgba(0, 0, 0, 0.9),
+    0 0 22px rgba(190, 235, 190, 0.16),
+    0 0 60px rgba(160, 220, 160, 0.08);
+}
+
+.store-crt__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #08140c;
+}
+
+.store-crt__screen-static {
+  position: absolute;
+  inset: 0;
+  opacity: 0.34;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.85'/></svg>");
+  animation: crt-noise 0.42s steps(4) infinite;
+}
+
+.store-crt__scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.42) 0 1px,
+    transparent 1px 3px
+  );
+  mix-blend-mode: multiply;
+}
+
+.store-crt__glass {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(118deg, rgba(255, 255, 255, 0.13) 0%, transparent 24%),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.05), transparent 40%);
+  box-shadow: inset 0 0 40px rgba(255, 255, 255, 0.05);
+  animation: crt-flicker 7s ease-in-out infinite;
+}
+
+.store-crt__glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 46%, rgba(190, 240, 190, 0.16), transparent 70%);
+  animation: crt-breath 4.8s ease-in-out infinite;
+}
+
+.store-crt__brand {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 4px;
+  color: #4a3824;
+  font-weight: 700;
+}
+
+.store-crt__controls {
+  position: absolute;
+  right: 18px;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.store-crt__knob {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #efe3c8, #8a7556 70%);
+  border: 1px solid #4a3824;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.4);
+}
+
+.store-crt__knob--small {
+  width: 10px;
+  height: 10px;
+}
+
+.store-crt__led {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #7be37b;
+  box-shadow: 0 0 6px #7be37b;
+  animation: crt-breath 4.8s ease-in-out infinite;
+}
+
+.store-crt__vents {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  width: 84px;
+  height: 10px;
+  background: repeating-linear-gradient(90deg, #6d5a3e 0 2px, transparent 2px 5px);
+  border-radius: 2px;
+  opacity: 0.75;
+}
+
+.store-crt__stand {
+  width: 72%;
+  height: 22px;
+  margin: 0 auto;
+  background: linear-gradient(180deg, #7d6240, #4e3824);
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 12px 18px rgba(0, 0, 0, 0.5);
+}
+
+.store-crt__cable {
+  position: absolute;
+  right: -10%;
+  bottom: -38px;
+  width: 60%;
+  height: 52px;
+  border: 3px solid #241a12;
+  border-top: 0;
+  border-left: 0;
+  border-radius: 0 0 60px 0;
+  opacity: 0.85;
+}
+
+/* ---------- 前台 / 游戏吧 ---------- */
+.store-counter {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 300px;
+  z-index: 4;
+}
+
+.store-counter__top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 16px;
+  background:
+    linear-gradient(180deg, #b08a5c 0%, #8d6a42 72%, #6f4f2e 100%);
+  box-shadow:
+    0 6px 12px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 235, 200, 0.4);
+  transform: perspective(400px) rotateX(24deg);
+  transform-origin: top center;
+  border-radius: 3px 3px 0 0;
+}
+
+.store-counter__top-glow {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 20%, rgba(255, 230, 170, 0.25) 50%, transparent 80%);
+}
+
+.store-counter__front {
+  position: absolute;
+  top: 16px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 9px),
+    linear-gradient(180deg, #6f4f2e, #4a3320 78%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 235, 200, 0.16),
+    inset 0 -24px 40px rgba(0, 0, 0, 0.5);
+}
+
+.store-counter__panel {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 34%;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(255, 230, 190, 0.05), rgba(0, 0, 0, 0.12));
+}
+
+.store-counter__panel--left {
+  left: 5%;
+}
+
+.store-counter__panel--right {
+  right: 5%;
+}
+
+.store-counter__trim {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 235, 200, 0.14);
+}
+
+.store-register {
+  position: absolute;
+  right: 3%;
+  top: -22px;
+  width: 150px;
+  aspect-ratio: 1.65;
+  background: linear-gradient(180deg, #4a4a4d, #26262a);
+  border-radius: 6px;
+  box-shadow:
+    0 10px 16px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.store-register__screen {
+  position: absolute;
+  top: 10px;
+  left: 14px;
+  right: 14px;
+  height: 34%;
+  background: linear-gradient(180deg, #2b3d28, #16211a);
+  border-radius: 2px;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8);
+}
+
+.store-register__screen::after {
+  content: '';
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 22%;
+  height: 18%;
+  background: #9fe09f;
+  box-shadow: 0 0 8px #9fe09f;
+  opacity: 0.8;
+}
+
+.store-register__keys {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 14px;
+  height: 22%;
+  background: repeating-linear-gradient(90deg, #3a3a3e 0 6px, #202024 6px 9px);
+  border-radius: 2px;
+}
+
+/* ---------- 灯光 / 氛围 ---------- */
+.store-light {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% -8%, rgba(255, 196, 120, 0.28), transparent 46%),
+    radial-gradient(ellipse at 50% 38%, rgba(255, 180, 100, 0.07), transparent 62%);
+  mix-blend-mode: screen;
+}
+
+.store-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(10, 7, 5, 0.42), transparent 26%),
+    radial-gradient(ellipse at 50% 46%, transparent 52%, rgba(8, 5, 3, 0.62) 100%);
+}
+
+/* ---------- 离开按钮 ---------- */
+.store-exit {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 20;
+  border: 1px solid rgba(255, 225, 180, 0.24);
+  background: rgba(24, 16, 11, 0.48);
+  color: rgba(255, 230, 190, 0.82);
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+.store-exit:hover {
+  background: rgba(58, 38, 24, 0.72);
+  color: #ffe9c8;
+  border-color: rgba(255, 225, 180, 0.5);
+}
+
+/* ---------- 拿出游戏盒 ---------- */
+.store-inspect {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 5, 3, 0.58);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.store-inspect__box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 26px 26px;
+}
+
+.store-inspect__case {
+  position: relative;
+  width: 320px;
+  aspect-ratio: 0.72;
+  border-radius: 4px;
+  transform: perspective(900px) rotateY(-2deg) rotateX(1deg);
+  box-shadow:
+    0 40px 80px rgba(0, 0, 0, 0.72),
+    0 14px 26px rgba(0, 0, 0, 0.5);
+}
+
+.store-inspect__case img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.store-inspect__sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.2), transparent 30%);
+  pointer-events: none;
+}
+
+.store-inspect__meta {
+  text-align: center;
+  color: #ffe9c8;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+}
+
+.store-inspect__meta h2 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 2px;
+}
+
+.store-inspect__meta p {
+  margin: 6px 0 0;
+  font-size: 15px;
+  color: rgba(255, 230, 190, 0.78);
+  letter-spacing: 1px;
+}
+
+.store-inspect__actions {
+  display: flex;
+  gap: 14px;
+}
+
+.store-btn {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  font-size: 14px;
+  letter-spacing: 2px;
+  padding: 9px 22px;
+  border-radius: 999px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.store-btn:hover {
+  transform: translateY(-1px);
+}
+
+.store-btn--ghost {
+  background: rgba(255, 230, 190, 0.08);
+  color: rgba(255, 230, 190, 0.9);
+  border: 1px solid rgba(255, 230, 190, 0.32);
+}
+
+.store-btn--ghost:hover {
+  background: rgba(255, 230, 190, 0.16);
+}
+
+.store-btn--primary {
+  background: linear-gradient(180deg, #d99b4e, #a9682a);
+  color: #2b180a;
+  font-weight: 700;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.42);
+}
+
+.store-btn--primary:hover {
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- 动画 ---------- */
+@keyframes crt-noise {
+  0% { background-position: 0 0; }
+  25% { background-position: -30px 12px; }
+  50% { background-position: 18px -22px; }
+  75% { background-position: -12px -30px; }
+  100% { background-position: 24px 18px; }
+}
+
+@keyframes crt-flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.78; }
+  94% { opacity: 1; }
+  97% { opacity: 0.9; }
+  98% { opacity: 1; }
+}
+
+@keyframes crt-breath {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.inspect-enter-active,
+.inspect-leave-active {
+  transition: opacity 0.28s ease;
+}
+
+.inspect-enter-from,
+.inspect-leave-to {
+  opacity: 0;
+}
+
+.inspect-enter-active .store-inspect__case,
+.inspect-leave-active .store-inspect__case {
+  transition: transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.28s ease;
+}
+
+.inspect-enter-from .store-inspect__case,
+.inspect-leave-to .store-inspect__case {
+  transform: perspective(900px) rotateY(-2deg) rotateX(1deg) scale(0.72);
+  opacity: 0;
+}
+</style>
+
+<!-- 看板娘：live2d-widget 创建的是 body 级节点，需用全局样式把它定位进店内场景 -->
+<style>
+#waifu {
+  position: absolute !important;
+  left: 0px !important;
+  bottom: 10px !important;
+  width: 800px !important;
+  height: 800px !important;
+  transform: none !important;
+  z-index: 3 !important;
+  transition: bottom 1s ease-in-out;
+}
+
+#waifu.waifu-active {
+  bottom: 10px !important;
+}
+
+#waifu:hover {
+  transform: none !important;
+}
+
+#waifu-toggle {
+  display: none !important;
+}
+
+#live2d {
+  width: 800px !important;
+  height: 800px !important;
+}
+
+#waifu-tips {
+  left: 560px !important;
+  top: 30px !important;
+  margin: 0 !important;
+  width: 220px !important;
+  min-height: 54px;
+  font-size: 13px;
+  line-height: 21px;
+}
+
+@media (max-width: 768px) {
+  #waifu {
+    display: none;
+  }
+}
+</style>

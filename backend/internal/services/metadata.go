@@ -40,7 +40,12 @@ type MetadataListOptions struct {
 
 type SeriesDetail struct {
 	Series *domain.MetadataItem
-	Games  []domain.SeriesGameSummary
+	Games  []domain.MetadataGameSummary
+}
+
+type PublisherDetail struct {
+	Publisher *domain.MetadataItem
+	Games     []domain.MetadataGameSummary
 }
 
 func NewMetadataService(repo *repositories.MetadataRepository) *MetadataService {
@@ -74,8 +79,8 @@ func (s *MetadataService) List(resource MetadataResource, includeAll bool, optio
 		}
 		s.listCache.Store(resource.Type, cachedMetadataList{items: items, cachedAt: time.Now()})
 	}
-	if resource.Type == domain.MetadataSeries {
-		if err := s.enrichSeriesItems(items, includeAll); err != nil {
+	if supportsMetadataGameGrouping(resource.Type) {
+		if err := s.enrichMetadataItems(items, resource.Type, includeAll); err != nil {
 			return nil, err
 		}
 		filtered := make([]domain.MetadataItem, 0, len(items))
@@ -136,7 +141,44 @@ func (s *MetadataService) Create(resource MetadataResource, input domain.Metadat
 }
 
 func (s *MetadataService) GetSeriesDetail(id int64, includeAll bool) (*SeriesDetail, error) {
-	item, err := s.repo.Get(domain.MetadataSeries, id)
+	detail, err := s.getMetadataDetail(domain.MetadataSeries, id, includeAll)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SeriesDetail{
+		Series: detail.Item,
+		Games:  detail.Games,
+	}, nil
+}
+
+func (s *MetadataService) GetPublisherDetail(id int64, includeAll bool) (*PublisherDetail, error) {
+	detail, err := s.getMetadataDetail(domain.MetadataPublishers, id, includeAll)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PublisherDetail{
+		Publisher: detail.Item,
+		Games:     detail.Games,
+	}, nil
+}
+
+type metadataDetail struct {
+	Item  *domain.MetadataItem
+	Games []domain.MetadataGameSummary
+}
+
+func supportsMetadataGameGrouping(typ domain.MetadataType) bool {
+	return typ == domain.MetadataSeries || typ == domain.MetadataPublishers
+}
+
+func (s *MetadataService) getMetadataDetail(typ domain.MetadataType, id int64, includeAll bool) (*metadataDetail, error) {
+	if !supportsMetadataGameGrouping(typ) {
+		return nil, fmt.Errorf("unsupported metadata detail type: %d", typ)
+	}
+
+	item, err := s.repo.Get(typ, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, domain.ErrNotFound
@@ -144,22 +186,19 @@ func (s *MetadataService) GetSeriesDetail(id int64, includeAll bool) (*SeriesDet
 		return nil, err
 	}
 
-	if err := s.enrichSeriesItem(item, includeAll); err != nil {
+	if err := s.enrichMetadataItem(item, typ, includeAll); err != nil {
 		return nil, err
 	}
 	if !includeAll && item.GameCount == 0 {
 		return nil, domain.ErrNotFound
 	}
 
-	games, err := s.repo.ListSeriesGames(id, includeAll)
+	games, err := s.repo.ListMetadataGames(typ, id, includeAll)
 	if err != nil {
 		return nil, err
 	}
 
-	return &SeriesDetail{
-		Series: item,
-		Games:  games,
-	}, nil
+	return &metadataDetail{Item: item, Games: games}, nil
 }
 
 func slugify(value string) string {
@@ -214,39 +253,39 @@ func filterMetadataItems(items []domain.MetadataItem, options MetadataListOption
 	return items
 }
 
-func (s *MetadataService) enrichSeriesItem(item *domain.MetadataItem, includeAll bool) error {
-	games, err := s.repo.ListSeriesGames(item.ID, includeAll)
+func (s *MetadataService) enrichMetadataItem(item *domain.MetadataItem, typ domain.MetadataType, includeAll bool) error {
+	games, err := s.repo.ListMetadataGames(typ, item.ID, includeAll)
 	if err != nil {
 		return err
 	}
 
-	applySeriesItemGames(item, games)
+	applyMetadataItemGames(item, games)
 	return nil
 }
 
-func (s *MetadataService) enrichSeriesItems(items []domain.MetadataItem, includeAll bool) error {
+func (s *MetadataService) enrichMetadataItems(items []domain.MetadataItem, typ domain.MetadataType, includeAll bool) error {
 	if len(items) == 0 {
 		return nil
 	}
 
-	seriesIDs := make([]int64, 0, len(items))
+	metadataIDs := make([]int64, 0, len(items))
 	for _, item := range items {
-		seriesIDs = append(seriesIDs, item.ID)
+		metadataIDs = append(metadataIDs, item.ID)
 	}
 
-	gamesBySeriesID, err := s.repo.ListSeriesGamesBySeriesIDs(seriesIDs, includeAll)
+	gamesByMetadataID, err := s.repo.ListMetadataGamesByIDs(typ, metadataIDs, includeAll)
 	if err != nil {
 		return err
 	}
 
 	for index := range items {
-		applySeriesItemGames(&items[index], gamesBySeriesID[items[index].ID])
+		applyMetadataItemGames(&items[index], gamesByMetadataID[items[index].ID])
 	}
 
 	return nil
 }
 
-func applySeriesItemGames(item *domain.MetadataItem, games []domain.SeriesGameSummary) {
+func applyMetadataItemGames(item *domain.MetadataItem, games []domain.MetadataGameSummary) {
 	item.GameCount = len(games)
 	item.LatestUpdatedAt = nil
 	item.CoverCandidates = nil
@@ -262,7 +301,7 @@ func applySeriesItemGames(item *domain.MetadataItem, games []domain.SeriesGameSu
 	seen := make(map[string]struct{}, 8)
 	bgSeen := make(map[string]struct{}, 8)
 	for _, game := range games {
-		path := pickSeriesCoverSource(game)
+		path := pickMetadataCoverSource(game)
 		if path != "" {
 			if _, exists := seen[path]; !exists {
 				seen[path] = struct{}{}
@@ -271,7 +310,7 @@ func applySeriesItemGames(item *domain.MetadataItem, games []domain.SeriesGameSu
 		}
 
 		// Collect landscape images (banner + screenshot) for ambient background
-		for _, bg := range pickSeriesBackgroundSources(game) {
+		for _, bg := range pickMetadataBackgroundSources(game) {
 			if _, exists := bgSeen[bg]; !exists {
 				bgSeen[bg] = struct{}{}
 				backgroundCandidates = append(backgroundCandidates, bg)
@@ -292,7 +331,7 @@ func applySeriesItemGames(item *domain.MetadataItem, games []domain.SeriesGameSu
 	}
 }
 
-func pickSeriesBackgroundSources(game domain.SeriesGameSummary) []string {
+func pickMetadataBackgroundSources(game domain.MetadataGameSummary) []string {
 	var sources []string
 	if game.BannerImage != nil && strings.TrimSpace(*game.BannerImage) != "" {
 		sources = append(sources, strings.TrimSpace(*game.BannerImage))
@@ -303,7 +342,7 @@ func pickSeriesBackgroundSources(game domain.SeriesGameSummary) []string {
 	return sources
 }
 
-func pickSeriesCoverSource(game domain.SeriesGameSummary) string {
+func pickMetadataCoverSource(game domain.MetadataGameSummary) string {
 	if game.CoverImage != nil && strings.TrimSpace(*game.CoverImage) != "" {
 		return strings.TrimSpace(*game.CoverImage)
 	}

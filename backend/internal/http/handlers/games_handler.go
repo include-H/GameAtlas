@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -149,6 +150,39 @@ func (h *GamesHandler) Get(c *gin.Context) {
 	}
 
 	writeJSONSuccess(c, http.StatusOK, toGameDetailResponse(detail, isAdminRequest(c)))
+}
+
+// ListPreviewVideos returns preview videos for a batch of games (game store session).
+func (h *GamesHandler) ListPreviewVideos(c *gin.Context) {
+	raw := strings.TrimSpace(c.Query("public_ids"))
+	if raw == "" {
+		writeJSONError(c, http.StatusBadRequest, "无效的游戏请求")
+		return
+	}
+
+	parts := strings.Split(raw, ",")
+	publicIDs := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if id := strings.TrimSpace(part); id != "" {
+			publicIDs = append(publicIDs, id)
+		}
+	}
+	if len(publicIDs) == 0 {
+		writeJSONError(c, http.StatusBadRequest, "无效的游戏请求")
+		return
+	}
+	if len(publicIDs) > 100 {
+		writeJSONError(c, http.StatusBadRequest, "游戏数量超出上限")
+		return
+	}
+
+	bundles, err := h.detail.ListPreviewVideos(publicIDs, isAdminRequest(c))
+	if err != nil {
+		writeServiceError(c, err, "无效的游戏请求")
+		return
+	}
+
+	writeJSONSuccess(c, http.StatusOK, toGamePreviewVideosResponses(bundles))
 }
 
 func (h *GamesHandler) Create(c *gin.Context) {

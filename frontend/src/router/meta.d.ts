@@ -8,6 +8,7 @@ declare module 'vue-router' {
     hideOnCompactNavigation?: boolean
     activeMenu?: string
     requiresAdmin?: boolean
+    fullscreen?: boolean
     icon?: Component
   }
 }

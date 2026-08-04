@@ -1,0 +1,225 @@
+{
+  "mouseover": [
+    {
+      "selector": ".game-box",
+      "text": [
+        "这款要不要看看？",
+        "货架上的都是好货哦～",
+        "有看中的吗？",
+        "随便试，不买也没关系～"
+      ]
+    },
+    {
+      "selector": ".store-crt",
+      "text": [
+        "电视里在播什么呢？",
+        "这台电视可是镇店之宝！",
+        "看入迷啦？"
+      ]
+    },
+    {
+      "selector": "#waifu",
+      "text": [
+        "欢迎光临～",
+        "嘿嘿，需要帮忙吗？",
+        "今天想玩点什么？"
+      ]
+    }
+  ],
+  "click": [
+    {
+      "selector": "#waifu",
+      "text": [
+        "呀！",
+        "别戳我啦～",
+        "痒痒的！"
+      ]
+    },
+    {
+      "selector": ".game-box",
+      "text": [
+        "眼光不错嘛！",
+        "这盒拿下来看看吧？",
+        "呜哇，这个我也喜欢！"
+      ]
+    }
+  ],
+  "seasons": [
+    {
+      "date": "01/01",
+      "text": "<span>元旦</span>了呢，新的一年又开始了，今年是{year}年～"
+    },
+    {
+      "date": "02/14",
+      "text": "又是一年<span>情人节</span>，{year}年找到对象了嘛～"
+    },
+    {
+      "date": "03/08",
+      "text": "今天是<span>国际妇女节</span>！"
+    },
+    {
+      "date": "03/12",
+      "text": "今天是<span>植树节</span>，要保护环境呀！"
+    },
+    {
+      "date": "04/01",
+      "text": "悄悄告诉你一个秘密～<span>今天是愚人节，不要被骗了哦～</span>"
+    },
+    {
+      "date": "05/01",
+      "text": "今天是<span>五一劳动节</span>，计划好假期去哪里了吗～"
+    },
+    {
+      "date": "06/01",
+      "text": "<span>儿童节</span>了呢，快活的时光总是短暂，要是永远长不大该多好啊…"
+    },
+    {
+      "date": "09/03",
+      "text": "<span>中国人民抗日战争胜利纪念日</span>，铭记历史、缅怀先烈、珍爱和平、开创未来。"
+    },
+    {
+      "date": "09/10",
+      "text": "<span>教师节</span>，在学校要给老师问声好呀～"
+    },
+    {
+      "date": "10/01",
+      "text": "<span>国庆节</span>到了，为祖国母亲庆生！"
+    },
+    {
+      "date": "11/05-11/12",
+      "text": "今年的<span>双十一</span>是和谁一起过的呢～"
+    },
+    {
+      "date": "12/20-12/31",
+      "text": "这几天是<span>圣诞节</span>，主人肯定又去剁手买买买了～"
+    }
+  ],
+  "time": [
+    {
+      "hour": "6-7",
+      "text": "早上好！一日之计在于晨，美好的一天就要开始了～"
+    },
+    {
+      "hour": "8-11",
+      "text": "上午好！工作顺利嘛，不要久坐，多起来走动走动哦！"
+    },
+    {
+      "hour": "12-13",
+      "text": "中午了，工作了一个上午，现在是午餐时间！"
+    },
+    {
+      "hour": "14-17",
+      "text": "午后很容易犯困呢，今天的运动目标完成了吗？"
+    },
+    {
+      "hour": "18-19",
+      "text": "傍晚了！窗外夕阳的景色很美丽呢，最美不过夕阳红～"
+    },
+    {
+      "hour": "20-21",
+      "text": "晚上好，今天过得怎么样？"
+    },
+    {
+      "hour": "22-23",
+      "text": [
+        "已经这么晚了呀，早点休息吧，晚安～",
+        "深夜时要爱护眼睛呀！"
+      ]
+    },
+    {
+      "hour": "0-5",
+      "text": "你是夜猫子呀？这么晚还不睡觉，明天起的来嘛？"
+    }
+  ],
+  "message": {
+    "default": [
+      "好久不见，日子过得好快呢……",
+      "大坏蛋！你都多久没理人家了呀，嘤嘤嘤～",
+      "嗨～快来逗我玩吧！",
+      "拿小拳拳锤你胸口！",
+      "记得把小家加入收藏夹哦！"
+    ],
+    "console": "哈哈，你打开了控制台，是想要看看我的小秘密吗？",
+    "copy": "你都复制了些什么呀，转载要记得加上出处哦！",
+    "visibilitychange": "哇，你终于回来了～",
+    "changeSuccess": "我的新衣服好看嘛？",
+    "changeFail": "我还没有其他衣服呢！",
+    "photo": "照好了嘛，是不是很可爱呢？",
+    "goodbye": "愿你有一天能与重要的人重逢。",
+    "hitokoto": "这句一言来自 <span>「$1」</span>，是 <span>$2</span> 在 hitokoto.cn 投稿的。",
+    "welcome": "欢迎光临～",
+    "referrer": "Hello！来自 <span>$1</span> 的朋友",
+    "hoverBody": [
+      "干嘛呢你，快把手拿开～～",
+      "鼠…鼠标放错地方了！",
+      "你要干嘛呀？",
+      "喵喵喵？",
+      "怕怕(ノ≧∇≦)ノ",
+      "非礼呀！救命！",
+      "这样的话，只能使用武力了！",
+      "我要生气了哦",
+      "不要动手动脚的！",
+      "真…真的是不知羞耻！",
+      "Hentai！"
+    ],
+    "tapBody": [
+      "是…是不小心碰到了吧…",
+      "萝莉控是什么呀？",
+      "你看到我的小熊了吗？",
+      "再摸的话我可要报警了！⌇●﹏●⌇",
+      "110 吗，这里有个变态一直在摸我(ó﹏ò｡)",
+      "不要摸我了，我会告诉老婆来打你的！",
+      "干嘛动我呀！小心我咬你！",
+      "别摸我，有什么好摸的！"
+    ]
+  },
+  "models": [
+    {
+      "name": "Potion-Maker/Pio",
+      "paths": [
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/Potion-Maker/Pio/index.json"
+      ],
+      "message": "来自 Potion Maker 的 Pio 酱 ~"
+    },
+    {
+      "name": "Potion-Maker/Tia",
+      "paths": [
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/Potion-Maker/Tia/index.json"
+      ],
+      "message": "来自 Potion Maker 的 Tia 酱 ~"
+    },
+    {
+      "name": "HyperdimensionNeptunia",
+      "paths": [
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/neptune_classic/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/nepnep/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/neptune_santa/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/nepmaid/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/nepswim/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/noir_classic/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/noir/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/noir_santa/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/noireswim/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/blanc_classic/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/blanc_normal/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/blanc_swimwear/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/vert_classic/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/vert_normal/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/vert_swimwear/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/nepgear/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/nepgear_extra/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/nepgearswim/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/histoire/index.json",
+        "https://fastly.jsdelivr.net/gh/fghrsh/live2d_api/model/HyperdimensionNeptunia/histoirenohover"
+      ],
+      "message": "Nep! Nep! 超次元游戏：海王星 系列"
+    },
+    {
+      "name": "Hiyori",
+      "paths": [
+        "https://fastly.jsdelivr.net/gh/Live2D/CubismWebSamples/Samples/Resources/Hiyori/Hiyori.model3.json"
+      ],
+      "message": "是 Hiyori 哦 ~"
+    }
+  ]
+}

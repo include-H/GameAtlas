@@ -69,20 +69,20 @@ func TestFilterMetadataItemsForSimpleResources(t *testing.T) {
 	}
 }
 
-func TestApplySeriesItemGamesPicksDistinctCoverCandidates(t *testing.T) {
+func TestApplyMetadataItemGamesPicksDistinctCoverCandidates(t *testing.T) {
 	item := &domain.MetadataItem{}
 	cover := "/assets/cover-a.jpg"
 	banner := "/assets/banner-b.jpg"
 	screenshot := "/assets/screenshot-c.jpg"
 
-	games := []domain.SeriesGameSummary{
+	games := []domain.MetadataGameSummary{
 		{UpdatedAt: "2026-03-25T00:00:00Z", CoverImage: &cover},
 		{UpdatedAt: "2026-03-24T00:00:00Z", CoverImage: &cover},
 		{UpdatedAt: "2026-03-23T00:00:00Z", BannerImage: &banner},
 		{UpdatedAt: "2026-03-22T00:00:00Z", PrimaryScreenshot: &screenshot},
 	}
 
-	applySeriesItemGames(item, games)
+	applyMetadataItemGames(item, games)
 
 	if item.GameCount != 4 {
 		t.Fatalf("GameCount = %d, want 4", item.GameCount)
@@ -104,19 +104,79 @@ func TestApplySeriesItemGamesPicksDistinctCoverCandidates(t *testing.T) {
 	}
 }
 
-func TestPickSeriesCoverSourceFallsBackInOrder(t *testing.T) {
+func TestPickMetadataCoverSourceFallsBackInOrder(t *testing.T) {
 	cover := " cover "
 	banner := " banner "
 	screenshot := " screenshot "
 
-	if got := pickSeriesCoverSource(domain.SeriesGameSummary{CoverImage: &cover, BannerImage: &banner, PrimaryScreenshot: &screenshot}); got != "cover" {
-		t.Fatalf("pickSeriesCoverSource() = %q, want cover", got)
+	if got := pickMetadataCoverSource(domain.MetadataGameSummary{CoverImage: &cover, BannerImage: &banner, PrimaryScreenshot: &screenshot}); got != "cover" {
+		t.Fatalf("pickMetadataCoverSource() = %q, want cover", got)
 	}
-	if got := pickSeriesCoverSource(domain.SeriesGameSummary{BannerImage: &banner, PrimaryScreenshot: &screenshot}); got != "banner" {
-		t.Fatalf("pickSeriesCoverSource() = %q, want banner", got)
+	if got := pickMetadataCoverSource(domain.MetadataGameSummary{BannerImage: &banner, PrimaryScreenshot: &screenshot}); got != "banner" {
+		t.Fatalf("pickMetadataCoverSource() = %q, want banner", got)
 	}
-	if got := pickSeriesCoverSource(domain.SeriesGameSummary{PrimaryScreenshot: &screenshot}); got != "screenshot" {
-		t.Fatalf("pickSeriesCoverSource() = %q, want screenshot", got)
+	if got := pickMetadataCoverSource(domain.MetadataGameSummary{PrimaryScreenshot: &screenshot}); got != "screenshot" {
+		t.Fatalf("pickMetadataCoverSource() = %q, want screenshot", got)
+	}
+}
+
+func TestMetadataServiceListPublishersEnrichesImagesAndRespectsVisibility(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	if _, err := db.Exec(`
+		INSERT INTO publishers (name, slug, sort_order)
+		VALUES ('Atlus', 'atlus', 0), ('Unused Publisher', 'unused-publisher', 1)
+	`); err != nil {
+		t.Fatalf("insert publishers: %v", err)
+	}
+	var publisherID int64
+	if err := db.Get(&publisherID, `SELECT id FROM publishers WHERE slug = 'atlus'`); err != nil {
+		t.Fatalf("load publisher id: %v", err)
+	}
+
+	publicID := insertServicesTestGame(t, db, "publisher-public", "Publisher Public", domain.GameVisibilityPublic)
+	privateID := insertServicesTestGame(t, db, "publisher-private", "Publisher Private", domain.GameVisibilityPrivate)
+	if _, err := db.Exec(`
+		UPDATE games
+		SET cover_image = ?, updated_at = '2026-03-25 00:00:00'
+		WHERE id = ?
+	`, "/assets/publisher-public/cover.png", publicID); err != nil {
+		t.Fatalf("update public publisher game: %v", err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO game_publishers (game_id, publisher_id, sort_order)
+		VALUES (?, ?, 0), (?, ?, 1)
+	`, publicID, publisherID, privateID, publisherID); err != nil {
+		t.Fatalf("link publisher games: %v", err)
+	}
+
+	service := NewMetadataService(repositories.NewMetadataRepository(db))
+	publicItems, err := service.List(
+		MetadataResource{Type: domain.MetadataPublishers},
+		false,
+		MetadataListOptions{Sort: "name"},
+	)
+	if err != nil {
+		t.Fatalf("List public publishers returned error: %v", err)
+	}
+	if len(publicItems) != 1 || publicItems[0].ID != publisherID {
+		t.Fatalf("public publishers = %+v, want Atlus only", publicItems)
+	}
+	if publicItems[0].GameCount != 1 || publicItems[0].CoverImage == nil || *publicItems[0].CoverImage != "/assets/publisher-public/cover.png" {
+		t.Fatalf("public publisher enrichment = %+v, want one game and cover", publicItems[0])
+	}
+
+	allItems, err := service.List(
+		MetadataResource{Type: domain.MetadataPublishers},
+		true,
+		MetadataListOptions{Sort: "name"},
+	)
+	if err != nil {
+		t.Fatalf("List all publishers returned error: %v", err)
+	}
+	if len(allItems) != 2 || allItems[0].GameCount != 2 {
+		t.Fatalf("all publishers = %+v, want Atlus with two games and unused row", allItems)
 	}
 }
 

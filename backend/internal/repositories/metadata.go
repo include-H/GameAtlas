@@ -3,6 +3,7 @@ package repositories
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 
@@ -171,121 +172,147 @@ func (r *MetadataRepository) CreateOrGet(
 	return nil, fmt.Errorf("metadata insert conflicted but no existing %s item was found", table)
 }
 
-func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([]domain.SeriesGameSummary, error) {
-	where := "WHERE g.series_id = ?"
-	args := []any{seriesID}
+type metadataGamesRelation struct {
+	name        string
+	join        string
+	groupColumn string
+}
+
+func metadataGamesRelationFor(typ domain.MetadataType) (metadataGamesRelation, bool) {
+	switch typ {
+	case domain.MetadataSeries:
+		return metadataGamesRelation{
+			name:        "series",
+			groupColumn: "g.series_id",
+		}, true
+	case domain.MetadataPublishers:
+		return metadataGamesRelation{
+			name:        "publisher",
+			join:        "INNER JOIN game_publishers gp ON gp.game_id = g.id",
+			groupColumn: "gp.publisher_id",
+		}, true
+	default:
+		return metadataGamesRelation{}, false
+	}
+}
+
+func metadataGameSummarySelect() string {
+	return `
+		g.id,
+		g.public_id,
+		g.title,
+		g.title_alt,
+		g.visibility,
+		g.summary,
+		g.release_date,
+		g.cover_image,
+		g.banner_image,
+		g.wiki_content,
+		g.downloads,
+		(
+			SELECT ga.path
+			FROM game_assets ga
+			WHERE ga.game_id = g.id AND ga.asset_type = 'screenshot'
+			ORDER BY ga.sort_order ASC, ga.id ASC
+			LIMIT 1
+		) AS primary_screenshot,
+		CASE WHEN EXISTS (SELECT 1 FROM favorite_games fg WHERE fg.game_id = g.id) THEN 1 ELSE 0 END AS is_favorite,
+		g.series_id,
+		s.name AS series_name,
+		g.created_at,
+		g.updated_at`
+}
+
+func (r *MetadataRepository) ListMetadataGames(typ domain.MetadataType, metadataID int64, includeAll bool) ([]domain.MetadataGameSummary, error) {
+	relation, ok := metadataGamesRelationFor(typ)
+	if !ok {
+		return nil, fmt.Errorf("unsupported metadata games type: %d", typ)
+	}
+
+	where := []string{relation.groupColumn + " = ?"}
+	args := []any{metadataID}
 	if !includeAll {
-		where += " AND g.visibility = ?"
+		where = append(where, "g.visibility = ?")
 		args = append(args, domain.GameVisibilityPublic)
 	}
 
-	var games []domain.SeriesGameSummary
 	query := fmt.Sprintf(`
-		SELECT
-			g.id,
-			g.public_id,
-			g.title,
-			g.title_alt,
-			g.visibility,
-			g.summary,
-			g.release_date,
-			g.cover_image,
-			g.banner_image,
-			g.wiki_content,
-			g.downloads,
-			(
-				SELECT ga.path
-				FROM game_assets ga
-				WHERE ga.game_id = g.id AND ga.asset_type = 'screenshot'
-				ORDER BY ga.sort_order ASC, ga.id ASC
-				LIMIT 1
-			) AS primary_screenshot,
-			CASE WHEN EXISTS (SELECT 1 FROM favorite_games fg WHERE fg.game_id = g.id) THEN 1 ELSE 0 END AS is_favorite,
-			g.series_id,
-			s.name AS series_name,
-			g.created_at,
-			g.updated_at
+		SELECT %s
 		FROM games g
-		INNER JOIN series s ON s.id = g.series_id
+		LEFT JOIN series s ON s.id = g.series_id
 		%s
+		WHERE %s
 		ORDER BY g.updated_at DESC, g.id DESC
-	`, where)
+	`, metadataGameSummarySelect(), relation.join, strings.Join(where, " AND "))
 
+	var games []domain.MetadataGameSummary
 	if err := r.db.Select(&games, query, args...); err != nil {
-		return nil, fmt.Errorf("list series games: %w", err)
+		return nil, fmt.Errorf("list %s games: %w", relation.name, err)
 	}
 
 	return games, nil
 }
 
-func (r *MetadataRepository) ListSeriesGamesBySeriesIDs(seriesIDs []int64, includeAll bool) (map[int64][]domain.SeriesGameSummary, error) {
-	normalized := uniquePositiveIDs(seriesIDs)
-	if len(normalized) == 0 {
-		return map[int64][]domain.SeriesGameSummary{}, nil
+func (r *MetadataRepository) ListMetadataGamesByIDs(typ domain.MetadataType, metadataIDs []int64, includeAll bool) (map[int64][]domain.MetadataGameSummary, error) {
+	relation, ok := metadataGamesRelationFor(typ)
+	if !ok {
+		return nil, fmt.Errorf("unsupported metadata games type: %d", typ)
 	}
 
-	where := "WHERE g.series_id IN (?)"
+	normalized := uniquePositiveIDs(metadataIDs)
+	gamesByMetadataID := make(map[int64][]domain.MetadataGameSummary, len(normalized))
+	if len(normalized) == 0 {
+		return gamesByMetadataID, nil
+	}
+	for _, metadataID := range normalized {
+		gamesByMetadataID[metadataID] = []domain.MetadataGameSummary{}
+	}
+
+	where := []string{relation.groupColumn + " IN (?)"}
 	args := []any{normalized}
 	if !includeAll {
-		where += " AND g.visibility = ?"
+		where = append(where, "g.visibility = ?")
 		args = append(args, domain.GameVisibilityPublic)
 	}
 
 	query, boundArgs, err := sqlx.In(fmt.Sprintf(`
 		SELECT
-			g.series_id AS group_series_id,
-			g.series_id,
-			g.id,
-			g.public_id,
-			g.title,
-			g.title_alt,
-			g.visibility,
-			g.summary,
-			g.release_date,
-			g.cover_image,
-			g.banner_image,
-			g.wiki_content,
-			g.downloads,
-			(
-				SELECT ga.path
-				FROM game_assets ga
-				WHERE ga.game_id = g.id AND ga.asset_type = 'screenshot'
-				ORDER BY ga.sort_order ASC, ga.id ASC
-				LIMIT 1
-			) AS primary_screenshot,
-			CASE WHEN EXISTS (SELECT 1 FROM favorite_games fg WHERE fg.game_id = g.id) THEN 1 ELSE 0 END AS is_favorite,
-			s.name AS series_name,
-			g.created_at,
-			g.updated_at
+			%s AS group_metadata_id,
+			%s
 		FROM games g
-		INNER JOIN series s ON s.id = g.series_id
+		LEFT JOIN series s ON s.id = g.series_id
 		%s
-		ORDER BY g.series_id ASC, g.updated_at DESC, g.id DESC
-	`, where), args...)
+		WHERE %s
+		ORDER BY %s ASC, g.updated_at DESC, g.id DESC
+	`, relation.groupColumn, metadataGameSummarySelect(), relation.join, strings.Join(where, " AND "), relation.groupColumn), args...)
 	if err != nil {
-		return nil, fmt.Errorf("build series games by ids query: %w", err)
+		return nil, fmt.Errorf("build %s games by ids query: %w", relation.name, err)
 	}
 	query = r.db.Rebind(query)
 
-	type seriesGameRow struct {
-		SeriesID int64 `db:"group_series_id"`
-		domain.SeriesGameSummary
+	type metadataGameRow struct {
+		MetadataID int64 `db:"group_metadata_id"`
+		domain.MetadataGameSummary
 	}
 
-	var rows []seriesGameRow
+	var rows []metadataGameRow
 	if err := r.db.Select(&rows, query, boundArgs...); err != nil {
-		return nil, fmt.Errorf("list series games by ids: %w", err)
+		return nil, fmt.Errorf("list %s games by ids: %w", relation.name, err)
 	}
 
-	gamesBySeriesID := make(map[int64][]domain.SeriesGameSummary, len(normalized))
-	for _, seriesID := range normalized {
-		gamesBySeriesID[seriesID] = []domain.SeriesGameSummary{}
-	}
 	for _, row := range rows {
-		gamesBySeriesID[row.SeriesID] = append(gamesBySeriesID[row.SeriesID], row.SeriesGameSummary)
+		gamesByMetadataID[row.MetadataID] = append(gamesByMetadataID[row.MetadataID], row.MetadataGameSummary)
 	}
 
-	return gamesBySeriesID, nil
+	return gamesByMetadataID, nil
+}
+
+func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([]domain.MetadataGameSummary, error) {
+	return r.ListMetadataGames(domain.MetadataSeries, seriesID, includeAll)
+}
+
+func (r *MetadataRepository) ListSeriesGamesBySeriesIDs(seriesIDs []int64, includeAll bool) (map[int64][]domain.MetadataGameSummary, error) {
+	return r.ListMetadataGamesByIDs(domain.MetadataSeries, seriesIDs, includeAll)
 }
 
 func (r *MetadataRepository) DeleteUnusedSeries() error {

@@ -107,6 +107,11 @@ type timelineGameItemResponse struct {
 	BannerImage *string `json:"banner_image"`
 }
 
+type gamePreviewVideosResponse struct {
+	PublicID      string              `json:"public_id"`
+	PreviewVideos []gameAssetResponse `json:"preview_videos"`
+}
+
 type gameAssetResponse struct {
 	ID        int64    `json:"id"`
 	AssetUID  string   `json:"asset_uid"`

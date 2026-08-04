@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jmoiron/sqlx"
+
 	"github.com/hao/game/internal/domain"
 )
 
@@ -128,6 +130,51 @@ func (r *GamesRepository) ListScreenshots(gameID int64) ([]domain.GameAsset, err
 
 func (r *GamesRepository) ListVideos(gameID int64) ([]domain.GameAsset, error) {
 	return r.listAssetsByType(gameID, "video")
+}
+
+// videoAssetRow 是批量预告片查询的行映射：在 GameAsset 上附带游戏可见性，
+// 供 service 层在返回前过滤私有游戏，避免把私有游戏的存在性泄露给匿名调用者。
+type videoAssetRow struct {
+	PublicID   string `db:"public_id"`
+	Visibility string `db:"visibility"`
+	domain.GameAsset
+}
+
+// ListVideosByPublicIDs 按 public_id 批量返回 video 资产，按 public_id 与
+// sort_order 排序，供游戏店会话一次拉取多个游戏的预告片。
+func (r *GamesRepository) ListVideosByPublicIDs(publicIDs []string) ([]videoAssetRow, error) {
+	normalized := make([]string, 0, len(publicIDs))
+	for _, id := range publicIDs {
+		trimmed := strings.TrimSpace(id)
+		if trimmed == "" {
+			continue
+		}
+		normalized = append(normalized, strings.ToLower(trimmed))
+	}
+	if len(normalized) == 0 {
+		return nil, nil
+	}
+
+	query, boundArgs, err := sqlx.In(`
+		SELECT g.public_id, g.visibility,
+			ga.id, ga.game_id, ga.asset_uid, ga.asset_type, ga.path,
+			ga.sort_order, ga.position_x, ga.position_y, ga.width_pct, ga.created_at
+		FROM game_assets ga
+		INNER JOIN games g ON g.id = ga.game_id
+		WHERE ga.asset_type = 'video' AND g.public_id IN (?)
+		ORDER BY g.public_id, ga.sort_order, ga.id
+	`, normalized)
+	if err != nil {
+		return nil, fmt.Errorf("build videos by public ids query: %w", err)
+	}
+	query = r.db.Rebind(query)
+
+	var rows []videoAssetRow
+	if err := r.db.Select(&rows, query, boundArgs...); err != nil {
+		return nil, fmt.Errorf("list videos by public ids: %w", err)
+	}
+
+	return rows, nil
 }
 
 func (r *GamesRepository) ListCovers(gameID int64) ([]domain.GameAsset, error) {

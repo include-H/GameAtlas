@@ -61,6 +61,41 @@ func TestMetadataRepositoryListSeriesGamesBySeriesIDsInitializesEmptyAndFiltersV
 	}
 }
 
+func TestMetadataRepositoryListPublisherGamesByIDsInitializesGroupsAndFiltersVisibility(t *testing.T) {
+	db := openRepositoryTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	publisherAID := insertRepositoryPublisher(t, db, "Publisher A", "publisher-a")
+	publisherBID := insertRepositoryPublisher(t, db, "Publisher B", "publisher-b")
+	publicID := insertRepositoryGame(t, db, "publisher-public", "Publisher Public", "public")
+	privateID := insertRepositoryGame(t, db, "publisher-private", "Publisher Private", "private")
+	otherID := insertRepositoryGame(t, db, "publisher-other", "Publisher Other", "public")
+	linkRepositoryGamePublisher(t, db, publicID, publisherAID, 0)
+	linkRepositoryGamePublisher(t, db, privateID, publisherAID, 1)
+	linkRepositoryGamePublisher(t, db, otherID, publisherBID, 0)
+
+	repo := NewMetadataRepository(db)
+
+	publicOnly, err := repo.ListMetadataGamesByIDs(domain.MetadataPublishers, []int64{publisherAID, publisherBID}, false)
+	if err != nil {
+		t.Fatalf("ListMetadataGamesByIDs(false) returned error: %v", err)
+	}
+	if len(publicOnly[publisherAID]) != 1 || publicOnly[publisherAID][0].ID != publicID {
+		t.Fatalf("publicOnly[publisherA] = %+v, want only public game", publicOnly[publisherAID])
+	}
+	if len(publicOnly[publisherBID]) != 1 || publicOnly[publisherBID][0].ID != otherID {
+		t.Fatalf("publicOnly[publisherB] = %+v, want other public game", publicOnly[publisherBID])
+	}
+
+	includeAll, err := repo.ListMetadataGames(domain.MetadataPublishers, publisherAID, true)
+	if err != nil {
+		t.Fatalf("ListMetadataGames(true) returned error: %v", err)
+	}
+	if len(includeAll) != 2 {
+		t.Fatalf("includeAll publisher games = %+v, want public and private games", includeAll)
+	}
+}
+
 func TestMetadataRepositoryFindSimpleBySlugReturnsExistingItem(t *testing.T) {
 	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()

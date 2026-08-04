@@ -59,8 +59,8 @@ type GameListItem struct {
 	UpdatedAt         string `db:"updated_at"`
 }
 
-// 2026-05-09: SeriesGameSummary 是系列摘要视图，保留 WikiContent 用于摘要展示，省略聚合计数字段（ScreenshotCount 等）因为系列视图不需要这些数据。
-type SeriesGameSummary struct {
+// MetadataGameSummary 是系列、发行商等分组详情视图，保留 WikiContent 用于摘要展示，省略聚合计数字段（ScreenshotCount 等）因为分组视图不需要这些数据。
+type MetadataGameSummary struct {
 	ID                int64   `db:"id"`
 	PublicID          string  `db:"public_id"`
 	Title             string  `db:"title"`

@@ -1,10 +1,13 @@
 <template>
-  <router-view v-if="isAuthPage" v-slot="{ Component, route }">
+  <router-view v-if="isFullscreenPage" v-slot="{ Component, route }">
     <transition name="route-fade" mode="out-in">
-      <div :key="String(route.name || route.path)" class="auth-route-shell">
-        <shared-ambient-background />
+      <div
+        :key="String(route.name || route.path)"
+        :class="route.name === 'login' ? 'auth-route-shell' : 'fullscreen-route-shell'"
+      >
+        <shared-ambient-background v-if="route.name === 'login'" />
         <component :is="Component" />
-        <alert-banner />
+        <alert-banner v-if="route.name === 'login'" />
       </div>
     </transition>
   </router-view>
@@ -153,7 +156,7 @@ const appName = 'GameAtlas'
 const sideWidth = 240
 const collapsedSideWidth = 48
 const compactNavigationBreakpoint = 992
-const isAuthPage = computed(() => route.name === 'login')
+const isFullscreenPage = computed(() => route.name === 'login' || route.meta?.fullscreen === true)
 
 const collapsed = computed({
   get: () => sidebarCollapsed.value,
@@ -532,6 +535,19 @@ body {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   background: transparent;
+}
+
+.fullscreen-route-shell {
+  height: 100vh;
+  height: 100dvh;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background: #17110d;
 }
 
 .arco-layout {

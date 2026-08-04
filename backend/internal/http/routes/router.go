@@ -99,6 +99,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.GET("/games", gamesHandler.List)
 	api.GET("/games/timeline", gamesHandler.ListTimeline)
 	api.GET("/games/stats", gamesHandler.Stats)
+	api.GET("/games/preview-videos", gamesHandler.ListPreviewVideos)
 	api.GET("/games/:publicId", gamesHandler.Get)
 	api.PUT("/games/:publicId/favorite", gamesHandler.Favorite)
 	api.DELETE("/games/:publicId/favorite", gamesHandler.Unfavorite)
@@ -119,6 +120,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.GET("/developers", developersHandler.List)
 	api.POST("/developers", developersHandler.Create)
 	api.GET("/publishers", publishersHandler.List)
+	api.GET("/publishers/:id", publishersHandler.Get)
 	api.POST("/publishers", publishersHandler.Create)
 	api.PUT("/games/:publicId/review-issues/:issueKey/ignore", reviewIssueOverrideHandler.Ignore)
 	api.DELETE("/games/:publicId/review-issues/:issueKey/ignore", reviewIssueOverrideHandler.Delete)
@@ -333,6 +335,7 @@ func registerStaticRoutesFromDisk(router *gin.Engine, staticDir string, indexPat
 	if _, err := os.Stat(uiAssetsDir); err == nil {
 		router.Static("/ui", uiAssetsDir)
 	}
+	registerLive2DStaticRoutesFromDisk(router, staticDir)
 
 	router.NoRoute(func(c *gin.Context) {
 		if !shouldServeSPAIndex(c) {
@@ -356,6 +359,7 @@ func registerStaticRoutesFromEmbedded(router *gin.Engine) {
 	if uiFS, err := fs.Sub(distFS, "ui"); err == nil {
 		router.StaticFS("/ui", http.FS(uiFS))
 	}
+	registerLive2DStaticRoutesFromFS(router, distFS)
 
 	router.NoRoute(func(c *gin.Context) {
 		if !shouldServeSPAIndex(c) {
@@ -371,6 +375,24 @@ func registerStaticRoutesFromEmbedded(router *gin.Engine) {
 
 		c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 	})
+}
+
+func registerLive2DStaticRoutesFromDisk(router *gin.Engine, staticDir string) {
+	for _, name := range []string{"live2d-widget", "live2d-models", "live2d-config"} {
+		dir := filepath.Join(staticDir, name)
+		if _, err := os.Stat(dir); err == nil {
+			router.Static("/"+name, dir)
+		}
+	}
+}
+
+func registerLive2DStaticRoutesFromFS(router *gin.Engine, distFS fs.FS) {
+	for _, name := range []string{"live2d-widget", "live2d-models", "live2d-config"} {
+		sub, err := fs.Sub(distFS, name)
+		if err == nil {
+			router.StaticFS("/"+name, http.FS(sub))
+		}
+	}
 }
 
 func shouldServeSPAIndex(c *gin.Context) bool {

@@ -5,8 +5,10 @@ import { useUiStore } from '@/stores/ui'
 // Import route modules
 import base from './modules/base'
 import dashboard from './modules/dashboard'
+import gameStore from './modules/game-store'
 import games, { gameDetailRoute, pendingCenterRoute, timelineRoute, wikiEditRoute } from './modules/games'
 import series, { seriesDetailRoute } from './modules/series'
+import publishers, { publisherDetailRoute } from './modules/publishers'
 import settings from './modules/settings'
 import notFound from './modules/not-found'
 
@@ -16,12 +18,15 @@ import notFound from './modules/not-found'
  */
 export const appRoutes: RouteRecordRaw[] = [
   dashboard,
+  gameStore,
   games,
   timelineRoute,
   series,
+  publishers,
   pendingCenterRoute,
   gameDetailRoute,
   seriesDetailRoute,
+  publisherDetailRoute,
   wikiEditRoute,
   settings,
 ]

@@ -799,3 +799,62 @@ func containsRepositoryGameID(ids []int64, want int64) bool {
 	}
 	return false
 }
+
+func TestGamesRepositoryListVideosByPublicIDs(t *testing.T) {
+	db := openRepositoryTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	repo := NewGamesRepository(db)
+
+	withVideoID := insertRepositoryGame(t, db, "with-video", "With Video", "public")
+	withoutVideoID := insertRepositoryGame(t, db, "without-video", "Without Video", "public")
+	privateWithVideoID := insertRepositoryGame(t, db, "private-video", "Private Video", "private")
+	_ = withoutVideoID
+
+	insertRepositoryAsset(t, db, withVideoID, "v1", "video", "/assets/with-video/v1.mp4", 1)
+	insertRepositoryAsset(t, db, withVideoID, "v0", "video", "/assets/with-video/v0.mp4", 0)
+	insertRepositoryAsset(t, db, withVideoID, "cover", "cover", "/assets/with-video/cover.jpg", 0)
+	insertRepositoryAsset(t, db, privateWithVideoID, "pv", "video", "/assets/private-video/pv.mp4", 0)
+
+	rows, err := repo.ListVideosByPublicIDs([]string{"with-video", "without-video", "private-video", "missing"})
+	if err != nil {
+		t.Fatalf("ListVideosByPublicIDs returned error: %v", err)
+	}
+
+	// with-video has two video assets sorted by sort_order; without-video and missing have none.
+	if len(rows) != 3 {
+		t.Fatalf("rows = %d, want 3 (2 videos for with-video + 1 for private-video)", len(rows))
+	}
+
+	// Path already starts with "/", so the key is a plain concatenation.
+	byID := map[string]videoAssetRow{}
+	for _, row := range rows {
+		byID[row.PublicID+row.Path] = row
+	}
+	first := byID["with-video/assets/with-video/v0.mp4"]
+	second := byID["with-video/assets/with-video/v1.mp4"]
+	if first.PublicID != "with-video" || second.PublicID != "with-video" {
+		t.Fatalf("expected with-video rows, got %q and %q", first.PublicID, second.PublicID)
+	}
+	if first.SortOrder != 0 || second.SortOrder != 1 {
+		t.Fatalf("sort_order = %d and %d, want 0 and 1", first.SortOrder, second.SortOrder)
+	}
+	private := byID["private-video/assets/private-video/pv.mp4"]
+	if private.Visibility != "private" {
+		t.Fatalf("private row visibility = %q, want private", private.Visibility)
+	}
+}
+
+func TestGamesRepositoryListVideosByPublicIDsEmpty(t *testing.T) {
+	db := openRepositoryTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	repo := NewGamesRepository(db)
+	rows, err := repo.ListVideosByPublicIDs(nil)
+	if err != nil {
+		t.Fatalf("ListVideosByPublicIDs returned error: %v", err)
+	}
+	if len(rows) != 0 {
+		t.Fatalf("rows = %d, want 0", len(rows))
+	}
+}

@@ -93,6 +93,11 @@ export interface Publisher {
   latest_updated_at?: string | null
 }
 
+export interface PublisherDetail {
+  publisher: Publisher
+  games: GameListItemView[]
+}
+
 
 export interface PublicGameFileEntry {
   id: number

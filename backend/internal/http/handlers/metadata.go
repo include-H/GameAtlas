@@ -84,13 +84,8 @@ func parseMetadataListSort(c *gin.Context) (string, bool) {
 	}
 }
 
-
 func (h *MetadataHandler) Get(c *gin.Context) {
-	// 2026-05-09: only series resources support detail queries today. This guard
-	// belongs here rather than in the service because it is a routing-level
-	// constraint: the Get endpoint was wired for series specifically, not as a
-	// generic metadata detail action.
-	if h.resource.Type != domain.MetadataSeries {
+	if h.resource.Type != domain.MetadataSeries && h.resource.Type != domain.MetadataPublishers {
 		writeJSONError(c, http.StatusNotFound, "资源不存在")
 		return
 	}
@@ -100,17 +95,28 @@ func (h *MetadataHandler) Get(c *gin.Context) {
 		return
 	}
 
-	detail, err := h.service.GetSeriesDetail(id, isAdminRequest(c))
-	if err != nil {
-		// 2026-05-09: 统一为中文错误信息
-		writeServiceError(c, err, "无效的元数据请求")
-		return
+	includeAll := isAdminRequest(c)
+	response := gin.H{"games": []gameListItemResponse{}}
+	switch h.resource.Type {
+	case domain.MetadataSeries:
+		detail, err := h.service.GetSeriesDetail(id, includeAll)
+		if err != nil {
+			writeServiceError(c, err, "无效的元数据请求")
+			return
+		}
+		response["series"] = toMetadataResponse(*detail.Series)
+		response["games"] = toMetadataGameSummaryResponses(detail.Games)
+	case domain.MetadataPublishers:
+		detail, err := h.service.GetPublisherDetail(id, includeAll)
+		if err != nil {
+			writeServiceError(c, err, "无效的元数据请求")
+			return
+		}
+		response["publisher"] = toMetadataResponse(*detail.Publisher)
+		response["games"] = toMetadataGameSummaryResponses(detail.Games)
 	}
 
-	writeJSONSuccess(c, http.StatusOK, gin.H{
-		"series": toMetadataResponse(*detail.Series),
-		"games":  toSeriesGameSummaryResponses(detail.Games),
-	})
+	writeJSONSuccess(c, http.StatusOK, response)
 }
 
 func (h *MetadataHandler) Create(c *gin.Context) {
