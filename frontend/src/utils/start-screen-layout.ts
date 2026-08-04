@@ -1,19 +1,19 @@
 import type { StartScreenTile, StartScreenTileSize } from '@/services/types'
 
-export interface PackedStartScreenSlot {
+interface PackedStartScreenSlot {
   tile: StartScreenTile
   globalIndex: number
   row: number
   col: number
 }
 
-export interface PackedStartScreenColumn {
+interface PackedStartScreenColumn {
   slots: PackedStartScreenSlot[]
 }
 
 // 列 = 高度容器：2 格宽 × 6 行高（约三个 2x2 大正方形占地），横向无限延伸。
-export const START_SCREEN_COLUMN_ROWS = 6
-export const START_SCREEN_COLUMN_COLS = 2
+const START_SCREEN_COLUMN_ROWS = 6
+const START_SCREEN_COLUMN_COLS = 2
 
 const SPANS: Record<StartScreenTileSize, { rows: number; cols: number }> = {
   small: { rows: 1, cols: 1 },
