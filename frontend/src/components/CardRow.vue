@@ -96,7 +96,8 @@ import {
   IconStar,
   IconFire,
   IconThunderbolt,
-  IconTrophy
+  IconTrophy,
+  IconSync
 } from '@arco-design/web-vue/es/icon'
 
 interface Props {
@@ -136,6 +137,7 @@ const iconMap: Record<string, Component> = {
   'mdi-gamepad-variant': IconTrophy,
   'mdi-crown': IconStar,
   'mdi-trophy': IconTrophy,
+  'mdi-update': IconSync,
   'new-box': IconPlus,
   'download': IconDownload,
   'heart': IconHeart,
@@ -146,6 +148,7 @@ const iconMap: Record<string, Component> = {
   'gamepad': IconTrophy,
   'crown': IconStar,
   'trophy': IconTrophy,
+  'update': IconSync,
 }
 
 const iconComponent = computed(() => {

@@ -176,11 +176,16 @@ func (r *GameCatalogRepository) Stats(params domain.GamesListParams) (*domain.Ga
 		return nil, fmt.Errorf("get games stats: %w", err)
 	}
 
-	loadGames := func(orderBy string) ([]domain.GameListItem, error) {
+	loadGames := func(orderBy string, favoriteOnly bool) ([]domain.GameListItem, error) {
+		favoriteJoin := ""
+		if favoriteOnly {
+			favoriteJoin = "INNER JOIN favorite_games fg ON fg.game_id = g.id"
+		}
 		query := fmt.Sprintf(`
 			WITH stat_games AS (
 				SELECT g.id
 				FROM games g
+				%s
 				WHERE %s
 				ORDER BY %s
 				LIMIT 12
@@ -198,7 +203,7 @@ func (r *GameCatalogRepository) Stats(params domain.GamesListParams) (*domain.Ga
 			LEFT JOIN publisher_stats ps ON ps.game_id = g.id
 			LEFT JOIN series s ON s.id = g.series_id
 			ORDER BY %s
-		`, baseWhere, orderBy, gameListItemStatsCTEs("stat_games"), gamesListItemSelectColumns(), orderBy)
+		`, favoriteJoin, baseWhere, orderBy, gameListItemStatsCTEs("stat_games"), gamesListItemSelectColumns(), orderBy)
 		stmt, queryArgs, err := sqlx.Named(query, args)
 		if err != nil {
 			return nil, fmt.Errorf("build stats games query: %w", err)
@@ -212,11 +217,19 @@ func (r *GameCatalogRepository) Stats(params domain.GamesListParams) (*domain.Ga
 		return games, nil
 	}
 
-	recentGames, err := loadGames("g.created_at DESC, g.id DESC")
+	recentGames, err := loadGames("g.created_at DESC, g.id DESC", false)
 	if err != nil {
 		return nil, err
 	}
-	popularGames, err := loadGames("g.downloads DESC, g.id DESC")
+	recentlyUpdatedGames, err := loadGames("g.updated_at DESC, g.id DESC", false)
+	if err != nil {
+		return nil, err
+	}
+	popularGames, err := loadGames("g.downloads DESC, g.id DESC", false)
+	if err != nil {
+		return nil, err
+	}
+	favoriteGames, err := loadGames("fg.created_at DESC, g.id DESC", true)
 	if err != nil {
 		return nil, err
 	}
@@ -226,11 +239,13 @@ func (r *GameCatalogRepository) Stats(params domain.GamesListParams) (*domain.Ga
 	}
 
 	return &domain.GameStats{
-		TotalGames:     summary.TotalGames,
-		TotalDownloads: summary.TotalDownloads,
-		RecentGames:    recentGames,
-		PopularGames:   popularGames,
-		FavoriteCount:  favoriteCount,
-		PendingReviews: summary.PendingReviews,
+		TotalGames:           summary.TotalGames,
+		TotalDownloads:       summary.TotalDownloads,
+		RecentGames:          recentGames,
+		RecentlyUpdatedGames: recentlyUpdatedGames,
+		PopularGames:         popularGames,
+		FavoriteGames:        favoriteGames,
+		FavoriteCount:        favoriteCount,
+		PendingReviews:       summary.PendingReviews,
 	}, nil
 }

@@ -47,9 +47,13 @@ describe('games store favorite sync', () => {
       recent_games: [
         { id: 1, public_id: 'game-1', title: 'Recent Game', isFavorite: false },
       ],
+      recently_updated_games: [
+        { id: 1, public_id: 'game-1', title: 'Updated Game', isFavorite: false },
+      ],
       popular_games: [
         { id: 1, public_id: 'game-1', title: 'Popular Game', isFavorite: false },
       ],
+      favorite_games: [],
     } as unknown as GameStats
 
     const isFavorite = await store.toggleFavorite('game-1')
@@ -59,7 +63,10 @@ describe('games store favorite sync', () => {
     expect(store.games[0]?.isFavorite).toBe(true)
     expect(store.currentGame?.isFavorite).toBe(true)
     expect(store.stats?.recent_games[0]?.isFavorite).toBe(true)
+    expect(store.stats?.recently_updated_games[0]?.isFavorite).toBe(true)
     expect(store.stats?.popular_games[0]?.isFavorite).toBe(true)
+    expect(store.stats?.favorite_games[0]?.public_id).toBe('game-1')
+    expect(store.stats?.favorite_games[0]?.isFavorite).toBe(true)
     expect(store.stats?.favorite_count).toBe(1)
   })
 

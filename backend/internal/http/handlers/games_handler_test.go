@@ -15,8 +15,8 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/hao/game/internal/config"
-	"github.com/hao/game/internal/domain"
 	dbpkg "github.com/hao/game/internal/db"
+	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/repositories"
 )
 
@@ -153,6 +153,82 @@ func TestGamesHandlerListTimelinePaginatesWithCursor(t *testing.T) {
 	}
 	if page2.Pagination.HasMore {
 		t.Fatalf("expected hasMore=false (no games after ancient)")
+	}
+}
+
+func TestGamesHandlerStatsIncludesHomeFeedCollections(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	firstID := insertGamesHandlerTestGame(t, db, "stats-home-a", "Stats Home A", "public", "2024-01-01")
+	secondID := insertGamesHandlerTestGame(t, db, "stats-home-b", "Stats Home B", "public", "2024-02-01")
+	if _, err := db.Exec(`UPDATE games SET updated_at = ? WHERE id = ?`, "2026-01-02 00:00:00", firstID); err != nil {
+		t.Fatalf("set first stats game updated_at: %v", err)
+	}
+	if _, err := db.Exec(`UPDATE games SET updated_at = ? WHERE id = ?`, "2026-01-03 00:00:00", secondID); err != nil {
+		t.Fatalf("set second stats game updated_at: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, secondID); err != nil {
+		t.Fatalf("insert stats favorite game: %v", err)
+	}
+
+	handler := newSplitGamesHandlerForTest(config.Config{}, db)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/games/stats", nil)
+	handler.Stats(context)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+		Data    struct {
+			TotalGames  int `json:"total_games"`
+			RecentGames []struct {
+				ID int64 `json:"id"`
+			} `json:"recent_games"`
+			RecentlyUpdatedGames []struct {
+				ID int64 `json:"id"`
+			} `json:"recently_updated_games"`
+			PopularGames []struct {
+				ID int64 `json:"id"`
+			} `json:"popular_games"`
+			FavoriteGames []struct {
+				ID int64 `json:"id"`
+			} `json:"favorite_games"`
+			FavoriteCount  int `json:"favorite_count"`
+			PendingReviews int `json:"pending_reviews"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if !response.Success {
+		t.Fatalf("expected success=true")
+	}
+	if response.Data.TotalGames != 2 {
+		t.Fatalf("total_games = %d, want 2", response.Data.TotalGames)
+	}
+	if len(response.Data.RecentGames) != 2 {
+		t.Fatalf("recent_games = %d, want 2", len(response.Data.RecentGames))
+	}
+	if len(response.Data.RecentlyUpdatedGames) != 2 || response.Data.RecentlyUpdatedGames[0].ID != secondID {
+		t.Fatalf("recently_updated_games = %+v, want second game first", response.Data.RecentlyUpdatedGames)
+	}
+	if len(response.Data.PopularGames) != 2 {
+		t.Fatalf("popular_games = %d, want 2", len(response.Data.PopularGames))
+	}
+	if len(response.Data.FavoriteGames) != 1 || response.Data.FavoriteGames[0].ID != secondID {
+		t.Fatalf("favorite_games = %+v, want only second game", response.Data.FavoriteGames)
+	}
+	if response.Data.FavoriteCount != 1 {
+		t.Fatalf("favorite_count = %d, want 1", response.Data.FavoriteCount)
 	}
 }
 

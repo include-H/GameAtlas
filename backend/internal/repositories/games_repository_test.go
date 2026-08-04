@@ -181,8 +181,17 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	if len(stats.RecentGames) != 2 || stats.RecentGames[0].ID != secondGameID {
 		t.Fatalf("RecentGames = %+v, want second game first", stats.RecentGames)
 	}
+	if len(stats.RecentlyUpdatedGames) != 2 || stats.RecentlyUpdatedGames[0].ID != secondGameID {
+		t.Fatalf("RecentlyUpdatedGames = %+v, want second game first", stats.RecentlyUpdatedGames)
+	}
 	if len(stats.PopularGames) != 2 || stats.PopularGames[0].ID != secondGameID {
 		t.Fatalf("PopularGames = %+v, want second game first", stats.PopularGames)
+	}
+	if len(stats.FavoriteGames) != 1 || stats.FavoriteGames[0].ID != secondGameID {
+		t.Fatalf("FavoriteGames = %+v, want only second game", stats.FavoriteGames)
+	}
+	if !stats.FavoriteGames[0].IsFavorite {
+		t.Fatalf("favorite[0].IsFavorite = false, want true")
 	}
 	if stats.PopularGames[0].ScreenshotCount != 2 {
 		t.Fatalf("popular[0].ScreenshotCount = %d, want 2", stats.PopularGames[0].ScreenshotCount)
@@ -228,6 +237,9 @@ func TestGamesRepositoryStatsIncludesPrivateFavoritesForAdmin(t *testing.T) {
 
 	if stats.FavoriteCount != 2 {
 		t.Fatalf("FavoriteCount = %d, want 2 favorites for admin scope", stats.FavoriteCount)
+	}
+	if len(stats.FavoriteGames) != 2 {
+		t.Fatalf("FavoriteGames = %d, want 2 favorites for admin scope", len(stats.FavoriteGames))
 	}
 }
 

@@ -1,7 +1,7 @@
 <template>
-  <div class="dashboard" :class="{ 'is-ready': isDashboardReady }">
-    <!-- Welcome Section (Slimmer Header) -->
-    <div v-show="isDashboardReady && !loadFailed" class="dashboard-section-title page-hero">
+  <div class="dashboard">
+    <!-- Welcome Section -->
+    <div v-if="isDashboardReady && !loadFailed" class="dashboard-section-title page-hero">
       <div class="page-hero__content">
         <h1 class="page-hero__title text-gradient">
           发现
@@ -21,139 +21,146 @@
       仪表盘刷新失败，当前显示的是上次成功加载的数据。
     </a-alert>
 
-    <!-- Top Hero Section -->
-    <a-row v-show="isDashboardReady && !loadFailed" :gutter="[16, 16]" class="dashboard-hero-section">
-      <a-col :xs="24" :sm="24" :md="24" :lg="17" :xl="17">
-        <game-carousel
-          v-if="carouselGames.length > 0"
-          :games="carouselGames"
-          :auto-play="true"
-          :interval="5000"
-        />
-      </a-col>
-      <a-col :xs="24" :sm="24" :md="24" :lg="7" :xl="7">
-        <div class="dashboard-stats-grid">
-          <stat-card
-            title="游戏总数"
-            :value="totalGames"
-            icon="mdi-gamepad-variant"
-            color="var(--color-primary-6)"
-            :height="104"
-            @click="router.push('/games')"
-          />
+    <!-- Initial Skeleton -->
+    <div v-if="isLoading && !isDashboardReady" class="dashboard-skeleton">
+      <a-skeleton :animation="true" class="dashboard-skeleton__hero">
+        <a-skeleton-shape class="dashboard-skeleton__hero-shape" />
+        <a-skeleton-line :rows="2" />
+      </a-skeleton>
+      <a-skeleton :animation="true" class="dashboard-skeleton__stats">
+        <a-skeleton-shape class="dashboard-skeleton__stat" />
+        <a-skeleton-shape class="dashboard-skeleton__stat" />
+        <a-skeleton-shape class="dashboard-skeleton__stat" />
+        <a-skeleton-shape class="dashboard-skeleton__stat" />
+      </a-skeleton>
+      <a-skeleton :animation="true" class="dashboard-skeleton__rows">
+        <a-skeleton-line :rows="4" />
+      </a-skeleton>
+    </div>
 
-          <stat-card
-            title="收藏"
-            :value="favoriteCount"
-            icon="mdi-heart"
-            color="var(--color-danger-6)"
-            :height="104"
-            @click="router.push('/games?favorite=true')"
-          />
+    <template v-else-if="isDashboardReady && !loadFailed">
+      <dashboard-hero
+        class="dashboard-hero-section"
+        :games="carouselGames"
+        :is-admin="isAdmin"
+        :pending-reviews="pendingReviews"
+        @enter-store="router.push({ name: 'game-store' })"
+        @browse-games="router.push({ name: 'games' })"
+        @add-game="showAddGameModal = true"
+        @open-pending="router.push({ name: 'pending-center' })"
+      />
 
-          <stat-card
-            title="新入库"
-            :value="recentAdditions.length"
-            icon="mdi-new-box"
-            color="var(--color-success-6)"
-            :height="104"
-            @click="router.push('/games?sort=created_at&order=desc')"
-          />
+      <stat-overview
+        class="dashboard-stats-section"
+        :total-games="totalGames"
+        :total-downloads="totalDownloads"
+        :favorite-count="favoriteCount"
+        :pending-reviews="pendingReviews"
+      />
 
-          <stat-card
-            title="待处理"
-            :value="pendingReviews"
-            icon="mdi-clock"
-            color="var(--color-warning-6)"
-            :height="104"
-            @click="router.push('/games/pending')"
-          />
-        </div>
-      </a-col>
-    </a-row>
+      <a-divider class="dashboard-divider" />
 
-    <!-- Divider between stats and content -->
-    <a-divider v-show="isDashboardReady && !loadFailed" class="dashboard-divider" />
+      <game-row-section
+        v-if="recentAdditions.length > 0"
+        title="最近添加"
+        icon="mdi-new-box"
+        :items="recentAdditions"
+        view-all-route="/games?sort=created_at&order=desc"
+        @view="viewGame"
+        @view-series="viewSeries"
+        @toggle-favorite="toggleFavorite"
+      />
 
-    <!-- Recently Added -->
-    <card-row
-      v-show="isDashboardReady && !loadFailed"
-      v-if="recentAdditions.length > 0"
-      title="最近添加"
-      icon="mdi-new-box"
-      :items="recentAdditions"
-      :show-view-all="true"
-      view-all-route="/games?sort=created_at&order=desc"
+      <game-row-section
+        v-if="mostPlayed.length > 0"
+        title="下载最多"
+        icon="mdi-download"
+        :items="mostPlayed"
+        view-all-route="/games?sort=downloads&order=desc"
+        @view="viewGame"
+        @view-series="viewSeries"
+        @toggle-favorite="toggleFavorite"
+      />
+
+      <game-row-section
+        v-if="favoriteGames.length > 0"
+        title="我的收藏"
+        icon="mdi-heart"
+        :items="favoriteGames"
+        view-all-route="/games?favorite=true"
+        @view="viewGame"
+        @view-series="viewSeries"
+        @toggle-favorite="toggleFavorite"
+      />
+
+      <game-row-section
+        v-if="recentlyUpdated.length > 0"
+        title="最近更新"
+        icon="mdi-update"
+        :items="recentlyUpdated"
+        view-all-route="/games"
+        @view="viewGame"
+        @view-series="viewSeries"
+        @toggle-favorite="toggleFavorite"
+      />
+
+      <pending-overview
+        v-if="isAdmin"
+        :pending-reviews="pendingReviews"
+        :groups="pendingGroups"
+        @open-pending="router.push({ name: 'pending-center' })"
+      />
+
+      <!-- Empty State -->
+      <div v-if="isEmpty" class="dashboard-empty">
+        <icon-trophy class="dashboard-empty-icon" />
+        <h2 class="dashboard-empty-title">还没有游戏</h2>
+        <p class="dashboard-empty-text">
+          添加一些游戏到您的库中
+        </p>
+        <a-button
+          type="primary"
+          size="large"
+          @click="router.push('/games')"
+        >
+          浏览游戏
+        </a-button>
+      </div>
+    </template>
+
+    <a-empty
+      v-else-if="isDashboardReady && loadFailed"
+      description="仪表盘加载失败，请稍后重试。"
     >
-      <template #item="{ item }">
-        <game-card
-          :game="item"
-          @view="viewGame"
-          @view-series="viewSeries"
-          @toggle-favorite="toggleFavorite"
-        />
-      </template>
-    </card-row>
-
-    <!-- Most Downloaded -->
-    <card-row
-      v-show="isDashboardReady && !loadFailed"
-      v-if="mostPlayed.length > 0"
-      title="下载最多"
-      icon="mdi-download"
-      :items="mostPlayed"
-      :show-view-all="true"
-      view-all-route="/games?sort=downloads&order=desc"
-    >
-      <template #item="{ item }">
-        <game-card
-          :game="item"
-          @view="viewGame"
-          @view-series="viewSeries"
-          @toggle-favorite="toggleFavorite"
-        />
-      </template>
-    </card-row>
-
-    <!-- Empty State -->
-    <a-empty v-show="isDashboardReady" v-if="loadFailed" description="仪表盘加载失败，请稍后重试。">
       <a-button type="primary" @click="loadDashboardData">
         重新加载
       </a-button>
     </a-empty>
-
-    <div v-show="isDashboardReady && !loadFailed" v-if="isEmpty" class="dashboard-empty">
-      <icon-trophy class="dashboard-empty-icon" />
-      <h2 class="dashboard-empty-title">还没有游戏</h2>
-      <p class="dashboard-empty-text">
-        添加一些游戏到您的库中
-      </p>
-      <a-button
-        type="primary"
-        size="large"
-        @click="router.push('/games')"
-      >
-        浏览游戏
-      </a-button>
-    </div>
-
   </div>
 
+  <add-game-modal
+    v-model:visible="showAddGameModal"
+    :submitting="addGameSubmitting"
+    @submit="handleAddGameSubmit"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onActivated } from 'vue'
+import { computed, onActivated, onMounted, ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
+import { IconTrophy } from '@arco-design/web-vue/es/icon'
+import AddGameModal from '@/components/AddGameModal.vue'
+import DashboardHero from '@/components/dashboard/DashboardHero.vue'
+import StatOverview from '@/components/dashboard/StatOverview.vue'
+import GameRowSection from '@/components/dashboard/GameRowSection.vue'
+import PendingOverview from '@/components/dashboard/PendingOverview.vue'
+import gamesService from '@/services/games.service'
+import type { GameListItem, PendingIssueCounts } from '@/services/types'
+import { getHttpErrorMessage } from '@/utils/http-error'
+import { useAuthStore } from '@/stores/auth'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
-import {
-  IconTrophy
-} from '@arco-design/web-vue/es/icon'
-import StatCard from '@/components/StatCard.vue'
-import CardRow from '@/components/CardRow.vue'
-import GameCard from '@/components/GameCard.vue'
-import GameCarousel from '@/components/GameCarousel.vue'
-import type { GameListItem } from '@/services/types'
 
 defineOptions({
   name: 'DashboardView',
@@ -162,39 +169,46 @@ defineOptions({
 const router = useRouter()
 const gamesStore = useGamesStore()
 const uiStore = useUiStore()
+const authStore = useAuthStore()
+const { isAdmin } = storeToRefs(authStore)
 
 const isLoading = ref(false)
 const isDashboardReady = ref(false)
 const loadFailed = ref(false)
 const refreshFailedWithStaleData = ref(false)
+const lastLoadedAt = ref(0)
 
-// Directly use gamesStore.stats (it's already a ref)
+const showAddGameModal = ref(false)
+const addGameSubmitting = ref(false)
+const pendingGroups = ref<PendingIssueCounts | null>(null)
+
 const totalGames = computed(() => gamesStore.stats?.total_games ?? 0)
+const totalDownloads = computed(() => gamesStore.stats?.total_downloads ?? 0)
 const recentAdditions = computed(() => gamesStore.stats?.recent_games ?? [])
+const recentlyUpdated = computed(() => gamesStore.stats?.recently_updated_games ?? [])
 const mostPlayed = computed(() => gamesStore.stats?.popular_games ?? [])
+const favoriteGames = computed(() => gamesStore.stats?.favorite_games ?? [])
 const favoriteCount = computed(() => gamesStore.stats?.favorite_count ?? 0)
 const pendingReviews = computed(() => gamesStore.stats?.pending_reviews ?? 0)
 
-const isEmpty = computed(() => {
-  return totalGames.value === 0
-})
+const isEmpty = computed(() => totalGames.value === 0)
 
-// Get games for carousel (combine recent and most played, shuffle them)
+// 轮播保持稳定：优先下载最多，不足 5 个时用最近添加补齐，不再随机打乱。
 const carouselGames = computed(() => {
   const seen = new Set<number>()
-
-  return [...recentAdditions.value, ...mostPlayed.value]
-    .filter((game): game is GameListItem => {
-      if (!game || seen.has(game.id)) {
-        return false
-      }
-      seen.add(game.id)
-      return true
-    })
-    .sort(() => Math.random() - 0.5)
+  const games: GameListItem[] = []
+  for (const game of [...mostPlayed.value, ...recentAdditions.value]) {
+    if (seen.has(game.id)) {
+      continue
+    }
+    seen.add(game.id)
+    games.push(game)
+    if (games.length >= 5) {
+      break
+    }
+  }
+  return games
 })
-
-const lastLoadedAt = ref(0)
 
 const viewGame = (publicId: string) => {
   if (!publicId) return
@@ -222,6 +236,19 @@ const toggleFavorite = async (gameRef: string) => {
   }
 }
 
+const loadPendingGroups = async () => {
+  if (!isAdmin.value) return
+  try {
+    const result = await gamesService.getGames({
+      query: { page: 1, limit: 1, pending: true },
+    })
+    pendingGroups.value = result.pagination.pending_issue_counts ?? null
+  } catch {
+    // 分组摘要失败不影响首页主体，仅隐藏分组明细。
+    pendingGroups.value = null
+  }
+}
+
 const loadDashboardData = async () => {
   isLoading.value = true
   isDashboardReady.value = false
@@ -231,6 +258,7 @@ const loadDashboardData = async () => {
     await gamesStore.fetchStats()
     isDashboardReady.value = true
     lastLoadedAt.value = Date.now()
+    void loadPendingGroups()
   } catch {
     uiStore.addAlert('加载数据失败', 'error')
     // 2026-04-08: dashboard refresh failures keep last good stats visible, but must not
@@ -241,6 +269,24 @@ const loadDashboardData = async () => {
     isDashboardReady.value = true
   } finally {
     isLoading.value = false
+  }
+}
+
+const handleAddGameSubmit = async (data: { title: string; visibility: 'public' | 'private' }) => {
+  if (addGameSubmitting.value) return
+  addGameSubmitting.value = true
+  try {
+    await gamesService.createGame({
+      title: data.title,
+      visibility: data.visibility,
+    })
+    uiStore.addAlert(`游戏 "${data.title}" 添加成功`, 'success')
+    showAddGameModal.value = false
+    await loadDashboardData()
+  } catch (error) {
+    uiStore.addAlert(`添加游戏失败：${getHttpErrorMessage(error)}`, 'error')
+  } finally {
+    addGameSubmitting.value = false
   }
 }
 
@@ -262,15 +308,6 @@ onActivated(async () => {
   z-index: 2;
   animation: fadeInUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
   padding-bottom: 24px;
-  transition: opacity 0.28s ease;
-}
-
-.dashboard:not(.is-ready) {
-  opacity: 0;
-}
-
-.dashboard.is-ready {
-  opacity: 1;
 }
 
 @keyframes fadeInUp {
@@ -289,49 +326,44 @@ onActivated(async () => {
 }
 
 .dashboard-hero-section {
-  margin-bottom: 32px;
-  align-items: stretch;
+  margin-bottom: 24px;
 }
 
-.dashboard-stats-grid {
+.dashboard-stats-section {
+  margin-bottom: 8px;
+}
+
+.dashboard-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.dashboard-skeleton__hero {
+  display: block;
+}
+
+.dashboard-skeleton__hero-shape {
+  display: block;
+  width: 100%;
+  height: 320px;
+  margin-bottom: 16px;
+}
+
+.dashboard-skeleton__stats {
   display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  height: 100%;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
 }
 
-.dashboard-stats-grid :deep(.stat-card) {
-  height: 100%;
+.dashboard-skeleton__stat {
+  width: 100%;
+  height: 104px;
 }
 
-.dashboard-stats-grid :deep(.arco-card-body) {
-  padding: 14px 18px;
-  height: 100%;
+.dashboard-skeleton__rows {
+  display: block;
 }
-
-.dashboard-stats-grid :deep(.stat-card-main) {
-  height: 100%;
-}
-
-.dashboard-stats-grid :deep(.stat-card-title) {
-  font-size: 12px;
-  margin-bottom: 4px;
-}
-
-.dashboard-stats-grid :deep(.stat-card-value) {
-  font-size: 24px;
-  line-height: 1;
-}
-
-.dashboard-stats-grid :deep(.stat-icon-wrapper) {
-  padding: 8px;
-}
-
-.dashboard-stats-grid :deep(.stat-card-icon) {
-  font-size: 22px !important;
-}
-
 
 .dashboard-empty {
   display: flex;
@@ -359,25 +391,14 @@ onActivated(async () => {
   margin: 0 0 24px;
 }
 
-/* Responsive - Arco Design Breakpoints */
 @media (max-width: 992px) {
-  .dashboard-stats-grid {
+  .dashboard-skeleton__stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: none;
-  }
-}
-
-/* md: 768px */
-@media (max-width: 768px) {
-  .dashboard-section-title {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
   }
 }
 
 @media (max-width: 576px) {
-  .dashboard-stats-grid {
+  .dashboard-skeleton__stats {
     grid-template-columns: 1fr;
   }
 }

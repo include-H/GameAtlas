@@ -284,12 +284,14 @@ type ReviewIssueOverride struct {
 }
 
 type GameStats struct {
-	TotalGames     int
-	TotalDownloads int64
-	RecentGames    []GameListItem
-	PopularGames   []GameListItem
-	FavoriteCount  int
-	PendingReviews int
+	TotalGames           int
+	TotalDownloads       int64
+	RecentGames          []GameListItem
+	RecentlyUpdatedGames []GameListItem
+	PopularGames         []GameListItem
+	FavoriteGames        []GameListItem
+	FavoriteCount        int
+	PendingReviews       int
 }
 
 const (

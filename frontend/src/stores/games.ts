@@ -41,7 +41,9 @@ export const useGamesStore = defineStore('games', () => {
       games.value.find(game => game.public_id === gameId)
       || (currentGame.value && currentGame.value.public_id === gameId ? currentGame.value : null)
       || stats.value?.recent_games.find(game => game.public_id === gameId)
+      || stats.value?.recently_updated_games.find(game => game.public_id === gameId)
       || stats.value?.popular_games.find(game => game.public_id === gameId)
+      || stats.value?.favorite_games.find(game => game.public_id === gameId)
       || null
 
     games.value.forEach((game) => {
@@ -64,7 +66,19 @@ export const useGamesStore = defineStore('games', () => {
       }
     })
 
+    stats.value.recently_updated_games.forEach(game => {
+      if (game.public_id === gameId) {
+        updateGame(game)
+      }
+    })
+
     stats.value.popular_games.forEach(game => {
+      if (game.public_id === gameId) {
+        updateGame(game)
+      }
+    })
+
+    stats.value.favorite_games.forEach(game => {
       if (game.public_id === gameId) {
         updateGame(game)
       }
@@ -79,6 +93,21 @@ export const useGamesStore = defineStore('games', () => {
     } else if (isFavorite && sourceGame) {
       stats.value.favorite_count = 1
     }
+
+    if (isFavorite) {
+      const alreadyInFavorites = stats.value.favorite_games.some(game => game.public_id === gameId)
+      if (!alreadyInFavorites) {
+        const candidate =
+          stats.value.recent_games.find(game => game.public_id === gameId)
+          || stats.value.recently_updated_games.find(game => game.public_id === gameId)
+          || stats.value.popular_games.find(game => game.public_id === gameId)
+        if (candidate) {
+          stats.value.favorite_games.unshift(candidate)
+        }
+      }
+    } else {
+      stats.value.favorite_games = stats.value.favorite_games.filter(game => game.public_id !== gameId)
+    }
   }
 
   const getFavoriteState = (gameId: string) => {
@@ -86,7 +115,9 @@ export const useGamesStore = defineStore('games', () => {
       games.value.find(game => game.public_id === gameId)
       || (currentGame.value && currentGame.value.public_id === gameId ? currentGame.value : null)
       || stats.value?.recent_games.find(game => game.public_id === gameId)
+      || stats.value?.recently_updated_games.find(game => game.public_id === gameId)
       || stats.value?.popular_games.find(game => game.public_id === gameId)
+      || stats.value?.favorite_games.find(game => game.public_id === gameId)
       || null
 
     return Boolean(sourceGame?.isFavorite)

@@ -25,7 +25,9 @@ interface GameStatsApiResponse {
   total_games: number
   total_downloads: number
   recent_games: GameListItemDto[]
+  recently_updated_games: GameListItemDto[]
   popular_games: GameListItemDto[]
+  favorite_games: GameListItemDto[]
   favorite_count: number
   pending_reviews: number
 }
@@ -290,7 +292,9 @@ const gamesService = {
       total_games: response.data.total_games,
       total_downloads: response.data.total_downloads,
       recent_games: response.data.recent_games.map((item) => normalizeGameListItem(item)),
+      recently_updated_games: response.data.recently_updated_games.map((item) => normalizeGameListItem(item)),
       popular_games: response.data.popular_games.map((item) => normalizeGameListItem(item)),
+      favorite_games: response.data.favorite_games.map((item) => normalizeGameListItem(item)),
       favorite_count: response.data.favorite_count,
       pending_reviews: response.data.pending_reviews,
     }

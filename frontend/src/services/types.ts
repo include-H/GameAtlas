@@ -12,11 +12,13 @@ export interface ApiPageEnvelope<T> {
     limit: number
     total: number
     totalPages: number
-    pending_issue_counts?: {
-      groups: Record<string, number>
-      ignored_total: number
-    } | null
+    pending_issue_counts?: PendingIssueCounts | null
   }
+}
+
+export interface PendingIssueCounts {
+  groups: Record<string, number>
+  ignored_total: number
 }
 
 export interface PendingIssueDefinition {
@@ -320,7 +322,9 @@ export interface GameStats {
   total_games: number
   total_downloads: number
   recent_games: GameListItem[]
+  recently_updated_games: GameListItem[]
   popular_games: GameListItem[]
+  favorite_games: GameListItem[]
   favorite_count: number
   pending_reviews: number
 }

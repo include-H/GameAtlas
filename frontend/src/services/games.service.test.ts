@@ -410,7 +410,9 @@ describe('games service', () => {
         total_games: 3,
         total_downloads: 7,
         recent_games: [{ ...baseGame, is_favorite: true }],
+        recently_updated_games: [{ ...baseGame, public_id: 'game-10', is_favorite: false }],
         popular_games: [{ ...baseGame, public_id: 'game-9', is_favorite: true }],
+        favorite_games: [{ ...baseGame, public_id: 'game-11', is_favorite: true }],
         favorite_count: 2,
         pending_reviews: 2,
       },
@@ -421,7 +423,9 @@ describe('games service', () => {
     expect(result.total_games).toBe(3)
     expect(result.favorite_count).toBe(2)
     expect(result.recent_games[0]?.isFavorite).toBe(true)
+    expect(result.recently_updated_games[0]?.public_id).toBe('game-10')
     expect(result.popular_games[0]?.isFavorite).toBe(true)
+    expect(result.favorite_games[0]?.public_id).toBe('game-11')
     expect(result.pending_reviews).toBe(2)
   })
 
