@@ -2,46 +2,64 @@
   <button
     type="button"
     class="metro-tile"
+    :class="[
+      `metro-tile--${tile.tile_size}`,
+      { 'metro-tile--editing': editing },
+    ]"
     :style="tileStyle"
-    :title="game.title"
-    @click="emit('select', game.public_id)"
+    :title="tile.title"
+    @click="handleClick"
   >
     <img
       v-if="coverUrl"
       :src="coverUrl"
-      :alt="game.title"
+      :alt="tile.title"
       class="metro-tile__cover"
       loading="lazy"
       draggable="false"
     >
     <span v-else class="metro-tile__fallback">{{ initial }}</span>
     <span class="metro-tile__shade" />
-    <span class="metro-tile__label">{{ game.title }}</span>
-    <span
-      class="metro-tile__unpin"
-      role="button"
-      tabindex="-1"
-      title="取消收藏"
-      @click.stop="emit('unpin', game.public_id)"
-    >
-      <icon-close />
-    </span>
+    <span class="metro-tile__label">{{ tile.title }}</span>
+
+    <template v-if="editing">
+      <span
+        class="metro-tile__action metro-tile__resize"
+        role="button"
+        tabindex="-1"
+        :title="resizeHint"
+        @click.stop="emit('resize', tile.game_id)"
+      >
+        <icon-expand />
+      </span>
+      <span
+        class="metro-tile__action metro-tile__remove"
+        role="button"
+        tabindex="-1"
+        title="从开始屏幕移除"
+        @click.stop="emit('remove', tile.game_id)"
+      >
+        <icon-close />
+      </span>
+    </template>
   </button>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IconClose } from '@arco-design/web-vue/es/icon'
-import type { GameListItem } from '@/services/types'
+import { IconClose, IconExpand } from '@arco-design/web-vue/es/icon'
+import type { StartScreenTile, StartScreenTileSize } from '@/services/types'
 
 const props = defineProps<{
-  game: GameListItem
+  tile: StartScreenTile
   colorIndex: number
+  editing: boolean
 }>()
 
 const emit = defineEmits<{
   select: [publicId: string]
-  unpin: [publicId: string]
+  resize: [gameId: number]
+  remove: [gameId: number]
 }>()
 
 // Win8 Metro 24 色磁贴配色：开始屏幕是沉浸式品牌页特例，色板留在组件内部不外溢。
@@ -54,11 +72,23 @@ const metroColors = [
   '#607d8b', '#ff5722', '#673ab7', '#3f51b5',
 ]
 
-const coverUrl = computed(() => props.game.cover_image || '')
-const initial = computed(() => props.game.title.trim().charAt(0).toUpperCase() || '?')
+const SIZE_HINTS: Record<StartScreenTileSize, string> = {
+  small: '当前：小磁贴',
+  wide: '当前：宽磁贴',
+  large: '当前：大磁贴',
+}
+
+const coverUrl = computed(() => props.tile.cover_image || '')
+const initial = computed(() => props.tile.title.trim().charAt(0).toUpperCase() || '?')
+const resizeHint = computed(() => `${SIZE_HINTS[props.tile.tile_size]}，点击切换`)
 const tileStyle = computed(() => ({
   '--metro-tile-color': metroColors[props.colorIndex % metroColors.length],
 }))
+
+const handleClick = () => {
+  if (props.editing) return
+  emit('select', props.tile.public_id)
+}
 </script>
 
 <style scoped>
@@ -66,9 +96,9 @@ const tileStyle = computed(() => ({
   position: relative;
   display: flex;
   align-items: flex-end;
-  width: min(240px, 34vw);
-  height: 120px;
-  padding: 12px;
+  width: 100%;
+  height: 100%;
+  padding: 10px;
   border: none;
   border-radius: 6px;
   overflow: hidden;
@@ -78,12 +108,24 @@ const tileStyle = computed(() => ({
   font-family: 'LXGW WenKai GB Screen', 'Microsoft YaHei', 'PingFang SC', sans-serif;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
   transition: transform 150ms ease, box-shadow 150ms ease;
-  flex-shrink: 0;
 }
 
 .metro-tile:hover {
   transform: translateY(-2px) scale(1.02);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+}
+
+.metro-tile--editing {
+  cursor: grab;
+}
+
+.metro-tile--editing:active {
+  cursor: grabbing;
+}
+
+.metro-tile--editing:hover {
+  transform: none;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.65);
 }
 
 .metro-tile__cover,
@@ -99,7 +141,7 @@ const tileStyle = computed(() => ({
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 56px;
+  font-size: 44px;
   font-weight: 700;
   opacity: 0.55;
 }
@@ -125,34 +167,34 @@ const tileStyle = computed(() => ({
   -webkit-box-orient: vertical;
 }
 
-.metro-tile__unpin {
+.metro-tile__action {
   position: absolute;
   top: 6px;
-  right: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.42);
-  color: rgba(255, 255, 255, 0.88);
-  opacity: 0;
-  transition: opacity 120ms ease, background 120ms ease;
+  color: rgba(255, 255, 255, 0.9);
 }
 
-.metro-tile:hover .metro-tile__unpin,
-.metro-tile__unpin:focus-visible {
-  opacity: 1;
-}
-
-.metro-tile__unpin:hover {
+.metro-tile__action:hover {
   background: rgba(0, 0, 0, 0.68);
 }
 
+.metro-tile__resize {
+  right: 38px;
+}
+
+.metro-tile__remove {
+  right: 6px;
+}
+
 @media (hover: none) {
-  .metro-tile__unpin {
-    opacity: 1;
+  .metro-tile__action {
+    background: rgba(0, 0, 0, 0.55);
   }
 }
 </style>

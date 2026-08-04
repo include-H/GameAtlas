@@ -280,6 +280,9 @@ backend/
 **设置**
 - `GET/PUT /api/settings/config` · `POST/DELETE /api/settings/bg` · `POST /api/settings/restart`（均需管理员）
 
+**开始屏幕磁贴**
+- `GET /api/start-screen/tiles` · `PUT /api/start-screen/tiles`（保存需管理员）
+
 **Steam / SteamGridDB**
 - `GET /api/steam/search` · `GET /api/steam/:appId/assets` · `GET /api/steam/proxy`
 - `GET /api/steamgriddb/available` · `GET /api/steamgriddb/search`

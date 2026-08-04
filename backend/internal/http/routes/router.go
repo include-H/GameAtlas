@@ -79,6 +79,11 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	hitokotoHandler := handlers.NewHitokotoHandler(hitokotoService)
 	settingsService := services.NewSettingsService(cfg, repositories.NewAppSettingsRepository(db))
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
+	startScreenTilesService := services.NewStartScreenTilesService(
+		repositories.NewStartScreenTilesRepository(db),
+		gamesRepo,
+	)
+	startScreenTilesHandler := handlers.NewStartScreenTilesHandler(startScreenTilesService)
 	gameFileRefreshService := services.NewGameFileRefreshService(gameFilesRepo, files.NewGuard(cfg.PrimaryROMRoot))
 	gameFileRefreshHandler := handlers.NewGameFileRefreshHandler(gameFileRefreshService)
 
@@ -136,6 +141,8 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.POST("/settings/bg", settingsHandler.UploadBackground)
 	api.DELETE("/settings/bg", settingsHandler.RemoveBackground)
 	api.POST("/settings/restart", settingsHandler.Restart)
+	api.GET("/start-screen/tiles", startScreenTilesHandler.Get)
+	api.PUT("/start-screen/tiles", startScreenTilesHandler.Update)
 	api.GET("/steam/search", steamHandler.Search)
 	api.GET("/steam/:appId/assets", steamHandler.Preview)
 	api.GET("/steam/proxy", steamHandler.Proxy)

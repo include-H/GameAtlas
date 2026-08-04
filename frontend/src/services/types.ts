@@ -369,3 +369,19 @@ export interface ReviewIssueOverride {
   created_at: string
   updated_at: string
 }
+
+export type StartScreenTileSize = 'small' | 'wide' | 'large'
+
+export interface StartScreenTile {
+  game_id: number
+  public_id: string
+  title: string
+  cover_image: string | null
+  tile_size: StartScreenTileSize
+  sort_order: number
+}
+
+export interface StartScreenTileWrite {
+  game_id: number
+  tile_size: StartScreenTileSize
+}

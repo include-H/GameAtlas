@@ -138,12 +138,21 @@
 
   <start-screen
     :visible="startScreenVisible"
-    :games="startScreenGames"
+    :tiles="startScreenTiles"
+    :favorite-pool="startScreenFavoritePool"
     :is-loading="startScreenLoading"
     :has-load-failure="startScreenLoadFailed"
+    :is-editing="startScreenEditing"
+    :is-saving="startScreenSaving"
     @close="closeStartScreen"
     @retry="retryStartScreen"
-    @unpin="handleStartScreenUnpin"
+    @start-edit="startStartScreenEdit"
+    @cancel-edit="cancelStartScreenEdit"
+    @save-edit="saveStartScreenEdit"
+    @resize="resizeStartScreenTile"
+    @remove="removeStartScreenTile"
+    @move="moveStartScreenTile"
+    @add="addStartScreenTile"
   />
 </template>
 
@@ -154,9 +163,9 @@ import { useRoute, useRouter } from 'vue-router'
 import useMenu from '@/hooks/useMenu'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
-import { useGamesStore } from '@/stores/games'
 import gamesService from '@/services/games.service'
-import type { GameListItem } from '@/services/types'
+import startScreenService from '@/services/start-screen.service'
+import type { GameListItem, StartScreenTileWrite } from '@/services/types'
 import AlertBanner from '@/components/AlertBanner.vue'
 import AppNavigationMenu from '@/components/AppNavigationMenu.vue'
 import SharedAmbientBackground from '@/components/SharedAmbientBackground.vue'
@@ -174,20 +183,29 @@ const router = useRouter()
 const route = useRoute()
 const uiStore = useUiStore()
 const authStore = useAuthStore()
-const gamesStore = useGamesStore()
 const { menuList, activeKey, openKeys: routeOpenKeys } = useMenu()
 const { sidebarCollapsed } = storeToRefs(uiStore)
 const { isAdmin, adminDisplayName, authLoadFailed } = storeToRefs(authStore)
 const {
   visible: startScreenVisible,
-  games: startScreenGames,
+  tiles: startScreenTiles,
+  favoritePool: startScreenFavoritePool,
   isLoading: startScreenLoading,
   hasLoadFailure: startScreenLoadFailed,
+  isEditing: startScreenEditing,
+  isSaving: startScreenSaving,
   close: closeStartScreen,
   toggle: toggleStartScreen,
   retry: retryStartScreen,
-  unpin: unpinStartScreen,
+  startEdit: startStartScreenEdit,
+  cancelEdit: cancelStartScreenEdit,
+  saveEdit: saveStartScreenEdit,
+  resizeTile: resizeStartScreenTile,
+  removeTile: removeStartScreenTile,
+  moveTile: moveStartScreenTile,
+  addTile: addStartScreenTile,
 } = useStartScreen({
+  fetchTiles: () => startScreenService.getTiles(),
   fetchFavorites: async () => {
     const favorites: GameListItem[] = []
     let page = 1
@@ -203,9 +221,7 @@ const {
     }
     return favorites
   },
-  removeFavorite: async (publicId: string) => {
-    await gamesStore.toggleFavorite(publicId)
-  },
+  saveTiles: (tiles: StartScreenTileWrite[]) => startScreenService.updateTiles(tiles),
   addAlert: (message, type) => {
     uiStore.addAlert(message, type)
   },
@@ -282,10 +298,6 @@ const scrollToTop = () => {
 
 const handleMenuClick = (key: string) => {
   router.push({ name: key })
-}
-
-const handleStartScreenUnpin = (publicId: string) => {
-  void unpinStartScreen(publicId)
 }
 
 const handleMobileMenuClick = (key: string) => {
