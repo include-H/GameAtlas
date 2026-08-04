@@ -3,7 +3,7 @@ import { IconFire } from '@arco-design/web-vue/es/icon'
 
 /**
  * 游戏店：第二种浏览方式（随机发现 / 随便逛逛）。
- * 独立全屏场景页，不套用后台管理布局。
+ * 保留后台框架（顶部/侧边/底部），在内容区全屏铺满场景。
  */
 export default {
   path: '/store',
@@ -12,6 +12,5 @@ export default {
   meta: {
     title: '游戏店',
     icon: IconFire,
-    fullscreen: true,
   },
 } as RouteRecordRaw

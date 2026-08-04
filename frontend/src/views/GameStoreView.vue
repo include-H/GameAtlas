@@ -1,5 +1,5 @@
 <template>
-  <div class="game-store">
+  <div ref="storeRootRef" class="game-store">
     <button type="button" class="store-exit" title="离开游戏店" @click="leaveStore">
       ← 离开
     </button>
@@ -231,18 +231,24 @@ const crtPaused = ref(false)
 const crtVideoRef = ref<HTMLVideoElement | null>(null)
 const stageScale = ref(1)
 const storePosters = ref<string[]>([])
+const storeRootRef = ref<HTMLElement | null>(null)
 
 /**
  * 固定 1280×720 设计稿，按窗口尺寸等比缩放整个场景，
- * 保证任何分辨率下货架/封面/电视的相对位置都不错位。
+ * 按内容区尺寸（框架内可用区域）等比缩放，保证任何分辨率下货架/封面/电视的相对位置都不错位。
  */
 const DESIGN_WIDTH = 1280
 const DESIGN_HEIGHT = 720
 
 const updateStageScale = () => {
+  const container = storeRootRef.value
+  if (!container) {
+    stageScale.value = 1
+    return
+  }
   stageScale.value = Math.min(
-    window.innerWidth / DESIGN_WIDTH,
-    window.innerHeight / DESIGN_HEIGHT,
+    container.clientWidth / DESIGN_WIDTH,
+    container.clientHeight / DESIGN_HEIGHT,
   )
 }
 
@@ -1494,6 +1500,8 @@ onUnmounted(() => {
   padding: 10px 20px;
   border-radius: 999px;
   cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
 }
 
@@ -1512,6 +1520,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   background: rgba(8, 5, 3, 0.58);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 .store-inspect__box {
