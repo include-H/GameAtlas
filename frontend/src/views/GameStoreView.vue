@@ -1082,10 +1082,11 @@ onUnmounted(() => {
   padding: 0;
   margin: 0 14.67px;
   position: relative;
-  /* 封面源图统一为 600×900（2:3），盒子按 2:3 显示，避免 cover 裁切 */
-  width: 68px;
-  height: 102px;
-  aspect-ratio: 2 / 3;
+  /* 盒身比例统一 0.72（宽:高 = 18:25），与检查盒一致；
+     封面源图 600×900 用 object-fit: cover 轻微裁左右出血 */
+  width: 72px;
+  height: 100px;
+  aspect-ratio: 0.72;
   background: transparent;
   cursor: pointer;
   outline: none;
@@ -1482,8 +1483,8 @@ onUnmounted(() => {
 .store-inspect__case {
   position: relative;
   width: 320px;
-  /* 与货架游戏盒统一 2:3，起飞/落回时与货架盒无痕衔接 */
-  aspect-ratio: 2 / 3;
+  /* 与货架游戏盒统一 0.72（宽:高），起飞/落回时与货架盒无痕衔接 */
+  aspect-ratio: 0.72;
   border-radius: 4px;
   cursor: pointer;
   perspective: 1100px;
