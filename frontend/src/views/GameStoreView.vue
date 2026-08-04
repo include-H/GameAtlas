@@ -35,7 +35,10 @@
           <span class="store-poster__kicker">BEST</span>
           <span class="store-poster__line">畅销榜</span>
         </div>
-        <div class="store-sign">GAME&nbsp;STORE</div>
+        <div class="store-sign">
+          ATLAS&nbsp;GAMES
+          <span class="store-sign__sub">阿特拉斯电玩</span>
+        </div>
         <div class="store-sign__cord" />
       </div>
 
@@ -94,7 +97,7 @@
             <video
               ref="crtVideoRef"
               class="store-crt__video"
-              :src="crtVideoUrl"
+              :src="crtVideoUrl || undefined"
               autoplay
               muted
               loop
@@ -173,11 +176,11 @@
           </div>
           <div class="store-inspect__meta">
             <h2>{{ pickedGame.title }}</h2>
-            <p>{{ pickedGame.year }} · {{ pickedGame.platform }}</p>
-            <p class="store-inspect__hint">点击游戏盒打开并查看详情</p>
-            <p v-if="missingDetailNotice" class="store-inspect__hint store-inspect__hint--error">
-              本地库暂无这个游戏（当前为演示封面），暂不能查看详情
+            <p>
+              {{ pickedGame.year }}
+              <template v-if="pickedGame.titleAlt"> · {{ pickedGame.titleAlt }}</template>
             </p>
+            <p class="store-inspect__hint">点击游戏盒打开并查看详情</p>
           </div>
           <div class="store-inspect__actions">
             <button type="button" class="store-btn store-btn--ghost" @click="putBack()">放回去</button>
@@ -191,11 +194,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  gameStoreCrtMock,
-  gameStoreSessionGames,
-  type GameStoreMockGame,
-} from './game-store/mock-session'
 import gamesService from '@/services/games.service'
 import {
   getAmbientBackgroundPoolFromGames,
@@ -203,8 +201,16 @@ import {
   type AmbientBackgroundPool,
 } from '@/utils/ambient-background'
 
+interface StoreShelfGame {
+  publicId: string
+  title: string
+  titleAlt: string
+  year: string
+  coverUrl: string
+}
+
 interface ShelfCell {
-  game: GameStoreMockGame
+  game: StoreShelfGame
   dx: number
   dy: number
   rot: number
@@ -213,19 +219,18 @@ interface ShelfCell {
 
 const router = useRouter()
 const hoveredId = ref<string | null>(null)
-const pickedGame = ref<GameStoreMockGame | null>(null)
+const pickedGame = ref<StoreShelfGame | null>(null)
 const isOpening = ref(false)
 const caseRef = ref<HTMLElement | null>(null)
 const stageDim = ref(false)
 const inspectSettled = ref(false)
-const crtVideoUrl = gameStoreCrtMock.videoUrl
+const gameStoreSessionGames = ref<StoreShelfGame[]>([])
+const crtVideoUrl = ref('')
 const crtPowered = ref(true)
 const crtPaused = ref(false)
 const crtVideoRef = ref<HTMLVideoElement | null>(null)
 const stageScale = ref(1)
 const storePosters = ref<string[]>([])
-const knownGameIds = ref<Set<string>>(new Set())
-const missingDetailNotice = ref(false)
 
 /**
  * 固定 1280×720 设计稿，按窗口尺寸等比缩放整个场景，
@@ -267,9 +272,6 @@ const loadStorePosters = async () => {
         query: { page, limit: 100 },
         sort: { field: 'created_at', order: 'desc' },
       })
-      for (const game of result.data) {
-        knownGameIds.value.add(game.public_id)
-      }
       pools.push(getAmbientBackgroundPoolFromGames(result.data))
       const totalPages = Math.max(1, result.pagination.totalPages || 1)
       if (page >= totalPages) break
@@ -278,6 +280,42 @@ const loadStorePosters = async () => {
     storePosters.value = pickPosterImages(mergeAmbientBackgroundPools(pools))
   } catch {
     // 拉取失败时保留纯色海报兜底
+  }
+}
+
+const loadStoreSession = async () => {
+  try {
+    // 每次进入生成一个随机种子，后端直接按 random 排序返回 20 个游戏
+    const seed = Math.floor(Math.random() * 2_147_483_647) + 1
+    const result = await gamesService.getGames({
+      query: { page: 1, limit: 20 },
+      sort: { field: 'random', order: 'desc', seed },
+    })
+    // 货架固定 4 行 × 5 盒
+    const picked = result.data.filter((game) => game.cover_image)
+    gameStoreSessionGames.value = picked.map((game) => ({
+      publicId: game.public_id,
+      title: game.title,
+      titleAlt: game.title_alt ?? '',
+      year: game.release_date ? game.release_date.slice(0, 4) : '',
+      coverUrl: game.cover_image || '',
+    }))
+
+    // CRT 播放真实预告：优先取本次 Session 里第一个带视频的游戏
+    for (const game of picked) {
+      try {
+        const detail = await gamesService.getGameDetail(game.public_id)
+        const video = detail.preview_videos?.[0]?.path
+        if (video) {
+          crtVideoUrl.value = video
+          break
+        }
+      } catch {
+        // 单个游戏详情失败不影响货架，继续找下一个视频
+      }
+    }
+  } catch {
+    // 拉取失败时保留空货架，避免展示 mock 数据
   }
 }
 
@@ -451,7 +489,7 @@ const cleanupWaifu = () => {
  */
 const shelfRows = computed<ShelfCell[][]>(() => {
   const rows: ShelfCell[][] = []
-  gameStoreSessionGames.forEach((game, index) => {
+  gameStoreSessionGames.value.forEach((game, index) => {
     const rowIndex = Math.floor(index / 5)
     if (!rows[rowIndex]) rows[rowIndex] = []
     // 上层货架在前：row0 最前，row3 最后，避免下层盒子顶部穿到上层时遮挡关系错误
@@ -474,11 +512,10 @@ const boxStyle = (cell: ShelfCell) => ({
   '--box-z': String(cell.z),
 })
 
-const pickGame = (game: GameStoreMockGame, event: MouseEvent) => {
+const pickGame = (game: StoreShelfGame, event: MouseEvent) => {
   const button = event.currentTarget as HTMLElement | null
   const buttonRect = button?.getBoundingClientRect()
   hoveredId.value = null
-  missingDetailNotice.value = false
   inspectSettled.value = false
   stageDim.value = false
   pickedGame.value = game
@@ -708,10 +745,6 @@ const putBack = (animate = true) => {
 
 const handleOpenCase = () => {
   if (isOpening.value || !pickedGame.value) return
-  if (!knownGameIds.value.has(pickedGame.value.publicId)) {
-    missingDetailNotice.value = true
-    return
-  }
   isOpening.value = true
   const publicId = pickedGame.value.publicId
   openCaseTimer = window.setTimeout(() => {
@@ -734,6 +767,7 @@ onMounted(() => {
   updateStageScale()
   void initWaifu()
   void loadStorePosters()
+  void loadStoreSession()
 
   // 调试工具：移动/缩放/报告看板娘位置（1280×720 设计稿坐标）
   window.__waifuTools = {
@@ -920,20 +954,34 @@ onUnmounted(() => {
 /* ---------- 霓虹招牌 ---------- */
 .store-sign {
   position: absolute;
-  top: 9.33px;
+  top: 4px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.67px;
+  font-size: 21px;
   font-weight: 700;
-  letter-spacing: 5.33px;
+  letter-spacing: 4.67px;
   color: #ffd9a0;
   text-shadow:
     0 0 4px rgba(255, 190, 110, 0.95),
     0 0 12px rgba(255, 160, 70, 0.75),
     0 0 28px rgba(255, 130, 40, 0.55);
   background: rgba(30, 20, 14, 0.35);
-  padding: 3.33px 14.67px 4.67px;
+  padding: 2.67px 12px 4px;
   border-radius: 2.67px;
+}
+
+.store-sign__sub {
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 2.67px;
+  color: rgba(255, 217, 160, 0.82);
+  text-shadow:
+    0 0 3.33px rgba(255, 190, 110, 0.8),
+    0 0 8px rgba(255, 160, 70, 0.5);
 }
 
 .store-sign__cord {
@@ -941,7 +989,7 @@ onUnmounted(() => {
   top: 100%;
   left: 50%;
   width: 1.33px;
-  height: 17.33px;
+  height: 9.33px;
   background: rgba(20, 14, 10, 0.8);
 }
 
