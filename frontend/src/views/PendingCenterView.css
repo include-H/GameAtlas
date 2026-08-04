@@ -44,8 +44,6 @@
 .stat-card--issue {
   background: var(--app-card-surface);
   border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .stat-card--active {
@@ -135,8 +133,6 @@
   border-radius: 18px;
   border: 1px solid var(--app-card-border);
   background: var(--app-card-surface);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   cursor: pointer;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
@@ -237,7 +233,7 @@
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
-  filter: blur(26px) saturate(1.02) brightness(0.72);
+  filter: saturate(1.02) brightness(0.72);
   transform: scale(1.08);
   transform-origin: center;
 }

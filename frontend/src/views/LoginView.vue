@@ -350,8 +350,6 @@ onBeforeUnmount(() => {
   transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
   padding: 0;
   min-width: 42px;
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .login-stage__close:hover {
@@ -427,7 +425,6 @@ onBeforeUnmount(() => {
   inset: 18px;
   border-radius: 20px;
   background: radial-gradient(circle, color-mix(in srgb, var(--color-primary-3) 24%, transparent), transparent 72%);
-  filter: blur(8px);
 }
 
 .login-stage__brand-mark-core {
@@ -477,8 +474,6 @@ onBeforeUnmount(() => {
   justify-content: center;
   padding: 32px;
   background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
   border-left: 0;
 }
 

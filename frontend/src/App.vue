@@ -395,8 +395,6 @@ onUnmounted(() => {
   color: color-mix(in srgb, var(--color-text-2) 72%, var(--color-text-3));
   font-size: 13px;
   background: var(--app-footer-surface);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   height: 48px;
   display: flex;
   align-items: center;
@@ -431,8 +429,6 @@ onUnmounted(() => {
   border-radius: 16px;
   background: color-mix(in srgb, var(--app-sider-surface) 72%, transparent) !important;
   color: color-mix(in srgb, var(--color-text-1) 74%, var(--color-primary-light-2) 26%) !important;
-  backdrop-filter: blur(10px) saturate(120%);
-  -webkit-backdrop-filter: blur(10px) saturate(120%);
   box-shadow: var(--shadow-hover);
   transition:
     background-color var(--transition-fast),
@@ -563,8 +559,6 @@ body {
 
 .app-sider.arco-layout-sider {
   background: var(--app-sider-surface);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border-right: 1px solid var(--app-sider-border);
   z-index: 99;
   position: relative;
@@ -597,8 +591,6 @@ body {
   background: color-mix(in srgb, var(--app-sider-surface) 72%, transparent);
   border-top: 1px solid var(--app-sider-border);
   color: color-mix(in srgb, var(--color-text-1) 74%, var(--color-primary-light-2) 26%);
-  backdrop-filter: blur(10px) saturate(120%);
-  -webkit-backdrop-filter: blur(10px) saturate(120%);
   box-shadow: none;
   transition:
     background-color var(--transition-fast),
@@ -639,23 +631,17 @@ body {
 
 .mobile-drawer .arco-drawer-mask {
   background: var(--app-scrim);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 .mobile-drawer .arco-drawer-content {
   background: var(--app-sider-surface) !important;
   border-right: 1px solid var(--app-sider-border);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   box-shadow: var(--app-header-shadow);
 }
 
 .mobile-drawer .arco-drawer {
   background: var(--app-sider-surface) !important;
   border-right: 1px solid var(--app-sider-border);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   box-shadow: var(--app-header-shadow);
 }
 

@@ -128,7 +128,6 @@
   --font-family-base: 'CustomDataFont', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   --app-card-surface: rgba(255, 255, 255, 0.8);
   --app-card-border: rgba(0, 0, 0, 0.05);
-  --app-card-backdrop-blur: 12px;
   --app-glass-border-hover: color-mix(in srgb, var(--color-primary-6) 28%, var(--app-card-border));
   --app-glass-shadow-rest: var(--shadow-soft);
   --app-glass-shadow-hover: var(--shadow-hover);
@@ -267,8 +266,6 @@ body[arco-theme='dark'] #app {
 .app-glass-surface {
   background: var(--app-card-surface);
   border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   box-shadow: var(--app-glass-shadow-rest);
 }
 
@@ -279,13 +276,6 @@ body[arco-theme='dark'] #app {
 .app-glass-surface--interactive:hover {
   border-color: var(--app-glass-border-hover);
   box-shadow: var(--app-glass-shadow-hover);
-}
-
-/* 密集网格/列表专用：保留表面质感，但去掉逐元素 backdrop-filter。
-   大量卡片同时模糊会显著拉高滚动与悬停的合成开销（如游戏库网格）。 */
-.app-glass-surface--no-blur {
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .app-input-action-row {
@@ -316,8 +306,6 @@ body[arco-theme='dark'] #app {
 
 .glass-header {
   background: var(--app-header-surface) !important;
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
   border-bottom: 1px solid var(--app-header-border) !important;
   box-shadow: var(--app-header-shadow);
   position: relative;
@@ -413,7 +401,6 @@ body .arco-btn-text.arco-btn-status-warning:hover {
   min-width: 40px;
   padding: 0;
   border-radius: 999px;
-  backdrop-filter: blur(8px);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
   transition: transform 0.2s ease;
 }
@@ -514,8 +501,6 @@ body .arco-btn-text.arco-btn-status-warning:hover {
   border-radius: var(--radius-lg);
   border: 1px solid var(--app-card-border);
   background: var(--app-card-surface);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   box-shadow: var(--app-glass-shadow-rest);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
@@ -524,8 +509,6 @@ body .arco-btn-text.arco-btn-status-warning:hover {
   background: var(--app-card-surface);
   background-color: var(--app-card-surface);
   border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   box-shadow: var(--shadow-float);
 }
 
@@ -543,8 +526,6 @@ body .arco-btn-text.arco-btn-status-warning:hover {
   background: var(--color-bg-popup);
   background-color: var(--color-bg-popup);
   border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   box-shadow: var(--shadow-float);
 }
 

@@ -285,7 +285,7 @@ watch(
 .shared-ambient-bg__layer {
   position: absolute;
   inset: 0;
-  filter: saturate(1.02) blur(8px) brightness(1.1);
+  filter: saturate(1.02) brightness(1.1);
   transform: scale(1.015);
   transform-origin: center center;
   transition: opacity 0.85s ease;

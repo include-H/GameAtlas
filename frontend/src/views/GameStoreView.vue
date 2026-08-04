@@ -1494,8 +1494,6 @@ onUnmounted(() => {
   padding: 10px 20px;
   border-radius: 999px;
   cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
 }
 
@@ -1514,8 +1512,6 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   background: rgba(8, 5, 3, 0.58);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
 }
 
 .store-inspect__box {

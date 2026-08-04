@@ -238,8 +238,6 @@
   border-radius: 8px;
   border: 1px solid var(--app-card-border);
   background: color-mix(in srgb, var(--app-card-surface) 90%, transparent);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -257,8 +255,6 @@
   border: 1px dashed var(--color-border-2);
   border-radius: 8px;
   background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-3);
   display: flex;
   flex-direction: column;
@@ -351,8 +347,6 @@
   border: 1px solid var(--app-card-border);
   border-radius: 12px;
   background: color-mix(in srgb, var(--app-card-surface) 84%, transparent);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .video-upload-progress__meta {
@@ -423,8 +417,6 @@
   position: relative;
   border: 1px dashed var(--color-border-2);
   background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-3);
   display: flex;
   align-items: center;
@@ -495,8 +487,6 @@
   overflow: hidden;
   background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
   border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -516,8 +506,6 @@
   overflow: hidden;
   background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
   border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -567,8 +555,6 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
   border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-2);
   line-height: 1.75;
   white-space: pre-wrap;
@@ -579,8 +565,6 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
   border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-video-source-card__label {
@@ -607,8 +591,6 @@
   border-radius: 8px;
   border: 1px solid var(--app-card-border);
   background: color-mix(in srgb, var(--app-card-surface) 84%, transparent);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-2);
   font-size: 12px;
 }
@@ -632,8 +614,6 @@
   border-radius: 12px;
   background: var(--app-card-surface);
   border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .video-library-card__header {
@@ -774,8 +754,6 @@
   border-radius: 12px;
   background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
   border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-images-grid {
@@ -788,8 +766,6 @@
   border-radius: 12px;
   background: color-mix(in srgb, var(--app-card-surface) 90%, transparent);
   border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-image-item {
@@ -828,8 +804,6 @@
   border-radius: 6px;
   background: color-mix(in srgb, rgba(var(--primary-6), 0.08) 60%, var(--app-card-surface));
   border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
   color: var(--color-text-2);
   font-size: 12px;
 }
@@ -842,8 +816,6 @@
   background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
   border: 1px solid var(--app-card-border);
   border-radius: 8px;
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-game-info img {
@@ -867,8 +839,6 @@
   border-radius: 12px;
   background: color-mix(in srgb, var(--app-card-surface) 90%, transparent);
   border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-screenshots-empty {
@@ -876,8 +846,6 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--app-card-surface) 88%, transparent);
   border: 1px solid var(--app-card-border);
-  backdrop-filter: blur(var(--app-card-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--app-card-backdrop-blur));
 }
 
 .steam-screenshot-item {
