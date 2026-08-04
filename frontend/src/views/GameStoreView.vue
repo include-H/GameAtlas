@@ -1,9 +1,5 @@
 <template>
   <div ref="storeRootRef" class="game-store">
-    <button type="button" class="store-exit" title="离开游戏店" @click="leaveStore">
-      ← 离开
-    </button>
-
     <div
       class="store-stage"
       :class="{ 'store-stage--dim': stageDim }"
@@ -234,8 +230,8 @@ const storePosters = ref<string[]>([])
 const storeRootRef = ref<HTMLElement | null>(null)
 
 /**
- * 固定 1280×720 设计稿，按窗口尺寸等比缩放整个场景，
- * 按内容区尺寸（框架内可用区域）等比缩放，保证任何分辨率下货架/封面/电视的相对位置都不错位。
+ * 固定 1280×720 设计稿，按内容区尺寸（框架内可用区域）缩放，
+ * 保证任何分辨率下货架/封面/电视的相对位置都不错位。
  */
 const DESIGN_WIDTH = 1280
 const DESIGN_HEIGHT = 720
@@ -361,6 +357,7 @@ declare global {
 let waifuStyleTag: HTMLLinkElement | null = null
 let waifuScriptTag: HTMLScriptElement | null = null
 let waifuZoomTimer: number | null = null
+let storeResizeObserver: ResizeObserver | null = null
 let openCaseTimer: number | null = null
 let putBackTimer: number | null = null
 let pickupSettleTimer: number | null = null
@@ -759,18 +756,18 @@ const handleOpenCase = () => {
   }, 750)
 }
 
-const leaveStore = () => {
-  router.push({ name: 'games' })
-}
-
 const handleKeydown = (event: KeyboardEvent) => {
   if (event.key === 'Escape') putBack()
 }
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
-  window.addEventListener('resize', updateStageScale)
   updateStageScale()
+  // 侧边栏收起/展开不会触发 window.resize，监听容器尺寸变化才能让场景跟随内容区缩放。
+  if (storeRootRef.value) {
+    storeResizeObserver = new ResizeObserver(() => updateStageScale())
+    storeResizeObserver.observe(storeRootRef.value)
+  }
   void initWaifu()
   void loadStorePosters()
   void loadStoreSession()
@@ -811,7 +808,8 @@ onUnmounted(() => {
   pickupAnimation?.cancel()
   pickupAnimation = null
   window.removeEventListener('keydown', handleKeydown)
-  window.removeEventListener('resize', updateStageScale)
+  storeResizeObserver?.disconnect()
+  storeResizeObserver = null
   if (openCaseTimer !== null) {
     window.clearTimeout(openCaseTimer)
     openCaseTimer = null
@@ -1485,30 +1483,6 @@ onUnmounted(() => {
   background:
     linear-gradient(180deg, rgba(10, 7, 5, 0.42), transparent 26%),
     radial-gradient(ellipse at 50% 46%, transparent 52%, rgba(8, 5, 3, 0.62) 100%);
-}
-
-/* ---------- 离开按钮 ---------- */
-.store-exit {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 20;
-  border: 1px solid rgba(255, 225, 180, 0.24);
-  background: rgba(24, 16, 11, 0.48);
-  color: rgba(255, 230, 190, 0.82);
-  font-size: 15px;
-  padding: 10px 20px;
-  border-radius: 999px;
-  cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
-}
-
-.store-exit:hover {
-  background: rgba(58, 38, 24, 0.72);
-  color: #ffe9c8;
-  border-color: rgba(255, 225, 180, 0.5);
 }
 
 /* ---------- 拿出游戏盒 ---------- */
