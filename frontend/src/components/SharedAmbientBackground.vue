@@ -46,6 +46,8 @@ const SUPPORTED_ROUTE_NAMES = new Set([
   'pending-center',
   'series-library',
   'series-detail',
+  'publisher-library',
+  'publisher-detail',
   'wiki-edit',
   'not-found',
   'settings',
