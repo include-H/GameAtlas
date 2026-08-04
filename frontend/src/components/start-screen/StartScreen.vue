@@ -425,18 +425,18 @@ onUnmounted(() => {
 }
 
 .start-screen__tile-slot--small {
-  grid-column: span 1;
-  grid-row: span 1;
+  grid-column-end: span 1;
+  grid-row-end: span 1;
 }
 
 .start-screen__tile-slot--wide {
-  grid-column: span 2;
-  grid-row: span 1;
+  grid-column-end: span 2;
+  grid-row-end: span 1;
 }
 
 .start-screen__tile-slot--large {
-  grid-column: span 2;
-  grid-row: span 2;
+  grid-column-end: span 2;
+  grid-row-end: span 2;
 }
 
 .start-screen__add-tile {
