@@ -348,6 +348,8 @@ onUnmounted(() => {
   inset: 0;
   z-index: 1500;
   outline: none;
+  /* 不透明基底：与 app 全局底色一致，盖住下层页面；背景图层在其上叠加处理后的 bg */
+  background: var(--color-bg-1, #0d1117);
 }
 
 /* 开始屏幕（1500）内部会打开裁剪/添加弹窗：Arco modal 默认 1000/1001，
