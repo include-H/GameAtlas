@@ -513,33 +513,55 @@ const pickGame = (game: GameStoreMockGame, event: MouseEvent) => {
             `scale(${origin.scale}) rotate(${origin.rot}deg) rotateY(-16deg) rotateX(9deg)`,
           boxShadow: '0 6px 12px rgba(0, 0, 0, 0.32), 0 2px 5px rgba(0, 0, 0, 0.28)',
           filter: 'brightness(0.8)',
+          easing: 'cubic-bezier(0.3, 0.9, 0.35, 1)',
           offset: 0,
         },
-        // 10%：手指捏住，轻微上抬并转个角度
+        // 8%：手指捏住，轻微上抬并转个角度
         {
           transform:
             `perspective(900px) translate(${origin.x * 0.92}px, ${origin.y * 0.92 - 16}px) ` +
             `scale(${origin.scale * 1.08}) rotate(${origin.rot * 0.9}deg) rotateY(-20deg) rotateX(12deg)`,
           boxShadow: '0 8px 16px rgba(0, 0, 0, 0.36), 0 3px 7px rgba(0, 0, 0, 0.3)',
           filter: 'brightness(0.84)',
-          offset: 0.1,
+          easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)',
+          offset: 0.08,
         },
-        // 45%：弧线最高点，往面前带
+        // 40%：弧线最高点，往面前带
         {
           transform:
             `perspective(900px) translate(${origin.x * 0.3}px, ${origin.y * 0.4 - 46}px) ` +
             `scale(${origin.scale + (1 - origin.scale) * 0.55}) rotate(0deg) rotateY(-8deg) rotateX(6deg)`,
           boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5), 0 8px 16px rgba(0, 0, 0, 0.38)',
           filter: 'brightness(0.95)',
-          offset: 0.45,
+          easing: 'cubic-bezier(0.35, 0.05, 0.4, 1)',
+          offset: 0.4,
         },
-        // 78%：就位前微过冲
+        // 58%：减速滑到终点附近，轻微过冲
         {
           transform:
-            'perspective(900px) translate(0px, -8px) scale(1.035) rotate(0deg) rotateY(-3deg) rotateX(2deg)',
-          boxShadow: '0 44px 88px rgba(0, 0, 0, 0.75), 0 16px 30px rgba(0, 0, 0, 0.52)',
-          filter: 'brightness(1.05)',
-          offset: 0.78,
+            'perspective(900px) translate(0px, -14px) scale(1.045) rotate(0deg) rotateY(-3deg) rotateX(2.5deg)',
+          boxShadow: '0 46px 92px rgba(0, 0, 0, 0.76), 0 17px 32px rgba(0, 0, 0, 0.54)',
+          filter: 'brightness(1.06)',
+          easing: 'cubic-bezier(0.25, 0.1, 0.45, 1)',
+          offset: 0.58,
+        },
+        // 72%：回落到正位
+        {
+          transform:
+            'perspective(900px) translate(0px, 0px) scale(1) rotate(0deg) rotateY(-2deg) rotateX(1deg)',
+          boxShadow: '0 40px 80px rgba(0, 0, 0, 0.72), 0 14px 26px rgba(0, 0, 0, 0.5)',
+          filter: 'brightness(1)',
+          easing: 'cubic-bezier(0.35, 0.2, 0.55, 1)',
+          offset: 0.72,
+        },
+        // 86%：极轻的一次回弹，像手停稳
+        {
+          transform:
+            'perspective(900px) translate(0px, -3px) scale(1.008) rotate(0deg) rotateY(-2.2deg) rotateX(1.3deg)',
+          boxShadow: '0 42px 84px rgba(0, 0, 0, 0.74), 0 15px 28px rgba(0, 0, 0, 0.52)',
+          filter: 'brightness(1.015)',
+          easing: 'cubic-bezier(0.45, 0.05, 0.5, 1)',
+          offset: 0.86,
         },
         // 100%：落定
         {
@@ -551,8 +573,7 @@ const pickGame = (game: GameStoreMockGame, event: MouseEvent) => {
         },
       ],
       {
-        duration: 700,
-        easing: 'cubic-bezier(0.25, 0.75, 0.3, 1)',
+        duration: 820,
         fill: 'forwards',
       },
     )
@@ -562,7 +583,7 @@ const pickGame = (game: GameStoreMockGame, event: MouseEvent) => {
     }, 180)
     pickupSettleTimer = window.setTimeout(() => {
       inspectSettled.value = true
-    }, 640)
+    }, 740)
   })
 }
 
@@ -645,24 +666,37 @@ const putBack = (animate = true) => {
         transform: startTransform,
         boxShadow: startShadow,
         filter: startFilter,
+        easing: 'cubic-bezier(0.3, 0.1, 0.45, 1)',
         offset: 0,
       },
-      // 30%：临走前轻轻抬一下
+      // 28%：临走前轻轻抬一下
       {
         transform:
           'perspective(900px) translate(0px, -10px) scale(1.03) rotate(0deg) rotateY(-4deg) rotateX(3deg)',
         boxShadow: '0 36px 72px rgba(0, 0, 0, 0.66), 0 12px 24px rgba(0, 0, 0, 0.46)',
         filter: 'brightness(1.02)',
-        offset: 0.3,
+        easing: 'cubic-bezier(0.35, 0.05, 0.4, 1)',
+        offset: 0.28,
       },
-      // 70%：弧线回去
+      // 60%：弧线回去
       {
         transform:
           `perspective(900px) translate(${origin.x * 0.28}px, ${origin.y * 0.4 - 40}px) ` +
           `scale(${origin.scale + (1 - origin.scale) * 0.5}) rotate(0deg) rotateY(-9deg) rotateX(7deg)`,
         boxShadow: '0 18px 34px rgba(0, 0, 0, 0.45), 0 6px 12px rgba(0, 0, 0, 0.35)',
         filter: 'brightness(0.94)',
-        offset: 0.7,
+        easing: 'cubic-bezier(0.3, 0.1, 0.45, 1)',
+        offset: 0.6,
+      },
+      // 84%：贴近货架，减速
+      {
+        transform:
+          `perspective(900px) translate(${origin.x * 0.88}px, ${origin.y * 0.88 - 5}px) ` +
+          `scale(${origin.scale * 1.06}) rotate(${origin.rot * 0.8}deg) rotateY(-15deg) rotateX(10deg)`,
+        boxShadow: '0 9px 18px rgba(0, 0, 0, 0.38), 0 3px 7px rgba(0, 0, 0, 0.3)',
+        filter: 'brightness(0.85)',
+        easing: 'cubic-bezier(0.35, 0.05, 0.45, 1)',
+        offset: 0.84,
       },
       // 100%：插回货架
       {
@@ -675,8 +709,7 @@ const putBack = (animate = true) => {
       },
     ],
     {
-      duration: 500,
-      easing: 'cubic-bezier(0.35, 0, 0.45, 1)',
+      duration: 560,
       fill: 'forwards',
     },
   )
@@ -684,7 +717,7 @@ const putBack = (animate = true) => {
   // 兜底：动画被中断时也能收场
   putBackTimer = window.setTimeout(() => {
     if (pickedGame.value) finishPutBack()
-  }, 800)
+  }, 900)
 }
 
 const handleOpenCase = () => {
