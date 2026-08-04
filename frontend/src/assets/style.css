@@ -508,8 +508,9 @@ body .arco-btn-text.arco-btn-status-warning:hover {
 }
 
 .arco-modal {
-  background: var(--app-card-surface);
-  background-color: var(--app-card-surface);
+  /* 弹窗可读性优先：比普通玻璃卡片更实，避免背景图透出影响正文 */
+  background: rgba(18, 24, 34, 0.94);
+  background-color: rgba(18, 24, 34, 0.94);
   border: 1px solid var(--app-card-border);
   box-shadow: var(--shadow-float);
 }

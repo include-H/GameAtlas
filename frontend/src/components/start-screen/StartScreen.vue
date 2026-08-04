@@ -8,6 +8,7 @@
         tabindex="-1"
         @keydown.esc="handleClose"
       >
+        <shared-ambient-background />
         <div class="start-screen-scrim" @click="handleClose" />
 
         <div class="start-screen" @wheel.passive="handleWheel" @click.self="handleClose">
@@ -190,6 +191,7 @@ import {
 } from '@arco-design/web-vue/es/icon'
 import MetroTile from './MetroTile.vue'
 import TileCropModal from './TileCropModal.vue'
+import SharedAmbientBackground from '@/components/SharedAmbientBackground.vue'
 import type {
   GameListItem,
   StartScreenColumn,
@@ -357,8 +359,9 @@ onUnmounted(() => {
 .start-screen-scrim {
   position: absolute;
   inset: 0;
-  background: rgba(8, 10, 16, 0.76);
-  backdrop-filter: blur(6px);
+  /* 半透明遮罩：让开始屏幕透出当前全局背景（自定义 bg / 环境背景池），同时保证文字可读 */
+  background: rgba(8, 10, 16, 0.46);
+  backdrop-filter: blur(4px);
 }
 
 .start-screen {
