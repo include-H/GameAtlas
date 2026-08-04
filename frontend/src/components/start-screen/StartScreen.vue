@@ -265,9 +265,38 @@ const onDrop = (index: number) => {
 }
 
 const onTileEnter = (el: Element) => {
-  const index = Number((el as HTMLElement).dataset.tileIndex)
+  const element = el as HTMLElement
+  const index = Number(element.dataset.tileIndex)
   if (Number.isNaN(index)) return
-  ;(el as HTMLElement).style.transitionDelay = `${Math.min(index, 24) * 35}ms`
+
+  // Win8 入场：所有磁贴从视口中心起算位移，缓慢滑到各自的网格位置。
+  const rect = element.getBoundingClientRect()
+  const fromX = window.innerWidth / 2 - (rect.left + rect.width / 2)
+  const fromY = window.innerHeight / 2 - (rect.top + rect.height / 2)
+
+  element.style.transition = 'none'
+  element.style.transitionDelay = '0ms'
+  element.style.opacity = '0'
+  element.style.transform = `translate(${fromX}px, ${fromY}px) scale(0.55)`
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      element.style.transition = 'transform 820ms cubic-bezier(0.25, 0.8, 0.25, 1), opacity 340ms ease'
+      element.style.transitionDelay = `${Math.min(index, 24) * 40}ms`
+      element.style.opacity = '1'
+      element.style.transform = 'translate(0, 0) scale(1)'
+    })
+  })
+
+  const cleanup = (event: TransitionEvent) => {
+    if (event.propertyName !== 'transform') return
+    element.style.transition = ''
+    element.style.transitionDelay = ''
+    element.style.transform = ''
+    element.style.opacity = ''
+    element.removeEventListener('transitionend', cleanup)
+  }
+  element.addEventListener('transitionend', cleanup)
 }
 
 const onTileLeave = (el: Element) => {
@@ -384,10 +413,11 @@ onUnmounted(() => {
 .start-screen__tile-slot {
   min-width: 0;
   min-height: 0;
-  /* Win8 磁贴入场：back-out 回弹曲线，配合 onTileEnter 的错峰 delay */
+  /* Win8 磁贴入场由 onTileEnter 内联控制（中心飞入 + 长滑行），
+     这里的 transition 作为离场/常规状态下的兜底 */
   transition:
     opacity 260ms ease,
-    transform 480ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform 260ms ease;
 }
 
 .start-screen__tile-slot--small {
@@ -428,7 +458,7 @@ onUnmounted(() => {
 .metro-tile-enter-from,
 .metro-tile-leave-to {
   opacity: 0;
-  transform: translateY(28px) scale(0.45);
+  transform: scale(0.55);
 }
 
 .metro-tile-enter-to {
