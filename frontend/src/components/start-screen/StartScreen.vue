@@ -72,6 +72,7 @@
             v-else
             ref="metroAreaRef"
             class="start-screen__metro"
+            :class="{ 'is-editing': isEditing }"
             @click.self="handleClose"
           >
             <div class="start-screen__columns">
@@ -98,13 +99,15 @@
                   <div
                     v-for="slot in column.slots"
                     :key="slot.tile.game_id"
-                    :class="['start-screen__tile-slot', `start-screen__tile-slot--${slot.tile.tile_size}`]"
+                    :class="[
+                      'start-screen__tile-slot',
+                      `start-screen__tile-slot--${slot.tile.tile_size}`,
+                      { 'start-screen__tile-slot--dragging': isDraggedTile(slot.tile) },
+                    ]"
                     :style="{ gridColumnStart: slot.col + 1, gridRowStart: slot.row + 1 }"
                     :data-tile-index="slot.globalIndex"
-                    :draggable="isEditing"
-                    @dragstart="onDragStart(slot.globalIndex, $event)"
-                    @dragover.prevent
-                    @drop="onDrop(slot.globalIndex)"
+                    :data-filtered-index="filteredIndexByGameId(slot.tile.game_id)"
+                    @pointerdown="onTilePointerDown(slot.globalIndex, $event)"
                   >
                     <MetroTile
                       :tile="slot.tile"
@@ -128,6 +131,15 @@
                 <icon-plus />
                 <span>添加</span>
               </div>
+            </div>
+
+            <div
+              v-if="dragState && dragPointer && draggedTile"
+              class="start-screen__drag-ghost"
+              :class="`start-screen__drag-ghost--${draggedTile.tile_size}`"
+              :style="{ left: `${dragPointer.x}px`, top: `${dragPointer.y}px` }"
+            >
+              <MetroTile :tile="draggedTile" :color-index="dragState.fromIndex" :editing="false" />
             </div>
           </div>
 
@@ -222,7 +234,7 @@ const emit = defineEmits<{
   select: [publicId: string]
   resize: [gameId: number]
   remove: [gameId: number]
-  move: [fromIndex: number, toIndex: number]
+  applyOrder: [tiles: StartScreenTile[]]
   add: [game: GameListItem]
   applyCrop: [gameId: number, blobs: Record<StartScreenTileSize, Blob>]
   renameColumn: [index: number, name: string]
@@ -234,7 +246,18 @@ const metroAreaRef = ref<HTMLElement | null>(null)
 const addVisible = ref(false)
 const cropVisible = ref(false)
 const cropGameId = ref<number | null>(null)
-const draggedIndex = ref<number | null>(null)
+
+interface TileDragState {
+  gameId: number
+  fromIndex: number
+  targetIndex: number
+}
+
+const dragState = ref<TileDragState | null>(null)
+const dragPointer = ref<{ x: number; y: number } | null>(null)
+let pendingDrag: { gameId: number; fromIndex: number } | null = null
+let dragStart: { x: number; y: number } | null = null
+let edgeScrollFrame: number | null = null
 
 const cropSource = computed(() => {
   const tile = props.tiles.find((item) => item.game_id === cropGameId.value)
@@ -246,7 +269,29 @@ const addCandidates = computed(() => {
   return props.favoritePool.filter((game) => !pinned.has(game.id))
 })
 
-const packedColumns = computed(() => packStartScreenTiles(props.tiles))
+const draggedTile = computed(() => props.tiles.find((tile) => tile.game_id === dragState.value?.gameId) ?? null)
+
+const filteredTiles = computed(() => props.tiles.filter((tile) => tile.game_id !== dragState.value?.gameId))
+
+// 拖拽预览：把被拖磁贴从队列抽出，按光标目标位置插回，其余磁贴自动让位重排。
+const displayTiles = computed(() => {
+  if (!dragState.value) return props.tiles
+  const next = filteredTiles.value.map((tile) => ({ ...tile }))
+  const dragged = props.tiles.find((tile) => tile.game_id === dragState.value?.gameId)
+  if (!dragged) return next
+  const target = Math.min(Math.max(dragState.value.targetIndex, 0), next.length)
+  next.splice(target, 0, { ...dragged })
+  return next
+})
+
+const packedColumns = computed(() => packStartScreenTiles(displayTiles.value))
+
+const filteredIndexByGameId = (gameId: number) => {
+  const index = filteredTiles.value.findIndex((tile) => tile.game_id === gameId)
+  return index === -1 ? undefined : String(index)
+}
+
+const isDraggedTile = (tile: StartScreenTile) => dragState.value?.gameId === tile.game_id
 
 const columnNameOf = (index: number) => {
   const name = props.columns[index]?.name?.trim()
@@ -259,6 +304,10 @@ const handleRenameColumn = (index: number, event: Event) => {
 }
 
 const handleClose = () => {
+  if (dragState.value) {
+    endDrag()
+    return
+  }
   emit('close')
 }
 
@@ -295,17 +344,93 @@ const handleWheel = (event: WheelEvent) => {
   area.scrollLeft += event.deltaY
 }
 
-const onDragStart = (index: number, event: DragEvent) => {
-  draggedIndex.value = index
-  if (event.dataTransfer) {
-    event.dataTransfer.effectAllowed = 'move'
+const onTilePointerDown = (index: number, event: PointerEvent) => {
+  if (!props.isEditing) return
+  const tile = props.tiles[index]
+  if (!tile) return
+  pendingDrag = { gameId: tile.game_id, fromIndex: index }
+  dragStart = { x: event.clientX, y: event.clientY }
+  window.addEventListener('pointermove', onWindowPointerMove)
+  window.addEventListener('pointerup', onWindowPointerUp)
+  window.addEventListener('pointercancel', onWindowPointerCancel)
+}
+
+const onWindowPointerMove = (event: PointerEvent) => {
+  if (!pendingDrag || !dragStart) return
+  if (!dragState.value && Math.hypot(event.clientX - dragStart.x, event.clientY - dragStart.y) < 6) {
+    return
+  }
+  if (!dragState.value) {
+    dragState.value = {
+      gameId: pendingDrag.gameId,
+      fromIndex: pendingDrag.fromIndex,
+      targetIndex: pendingDrag.fromIndex,
+    }
+  }
+  dragPointer.value = { x: event.clientX, y: event.clientY }
+  updateDragTarget(event.clientX, event.clientY)
+  updateEdgeScroll(event.clientX)
+}
+
+const updateDragTarget = (x: number, y: number) => {
+  if (!dragState.value) return
+  const hit = document.elementFromPoint(x, y)
+  const slot = hit?.closest?.('.start-screen__tile-slot')
+  if (!slot) return
+  const rawIndex = (slot as HTMLElement).dataset.filteredIndex
+  if (rawIndex === undefined || rawIndex === '') return
+  const target = Number(rawIndex)
+  if (Number.isInteger(target) && target >= 0) {
+    dragState.value.targetIndex = target
   }
 }
 
-const onDrop = (index: number) => {
-  if (draggedIndex.value === null) return
-  emit('move', draggedIndex.value, index)
-  draggedIndex.value = null
+const updateEdgeScroll = (x: number) => {
+  const area = metroAreaRef.value
+  if (!area) return
+  const rect = area.getBoundingClientRect()
+  const nearLeft = x < rect.left + 70
+  const nearRight = x > rect.right - 70
+  if (edgeScrollFrame !== null) {
+    cancelAnimationFrame(edgeScrollFrame)
+    edgeScrollFrame = null
+  }
+  if (!nearLeft && !nearRight) return
+  const step = () => {
+    if (!dragState.value) {
+      edgeScrollFrame = null
+      return
+    }
+    if (nearLeft) area.scrollLeft -= 14
+    if (nearRight) area.scrollLeft += 14
+    edgeScrollFrame = requestAnimationFrame(step)
+  }
+  edgeScrollFrame = requestAnimationFrame(step)
+}
+
+const onWindowPointerUp = () => {
+  if (dragState.value) {
+    emit('applyOrder', displayTiles.value.map((tile) => ({ ...tile })))
+  }
+  endDrag()
+}
+
+const onWindowPointerCancel = () => {
+  endDrag()
+}
+
+const endDrag = () => {
+  dragState.value = null
+  dragPointer.value = null
+  pendingDrag = null
+  dragStart = null
+  if (edgeScrollFrame !== null) {
+    cancelAnimationFrame(edgeScrollFrame)
+    edgeScrollFrame = null
+  }
+  window.removeEventListener('pointermove', onWindowPointerMove)
+  window.removeEventListener('pointerup', onWindowPointerUp)
+  window.removeEventListener('pointercancel', onWindowPointerCancel)
 }
 
 const onTileEnter = (el: Element) => {
@@ -333,6 +458,7 @@ watch(
 )
 
 onUnmounted(() => {
+  endDrag()
   if (typeof document !== 'undefined') {
     document.body.style.overflow = ''
   }
@@ -500,6 +626,40 @@ onUnmounted(() => {
 .start-screen__tile-slot--large {
   grid-column-end: span 2;
   grid-row-end: span 2;
+}
+
+.start-screen__tile-slot--dragging {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.start-screen__metro.is-editing .start-screen__tile-slot {
+  /* 编辑拖拽时禁止触摸滚动，pointer 事件接管 */
+  touch-action: none;
+}
+
+.start-screen__drag-ghost {
+  position: fixed;
+  z-index: 2000;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(1.05);
+  filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.55));
+  opacity: 0.92;
+}
+
+.start-screen__drag-ghost--small {
+  width: var(--start-cell);
+  height: var(--start-cell);
+}
+
+.start-screen__drag-ghost--wide {
+  width: calc(var(--start-cell) * 2 + var(--start-gap));
+  height: var(--start-cell);
+}
+
+.start-screen__drag-ghost--large {
+  width: calc(var(--start-cell) * 2 + var(--start-gap));
+  height: calc(var(--start-cell) * 2 + var(--start-gap));
 }
 
 .start-screen__add-tile {

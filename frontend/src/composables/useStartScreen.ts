@@ -183,6 +183,10 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     tiles.value = next
   }
 
+  const applyTileOrder = (ordered: StartScreenTile[]) => {
+    tiles.value = ordered.map((tile) => ({ ...tile }))
+  }
+
   const addTile = (game: GameListItem) => {
     if (tiles.value.some((tile) => tile.game_id === game.id)) return
     tiles.value.push({
@@ -238,6 +242,7 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     resizeTile,
     removeTile,
     moveTile,
+    applyTileOrder,
     addTile,
     applyTileCrop,
   }

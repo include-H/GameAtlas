@@ -154,7 +154,7 @@
     @save-edit="saveStartScreenEdit"
     @resize="resizeStartScreenTile"
     @remove="removeStartScreenTile"
-    @move="moveStartScreenTile"
+    @apply-order="applyStartScreenOrder"
     @add="addStartScreenTile"
     @apply-crop="applyStartScreenCrop"
     @rename-column="renameStartScreenColumn"
@@ -209,7 +209,7 @@ const {
   saveEdit: saveStartScreenEdit,
   resizeTile: resizeStartScreenTile,
   removeTile: removeStartScreenTile,
-  moveTile: moveStartScreenTile,
+  applyTileOrder: applyStartScreenOrder,
   addTile: addStartScreenTile,
   applyTileCrop: applyStartScreenCrop,
   renameColumn: renameStartScreenColumn,
