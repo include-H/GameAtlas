@@ -1,15 +1,26 @@
 import { get, post, put } from './api'
-import type { ApiEnvelope, StartScreenTile, StartScreenTileSize, StartScreenTileWrite } from './types'
+import type {
+  ApiEnvelope,
+  StartScreenLayout,
+  StartScreenLayoutInput,
+  StartScreenTileSize,
+} from './types'
 
 const startScreenService = {
-  async getTiles(): Promise<StartScreenTile[]> {
-    const response = await get<ApiEnvelope<StartScreenTile[]>>('/start-screen/tiles')
-    return response.data ?? []
+  async getTiles(): Promise<StartScreenLayout> {
+    const response = await get<ApiEnvelope<StartScreenLayout>>('/start-screen/tiles')
+    return {
+      columns: response.data?.columns ?? [],
+      tiles: response.data?.tiles ?? [],
+    }
   },
 
-  async updateTiles(tiles: StartScreenTileWrite[]): Promise<StartScreenTile[]> {
-    const response = await put<ApiEnvelope<StartScreenTile[]>>('/start-screen/tiles', { tiles })
-    return response.data ?? []
+  async updateTiles(input: StartScreenLayoutInput): Promise<StartScreenLayout> {
+    const response = await put<ApiEnvelope<StartScreenLayout>>('/start-screen/tiles', input)
+    return {
+      columns: response.data?.columns ?? [],
+      tiles: response.data?.tiles ?? [],
+    }
   },
 
   async uploadTileImage(file: File, size: StartScreenTileSize): Promise<string> {

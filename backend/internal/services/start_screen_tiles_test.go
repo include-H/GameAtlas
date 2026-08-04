@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hao/game/internal/domain"
@@ -17,6 +18,7 @@ func openStartScreenTilesService(t *testing.T) *StartScreenTilesService {
 	t.Cleanup(func() { _ = db.Close() })
 	return NewStartScreenTilesService(
 		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewStartScreenColumnsRepository(db),
 		repositories.NewGamesRepository(db),
 		files.NewAssetStore(t.TempDir()),
 	)
@@ -24,12 +26,12 @@ func openStartScreenTilesService(t *testing.T) *StartScreenTilesService {
 
 func TestStartScreenTilesListEmpty(t *testing.T) {
 	service := openStartScreenTilesService(t)
-	tiles, err := service.List()
+	layout, err := service.List()
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
 	}
-	if len(tiles) != 0 {
-		t.Fatalf("List = %d tiles, want 0", len(tiles))
+	if len(layout.Tiles) != 0 || len(layout.Columns) != 0 {
+		t.Fatalf("List = %d tiles / %d columns, want empty", len(layout.Tiles), len(layout.Columns))
 	}
 }
 
@@ -42,28 +44,35 @@ func TestStartScreenTilesUpdatePersistsOrderAndSizes(t *testing.T) {
 
 	service := NewStartScreenTilesService(
 		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewStartScreenColumnsRepository(db),
 		repositories.NewGamesRepository(db),
 		files.NewAssetStore(t.TempDir()),
 	)
 
-	tiles, err := service.Update([]domain.StartScreenTileWrite{
+	layout, err := service.Update(
+		[]domain.StartScreenColumnWrite{{Name: "第一列"}},
+		[]domain.StartScreenTileWrite{
 		{GameID: secondID, TileSize: "wide"},
 		{GameID: firstID, TileSize: "large"},
-	})
+		},
+	)
 	if err != nil {
 		t.Fatalf("Update returned error: %v", err)
 	}
-	if len(tiles) != 2 {
-		t.Fatalf("Update returned %d tiles, want 2", len(tiles))
+	if len(layout.Tiles) != 2 {
+		t.Fatalf("Update returned %d tiles, want 2", len(layout.Tiles))
 	}
-	if tiles[0].GameID != secondID || tiles[0].TileSize != "wide" || tiles[0].SortOrder != 0 {
-		t.Fatalf("first tile = %+v, want second game first with wide size", tiles[0])
+	if layout.Tiles[0].GameID != secondID || layout.Tiles[0].TileSize != "wide" || layout.Tiles[0].SortOrder != 0 {
+		t.Fatalf("first tile = %+v, want second game first with wide size", layout.Tiles[0])
 	}
-	if tiles[1].GameID != firstID || tiles[1].TileSize != "large" || tiles[1].SortOrder != 1 {
-		t.Fatalf("second tile = %+v, want first game second with large size", tiles[1])
+	if layout.Tiles[1].GameID != firstID || layout.Tiles[1].TileSize != "large" || layout.Tiles[1].SortOrder != 1 {
+		t.Fatalf("second tile = %+v, want first game second with large size", layout.Tiles[1])
 	}
-	if tiles[0].PublicID != "tile-b" || tiles[0].Title != "Tile B" {
-		t.Fatalf("first tile join = %+v, want tile-b metadata", tiles[0])
+	if layout.Tiles[0].PublicID != "tile-b" || layout.Tiles[0].Title != "Tile B" {
+		t.Fatalf("first tile join = %+v, want tile-b metadata", layout.Tiles[0])
+	}
+	if len(layout.Columns) != 1 || layout.Columns[0].Name != "第一列" {
+		t.Fatalf("columns = %+v, want one column named 第一列", layout.Columns)
 	}
 }
 
@@ -74,21 +83,25 @@ func TestStartScreenTilesUpdateRejectsInvalidInput(t *testing.T) {
 	gameID := insertServicesTestGame(t, db, "tile-invalid", "Tile Invalid", domain.GameVisibilityPublic)
 	service := NewStartScreenTilesService(
 		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewStartScreenColumnsRepository(db),
 		repositories.NewGamesRepository(db),
 		files.NewAssetStore(t.TempDir()),
 	)
 
-	if _, err := service.Update([]domain.StartScreenTileWrite{{GameID: gameID, TileSize: "huge"}}); !errors.Is(err, domain.ErrValidation) {
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{GameID: gameID, TileSize: "huge"}}); !errors.Is(err, domain.ErrValidation) {
 		t.Fatalf("invalid size error = %v, want ErrValidation", err)
 	}
-	if _, err := service.Update([]domain.StartScreenTileWrite{
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{
 		{GameID: gameID, TileSize: "small"},
 		{GameID: gameID, TileSize: "wide"},
 	}); !errors.Is(err, domain.ErrValidation) {
 		t.Fatalf("duplicate game error = %v, want ErrValidation", err)
 	}
-	if _, err := service.Update([]domain.StartScreenTileWrite{{GameID: 999999, TileSize: "small"}}); !errors.Is(err, domain.ErrNotFound) {
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{GameID: 999999, TileSize: "small"}}); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("missing game error = %v, want ErrNotFound", err)
+	}
+	if _, err := service.Update([]domain.StartScreenColumnWrite{{Name: strings.Repeat("名", 31)}}, nil); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("long column name error = %v, want ErrValidation", err)
 	}
 }
 
@@ -110,12 +123,13 @@ func TestStartScreenTilesUpdateValidatesTileImages(t *testing.T) {
 
 	service := NewStartScreenTilesService(
 		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewStartScreenColumnsRepository(db),
 		repositories.NewGamesRepository(db),
 		files.NewAssetStore(assetsDir),
 	)
 
 	invalidPath := "/assets/start-screen/missing.jpg"
-	if _, err := service.Update([]domain.StartScreenTileWrite{{
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{
 		GameID:         gameID,
 		TileSize:       "small",
 		ImageSmallPath: &invalidPath,
@@ -124,7 +138,7 @@ func TestStartScreenTilesUpdateValidatesTileImages(t *testing.T) {
 	}
 
 	badPrefix := "/etc/passwd"
-	if _, err := service.Update([]domain.StartScreenTileWrite{{
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{
 		GameID:         gameID,
 		TileSize:       "small",
 		ImageSmallPath: &badPrefix,
@@ -132,7 +146,7 @@ func TestStartScreenTilesUpdateValidatesTileImages(t *testing.T) {
 		t.Fatalf("bad prefix error = %v, want ErrValidation", err)
 	}
 
-	tiles, err := service.Update([]domain.StartScreenTileWrite{{
+	layout, err := service.Update(nil, []domain.StartScreenTileWrite{{
 		GameID:         gameID,
 		TileSize:       "small",
 		ImageSmallPath: &imagePath,
@@ -140,7 +154,7 @@ func TestStartScreenTilesUpdateValidatesTileImages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("valid image update returned error: %v", err)
 	}
-	if len(tiles) != 1 || tiles[0].ImageSmallPath == nil || *tiles[0].ImageSmallPath != imagePath {
-		t.Fatalf("tiles = %+v, want image path %q", tiles, imagePath)
+	if len(layout.Tiles) != 1 || layout.Tiles[0].ImageSmallPath == nil || *layout.Tiles[0].ImageSmallPath != imagePath {
+		t.Fatalf("tiles = %+v, want image path %q", layout.Tiles, imagePath)
 	}
 }

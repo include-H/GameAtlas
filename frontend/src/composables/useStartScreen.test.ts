@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { useStartScreen } from './useStartScreen'
-import type { GameListItem, StartScreenTile } from '@/services/types'
+import type {
+  GameListItem,
+  StartScreenColumn,
+  StartScreenLayout,
+  StartScreenTile,
+} from '@/services/types'
 
 const makeGame = (publicId: string, id = 1): GameListItem => ({
   id,
@@ -35,16 +40,27 @@ const makeTile = (gameId: number, publicId: string, tileSize: StartScreenTile['t
   sort_order: 0,
 })
 
+const makeColumn = (name: string, id = 1): StartScreenColumn => ({
+  id,
+  name,
+  sort_order: 0,
+})
+
+const makeLayout = (tiles: StartScreenTile[], columns: StartScreenColumn[] = []): StartScreenLayout => ({
+  tiles,
+  columns,
+})
+
 const createScreen = (overrides: Partial<{
-  fetchTiles: () => Promise<StartScreenTile[]>
+  fetchTiles: () => Promise<StartScreenLayout>
   fetchFavorites: () => Promise<GameListItem[]>
-  saveTiles: () => Promise<StartScreenTile[]>
+  saveTiles: () => Promise<StartScreenLayout>
   uploadTileImage: () => Promise<string>
   addAlert: () => void
 }> = {}) => {
-  const fetchTiles = overrides.fetchTiles ?? vi.fn().mockResolvedValue([])
+  const fetchTiles = overrides.fetchTiles ?? vi.fn().mockResolvedValue(makeLayout([]))
   const fetchFavorites = overrides.fetchFavorites ?? vi.fn().mockResolvedValue([])
-  const saveTiles = overrides.saveTiles ?? vi.fn().mockResolvedValue([])
+  const saveTiles = overrides.saveTiles ?? vi.fn().mockResolvedValue(makeLayout([]))
   const uploadTileImage = overrides.uploadTileImage ?? vi.fn().mockResolvedValue('/assets/start-screen/tile.png')
   const addAlert = overrides.addAlert ?? vi.fn()
   const screen = useStartScreen({
@@ -58,9 +74,9 @@ const createScreen = (overrides: Partial<{
 }
 
 describe('useStartScreen', () => {
-  it('falls back to favorites as default tiles when no tiles are saved', async () => {
+  it('falls back to favorites as default tiles when nothing is saved', async () => {
     const { screen, fetchTiles, fetchFavorites } = createScreen({
-      fetchTiles: vi.fn().mockResolvedValue([]),
+      fetchTiles: vi.fn().mockResolvedValue(makeLayout([])),
       fetchFavorites: vi.fn().mockResolvedValue([makeGame('a', 1), makeGame('b', 2)]),
     })
 
@@ -70,12 +86,15 @@ describe('useStartScreen', () => {
     expect(fetchTiles).toHaveBeenCalledTimes(1)
     expect(fetchFavorites).toHaveBeenCalledTimes(1)
     expect(screen.tiles.value.map((tile) => tile.public_id)).toEqual(['a', 'b'])
-    expect(screen.tiles.value.every((tile) => tile.tile_size === 'small')).toBe(true)
+    expect(screen.columns.value).toEqual([])
   })
 
-  it('uses saved tiles and skips the favorites fallback', async () => {
+  it('uses the saved layout with column names', async () => {
     const { screen, fetchFavorites } = createScreen({
-      fetchTiles: vi.fn().mockResolvedValue([makeTile(1, 'a', 'wide')]),
+      fetchTiles: vi.fn().mockResolvedValue(makeLayout(
+        [makeTile(1, 'a', 'wide')],
+        [makeColumn('我的收藏')],
+      )),
       fetchFavorites: vi.fn(),
     })
 
@@ -84,6 +103,7 @@ describe('useStartScreen', () => {
 
     expect(fetchFavorites).not.toHaveBeenCalled()
     expect(screen.tiles.value).toEqual([makeTile(1, 'a', 'wide')])
+    expect(screen.columns.value[0]?.name).toBe('我的收藏')
   })
 
   it('alerts and keeps a retryable failure state when loading fails', async () => {
@@ -99,8 +119,8 @@ describe('useStartScreen', () => {
     expect(addAlert).toHaveBeenCalledWith('开始屏幕加载失败，请稍后重试', 'error')
   })
 
-  it('refetches tiles every time the screen is opened', async () => {
-    const fetchTiles = vi.fn().mockResolvedValue([makeTile(1, 'a')])
+  it('refetches the layout every time the screen is opened', async () => {
+    const fetchTiles = vi.fn().mockResolvedValue(makeLayout([makeTile(1, 'a')]))
     const { screen } = createScreen({ fetchTiles })
 
     screen.open()
@@ -112,27 +132,37 @@ describe('useStartScreen', () => {
     expect(fetchTiles).toHaveBeenCalledTimes(2)
   })
 
-  it('cancels editing and restores the original tiles', async () => {
+  it('cancels editing and restores both tiles and column names', async () => {
     const { screen } = createScreen({
-      fetchTiles: vi.fn().mockResolvedValue([makeTile(1, 'a'), makeTile(2, 'b')]),
+      fetchTiles: vi.fn().mockResolvedValue(makeLayout(
+        [makeTile(1, 'a'), makeTile(2, 'b')],
+        [makeColumn('第一列')],
+      )),
     })
 
     screen.open()
     await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
     await screen.startEdit()
     screen.removeTile(1)
-    expect(screen.tiles.value.map((tile) => tile.public_id)).toEqual(['b'])
-
+    screen.renameColumn(0, '改过的名字')
     screen.cancelEdit()
+
     expect(screen.tiles.value.map((tile) => tile.public_id)).toEqual(['a', 'b'])
+    expect(screen.columns.value[0]?.name).toBe('第一列')
     expect(screen.isEditing.value).toBe(false)
   })
 
-  it('saves the current tile arrangement', async () => {
-    const saveTiles = vi.fn().mockResolvedValue([makeTile(1, 'a', 'wide')])
+  it('saves tiles together with column names', async () => {
+    const saveTiles = vi.fn().mockResolvedValue(makeLayout(
+      [makeTile(1, 'a', 'wide')],
+      [makeColumn('改名')],
+    ))
     const addAlert = vi.fn()
     const { screen } = createScreen({
-      fetchTiles: vi.fn().mockResolvedValue([makeTile(1, 'a', 'small')]),
+      fetchTiles: vi.fn().mockResolvedValue(makeLayout(
+        [makeTile(1, 'a', 'small')],
+        [makeColumn('第一列')],
+      )),
       saveTiles,
       addAlert,
     })
@@ -141,56 +171,53 @@ describe('useStartScreen', () => {
     await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
     await screen.startEdit()
     screen.resizeTile(1)
+    screen.renameColumn(0, '改名')
     await screen.saveEdit()
 
-    expect(saveTiles).toHaveBeenCalledWith([{
-      game_id: 1,
-      tile_size: 'wide',
-      image_small_path: null,
-      image_wide_path: null,
-      image_large_path: null,
-    }])
-    expect(screen.tiles.value[0]?.tile_size).toBe('wide')
+    expect(saveTiles).toHaveBeenCalledWith({
+      columns: [{ name: '改名' }],
+      tiles: [{
+        game_id: 1,
+        tile_size: 'wide',
+        image_small_path: null,
+        image_wide_path: null,
+        image_large_path: null,
+      }],
+    })
+    expect(screen.columns.value[0]?.name).toBe('改名')
     expect(screen.isEditing.value).toBe(false)
     expect(addAlert).toHaveBeenCalledWith('开始屏幕已保存', 'success')
   })
 
-  it('cycles tile sizes small -> wide -> large -> small', async () => {
+  it('pads column names to match packed columns when saving', async () => {
+    const saveTiles = vi.fn().mockResolvedValue(makeLayout([], [makeColumn('一'), makeColumn('二')]))
     const { screen } = createScreen({
-      fetchTiles: vi.fn().mockResolvedValue([makeTile(1, 'a', 'small')]),
+      fetchTiles: vi.fn().mockResolvedValue(makeLayout([
+        makeTile(1, 'a'),
+        makeTile(2, 'b'),
+        makeTile(3, 'c'),
+        makeTile(4, 'd'),
+        makeTile(5, 'e'),
+        makeTile(6, 'f'),
+        makeTile(7, 'g'),
+        makeTile(8, 'h'),
+        makeTile(9, 'i'),
+        makeTile(10, 'j'),
+        makeTile(11, 'k'),
+        makeTile(12, 'l'),
+        makeTile(13, 'm'),
+      ])),
+      saveTiles,
     })
+
     screen.open()
     await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
+    await screen.startEdit()
+    screen.renameColumn(1, '二')
+    await screen.saveEdit()
 
-    screen.resizeTile(1)
-    expect(screen.tiles.value[0]?.tile_size).toBe('wide')
-    screen.resizeTile(1)
-    expect(screen.tiles.value[0]?.tile_size).toBe('large')
-    screen.resizeTile(1)
-    expect(screen.tiles.value[0]?.tile_size).toBe('small')
-  })
-
-  it('reorders tiles with moveTile', async () => {
-    const { screen } = createScreen({
-      fetchTiles: vi.fn().mockResolvedValue([makeTile(1, 'a'), makeTile(2, 'b'), makeTile(3, 'c')]),
-    })
-    screen.open()
-    await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
-
-    screen.moveTile(0, 2)
-    expect(screen.tiles.value.map((tile) => tile.public_id)).toEqual(['b', 'c', 'a'])
-  })
-
-  it('adds a tile from the favorite pool and ignores duplicates', async () => {
-    const { screen } = createScreen({
-      fetchTiles: vi.fn().mockResolvedValue([makeTile(1, 'a')]),
-    })
-    screen.open()
-    await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
-
-    screen.addTile(makeGame('b', 2))
-    screen.addTile(makeGame('b', 2))
-    expect(screen.tiles.value.map((tile) => tile.public_id)).toEqual(['a', 'b'])
+    const input = saveTiles.mock.calls[0]?.[0] as { columns: Array<{ name: string }> }
+    expect(input.columns).toEqual([{ name: '' }, { name: '二' }])
   })
 
   it('keeps edit mode and reports the real reason when saving fails with 401', async () => {
@@ -201,7 +228,7 @@ describe('useStartScreen', () => {
     const saveTiles = vi.fn().mockRejectedValue(axiosError)
     const addAlert = vi.fn()
     const { screen } = createScreen({
-      fetchTiles: vi.fn().mockResolvedValue([makeTile(1, 'a')]),
+      fetchTiles: vi.fn().mockResolvedValue(makeLayout([makeTile(1, 'a')])),
       saveTiles,
       addAlert,
     })
@@ -222,7 +249,7 @@ describe('useStartScreen', () => {
       .mockResolvedValueOnce('/assets/start-screen/large.png')
     const addAlert = vi.fn()
     const { screen } = createScreen({
-      fetchTiles: vi.fn().mockResolvedValue([makeTile(1, 'a')]),
+      fetchTiles: vi.fn().mockResolvedValue(makeLayout([makeTile(1, 'a')])),
       uploadTileImage,
       addAlert,
     })

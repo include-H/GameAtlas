@@ -40,3 +40,20 @@ type StartScreenTileWrite struct {
 	ImageWidePath  *string
 	ImageLargePath *string
 }
+
+type StartScreenColumn struct {
+	ID        int64  `db:"id"`
+	Name      string `db:"name"`
+	SortOrder int    `db:"sort_order"`
+	CreatedAt string `db:"created_at"`
+	UpdatedAt string `db:"updated_at"`
+}
+
+type StartScreenColumnWrite struct {
+	Name string
+}
+
+type StartScreenLayout struct {
+	Columns []StartScreenColumn
+	Tiles   []StartScreenTile
+}

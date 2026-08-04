@@ -1,11 +1,19 @@
 import { ref } from 'vue'
 import { getHttpErrorMessage, getHttpStatus } from '@/utils/http-error'
-import type { GameListItem, StartScreenTile, StartScreenTileSize, StartScreenTileWrite } from '@/services/types'
+import { packStartScreenTiles } from '@/utils/start-screen-layout'
+import type {
+  GameListItem,
+  StartScreenColumn,
+  StartScreenLayout,
+  StartScreenLayoutInput,
+  StartScreenTile,
+  StartScreenTileSize,
+} from '@/services/types'
 
 interface UseStartScreenOptions {
-  fetchTiles: () => Promise<StartScreenTile[]>
+  fetchTiles: () => Promise<StartScreenLayout>
   fetchFavorites: () => Promise<GameListItem[]>
-  saveTiles: (tiles: StartScreenTileWrite[]) => Promise<StartScreenTile[]>
+  saveTiles: (input: StartScreenLayoutInput) => Promise<StartScreenLayout>
   uploadTileImage: (file: File, size: StartScreenTileSize) => Promise<string>
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
 }
@@ -26,6 +34,7 @@ const describeSaveError = (error: unknown): string => {
 export const useStartScreen = (options: UseStartScreenOptions) => {
   const visible = ref(false)
   const tiles = ref<StartScreenTile[]>([])
+  const columns = ref<StartScreenColumn[]>([])
   const favoritePool = ref<GameListItem[]>([])
   const isLoading = ref(false)
   const hasLoadFailure = ref(false)
@@ -33,17 +42,23 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
   const isSaving = ref(false)
   const saveError = ref<string | null>(null)
   const originalTiles = ref<StartScreenTile[]>([])
+  const originalColumns = ref<StartScreenColumn[]>([])
+
+  const applyLayout = (layout: StartScreenLayout) => {
+    tiles.value = layout.tiles
+    columns.value = layout.columns
+  }
 
   const refresh = async () => {
     isLoading.value = true
     hasLoadFailure.value = false
     try {
       const saved = await options.fetchTiles()
-      if (saved.length > 0) {
-        tiles.value = saved
+      if (saved.tiles.length > 0) {
+        applyLayout(saved)
         return
       }
-      // 没有保存过自定义磁贴时，先用收藏游戏作为默认磁贴。
+      // 没有保存过自定义磁贴时，先用收藏游戏作为默认磁贴；列名留空，展示时按"列 N"兜底。
       const favorites = await options.fetchFavorites()
       tiles.value = favorites.map((game, index) => ({
         game_id: game.id,
@@ -57,6 +72,7 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
         image_large_path: null,
         sort_order: index,
       }))
+      columns.value = []
     } catch {
       hasLoadFailure.value = true
       options.addAlert('开始屏幕加载失败，请稍后重试', 'error')
@@ -93,6 +109,7 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     if (isEditing.value) return
     saveError.value = null
     originalTiles.value = tiles.value.map((tile) => ({ ...tile }))
+    originalColumns.value = columns.value.map((column) => ({ ...column }))
     isEditing.value = true
     try {
       favoritePool.value = await options.fetchFavorites()
@@ -104,9 +121,17 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
 
   const cancelEdit = () => {
     tiles.value = originalTiles.value.map((tile) => ({ ...tile }))
+    columns.value = originalColumns.value.map((column) => ({ ...column }))
     favoritePool.value = []
     saveError.value = null
     isEditing.value = false
+  }
+
+  const renameColumn = (index: number, name: string) => {
+    while (columns.value.length <= index) {
+      columns.value.push({ id: 0, name: '', sort_order: columns.value.length })
+    }
+    columns.value[index].name = name.trim()
   }
 
   const saveEdit = async () => {
@@ -114,16 +139,19 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     isSaving.value = true
     saveError.value = null
     try {
-      const saved = await options.saveTiles(
-        tiles.value.map((tile) => ({
+      const packed = packStartScreenTiles(tiles.value)
+      const columnNames = packed.map((_, index) => columns.value[index]?.name ?? '')
+      const saved = await options.saveTiles({
+        columns: columnNames.map((name) => ({ name })),
+        tiles: tiles.value.map((tile) => ({
           game_id: tile.game_id,
           tile_size: tile.tile_size,
           image_small_path: tile.image_small_path,
           image_wide_path: tile.image_wide_path,
           image_large_path: tile.image_large_path,
         })),
-      )
-      tiles.value = saved
+      })
+      applyLayout(saved)
       favoritePool.value = []
       isEditing.value = false
       options.addAlert('开始屏幕已保存', 'success')
@@ -192,6 +220,7 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
   return {
     visible,
     tiles,
+    columns,
     favoritePool,
     isLoading,
     hasLoadFailure,
@@ -205,6 +234,7 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     startEdit,
     cancelEdit,
     saveEdit,
+    renameColumn,
     resizeTile,
     removeTile,
     moveTile,

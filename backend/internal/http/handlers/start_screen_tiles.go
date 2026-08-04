@@ -18,12 +18,12 @@ func NewStartScreenTilesHandler(service *services.StartScreenTilesService) *Star
 }
 
 func (h *StartScreenTilesHandler) Get(c *gin.Context) {
-	tiles, err := h.service.List()
+	layout, err := h.service.List()
 	if err != nil {
 		writeServiceError(c, err, "获取开始屏幕磁贴失败")
 		return
 	}
-	writeJSONSuccess(c, http.StatusOK, toStartScreenTileResponses(tiles))
+	writeJSONSuccess(c, http.StatusOK, toStartScreenLayoutResponse(layout))
 }
 
 func (h *StartScreenTilesHandler) Update(c *gin.Context) {
@@ -32,6 +32,9 @@ func (h *StartScreenTilesHandler) Update(c *gin.Context) {
 	}
 
 	var request struct {
+		Columns []struct {
+			Name string `json:"name"`
+		} `json:"columns"`
 		Tiles []struct {
 			GameID         int64   `json:"game_id"`
 			TileSize       string  `json:"tile_size"`
@@ -45,6 +48,11 @@ func (h *StartScreenTilesHandler) Update(c *gin.Context) {
 		return
 	}
 
+	columns := make([]domain.StartScreenColumnWrite, 0, len(request.Columns))
+	for _, item := range request.Columns {
+		columns = append(columns, domain.StartScreenColumnWrite{Name: item.Name})
+	}
+
 	tiles := make([]domain.StartScreenTileWrite, 0, len(request.Tiles))
 	for _, item := range request.Tiles {
 		tiles = append(tiles, domain.StartScreenTileWrite{
@@ -56,12 +64,12 @@ func (h *StartScreenTilesHandler) Update(c *gin.Context) {
 		})
 	}
 
-	result, err := h.service.Update(tiles)
+	result, err := h.service.Update(columns, tiles)
 	if err != nil {
 		writeServiceError(c, err, "保存开始屏幕磁贴失败")
 		return
 	}
-	writeJSONSuccess(c, http.StatusOK, toStartScreenTileResponses(result))
+	writeJSONSuccess(c, http.StatusOK, toStartScreenLayoutResponse(result))
 }
 
 func (h *StartScreenTilesHandler) UploadImage(c *gin.Context) {
@@ -86,6 +94,25 @@ func (h *StartScreenTilesHandler) UploadImage(c *gin.Context) {
 	})
 }
 
+func toStartScreenLayoutResponse(layout *domain.StartScreenLayout) startScreenLayoutResponse {
+	return startScreenLayoutResponse{
+		Columns: toStartScreenColumnResponses(layout.Columns),
+		Tiles:   toStartScreenTileResponses(layout.Tiles),
+	}
+}
+
+func toStartScreenColumnResponses(columns []domain.StartScreenColumn) []startScreenColumnResponse {
+	result := make([]startScreenColumnResponse, 0, len(columns))
+	for _, column := range columns {
+		result = append(result, startScreenColumnResponse{
+			ID:        column.ID,
+			Name:      column.Name,
+			SortOrder: column.SortOrder,
+		})
+	}
+	return result
+}
+
 func toStartScreenTileResponses(tiles []domain.StartScreenTile) []startScreenTileResponse {
 	result := make([]startScreenTileResponse, 0, len(tiles))
 	for _, tile := range tiles {
@@ -103,6 +130,17 @@ func toStartScreenTileResponses(tiles []domain.StartScreenTile) []startScreenTil
 		})
 	}
 	return result
+}
+
+type startScreenLayoutResponse struct {
+	Columns []startScreenColumnResponse `json:"columns"`
+	Tiles   []startScreenTileResponse   `json:"tiles"`
+}
+
+type startScreenColumnResponse struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	SortOrder int    `json:"sort_order"`
 }
 
 type startScreenTileResponse struct {

@@ -81,6 +81,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
 	startScreenTilesService := services.NewStartScreenTilesService(
 		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewStartScreenColumnsRepository(db),
 		gamesRepo,
 		files.NewAssetStore(cfg.AssetsDir),
 	)

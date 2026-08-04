@@ -11,35 +11,71 @@ import (
 
 type StartScreenTilesService struct {
 	tilesRepo *repositories.StartScreenTilesRepository
+	columnsRepo *repositories.StartScreenColumnsRepository
 	gamesRepo *repositories.GamesRepository
 	store     *files.AssetStore
 }
 
 func NewStartScreenTilesService(
 	tilesRepo *repositories.StartScreenTilesRepository,
+	columnsRepo *repositories.StartScreenColumnsRepository,
 	gamesRepo *repositories.GamesRepository,
 	store *files.AssetStore,
 ) *StartScreenTilesService {
 	return &StartScreenTilesService{
 		tilesRepo: tilesRepo,
+		columnsRepo: columnsRepo,
 		gamesRepo: gamesRepo,
 		store:     store,
 	}
 }
 
-func (s *StartScreenTilesService) List() ([]domain.StartScreenTile, error) {
-	return s.tilesRepo.List()
+func (s *StartScreenTilesService) List() (*domain.StartScreenLayout, error) {
+	columns, err := s.columnsRepo.List()
+	if err != nil {
+		return nil, err
+	}
+	tiles, err := s.tilesRepo.List()
+	if err != nil {
+		return nil, err
+	}
+	return &domain.StartScreenLayout{Columns: columns, Tiles: tiles}, nil
 }
 
-func (s *StartScreenTilesService) Update(tiles []domain.StartScreenTileWrite) ([]domain.StartScreenTile, error) {
+func (s *StartScreenTilesService) Update(
+	columns []domain.StartScreenColumnWrite,
+	tiles []domain.StartScreenTileWrite,
+) (*domain.StartScreenLayout, error) {
+	normalizedColumns, err := s.validateColumns(columns)
+	if err != nil {
+		return nil, err
+	}
 	normalized, err := s.validateTiles(tiles)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.columnsRepo.Replace(normalizedColumns); err != nil {
 		return nil, err
 	}
 	if err := s.tilesRepo.Replace(normalized); err != nil {
 		return nil, err
 	}
-	return s.tilesRepo.List()
+	return s.List()
+}
+
+func (s *StartScreenTilesService) validateColumns(columns []domain.StartScreenColumnWrite) ([]domain.StartScreenColumnWrite, error) {
+	if len(columns) > 100 {
+		return nil, domain.ErrValidation
+	}
+	normalized := make([]domain.StartScreenColumnWrite, 0, len(columns))
+	for _, column := range columns {
+		name := strings.TrimSpace(column.Name)
+		if len([]rune(name)) > 30 {
+			return nil, domain.ErrValidation
+		}
+		normalized = append(normalized, domain.StartScreenColumnWrite{Name: name})
+	}
+	return normalized, nil
 }
 
 func (s *StartScreenTilesService) validateTiles(tiles []domain.StartScreenTileWrite) ([]domain.StartScreenTileWrite, error) {

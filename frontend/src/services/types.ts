@@ -392,3 +392,19 @@ export interface StartScreenTileWrite {
   image_wide_path: string | null
   image_large_path: string | null
 }
+
+export interface StartScreenColumn {
+  id: number
+  name: string
+  sort_order: number
+}
+
+export interface StartScreenLayout {
+  columns: StartScreenColumn[]
+  tiles: StartScreenTile[]
+}
+
+export interface StartScreenLayoutInput {
+  columns: Array<{ name: string }>
+  tiles: StartScreenTileWrite[]
+}

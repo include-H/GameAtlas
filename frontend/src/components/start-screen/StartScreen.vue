@@ -79,6 +79,14 @@
                 :key="columnIndex"
                 class="start-screen__column"
               >
+                <input
+                  v-if="isEditing"
+                  class="start-screen__column-name-input"
+                  :value="columnNameOf(columnIndex)"
+                  :placeholder="`列 ${columnIndex + 1}`"
+                  @change="handleRenameColumn(columnIndex, $event)"
+                >
+                <span v-else class="start-screen__column-name">{{ columnNameOf(columnIndex) }}</span>
                 <TransitionGroup
                   name="metro-tile"
                   tag="div"
@@ -182,12 +190,18 @@ import {
 } from '@arco-design/web-vue/es/icon'
 import MetroTile from './MetroTile.vue'
 import TileCropModal from './TileCropModal.vue'
-import type { GameListItem, StartScreenTile, StartScreenTileSize } from '@/services/types'
+import type {
+  GameListItem,
+  StartScreenColumn,
+  StartScreenTile,
+  StartScreenTileSize,
+} from '@/services/types'
 import { packStartScreenTiles } from '@/utils/start-screen-layout'
 
 const props = defineProps<{
   visible: boolean
   tiles: StartScreenTile[]
+  columns: StartScreenColumn[]
   favoritePool: GameListItem[]
   canEdit: boolean
   isLoading: boolean
@@ -209,6 +223,7 @@ const emit = defineEmits<{
   move: [fromIndex: number, toIndex: number]
   add: [game: GameListItem]
   applyCrop: [gameId: number, blobs: Record<StartScreenTileSize, Blob>]
+  renameColumn: [index: number, name: string]
 }>()
 
 const router = useRouter()
@@ -230,6 +245,16 @@ const addCandidates = computed(() => {
 })
 
 const packedColumns = computed(() => packStartScreenTiles(props.tiles))
+
+const columnNameOf = (index: number) => {
+  const name = props.columns[index]?.name?.trim()
+  return name || `列 ${index + 1}`
+}
+
+const handleRenameColumn = (index: number, event: Event) => {
+  const target = event.target as HTMLInputElement
+  emit('renameColumn', index, target.value)
+}
 
 const handleClose = () => {
   emit('close')
@@ -414,6 +439,38 @@ onUnmounted(() => {
   grid-template-rows: repeat(6, var(--start-cell));
   gap: var(--start-gap);
   width: max-content;
+}
+
+.start-screen__column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.start-screen__column-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.78);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+}
+
+.start-screen__column-name-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+}
+
+.start-screen__column-name-input:focus {
+  border-color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .start-screen__tile-slot {

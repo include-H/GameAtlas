@@ -139,6 +139,7 @@
   <start-screen
     :visible="startScreenVisible"
     :tiles="startScreenTiles"
+    :columns="startScreenColumns"
     :favorite-pool="startScreenFavoritePool"
     :can-edit="isAdmin"
     :is-loading="startScreenLoading"
@@ -156,6 +157,7 @@
     @move="moveStartScreenTile"
     @add="addStartScreenTile"
     @apply-crop="applyStartScreenCrop"
+    @rename-column="renameStartScreenColumn"
   />
 </template>
 
@@ -168,7 +170,7 @@ import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import gamesService from '@/services/games.service'
 import startScreenService from '@/services/start-screen.service'
-import type { GameListItem, StartScreenTileWrite } from '@/services/types'
+import type { GameListItem, StartScreenLayoutInput } from '@/services/types'
 import AlertBanner from '@/components/AlertBanner.vue'
 import AppNavigationMenu from '@/components/AppNavigationMenu.vue'
 import SharedAmbientBackground from '@/components/SharedAmbientBackground.vue'
@@ -192,6 +194,7 @@ const { isAdmin, adminDisplayName, authLoadFailed } = storeToRefs(authStore)
 const {
   visible: startScreenVisible,
   tiles: startScreenTiles,
+  columns: startScreenColumns,
   favoritePool: startScreenFavoritePool,
   isLoading: startScreenLoading,
   hasLoadFailure: startScreenLoadFailed,
@@ -209,6 +212,7 @@ const {
   moveTile: moveStartScreenTile,
   addTile: addStartScreenTile,
   applyTileCrop: applyStartScreenCrop,
+  renameColumn: renameStartScreenColumn,
 } = useStartScreen({
   fetchTiles: () => startScreenService.getTiles(),
   uploadTileImage: (file, size) => startScreenService.uploadTileImage(file, size),
@@ -227,7 +231,7 @@ const {
     }
     return favorites
   },
-  saveTiles: (tiles: StartScreenTileWrite[]) => startScreenService.updateTiles(tiles),
+  saveTiles: (input: StartScreenLayoutInput) => startScreenService.updateTiles(input),
   addAlert: (message, type) => {
     uiStore.addAlert(message, type)
   },
