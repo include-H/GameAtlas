@@ -32,7 +32,7 @@ var runtimeSettingDefinitions = []SettingDefinition{
 	{Key: "AUTH_MAX_FAILS", Label: "登录失败次数限制", Group: "auth"},
 	{Key: "AUTH_COOLDOWN", Label: "限制冷却时间", Group: "auth"},
 	{Key: "AUTH_FAIL_WINDOW", Label: "失败计数时间窗口", Group: "auth"},
-	{Key: "AUTH_STATE_TTL", Label: "登录会话有效期", Group: "auth"},
+	{Key: "AUTH_STATE_TTL", Label: "锁定状态保留时间", Group: "auth"},
 	{Key: "AUTH_TRACK_BY", Label: "失败追踪方式", Group: "auth"},
 	{Key: "WIKI_HISTORY_LIMIT", Label: "Wiki 历史记录上限", Group: "general"},
 	{Key: "SMB_PATH_MAPPINGS", Label: "SMB 路径映射", Group: "smb"},

@@ -191,11 +191,14 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import gamesService from '@/services/games.service'
+import { useUiStore } from '@/stores/ui'
 import {
   getAmbientBackgroundPoolFromGames,
   mergeAmbientBackgroundPools,
   type AmbientBackgroundPool,
 } from '@/utils/ambient-background'
+
+const uiStore = useUiStore()
 
 interface StoreShelfGame {
   publicId: string
@@ -282,6 +285,7 @@ const loadStorePosters = async () => {
     storePosters.value = pickPosterImages(mergeAmbientBackgroundPools(pools))
   } catch {
     // 拉取失败时保留纯色海报兜底
+    uiStore.addAlert('游戏店海报加载失败，已显示兜底样式', 'warning')
   }
 }
 
@@ -304,20 +308,14 @@ const loadStoreSession = async () => {
     }))
 
     // CRT 播放真实预告：优先取本次 Session 里第一个带视频的游戏
-    for (const game of picked) {
-      try {
-        const detail = await gamesService.getGameDetail(game.public_id)
-        const video = detail.preview_videos?.[0]?.path
-        if (video) {
-          crtVideoUrl.value = video
-          break
-        }
-      } catch {
-        // 单个游戏详情失败不影响货架，继续找下一个视频
-      }
+    const videoBundles = await gamesService.getPreviewVideos(picked.map((game) => game.public_id))
+    const firstVideo = videoBundles.find((bundle) => bundle.preview_videos.length > 0)?.preview_videos[0]?.path
+    if (firstVideo) {
+      crtVideoUrl.value = firstVideo
     }
   } catch {
     // 拉取失败时保留空货架，避免展示 mock 数据
+    uiStore.addAlert('游戏店数据加载失败，货架暂时为空', 'warning')
   }
 }
 
@@ -344,12 +342,6 @@ declare global {
           getScaleX?: () => number
         }
       }
-    }
-    __waifuTools?: {
-      el: () => HTMLElement | null
-      move: (left: number, bottom: number) => void
-      zoom: (factor: number) => void
-      report: () => Record<string, number | null>
     }
   }
 }
@@ -772,37 +764,6 @@ onMounted(() => {
   void loadStorePosters()
   void loadStoreSession()
 
-  // 调试工具：移动/缩放/报告看板娘位置（1280×720 设计稿坐标）
-  window.__waifuTools = {
-    el: () => document.getElementById('waifu'),
-    move: (left, bottom) => {
-      const element = document.getElementById('waifu')
-      if (!element) return
-      element.style.setProperty('left', `${left}px`, 'important')
-      element.style.setProperty('bottom', `${bottom}px`, 'important')
-    },
-    zoom: (factor) => {
-      window.__waifuManager?.cubism2model?.modelScaling(factor)
-    },
-    report: () => {
-      const element = document.getElementById('waifu')
-      const rect = element?.getBoundingClientRect()
-      const stage = document.querySelector<HTMLElement>('.store-stage')
-      const scale = stage ? new DOMMatrixReadOnly(getComputedStyle(stage).transform).a : 1
-      const model = window.__waifuManager?.cubism2model
-      const info = {
-        designLeft: rect ? (rect.left - (window.innerWidth - 1280 * scale) / 2) / scale : null,
-        designBottom: rect
-          ? (window.innerHeight - rect.bottom - (window.innerHeight - 720 * scale) / 2) / scale
-          : null,
-        width: rect?.width ?? null,
-        height: rect?.height ?? null,
-        viewScale: model?.viewMatrix?.getScaleX?.() ?? null,
-      }
-      console.log(JSON.stringify(info, null, 2))
-      return info
-    },
-  }
 })
 onUnmounted(() => {
   pickupAnimation?.cancel()
@@ -831,6 +792,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 游戏店是沉浸式品牌页面特例：本页场景色直接在局部样式中定义，不外溢到全局 token。 */
 .game-store {
   position: absolute;
   inset: 0;

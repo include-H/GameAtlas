@@ -87,12 +87,7 @@ func insertServicesGameFile(t *testing.T, db *sqlx.DB, gameID int64, path string
 
 func newServicesAssetsService(db *sqlx.DB, assetsDir string) *AssetsService {
 	gamesRepo := repositories.NewGamesRepository(db)
-	return NewAssetsService(
-		config.Config{AssetsDir: assetsDir},
-		gamesRepo,
-		repositories.NewAssetsRepository(db),
-		repositories.NewAssetCleanupTasksRepository(db),
-	)
+	return NewAssetsService(config.Config{AssetsDir: assetsDir}, gamesRepo)
 }
 
 func newServicesCatalogService(db *sqlx.DB) *GameCatalogService {

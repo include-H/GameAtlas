@@ -269,6 +269,9 @@ func (h *GamesHandler) Delete(c *gin.Context) {
 	writeJSONSuccess(c, http.StatusOK, data)
 }
 
+// Favorite/Unfavorite 有意不做 requireAdmin：favorite_games 是单用户/家庭场景下的
+// 全局收藏状态，匿名访客也可切换（与"我的收藏"共享同一份数据）。
+// 若未来引入多用户或需要管理员独占写权限，应先在这里加门禁并同步前端。
 func (h *GamesHandler) Favorite(c *gin.Context) {
 	id, ok := parseGamePublicIDParam(c, "publicId", h.favorites.ResolveGameID)
 	if !ok {

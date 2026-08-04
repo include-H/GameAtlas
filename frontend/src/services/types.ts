@@ -298,7 +298,7 @@ export type TimelineGame = TimelineGameResponse
 // Keep the public/admin detail contract explicit in the frontend because the backend
 // serves both shapes from the same route depending on auth state. Without this split,
 // edit bootstrap code silently drifts back to optional file_path handling.
-export const hasResolvedGameFilePath = (file: GameFileEntry): file is AdminGameFileEntry => {
+const hasResolvedGameFilePath = (file: GameFileEntry): file is AdminGameFileEntry => {
   return 'file_path' in file && typeof file.file_path === 'string' && file.file_path.trim().length > 0
 }
 

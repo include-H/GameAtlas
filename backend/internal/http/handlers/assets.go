@@ -34,12 +34,7 @@ func (h *AssetsHandler) Upload(assetType string) gin.HandlerFunc {
 			return
 		}
 
-		sortOrder, ok := parseAssetUploadSortOrder(c)
-		if !ok {
-			return
-		}
-
-		result, err := h.service.Upload(gameID, assetType, file, sortOrder)
+		result, err := h.service.Upload(gameID, assetType, file)
 		if err != nil {
 			writeServiceError(c, err, "无效的资源上传")
 			return
@@ -52,20 +47,4 @@ func (h *AssetsHandler) Upload(assetType string) gin.HandlerFunc {
 
 		writeJSONSuccess(c, http.StatusCreated, response)
 	}
-}
-
-func parseAssetUploadSortOrder(c *gin.Context) (int, bool) {
-	raw := c.PostForm("sort_order")
-	if raw == "" {
-		return 0, true
-	}
-
-	value, err := strconv.Atoi(raw)
-	if err != nil || value < 0 {
-		// 2026-05-09: 统一为中文错误信息
-		writeJSONError(c, http.StatusBadRequest, "需要有效的排序值")
-		return 0, false
-	}
-
-	return value, true
 }

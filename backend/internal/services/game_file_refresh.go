@@ -27,10 +27,12 @@ type RefreshResult struct {
 	Errors  int `json:"errors"`
 }
 
+// RefreshFileSizes 重新读取所有已登记文件的实际大小与修改时间并写回数据库，
+// 覆盖文件被替换/增大后数据库中仍保留旧大小的情况。
 func (s *GameFileRefreshService) RefreshFileSizes() (*RefreshResult, error) {
 	result := &RefreshResult{}
 
-	files, err := s.gameFilesRepo.ListFilesWithoutSize()
+	files, err := s.gameFilesRepo.ListAll()
 	if err != nil {
 		return nil, err
 	}

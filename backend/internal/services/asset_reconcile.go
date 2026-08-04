@@ -36,7 +36,7 @@ const orphanAssetQuarantineRetention = 7 * 24 * time.Hour
 func NewAssetReconcileService(cfg config.Config, db *sqlx.DB) *AssetReconcileService {
 	return &AssetReconcileService{
 		db:                  db,
-		store:               files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
+		store:               files.NewAssetStore(cfg.AssetsDir),
 		fullSweepCooldown:   2 * time.Second,
 		orphanQuarantineDir: filepath.Join(filepath.Dir(cfg.AssetsDir), "orphaned-assets"),
 	}

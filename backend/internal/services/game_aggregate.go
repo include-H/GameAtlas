@@ -34,7 +34,7 @@ func NewGameAggregateService(
 		metadataService:       metadataService,
 		assetCleanupTasksRepo: assetCleanupTasksRepo,
 		fileGuard:             files.NewGuard(cfg.PrimaryROMRoot),
-		assetStore:            files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
+		assetStore:            files.NewAssetStore(cfg.AssetsDir),
 		catalogService:        catalogService,
 	}
 }

@@ -77,27 +77,27 @@ const normalizeCommittedSearchValue = (value: string | undefined): string | unde
   return normalized ? normalized : undefined
 }
 
-export const parsePositiveQueryNumber = (value: string | undefined, fallback: number): number => {
+const parsePositiveQueryNumber = (value: string | undefined, fallback: number): number => {
   if (!value) return fallback
   const parsed = Number.parseInt(value, 10)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
 
-export const parsePositiveRouteNumber = (
+const parsePositiveRouteNumber = (
   value: LocationQueryValue | LocationQueryValue[] | undefined,
 ): number | undefined => {
   const parsed = Number(readSingleQueryValue(value))
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
 }
 
-export const parseGamesItemsPerPage = (
+const parseGamesItemsPerPage = (
   value: LocationQueryValue | LocationQueryValue[] | undefined,
 ): number | undefined => {
   const parsed = parsePositiveRouteNumber(value)
   return parsed !== undefined && ITEMS_PER_PAGE_VALUES.has(parsed) ? parsed : undefined
 }
 
-export const parseRouteBoolean = (
+const parseRouteBoolean = (
   value: LocationQueryValue | LocationQueryValue[] | undefined,
 ): boolean | undefined => {
   const raw = readSingleQueryValue(value)

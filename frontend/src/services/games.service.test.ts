@@ -216,6 +216,43 @@ describe('games service', () => {
     await expect(gamesService.getTimelineGames()).rejects.toThrow('时间线响应缺少分页信息')
   })
 
+  it('loads preview videos for a batch of public ids', async () => {
+    getMock.mockResolvedValue({
+      data: [
+        {
+          public_id: 'game-1',
+          preview_videos: [
+            {
+              id: 12,
+              asset_uid: 'video-1',
+              path: '/assets/video-1.mp4',
+              sort_order: 0,
+            },
+          ],
+        },
+        {
+          public_id: 'game-2',
+          preview_videos: [],
+        },
+      ],
+    })
+
+    const result = await gamesService.getPreviewVideos(['game-1', 'game-2'])
+
+    expect(getMock).toHaveBeenCalledWith('/games/preview-videos', expect.anything())
+    const params = getMock.mock.calls[0]?.[1]?.params as URLSearchParams
+    expect(params.get('public_ids')).toBe('game-1,game-2')
+    expect(result[0]?.public_id).toBe('game-1')
+    expect(result[0]?.preview_videos[0]?.path).toBe('/assets/video-1.mp4')
+    expect(result[1]?.preview_videos).toEqual([])
+  })
+
+  it('skips preview video requests when no public ids are given', async () => {
+    const result = await gamesService.getPreviewVideos(['', '  '])
+    expect(result).toEqual([])
+    expect(getMock).not.toHaveBeenCalled()
+  })
+
   it('maps game files to version metadata using backend file order', () => {
     const result = mapGameVersions({
       public_id: 'game-1',

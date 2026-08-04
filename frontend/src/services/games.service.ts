@@ -19,6 +19,7 @@ import type {
   PendingIssueCounts,
   TimelineGame,
   TimelineGameResponse,
+  VideoAssetItem,
 } from './types'
 import { isAdminGameDetail } from './types'
 
@@ -43,6 +44,11 @@ interface TimelinePaginationApi {
 interface TimelineGamesApiResponse {
   data: TimelineGameResponse[]
   pagination: TimelinePaginationApi
+}
+
+interface GamePreviewVideosApiItem {
+  public_id: string
+  preview_videos: VideoAssetItem[]
 }
 
 interface AggregateUpdateApiResponse {
@@ -237,6 +243,18 @@ const gamesService = {
       hasMore: pagination.hasMore,
       nextCursor: pagination.nextCursor || null,
     }
+  },
+
+  // 游戏店会话批量拉取预告片：一次请求返回多个游戏的 preview_videos，
+  // 避免对每个游戏再发一次详情请求。
+  async getPreviewVideos(publicIds: string[]): Promise<GamePreviewVideosApiItem[]> {
+    const ids = Array.from(new Set(publicIds.map((id) => id.trim()).filter(Boolean)))
+    if (ids.length === 0) return []
+    const queryParams = new URLSearchParams({ public_ids: ids.join(',') })
+    const response = await get<ApiEnvelope<GamePreviewVideosApiItem[]>>('/games/preview-videos', {
+      params: queryParams,
+    })
+    return response.data ?? []
   },
 
   // Use the generic detail reader for page/store flows that can legally render either

@@ -1,14 +1,10 @@
 package files
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
 	"mime"
-	"net"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -32,153 +28,20 @@ var allowedVideoContentTypes = map[string]string{
 var ErrInvalidImageType = errors.New("invalid image type")
 var ErrInvalidAssetName = errors.New("invalid asset name")
 var ErrInvalidRemoteURL = errors.New("invalid remote image url")
-var ErrBlockedRemoteURL = errors.New("blocked remote image url")
 
 var uuidAssetNamePattern = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$`)
 
+// AssetStore 只负责本地素材的 staging/permanent 两阶段存取。
+// 远程素材下载已收敛到 /api/steam/proxy + 前端重新上传的单一路径，
+// 这里不再持有出站 HTTP 客户端，避免维护一条没有生产调用的 SSRF 边界。
 type AssetStore struct {
-	baseDir    string
-	client     *http.Client
-	lookupHost func(ctx context.Context, host string) ([]net.IP, error)
+	baseDir string
 }
 
-func NewAssetStore(baseDir string, proxyURL string, timeout time.Duration) *AssetStore {
-	store := &AssetStore{
-		baseDir:    baseDir,
-		lookupHost: lookupHostIPs,
+func NewAssetStore(baseDir string) *AssetStore {
+	return &AssetStore{
+		baseDir: strings.TrimSpace(baseDir),
 	}
-
-	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		// Re-resolve at dial time so DNS rebinding cannot bypass the initial URL check.
-		DialContext: store.dialContext,
-	}
-
-	if proxyURL != "" {
-		if parsed, err := url.Parse(proxyURL); err == nil {
-			transport.Proxy = http.ProxyURL(parsed)
-		}
-	}
-
-	store.client = &http.Client{
-		Timeout:       timeout,
-		Transport:     transport,
-		CheckRedirect: store.checkRedirect,
-	}
-	return store
-}
-
-func (s *AssetStore) SaveUploadedAsset(
-	gamePublicID string,
-	assetType string,
-	assetName string,
-	file io.Reader,
-	contentType string,
-) (string, error) {
-	extension, err := validateAssetContentType(assetType, contentType)
-	if err != nil {
-		return "", err
-	}
-	if !uuidAssetNamePattern.MatchString(strings.ToLower(strings.TrimSpace(assetName))) {
-		return "", ErrInvalidAssetName
-	}
-
-	dir, filename := assetTarget(gamePublicID, assetName, extension)
-	targetDir := filepath.Join(s.baseDir, dir)
-	if err := os.MkdirAll(targetDir, 0o755); err != nil {
-		return "", fmt.Errorf("create asset directory: %w", err)
-	}
-
-	targetPath := filepath.Join(targetDir, filename)
-	output, err := os.Create(targetPath)
-	if err != nil {
-		return "", fmt.Errorf("create asset file: %w", err)
-	}
-	defer output.Close()
-
-	if _, err := io.Copy(output, file); err != nil {
-		return "", fmt.Errorf("write asset file: %w", err)
-	}
-
-	return "/" + filepath.ToSlash(filepath.Join("assets", dir, filename)), nil
-}
-
-func (s *AssetStore) DownloadRemoteAsset(
-	gamePublicID string,
-	assetType string,
-	assetName string,
-	remoteURL string,
-) (string, error) {
-	parsed, err := validateRemoteImageURL(remoteURL, s.lookupHost)
-	if err != nil {
-		return "", err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, parsed.String(), nil)
-	if err != nil {
-		return "", fmt.Errorf("build remote asset request: %w", err)
-	}
-	req.Header.Set("User-Agent", "NAS-Game-Library-Manager/1.0")
-	req.Header.Set("Accept", "image/webp,image/apng,image/*,*/*;q=0.8")
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("download remote asset: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("download remote asset: unexpected status %d", resp.StatusCode)
-	}
-
-	contentType := resp.Header.Get("Content-Type")
-	if idx := strings.Index(contentType, ";"); idx >= 0 {
-		contentType = contentType[:idx]
-	}
-
-	return s.SaveUploadedAsset(gamePublicID, assetType, assetName, resp.Body, contentType)
-}
-
-// DownloadRemoteToStaging downloads a remote file and writes it to the staging directory.
-func (s *AssetStore) DownloadRemoteToStaging(
-	gamePublicID string,
-	assetType string,
-	assetName string,
-	remoteURL string,
-) (string, error) {
-	parsed, err := validateRemoteImageURL(remoteURL, s.lookupHost)
-	if err != nil {
-		return "", err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, parsed.String(), nil)
-	if err != nil {
-		return "", fmt.Errorf("build remote asset request: %w", err)
-	}
-	req.Header.Set("User-Agent", "NAS-Game-Library-Manager/1.0")
-	req.Header.Set("Accept", "image/webp,image/apng,image/*,*/*;q=0.8")
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("download remote asset: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("download remote asset: unexpected status %d", resp.StatusCode)
-	}
-
-	contentType := resp.Header.Get("Content-Type")
-	if idx := strings.Index(contentType, ";"); idx >= 0 {
-		contentType = contentType[:idx]
-	}
-
-	return s.SaveToStaging(gamePublicID, assetType, assetName, resp.Body, contentType)
-}
-
-// BaseDir returns the root directory for asset storage.
-func (s *AssetStore) BaseDir() string {
-	return s.baseDir
 }
 
 // SaveToStaging writes an uploaded file to the staging directory and returns
@@ -259,6 +122,11 @@ func (s *AssetStore) MoveToPermanent(permanentPath string, gamePublicID string) 
 	}
 
 	return "/" + filepath.ToSlash(filepath.Join("assets", dir, filename)), nil
+}
+
+// BaseDir returns the root directory for asset storage.
+func (s *AssetStore) BaseDir() string {
+	return s.baseDir
 }
 
 // StagingDir returns the path to the staging directory.
@@ -361,113 +229,4 @@ func validateAssetContentType(assetType string, contentType string) (string, err
 	}
 
 	return "", ErrInvalidImageType
-}
-
-func assetTarget(gamePublicID string, assetName string, extension string) (string, string) {
-	dir := strings.ToLower(strings.TrimSpace(gamePublicID))
-	if dir == "" {
-		dir = "unknown-game"
-	}
-	assetName = strings.ToLower(strings.TrimSpace(assetName))
-	return dir, assetName + extension
-}
-
-func validateRemoteImageURL(raw string, lookupHost func(ctx context.Context, host string) ([]net.IP, error)) (*url.URL, error) {
-	parsed, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || parsed == nil || parsed.Host == "" {
-		return nil, ErrInvalidRemoteURL
-	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return nil, ErrInvalidRemoteURL
-	}
-	if _, err := resolvePublicIPs(context.Background(), parsed.Hostname(), lookupHost); err != nil {
-		return nil, err
-	}
-	return parsed, nil
-}
-
-func lookupHostIPs(ctx context.Context, host string) ([]net.IP, error) {
-	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-	if err != nil {
-		return nil, err
-	}
-	ips := make([]net.IP, 0, len(addrs))
-	for _, addr := range addrs {
-		if addr.IP != nil {
-			ips = append(ips, addr.IP)
-		}
-	}
-	return ips, nil
-}
-
-func resolvePublicIPs(ctx context.Context, host string, lookupHost func(ctx context.Context, host string) ([]net.IP, error)) ([]net.IP, error) {
-	lower := strings.ToLower(strings.TrimSpace(host))
-	if lower == "" {
-		return nil, ErrInvalidRemoteURL
-	}
-	if lower == "localhost" || strings.HasSuffix(lower, ".localhost") || strings.HasSuffix(lower, ".local") {
-		return nil, ErrBlockedRemoteURL
-	}
-
-	ip := net.ParseIP(lower)
-	if ip != nil {
-		if isPrivateIP(ip) {
-			return nil, ErrBlockedRemoteURL
-		}
-		return []net.IP{ip}, nil
-	}
-
-	addrs, err := lookupHost(ctx, lower)
-	if err != nil || len(addrs) == 0 {
-		// Treat lookup failures as blocked so this path can serve as a hard boundary.
-		return nil, ErrBlockedRemoteURL
-	}
-	publicAddrs := make([]net.IP, 0, len(addrs))
-	for _, addr := range addrs {
-		if isPrivateIP(addr) {
-			return nil, ErrBlockedRemoteURL
-		}
-		publicAddrs = append(publicAddrs, addr)
-	}
-	return publicAddrs, nil
-}
-
-func (s *AssetStore) checkRedirect(req *http.Request, via []*http.Request) error {
-	if len(via) >= 10 {
-		return errors.New("stopped after 10 redirects")
-	}
-	// Re-validate every redirect target so a safe origin cannot bounce us into a blocked one.
-	_, err := validateRemoteImageURL(req.URL.String(), s.lookupHost)
-	return err
-}
-
-func (s *AssetStore) dialContext(ctx context.Context, network string, address string) (net.Conn, error) {
-	host, port, err := net.SplitHostPort(address)
-	if err != nil {
-		return nil, err
-	}
-
-	addrs, err := resolvePublicIPs(ctx, host, s.lookupHost)
-	if err != nil {
-		return nil, err
-	}
-
-	// Only connect to the public IPs we just validated for this hostname.
-	dialer := &net.Dialer{}
-	var lastErr error
-	for _, addr := range addrs {
-		conn, dialErr := dialer.DialContext(ctx, network, net.JoinHostPort(addr.String(), port))
-		if dialErr == nil {
-			return conn, nil
-		}
-		lastErr = dialErr
-	}
-	if lastErr != nil {
-		return nil, lastErr
-	}
-	return nil, ErrBlockedRemoteURL
-}
-
-func isPrivateIP(ip net.IP) bool {
-	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast()
 }

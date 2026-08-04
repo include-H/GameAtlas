@@ -1,7 +1,6 @@
 package services
 
 import (
-	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -12,8 +11,6 @@ import (
 	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/files"
-	"github.com/hao/game/internal/repositories"
-
 )
 
 type assetGameRepository interface {
@@ -21,10 +18,8 @@ type assetGameRepository interface {
 }
 
 type AssetsService struct {
-	gamesRepo             assetGameRepository
-	assetsRepo            *repositories.AssetsRepository
-	assetCleanupTasksRepo *repositories.AssetCleanupTasksRepository
-	store                 *files.AssetStore
+	gamesRepo assetGameRepository
+	store     *files.AssetStore
 }
 
 type UploadResult struct {
@@ -32,12 +27,10 @@ type UploadResult struct {
 	AssetUID string
 }
 
-func NewAssetsService(cfg config.Config, gamesRepo assetGameRepository, assetsRepo *repositories.AssetsRepository, assetCleanupTasksRepo *repositories.AssetCleanupTasksRepository) *AssetsService {
+func NewAssetsService(cfg config.Config, gamesRepo assetGameRepository) *AssetsService {
 	return &AssetsService{
-		gamesRepo:             gamesRepo,
-		assetsRepo:            assetsRepo,
-		assetCleanupTasksRepo: assetCleanupTasksRepo,
-		store:                 files.NewAssetStore(cfg.AssetsDir, cfg.Proxy, 30*time.Second),
+		gamesRepo: gamesRepo,
+		store:     files.NewAssetStore(cfg.AssetsDir),
 	}
 }
 
@@ -46,7 +39,7 @@ func NewAssetsService(cfg config.Config, gamesRepo assetGameRepository, assetsRe
 // the stream and the content-type from the header. For a single-process app with
 // one upload entrypoint, extracting an io.Reader interface adds indirection
 // without practical testability gain.
-func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart.FileHeader, sortOrder int) (*UploadResult, error) {
+func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart.FileHeader) (*UploadResult, error) {
 	game, err := s.gamesRepo.GetByID(gameID)
 	if err != nil {
 		return nil, normalizeRepoError(err)
@@ -59,41 +52,14 @@ func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart
 	defer src.Close()
 
 	contentType := header.Header.Get("Content-Type")
-	assetUID, assetName := allocateAssetIdentity(assetType)
+	assetUID := newAssetUID()
+	assetName := assetUID
 	path, err := s.store.SaveToStaging(game.PublicID, assetType, assetName, src, contentType)
 	if err != nil {
 		return nil, normalizeAssetError(err)
 	}
 
 	return &UploadResult{Path: path, AssetUID: assetUID}, nil
-}
-
-func (s *AssetsService) ApplyRemoteAsset(gameID int64, assetType string, remoteURL string, sortOrder int) (string, error) {
-	game, err := s.gamesRepo.GetByID(gameID)
-	if err != nil {
-		return "", normalizeRepoError(err)
-	}
-	assetUID, assetName := allocateAssetIdentity(assetType)
-	path, err := s.store.DownloadRemoteToStaging(game.PublicID, assetType, assetName, remoteURL)
-	if err != nil {
-		return "", normalizeAssetError(err)
-	}
-	_ = assetUID
-	return path, nil
-}
-
-func (s *AssetsService) ApplyRawAsset(gameID int64, assetType string, content []byte, contentType string, sortOrder int) (string, error) {
-	game, err := s.gamesRepo.GetByID(gameID)
-	if err != nil {
-		return "", normalizeRepoError(err)
-	}
-	assetUID, assetName := allocateAssetIdentity(assetType)
-	path, err := s.store.SaveToStaging(game.PublicID, assetType, assetName, bytes.NewReader(content), contentType)
-	if err != nil {
-		return "", normalizeAssetError(err)
-	}
-	_ = assetUID
-	return path, nil
 }
 
 // MoveStagingToPermanent moves an asset file from the staging directory to
@@ -131,26 +97,11 @@ func newAssetUID() string {
 	)
 }
 
-func allocateAssetIdentity(assetType string) (string, string) {
-	switch assetType {
-	case "screenshot", "video", "cover", "logo":
-		uid := newAssetUID()
-		return uid, uid
-	case "banner":
-		uid := newAssetUID()
-		return uid, uid
-	default:
-		return "", newAssetUID()
-	}
-}
-
 func normalizeAssetError(err error) error {
 	switch {
 	case errors.Is(err, files.ErrInvalidImageType):
 		return domain.ErrValidation
 	case errors.Is(err, files.ErrInvalidAssetName):
-		return domain.ErrValidation
-	case errors.Is(err, files.ErrInvalidRemoteURL), errors.Is(err, files.ErrBlockedRemoteURL):
 		return domain.ErrValidation
 	default:
 		return err

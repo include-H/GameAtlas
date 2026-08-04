@@ -538,6 +538,7 @@ body {
 }
 
 .fullscreen-route-shell {
+  /* 全屏沉浸式页面（登录/游戏店）的深色底是品牌特例，仅用于脱离后台框架的页面壳。 */
   height: 100vh;
   height: 100dvh;
   width: 100%;

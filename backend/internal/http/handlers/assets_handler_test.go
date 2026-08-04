@@ -30,21 +30,13 @@ func TestAssetsHandlerUploadVideoPersistsAsset(t *testing.T) {
 
 	gameID := insertGamesHandlerTestGame(t, db, "upload-game", "Upload Game", domain.GameVisibilityPublic, "")
 	assetsDir := filepath.Join(t.TempDir(), "assets")
-	service := services.NewAssetsService(
-		config.Config{AssetsDir: assetsDir},
-		repositories.NewGamesRepository(db),
-		repositories.NewAssetsRepository(db),
-		repositories.NewAssetCleanupTasksRepository(db),
-	)
+	service := services.NewAssetsService(config.Config{AssetsDir: assetsDir}, repositories.NewGamesRepository(db))
 	handler := NewAssetsHandler(service)
 
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	if err := writer.WriteField("game_id", strconv.FormatInt(gameID, 10)); err != nil {
 		t.Fatalf("WriteField game_id: %v", err)
-	}
-	if err := writer.WriteField("sort_order", "2"); err != nil {
-		t.Fatalf("WriteField sort_order: %v", err)
 	}
 	partHeader := textproto.MIMEHeader{}
 	partHeader.Set("Content-Disposition", `form-data; name="file"; filename="trailer.mp4"`)
@@ -98,59 +90,6 @@ func TestAssetsHandlerUploadVideoPersistsAsset(t *testing.T) {
 	}
 }
 
-func TestAssetsHandlerUploadRejectsInvalidSortOrder(t *testing.T) {
-	t.Setenv("GIN_MODE", gin.TestMode)
-
-	db := openGamesHandlerTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	gameID := insertGamesHandlerTestGame(t, db, "upload-invalid-sort", "Upload Invalid Sort", domain.GameVisibilityPublic, "")
-	service := services.NewAssetsService(
-		config.Config{AssetsDir: filepath.Join(t.TempDir(), "assets")},
-		repositories.NewGamesRepository(db),
-		repositories.NewAssetsRepository(db),
-		repositories.NewAssetCleanupTasksRepository(db),
-	)
-	handler := NewAssetsHandler(service)
-
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	if err := writer.WriteField("game_id", strconv.FormatInt(gameID, 10)); err != nil {
-		t.Fatalf("WriteField game_id: %v", err)
-	}
-	if err := writer.WriteField("sort_order", "-5"); err != nil {
-		t.Fatalf("WriteField sort_order: %v", err)
-	}
-	partHeader := textproto.MIMEHeader{}
-	partHeader.Set("Content-Disposition", `form-data; name="file"; filename="trailer.mp4"`)
-	partHeader.Set("Content-Type", "video/mp4")
-	part, err := writer.CreatePart(partHeader)
-	if err != nil {
-		t.Fatalf("CreatePart returned error: %v", err)
-	}
-	if _, err := part.Write([]byte("video-content")); err != nil {
-		t.Fatalf("Write file part returned error: %v", err)
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatalf("writer.Close returned error: %v", err)
-	}
-
-	recorder := httptest.NewRecorder()
-	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodPost, "/api/assets/video", body)
-	context.Request.Header.Set("Content-Type", writer.FormDataContentType())
-	context.Set("is_admin", true)
-
-	handler.Upload("video")(context)
-
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
-	}
-	if !strings.Contains(recorder.Body.String(), `"error":"需要有效的排序值"`) {
-		t.Fatalf("body = %s, want 需要有效的排序值", recorder.Body.String())
-	}
-}
-
 func TestAssetsHandlerUploadReturnsBadRequestWhenFileMissing(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 
@@ -187,12 +126,7 @@ func TestAssetsHandlerUploadReturnsBadRequestWhenContentTypeInvalid(t *testing.T
 	defer func() { _ = db.Close() }()
 
 	gameID := insertGamesHandlerTestGame(t, db, "upload-invalid-type", "Upload Invalid Type", domain.GameVisibilityPublic, "")
-	service := services.NewAssetsService(
-		config.Config{AssetsDir: filepath.Join(t.TempDir(), "assets")},
-		repositories.NewGamesRepository(db),
-		repositories.NewAssetsRepository(db),
-		repositories.NewAssetCleanupTasksRepository(db),
-	)
+	service := services.NewAssetsService(config.Config{AssetsDir: filepath.Join(t.TempDir(), "assets")}, repositories.NewGamesRepository(db))
 	handler := NewAssetsHandler(service)
 
 	body := &bytes.Buffer{}
@@ -236,12 +170,7 @@ func TestAssetsHandlerUploadReturnsNotFoundWhenGameMissing(t *testing.T) {
 	db := openGamesHandlerTestDB(t)
 	defer func() { _ = db.Close() }()
 
-	service := services.NewAssetsService(
-		config.Config{AssetsDir: filepath.Join(t.TempDir(), "assets")},
-		repositories.NewGamesRepository(db),
-		repositories.NewAssetsRepository(db),
-		repositories.NewAssetCleanupTasksRepository(db),
-	)
+	service := services.NewAssetsService(config.Config{AssetsDir: filepath.Join(t.TempDir(), "assets")}, repositories.NewGamesRepository(db))
 	handler := NewAssetsHandler(service)
 
 	body := &bytes.Buffer{}
@@ -288,4 +217,3 @@ func mustLoadHandlerGame(t *testing.T, db *sqlx.DB, gameID int64) *domain.Game {
 	}
 	return game
 }
-

@@ -1,5 +1,6 @@
 -- GameAtlas baseline schema
--- Consolidated baseline schema, synchronized through migration 000004.
+-- v1.1.0 起为单基线：本文件直接表达当前最终 schema，不回放历史增量语句；
+-- 已被废弃的字段/表在基线中直接不创建。下一个增量迁移从 000002_xxx.sql 开始。
 
 CREATE TABLE IF NOT EXISTS games (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -16,7 +17,8 @@ CREATE TABLE IF NOT EXISTS games (
     downloads INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    series_id INTEGER REFERENCES series(id) ON DELETE SET NULL
+    series_id INTEGER REFERENCES series(id) ON DELETE SET NULL,
+    logo_visible INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS game_files (

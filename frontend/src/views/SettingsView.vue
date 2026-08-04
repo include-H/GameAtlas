@@ -117,7 +117,7 @@
                 <a-input
                   v-else-if="entry.key === 'AUTH_STATE_TTL'"
                   v-model="configForm[entry.key]"
-                  placeholder="登录会话有效期，如 24h"
+                  placeholder="失败锁定状态保留时间，如 24h"
                 />
                 <a-select
                   v-else-if="entry.key === 'AUTH_TRACK_BY'"

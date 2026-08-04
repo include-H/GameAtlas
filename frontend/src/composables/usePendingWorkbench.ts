@@ -10,7 +10,7 @@ import type {
 
 export const PENDING_WORKBENCH_PAGE_SIZE = 10
 
-export type PendingWorkbenchSortBy =
+type PendingWorkbenchSortBy =
   | 'issue-count'
   | 'created-desc'
   | 'updated-asc'

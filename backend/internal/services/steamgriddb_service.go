@@ -22,12 +22,12 @@ type SteamGridDBService struct {
 }
 
 type cachedSearchResult struct {
-	data    []SteamGridDBGame
+	data     []SteamGridDBGame
 	cachedAt time.Time
 }
 
 type cachedImageResult struct {
-	data    []SteamGridDBImage
+	data     []SteamGridDBImage
 	cachedAt time.Time
 }
 
@@ -42,11 +42,11 @@ type SteamGridDBImage struct {
 }
 
 type SteamGridDBGame struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	ReleaseDate int    `json:"release_date"`
+	ID          int      `json:"id"`
+	Name        string   `json:"name"`
+	ReleaseDate int      `json:"release_date"`
 	Types       []string `json:"types"`
-	Verified    bool   `json:"verified"`
+	Verified    bool     `json:"verified"`
 }
 
 type steamGridDBImageResponse struct {
@@ -55,15 +55,22 @@ type steamGridDBImageResponse struct {
 }
 
 type steamGridDBSearchResponse struct {
-	Success bool               `json:"success"`
-	Data    []SteamGridDBGame  `json:"data"`
+	Success bool              `json:"success"`
+	Data    []SteamGridDBGame `json:"data"`
 }
 
-func NewSteamGridDBService(apiKey string) *SteamGridDBService {
+func NewSteamGridDBService(apiKey string, proxy string) *SteamGridDBService {
+	transport := &http.Transport{Proxy: http.ProxyFromEnvironment}
+	if strings.TrimSpace(proxy) != "" {
+		if parsed, err := url.Parse(proxy); err == nil {
+			transport.Proxy = http.ProxyURL(parsed)
+		}
+	}
+
 	return &SteamGridDBService{
 		apiKey:  apiKey,
 		baseURL: "https://www.steamgriddb.com/api/v2",
-		client:  &http.Client{Timeout: 15 * time.Second},
+		client:  &http.Client{Timeout: 15 * time.Second, Transport: transport},
 	}
 }
 

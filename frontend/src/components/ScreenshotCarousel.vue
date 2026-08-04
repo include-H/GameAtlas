@@ -32,6 +32,7 @@
             <template v-else>
               <video
                 ref="videoRef"
+                v-show="!videoFailed"
                 :src="currentMedia.url"
                 class="screenshot-carousel__video"
                 :class="{ 'screenshot-carousel__video--ready': videoReady }"
@@ -46,9 +47,10 @@
                 @playing="onVideoPlaying"
                 @ended="handleVideoEnded"
                 @volumechange="onVideoVolumeChange"
+                @error="handleVideoError"
               />
               <transition name="screenshot-carousel-spinner-fade">
-                <div v-if="!videoReady" class="screenshot-carousel__video-loader">
+                <div v-if="!videoReady && !videoFailed" class="screenshot-carousel__video-loader">
                   <div class="screenshot-carousel__loader-ring">
                     <img
                       v-if="videoPoster"
@@ -71,6 +73,15 @@
                   </div>
                 </div>
               </transition>
+              <div v-if="videoFailed" class="screenshot-carousel__video-failed">
+                <img
+                  v-if="videoPoster"
+                  :src="resolveAssetUrl(videoPoster)"
+                  class="screenshot-carousel__loader-thumb"
+                  alt=""
+                >
+                <span class="screenshot-carousel__video-failed-text">视频加载失败</span>
+              </div>
             </template>
           </div>
         </transition>
@@ -133,6 +144,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { IconLeft, IconRight } from '@arco-design/web-vue/es/icon'
 import { resolveAssetUrl } from '@/utils/asset-url'
+import { shouldResetVideoPlaybackState } from '@/utils/video-playback'
 
 interface Props {
   screenshots?: string[]
@@ -165,6 +177,7 @@ const brokenImages = ref<string[]>([])
 const aspectResolved = ref(false)
 const imageLoaded = ref(false)
 const videoReady = ref(false)
+const videoFailed = ref(false)
 const userUnmuted = ref(false)
 let resizeObserver: ResizeObserver | null = null
 let imageAutoplayTimer: number | null = null
@@ -220,6 +233,7 @@ const viewportStyle = computed(() => {
 
 watch(() => [props.screenshots, props.previewVideos], () => {
   brokenImages.value = []
+  videoFailed.value = false
   aspectResolved.value = false
   const items = mediaItems.value
   if (items.length === 0) {
@@ -234,13 +248,19 @@ watch(currentMedia, (nextMedia, previousMedia) => {
   if (!nextMedia) {
     imageLoaded.value = false
     videoReady.value = false
+    videoFailed.value = false
     stopImageAutoplay()
     return
   }
   if (nextMedia.type === 'video') {
     imageLoaded.value = true
-    videoReady.value = false
-    userUnmuted.value = false
+    // 2026-08-05: 只有视频 URL 变化才重置播放状态；详情保存后刷新是同一 URL，
+    // 直接复用已就绪的 <video>，避免卡在"已加载但不触发事件"的透明态。
+    if (shouldResetVideoPlaybackState(previousMedia?.url, nextMedia.url)) {
+      videoReady.value = false
+      videoFailed.value = false
+      userUnmuted.value = false
+    }
     aspectResolved.value = true
     viewportAspect.value = '16 / 9'
     stopImageAutoplay()
@@ -250,6 +270,7 @@ watch(currentMedia, (nextMedia, previousMedia) => {
     return
   }
   videoReady.value = false
+  videoFailed.value = false
   imageLoaded.value = nextMedia.url === previousMedia?.url
   startImageAutoplay()
 })
@@ -298,6 +319,11 @@ const onVideoPlaying = () => {
   videoReady.value = true
 }
 
+const handleVideoError = () => {
+  videoReady.value = false
+  videoFailed.value = true
+}
+
 const onVideoVolumeChange = () => {
   const video = videoRef.value
   if (!video) return
@@ -311,6 +337,10 @@ const tryPlayVideo = () => {
   if (!video) return
   if (!userUnmuted.value) {
     video.muted = true
+  }
+  // 已加载/播放中的视频不会再次触发 canplay/playing，直接按 readyState 恢复可见。
+  if (video.readyState >= 2) {
+    videoReady.value = true
   }
   const playPromise = video.play()
   if (playPromise && typeof playPromise.catch === 'function') {
@@ -459,6 +489,22 @@ const handleImageError = (url: string) => {
   justify-content: center;
   background: var(--app-scrim);
   z-index: 5;
+}
+
+.screenshot-carousel__video-failed {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--color-carousel-empty-start);
+  color: var(--color-text-3);
+}
+
+.screenshot-carousel__video-failed-text {
+  font-size: 14px;
 }
 
 .screenshot-carousel__loader-ring {
