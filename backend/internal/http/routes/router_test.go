@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"errors"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +12,61 @@ import (
 	"testing/fstest"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/hao/game/internal/domain"
 )
+
+type assetRouteGameRepositoryStub struct {
+	err error
+}
+
+func (s assetRouteGameRepositoryStub) GetByPublicID(publicID string) (*domain.Game, error) {
+	return nil, s.err
+}
+
+func TestRegisterAssetRoutesServesStartScreenImagesWithoutGameLookup(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	assetsDir := t.TempDir()
+	imageDir := filepath.Join(assetsDir, "start-screen")
+	if err := os.MkdirAll(imageDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	imagePath := filepath.Join(imageDir, "66dbcee2-3512-4139-ad10-65898b8f0cfb.png")
+	if err := os.WriteFile(imagePath, []byte("tile-image"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	router := gin.New()
+	registerAssetRoutes(router, assetsDir, assetRouteGameRepositoryStub{err: errors.New("game lookup must be skipped")})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/assets/start-screen/66dbcee2-3512-4139-ad10-65898b8f0cfb.png", nil)
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	if recorder.Body.String() != "tile-image" {
+		t.Fatalf("body = %q, want %q", recorder.Body.String(), "tile-image")
+	}
+}
+
+func TestRegisterAssetRoutesStillHidesUnknownGameAssets(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	assetsDir := t.TempDir()
+	router := gin.New()
+	registerAssetRoutes(router, assetsDir, assetRouteGameRepositoryStub{err: errors.New("no such game")})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/assets/unknown-game/cover.png", nil)
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNotFound)
+	}
+}
 
 func TestRegisterCustomDataRoutesAllowsUppercaseExtensions(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)

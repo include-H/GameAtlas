@@ -182,6 +182,29 @@ func registerAssetRoutes(router *gin.Engine, assetsDir string, gamesRepo assetRo
 
 	var assetCache sync.Map
 
+	serveAssetFile := func(c *gin.Context, rawPath string) {
+		targetPath := filepath.Join(assetsDir, filepath.FromSlash(rawPath))
+		relative, err := filepath.Rel(assetsDir, targetPath)
+		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		if _, err := os.Stat(targetPath); err != nil {
+			// Fallback: check staging directory for files not yet moved to permanent.
+			stagingPath := filepath.Join(assetsDir, "_staging", filepath.Base(rawPath))
+			if _, statErr := os.Stat(stagingPath); statErr == nil {
+				targetPath = stagingPath
+			} else {
+				c.Status(http.StatusNotFound)
+				return
+			}
+		}
+
+		c.Header("Cache-Control", "public, max-age=86400")
+		c.File(targetPath)
+	}
+
 	router.GET("/assets/*filepath", func(c *gin.Context) {
 		rawPath := strings.TrimPrefix(c.Param("filepath"), "/")
 		if rawPath == "" {
@@ -198,6 +221,13 @@ func registerAssetRoutes(router *gin.Engine, assetsDir string, gamesRepo assetRo
 		gamePublicID := strings.TrimSpace(segments[0])
 		if gamePublicID == "" {
 			c.Status(http.StatusNotFound)
+			return
+		}
+
+		// 开始屏幕磁贴裁剪图存放在 assets/start-screen/ 下，不属于某个游戏，
+		// 跳过游戏可见性校验，直接按文件服务。
+		if gamePublicID == "start-screen" {
+			serveAssetFile(c, rawPath)
 			return
 		}
 
@@ -231,26 +261,7 @@ func registerAssetRoutes(router *gin.Engine, assetsDir string, gamesRepo assetRo
 			return
 		}
 
-		targetPath := filepath.Join(assetsDir, filepath.FromSlash(rawPath))
-		relative, err := filepath.Rel(assetsDir, targetPath)
-		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-			c.Status(http.StatusNotFound)
-			return
-		}
-
-		if _, err := os.Stat(targetPath); err != nil {
-			// Fallback: check staging directory for files not yet moved to permanent.
-			stagingPath := filepath.Join(assetsDir, "_staging", filepath.Base(rawPath))
-			if _, statErr := os.Stat(stagingPath); statErr == nil {
-				targetPath = stagingPath
-			} else {
-				c.Status(http.StatusNotFound)
-				return
-			}
-		}
-
-		c.Header("Cache-Control", "public, max-age=86400")
-		c.File(targetPath)
+		serveAssetFile(c, rawPath)
 	})
 }
 
