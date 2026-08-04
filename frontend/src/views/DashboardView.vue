@@ -89,6 +89,7 @@
         <game-card
           :game="item"
           @view="viewGame"
+          @view-series="viewSeries"
           @toggle-favorite="toggleFavorite"
         />
       </template>
@@ -108,6 +109,7 @@
         <game-card
           :game="item"
           @view="viewGame"
+          @view-series="viewSeries"
           @toggle-favorite="toggleFavorite"
         />
       </template>
@@ -199,6 +201,14 @@ const viewGame = (publicId: string) => {
   router.push({
     name: 'game-detail',
     params: { publicId },
+  })
+}
+
+const viewSeries = (id: number) => {
+  if (id <= 0) return
+  router.push({
+    name: 'series-detail',
+    params: { id: String(id) },
   })
 }
 

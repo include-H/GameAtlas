@@ -38,6 +38,7 @@ const baseGame = {
   developer_count: 0,
   publisher_count: 0,
   is_favorite: false,
+  series: null,
   downloads: 0,
   created_at: '2026-03-25T00:00:00Z',
   updated_at: '2026-03-25T00:00:00Z',
@@ -58,6 +59,7 @@ describe('games service', () => {
         {
           ...baseGame,
           is_favorite: true,
+          series: { id: 12, name: 'Halo' },
         },
         {
           ...baseGame,
@@ -89,9 +91,9 @@ describe('games service', () => {
       },
     })
 
-    expect(result.data.map((item) => ({ id: item.public_id, isFavorite: item.isFavorite }))).toEqual([
-      { id: 'game-1', isFavorite: true },
-      { id: 'game-2', isFavorite: false },
+    expect(result.data.map((item) => ({ id: item.public_id, isFavorite: item.isFavorite, series: item.series }))).toEqual([
+      { id: 'game-1', isFavorite: true, series: { id: 12, name: 'Halo' } },
+      { id: 'game-2', isFavorite: false, series: null },
     ])
 
     const params = getMock.mock.calls[0]?.[1]?.params as URLSearchParams

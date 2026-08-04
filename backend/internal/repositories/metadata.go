@@ -201,9 +201,12 @@ func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([
 				LIMIT 1
 			) AS primary_screenshot,
 			CASE WHEN EXISTS (SELECT 1 FROM favorite_games fg WHERE fg.game_id = g.id) THEN 1 ELSE 0 END AS is_favorite,
+			g.series_id,
+			s.name AS series_name,
 			g.created_at,
 			g.updated_at
 		FROM games g
+		INNER JOIN series s ON s.id = g.series_id
 		%s
 		ORDER BY g.updated_at DESC, g.id DESC
 	`, where)
@@ -230,6 +233,7 @@ func (r *MetadataRepository) ListSeriesGamesBySeriesIDs(seriesIDs []int64, inclu
 
 	query, boundArgs, err := sqlx.In(fmt.Sprintf(`
 		SELECT
+			g.series_id AS group_series_id,
 			g.series_id,
 			g.id,
 			g.public_id,
@@ -250,9 +254,11 @@ func (r *MetadataRepository) ListSeriesGamesBySeriesIDs(seriesIDs []int64, inclu
 				LIMIT 1
 			) AS primary_screenshot,
 			CASE WHEN EXISTS (SELECT 1 FROM favorite_games fg WHERE fg.game_id = g.id) THEN 1 ELSE 0 END AS is_favorite,
+			s.name AS series_name,
 			g.created_at,
 			g.updated_at
 		FROM games g
+		INNER JOIN series s ON s.id = g.series_id
 		%s
 		ORDER BY g.series_id ASC, g.updated_at DESC, g.id DESC
 	`, where), args...)
@@ -262,7 +268,7 @@ func (r *MetadataRepository) ListSeriesGamesBySeriesIDs(seriesIDs []int64, inclu
 	query = r.db.Rebind(query)
 
 	type seriesGameRow struct {
-		SeriesID int64 `db:"series_id"`
+		SeriesID int64 `db:"group_series_id"`
 		domain.SeriesGameSummary
 	}
 

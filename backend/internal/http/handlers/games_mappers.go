@@ -29,6 +29,7 @@ func toGameListItemResponse(game domain.GameListItem) gameListItemResponse {
 		DeveloperCount:    game.DeveloperCount,
 		PublisherCount:    game.PublisherCount,
 		IsFavorite:        game.IsFavorite,
+		Series:            toGameSeriesResponse(game.SeriesID, game.SeriesName),
 		PendingIssues:     toPendingIssueEvaluationResponse(game.PendingIssues),
 		CreatedAt:         game.CreatedAt,
 		UpdatedAt:         game.UpdatedAt,
@@ -73,6 +74,7 @@ func toGameSummaryResponse(game domain.Game) gameListItemResponse {
 		WikiContent: game.WikiContent,
 		Downloads:   game.Downloads,
 		IsFavorite:  game.IsFavorite,
+		Series:      nil,
 		CreatedAt:   game.CreatedAt,
 		UpdatedAt:   game.UpdatedAt,
 	}
@@ -99,11 +101,22 @@ func toSeriesGameSummaryResponses(games []domain.SeriesGameSummary) []gameListIt
 			Downloads:         game.Downloads,
 			PrimaryScreenshot: game.PrimaryScreenshot,
 			IsFavorite:        game.IsFavorite,
+			Series:            toGameSeriesResponse(game.SeriesID, game.SeriesName),
 			CreatedAt:         game.CreatedAt,
 			UpdatedAt:         game.UpdatedAt,
 		})
 	}
 	return result
+}
+
+func toGameSeriesResponse(id *int64, name *string) *gameSeriesResponse {
+	if id == nil || *id <= 0 || name == nil {
+		return nil
+	}
+	return &gameSeriesResponse{
+		ID:   *id,
+		Name: *name,
+	}
 }
 
 func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDetailResponse {
@@ -379,4 +392,3 @@ func toPendingIssueCountSummaryResponse(item *domain.PendingIssueCountSummary) *
 		IgnoredTotal: item.IgnoredTotal,
 	}
 }
-

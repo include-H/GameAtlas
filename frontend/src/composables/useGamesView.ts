@@ -501,6 +501,14 @@ export const useGamesView = ({
     })
   }
 
+  const viewSeries = (id: number) => {
+    if (id <= 0) return
+    router.push({
+      name: 'series-detail',
+      params: { id: String(id) },
+    })
+  }
+
   const handleAddGame = () => {
     if (!isAdmin.value) return
     showAddModal.value = true
@@ -668,6 +676,7 @@ export const useGamesView = ({
     totalPages,
     updateRoute,
     viewGame,
+    viewSeries,
     viewMode,
   }
 }

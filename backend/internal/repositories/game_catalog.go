@@ -77,6 +77,7 @@ func (r *GameCatalogRepository) List(params domain.GamesListParams) ([]domain.Ga
 		LEFT JOIN file_stats fs ON fs.game_id = g.id
 		LEFT JOIN developer_stats ds ON ds.game_id = g.id
 		LEFT JOIN publisher_stats ps ON ps.game_id = g.id
+		LEFT JOIN series s ON s.id = g.series_id
 		ORDER BY %s %s, g.id %s
 	`, baseWhere, sortField, order, idOrder, gameListItemStatsCTEs("page_games"), gamesListItemSelectColumns(), sortField, order, idOrder)
 
@@ -195,6 +196,7 @@ func (r *GameCatalogRepository) Stats(params domain.GamesListParams) (*domain.Ga
 			LEFT JOIN file_stats fs ON fs.game_id = g.id
 			LEFT JOIN developer_stats ds ON ds.game_id = g.id
 			LEFT JOIN publisher_stats ps ON ps.game_id = g.id
+			LEFT JOIN series s ON s.id = g.series_id
 			ORDER BY %s
 		`, baseWhere, orderBy, gameListItemStatsCTEs("stat_games"), gamesListItemSelectColumns(), orderBy)
 		stmt, queryArgs, err := sqlx.Named(query, args)

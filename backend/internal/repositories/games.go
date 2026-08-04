@@ -82,6 +82,8 @@ func gamesListItemSelectColumns() string {
 			COALESCE(ds.developer_count, 0) AS developer_count,
 			COALESCE(ps.publisher_count, 0) AS publisher_count,
 			CASE WHEN fg.game_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
+			s.id AS series_id,
+			s.name AS series_name,
 			g.created_at,
 			g.updated_at`
 }

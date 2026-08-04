@@ -153,6 +153,10 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	linkRepositoryGamePublisher(t, db, secondGameID, publisherID, 0)
 	linkRepositoryGameDeveloper(t, db, privateGameID, developerID, 0)
 	linkRepositoryGamePublisher(t, db, privateGameID, publisherID, 0)
+	seriesID := insertRepositorySeries(t, db, "Stats Series", "stats-series")
+	if _, err := db.Exec(`UPDATE games SET series_id = ? WHERE id = ?`, seriesID, secondGameID); err != nil {
+		t.Fatalf("set stats game series: %v", err)
+	}
 
 	catalogRepo := NewGameCatalogRepository(repo, NewFavoriteGamesRepository(db))
 
@@ -191,6 +195,12 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	}
 	if !stats.PopularGames[0].IsFavorite {
 		t.Fatalf("popular[0].IsFavorite = false, want true")
+	}
+	if stats.PopularGames[0].SeriesID == nil || *stats.PopularGames[0].SeriesID != seriesID {
+		t.Fatalf("popular[0].SeriesID = %v, want %d", stats.PopularGames[0].SeriesID, seriesID)
+	}
+	if stats.PopularGames[0].SeriesName == nil || *stats.PopularGames[0].SeriesName != "Stats Series" {
+		t.Fatalf("popular[0].SeriesName = %v, want Stats Series", stats.PopularGames[0].SeriesName)
 	}
 }
 
@@ -237,6 +247,10 @@ func TestGameCatalogRepositoryListFiltersFavoritesAndExposesFavoriteState(t *tes
 	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, privateFavoriteID); err != nil {
 		t.Fatalf("insert private favorite: %v", err)
 	}
+	seriesID := insertRepositorySeries(t, db, "Favorite Series", "favorite-series")
+	if _, err := db.Exec(`UPDATE games SET series_id = ? WHERE id = ?`, seriesID, favoriteID); err != nil {
+		t.Fatalf("set favorite series: %v", err)
+	}
 
 	games, total, err := catalogRepo.List(domain.GamesListParams{
 		Page:         1,
@@ -257,6 +271,12 @@ func TestGameCatalogRepositoryListFiltersFavoritesAndExposesFavoriteState(t *tes
 	}
 	if !games[0].IsFavorite {
 		t.Fatalf("games[0].IsFavorite = false, want true")
+	}
+	if games[0].SeriesID == nil || *games[0].SeriesID != seriesID {
+		t.Fatalf("games[0].SeriesID = %v, want %d", games[0].SeriesID, seriesID)
+	}
+	if games[0].SeriesName == nil || *games[0].SeriesName != "Favorite Series" {
+		t.Fatalf("games[0].SeriesName = %v, want Favorite Series", games[0].SeriesName)
 	}
 
 	allGames, allTotal, err := catalogRepo.List(domain.GamesListParams{
@@ -523,9 +543,9 @@ func TestGamesRepositoryListTimelineAppliesVisibilityAndCursor(t *testing.T) {
 
 	// Second page: cursor after middle.
 	games, err = repo.ListTimeline(domain.GamesTimelineParams{
-		Limit:     2,
-		AfterDate: "2024-05-01",
-		AfterID:   middleID,
+		Limit:      2,
+		AfterDate:  "2024-05-01",
+		AfterID:    middleID,
 		Visibility: domain.GameVisibilityPublic,
 	})
 	if err != nil {
@@ -593,8 +613,7 @@ func TestGamesRepositoryUpdateAggregateRemoveCoverSetsNull(t *testing.T) {
 				Visibility: "public",
 			},
 		},
-		Assets: domain.GameAggregateAssetsInput{
-		},
+		Assets: domain.GameAggregateAssetsInput{},
 	}); err != nil {
 		t.Fatalf("UpdateAggregate returned error: %v", err)
 	}

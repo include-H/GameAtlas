@@ -41,19 +41,24 @@
         </span>
       </div>
 
-      <!-- Row 2: Developer and Actions -->
+      <!-- Row 2: Series and Actions -->
       <div
         :class="[
           'game-card__row',
           'game-card__row--metadata',
-          { 'game-card__row--actions-only': !metadataText }
+          { 'game-card__row--actions-only': !series }
         ]"
       >
-        <span v-if="metadataText" class="game-card__developer" :title="metadataText">
-          {{ metadataText }}
-        </span>
-        
-        <!-- Card Actions moved inside metadata row -->
+        <button
+          v-if="series"
+          type="button"
+          class="game-card__series"
+          :title="series.name"
+          @click.stop="handleViewSeries"
+        >
+          {{ series.name }}
+        </button>
+
         <div v-if="!isList" class="game-card__actions">
           <a-button
             type="text"
@@ -121,6 +126,7 @@ const { isAdmin } = storeToRefs(authStore)
 
 const emit = defineEmits<{
   view: [id: string]
+  'view-series': [id: number]
   'toggle-favorite': [id: string]
   delete: [id: string]
 }>()
@@ -135,6 +141,11 @@ const handleToggleFavorite = () => {
   emit('toggle-favorite', props.game.public_id)
 }
 
+const handleViewSeries = () => {
+  if (!series.value) return
+  emit('view-series', series.value.id)
+}
+
 const handleDelete = () => {
   if (!props.game.public_id) return
   emit('delete', props.game.public_id)
@@ -142,8 +153,9 @@ const handleDelete = () => {
 
 const placeholderImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23424242" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/%3E%3C/svg%3E'
 
-const metadataText = computed(() => {
-  return ''
+const series = computed(() => {
+  if (!('series' in props.game)) return null
+  return props.game.series ?? null
 })
 
 const bannerImage = computed(() => {
@@ -292,13 +304,26 @@ const displayImage = computed(() => {
   flex-shrink: 0;
 }
 
-.game-card__developer {
+.game-card__series {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
   font-size: 12px;
+  font-family: inherit;
+  text-align: left;
   color: var(--color-text-3);
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.game-card__series:hover {
+  color: rgb(var(--primary-6));
 }
 
 .game-card__actions {
@@ -351,7 +376,7 @@ const displayImage = computed(() => {
   }
 
   .game-card__year,
-  .game-card__developer {
+  .game-card__series {
     font-size: 11px;
   }
 

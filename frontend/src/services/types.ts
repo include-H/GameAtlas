@@ -169,10 +169,16 @@ export interface GameListItemDto {
   developer_count?: number
   publisher_count?: number
   is_favorite: boolean
+  series: GameSeriesSummary | null
   pending_issues?: PendingIssueEvaluation
   downloads: number
   created_at: string
   updated_at: string
+}
+
+export interface GameSeriesSummary {
+  id: number
+  name: string
 }
 
 interface GameDetailDtoBase<TFile extends GameFileEntry = GameFileEntry> extends Omit<GameListItemDto, 'primary_screenshot' | 'screenshot_count' | 'file_count' | 'developer_count' | 'publisher_count'> {

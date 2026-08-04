@@ -28,8 +28,8 @@ type Game struct {
 	PrimaryScreenshot *string `db:"primary_screenshot"`
 	LogoVisible       bool    `db:"logo_visible"`
 	IsFavorite        bool    `db:"is_favorite"`
-	CreatedAt         string `db:"created_at"`
-	UpdatedAt         string `db:"updated_at"`
+	CreatedAt         string  `db:"created_at"`
+	UpdatedAt         string  `db:"updated_at"`
 }
 
 type GameListItem struct {
@@ -52,6 +52,8 @@ type GameListItem struct {
 	DeveloperCount    int64   `db:"developer_count"`
 	PublisherCount    int64   `db:"publisher_count"`
 	IsFavorite        bool    `db:"is_favorite"`
+	SeriesID          *int64  `db:"series_id"`
+	SeriesName        *string `db:"series_name"`
 	PendingIssues     *PendingIssueEvaluation
 	CreatedAt         string `db:"created_at"`
 	UpdatedAt         string `db:"updated_at"`
@@ -72,6 +74,8 @@ type SeriesGameSummary struct {
 	Downloads         int64   `db:"downloads"`
 	PrimaryScreenshot *string `db:"primary_screenshot"`
 	IsFavorite        bool    `db:"is_favorite"`
+	SeriesID          *int64  `db:"series_id"`
+	SeriesName        *string `db:"series_name"`
 	CreatedAt         string  `db:"created_at"`
 	UpdatedAt         string  `db:"updated_at"`
 }
@@ -103,16 +107,16 @@ type GameFile struct {
 }
 
 type MetadataItem struct {
-	ID                  int64    `db:"id"`
-	Name                string   `db:"name"`
-	Slug                string   `db:"slug"`
-	SortOrder           int      `db:"sort_order"`
-	CreatedAt           string   `db:"created_at"`
-	GameCount           int
-	CoverImage          *string
-	CoverCandidates     []string
+	ID                   int64  `db:"id"`
+	Name                 string `db:"name"`
+	Slug                 string `db:"slug"`
+	SortOrder            int    `db:"sort_order"`
+	CreatedAt            string `db:"created_at"`
+	GameCount            int
+	CoverImage           *string
+	CoverCandidates      []string
 	BackgroundCandidates []string
-	LatestUpdatedAt     *string
+	LatestUpdatedAt      *string
 }
 
 type MetadataWriteInput struct {

@@ -87,9 +87,15 @@ type gameListItemResponse struct {
 	DeveloperCount    int64                           `json:"developer_count,omitempty"`
 	PublisherCount    int64                           `json:"publisher_count,omitempty"`
 	IsFavorite        bool                            `json:"is_favorite"`
+	Series            *gameSeriesResponse             `json:"series"`
 	PendingIssues     *pendingIssueEvaluationResponse `json:"pending_issues,omitempty"`
 	CreatedAt         string                          `json:"created_at"`
 	UpdatedAt         string                          `json:"updated_at"`
+}
+
+type gameSeriesResponse struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
 }
 
 type timelineGameItemResponse struct {

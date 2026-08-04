@@ -161,6 +161,7 @@
           <game-card
             :game="game"
             @view="viewGame"
+            @view-series="viewSeries"
             @toggle-favorite="toggleFavorite"
             @delete="handleDelete($event, game.title)"
           />
@@ -178,6 +179,7 @@
             :game="game"
             is-list
             @view="viewGame"
+            @view-series="viewSeries"
             @toggle-favorite="toggleFavorite"
             @delete="handleDelete($event, game.title)"
           />
@@ -288,6 +290,7 @@ const {
   totalPages,
   updateRoute,
   viewGame,
+  viewSeries,
   viewMode,
 } = useGamesView({
   route,
