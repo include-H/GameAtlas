@@ -2,9 +2,12 @@ package services
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/hao/game/internal/domain"
+	"github.com/hao/game/internal/files"
 	"github.com/hao/game/internal/repositories"
 )
 
@@ -15,6 +18,7 @@ func openStartScreenTilesService(t *testing.T) *StartScreenTilesService {
 	return NewStartScreenTilesService(
 		repositories.NewStartScreenTilesRepository(db),
 		repositories.NewGamesRepository(db),
+		files.NewAssetStore(t.TempDir()),
 	)
 }
 
@@ -39,6 +43,7 @@ func TestStartScreenTilesUpdatePersistsOrderAndSizes(t *testing.T) {
 	service := NewStartScreenTilesService(
 		repositories.NewStartScreenTilesRepository(db),
 		repositories.NewGamesRepository(db),
+		files.NewAssetStore(t.TempDir()),
 	)
 
 	tiles, err := service.Update([]domain.StartScreenTileWrite{
@@ -70,6 +75,7 @@ func TestStartScreenTilesUpdateRejectsInvalidInput(t *testing.T) {
 	service := NewStartScreenTilesService(
 		repositories.NewStartScreenTilesRepository(db),
 		repositories.NewGamesRepository(db),
+		files.NewAssetStore(t.TempDir()),
 	)
 
 	if _, err := service.Update([]domain.StartScreenTileWrite{{GameID: gameID, TileSize: "huge"}}); !errors.Is(err, domain.ErrValidation) {
@@ -83,5 +89,58 @@ func TestStartScreenTilesUpdateRejectsInvalidInput(t *testing.T) {
 	}
 	if _, err := service.Update([]domain.StartScreenTileWrite{{GameID: 999999, TileSize: "small"}}); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("missing game error = %v, want ErrNotFound", err)
+	}
+}
+
+func TestStartScreenTilesUpdateValidatesTileImages(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	assetsDir := t.TempDir()
+	gameID := insertServicesTestGame(t, db, "tile-image", "Tile Image", domain.GameVisibilityPublic)
+
+	imagePath := "/assets/start-screen/11111111-1111-4111-8111-111111111111.jpg"
+	imageFile := filepath.Join(assetsDir, "start-screen", "11111111-1111-4111-8111-111111111111.jpg")
+	if err := os.MkdirAll(filepath.Dir(imageFile), 0o755); err != nil {
+		t.Fatalf("create tile image dir: %v", err)
+	}
+	if err := os.WriteFile(imageFile, []byte("fake-image"), 0o644); err != nil {
+		t.Fatalf("write tile image: %v", err)
+	}
+
+	service := NewStartScreenTilesService(
+		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewGamesRepository(db),
+		files.NewAssetStore(assetsDir),
+	)
+
+	invalidPath := "/assets/start-screen/missing.jpg"
+	if _, err := service.Update([]domain.StartScreenTileWrite{{
+		GameID:         gameID,
+		TileSize:       "small",
+		ImageSmallPath: &invalidPath,
+	}}); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("missing image error = %v, want ErrValidation", err)
+	}
+
+	badPrefix := "/etc/passwd"
+	if _, err := service.Update([]domain.StartScreenTileWrite{{
+		GameID:         gameID,
+		TileSize:       "small",
+		ImageSmallPath: &badPrefix,
+	}}); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("bad prefix error = %v, want ErrValidation", err)
+	}
+
+	tiles, err := service.Update([]domain.StartScreenTileWrite{{
+		GameID:         gameID,
+		TileSize:       "small",
+		ImageSmallPath: &imagePath,
+	}})
+	if err != nil {
+		t.Fatalf("valid image update returned error: %v", err)
+	}
+	if len(tiles) != 1 || tiles[0].ImageSmallPath == nil || *tiles[0].ImageSmallPath != imagePath {
+		t.Fatalf("tiles = %+v, want image path %q", tiles, imagePath)
 	}
 }

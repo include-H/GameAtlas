@@ -140,10 +140,12 @@
     :visible="startScreenVisible"
     :tiles="startScreenTiles"
     :favorite-pool="startScreenFavoritePool"
+    :can-edit="isAdmin"
     :is-loading="startScreenLoading"
     :has-load-failure="startScreenLoadFailed"
     :is-editing="startScreenEditing"
     :is-saving="startScreenSaving"
+    :save-error="startScreenSaveError"
     @close="closeStartScreen"
     @retry="retryStartScreen"
     @start-edit="startStartScreenEdit"
@@ -153,6 +155,7 @@
     @remove="removeStartScreenTile"
     @move="moveStartScreenTile"
     @add="addStartScreenTile"
+    @apply-crop="applyStartScreenCrop"
   />
 </template>
 
@@ -194,6 +197,7 @@ const {
   hasLoadFailure: startScreenLoadFailed,
   isEditing: startScreenEditing,
   isSaving: startScreenSaving,
+  saveError: startScreenSaveError,
   close: closeStartScreen,
   toggle: toggleStartScreen,
   retry: retryStartScreen,
@@ -204,8 +208,10 @@ const {
   removeTile: removeStartScreenTile,
   moveTile: moveStartScreenTile,
   addTile: addStartScreenTile,
+  applyTileCrop: applyStartScreenCrop,
 } = useStartScreen({
   fetchTiles: () => startScreenService.getTiles(),
+  uploadTileImage: (file, size) => startScreenService.uploadTileImage(file, size),
   fetchFavorites: async () => {
     const favorites: GameListItem[] = []
     let page = 1

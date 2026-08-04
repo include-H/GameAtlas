@@ -11,8 +11,8 @@
     @click="handleClick"
   >
     <img
-      v-if="coverUrl"
-      :src="coverUrl"
+      v-if="imageSrc"
+      :src="imageSrc"
       :alt="tile.title"
       class="metro-tile__cover"
       loading="lazy"
@@ -23,6 +23,15 @@
     <span class="metro-tile__label">{{ tile.title }}</span>
 
     <template v-if="editing">
+      <span
+        class="metro-tile__action metro-tile__crop"
+        role="button"
+        tabindex="-1"
+        title="用 banner 裁剪磁贴图片"
+        @click.stop="emit('crop', tile.game_id)"
+      >
+        <icon-image />
+      </span>
       <span
         class="metro-tile__action metro-tile__resize"
         role="button"
@@ -47,7 +56,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IconClose, IconExpand } from '@arco-design/web-vue/es/icon'
+import { IconClose, IconExpand, IconImage } from '@arco-design/web-vue/es/icon'
 import type { StartScreenTile, StartScreenTileSize } from '@/services/types'
 
 const props = defineProps<{
@@ -58,6 +67,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   select: [publicId: string]
+  crop: [gameId: number]
   resize: [gameId: number]
   remove: [gameId: number]
 }>()
@@ -78,7 +88,10 @@ const SIZE_HINTS: Record<StartScreenTileSize, string> = {
   large: '当前：大磁贴',
 }
 
-const coverUrl = computed(() => props.tile.cover_image || '')
+const imageSrc = computed(() => {
+  const custom = props.tile[`image_${props.tile.tile_size}_path`]
+  return custom || props.tile.cover_image || ''
+})
 const initial = computed(() => props.tile.title.trim().charAt(0).toUpperCase() || '?')
 const resizeHint = computed(() => `${SIZE_HINTS[props.tile.tile_size]}，点击切换`)
 const tileStyle = computed(() => ({
@@ -185,6 +198,10 @@ const handleClick = () => {
 }
 
 .metro-tile__resize {
+  right: 70px;
+}
+
+.metro-tile__crop {
   right: 38px;
 }
 

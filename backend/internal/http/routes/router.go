@@ -82,6 +82,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	startScreenTilesService := services.NewStartScreenTilesService(
 		repositories.NewStartScreenTilesRepository(db),
 		gamesRepo,
+		files.NewAssetStore(cfg.AssetsDir),
 	)
 	startScreenTilesHandler := handlers.NewStartScreenTilesHandler(startScreenTilesService)
 	gameFileRefreshService := services.NewGameFileRefreshService(gameFilesRepo, files.NewGuard(cfg.PrimaryROMRoot))
@@ -143,6 +144,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.POST("/settings/restart", settingsHandler.Restart)
 	api.GET("/start-screen/tiles", startScreenTilesHandler.Get)
 	api.PUT("/start-screen/tiles", startScreenTilesHandler.Update)
+	api.POST("/start-screen/tiles/image", startScreenTilesHandler.UploadImage)
 	api.GET("/steam/search", steamHandler.Search)
 	api.GET("/steam/:appId/assets", steamHandler.Preview)
 	api.GET("/steam/proxy", steamHandler.Proxy)

@@ -1,10 +1,12 @@
 import { ref } from 'vue'
+import { getHttpErrorMessage, getHttpStatus } from '@/utils/http-error'
 import type { GameListItem, StartScreenTile, StartScreenTileSize, StartScreenTileWrite } from '@/services/types'
 
 interface UseStartScreenOptions {
   fetchTiles: () => Promise<StartScreenTile[]>
   fetchFavorites: () => Promise<GameListItem[]>
   saveTiles: (tiles: StartScreenTileWrite[]) => Promise<StartScreenTile[]>
+  uploadTileImage: (file: File, size: StartScreenTileSize) => Promise<string>
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
 }
 
@@ -12,6 +14,13 @@ const NEXT_TILE_SIZE: Record<StartScreenTileSize, StartScreenTileSize> = {
   small: 'wide',
   wide: 'large',
   large: 'small',
+}
+
+const describeSaveError = (error: unknown): string => {
+  const status = getHttpStatus(error)
+  if (status === 401) return '保存失败：需要管理员登录'
+  if (status === 404) return '保存失败：后端接口不存在，请确认后端已更新并重启'
+  return `保存失败：${getHttpErrorMessage(error, '未知错误')}`
 }
 
 export const useStartScreen = (options: UseStartScreenOptions) => {
@@ -22,6 +31,7 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
   const hasLoadFailure = ref(false)
   const isEditing = ref(false)
   const isSaving = ref(false)
+  const saveError = ref<string | null>(null)
   const originalTiles = ref<StartScreenTile[]>([])
 
   const refresh = async () => {
@@ -40,7 +50,11 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
         public_id: game.public_id,
         title: game.title,
         cover_image: game.cover_image,
+        banner_image: game.banner_image,
         tile_size: 'small',
+        image_small_path: null,
+        image_wide_path: null,
+        image_large_path: null,
         sort_order: index,
       }))
     } catch {
@@ -77,6 +91,7 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
 
   const startEdit = async () => {
     if (isEditing.value) return
+    saveError.value = null
     originalTiles.value = tiles.value.map((tile) => ({ ...tile }))
     isEditing.value = true
     try {
@@ -90,25 +105,32 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
   const cancelEdit = () => {
     tiles.value = originalTiles.value.map((tile) => ({ ...tile }))
     favoritePool.value = []
+    saveError.value = null
     isEditing.value = false
   }
 
   const saveEdit = async () => {
     if (isSaving.value) return
     isSaving.value = true
+    saveError.value = null
     try {
       const saved = await options.saveTiles(
         tiles.value.map((tile) => ({
           game_id: tile.game_id,
           tile_size: tile.tile_size,
+          image_small_path: tile.image_small_path,
+          image_wide_path: tile.image_wide_path,
+          image_large_path: tile.image_large_path,
         })),
       )
       tiles.value = saved
       favoritePool.value = []
       isEditing.value = false
       options.addAlert('开始屏幕已保存', 'success')
-    } catch {
-      options.addAlert('保存开始屏幕失败，请稍后重试', 'error')
+    } catch (error) {
+      const message = describeSaveError(error)
+      saveError.value = message
+      options.addAlert(message, 'error')
     } finally {
       isSaving.value = false
     }
@@ -140,9 +162,31 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
       public_id: game.public_id,
       title: game.title,
       cover_image: game.cover_image,
+      banner_image: game.banner_image,
       tile_size: 'small',
+      image_small_path: null,
+      image_wide_path: null,
+      image_large_path: null,
       sort_order: tiles.value.length,
     })
+  }
+
+  const applyTileCrop = async (gameId: number, blobs: Record<StartScreenTileSize, Blob>) => {
+    const tile = tiles.value.find((item) => item.game_id === gameId)
+    if (!tile) return
+    try {
+      const [smallPath, widePath, largePath] = await Promise.all([
+        options.uploadTileImage(new File([blobs.small], 'tile-small.png', { type: 'image/png' }), 'small'),
+        options.uploadTileImage(new File([blobs.wide], 'tile-wide.png', { type: 'image/png' }), 'wide'),
+        options.uploadTileImage(new File([blobs.large], 'tile-large.png', { type: 'image/png' }), 'large'),
+      ])
+      tile.image_small_path = smallPath
+      tile.image_wide_path = widePath
+      tile.image_large_path = largePath
+      options.addAlert('磁贴图片已更新', 'success')
+    } catch (error) {
+      options.addAlert(`磁贴图片更新失败：${getHttpErrorMessage(error, '未知错误')}`, 'error')
+    }
   }
 
   return {
@@ -153,6 +197,7 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     hasLoadFailure,
     isEditing,
     isSaving,
+    saveError,
     open,
     close,
     toggle,
@@ -164,5 +209,6 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     removeTile,
     moveTile,
     addTile,
+    applyTileCrop,
   }
 }

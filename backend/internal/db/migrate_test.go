@@ -31,6 +31,7 @@ func TestRunMigrationsOnFreshDatabaseAppliesAllEmbeddedFiles(t *testing.T) {
 	assertTableExists(t, db, "asset_cleanup_tasks")
 	assertTableExists(t, db, "app_settings")
 	assertTableExists(t, db, "start_screen_tiles")
+	assertColumnExists(t, db, "start_screen_tiles", "image_small_path")
 	assertColumnExists(t, db, "games", "series_id")
 	assertColumnExists(t, db, "games", "logo_visible")
 	assertColumnMissing(t, db, "games", "needs_review")

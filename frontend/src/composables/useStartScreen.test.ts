@@ -27,7 +27,11 @@ const makeTile = (gameId: number, publicId: string, tileSize: StartScreenTile['t
   public_id: publicId,
   title: publicId,
   cover_image: null,
+  banner_image: null,
   tile_size: tileSize,
+  image_small_path: null,
+  image_wide_path: null,
+  image_large_path: null,
   sort_order: 0,
 })
 
@@ -35,19 +39,22 @@ const createScreen = (overrides: Partial<{
   fetchTiles: () => Promise<StartScreenTile[]>
   fetchFavorites: () => Promise<GameListItem[]>
   saveTiles: () => Promise<StartScreenTile[]>
+  uploadTileImage: () => Promise<string>
   addAlert: () => void
 }> = {}) => {
   const fetchTiles = overrides.fetchTiles ?? vi.fn().mockResolvedValue([])
   const fetchFavorites = overrides.fetchFavorites ?? vi.fn().mockResolvedValue([])
   const saveTiles = overrides.saveTiles ?? vi.fn().mockResolvedValue([])
+  const uploadTileImage = overrides.uploadTileImage ?? vi.fn().mockResolvedValue('/assets/start-screen/tile.png')
   const addAlert = overrides.addAlert ?? vi.fn()
   const screen = useStartScreen({
     fetchTiles,
     fetchFavorites,
     saveTiles,
+    uploadTileImage,
     addAlert,
   })
-  return { screen, fetchTiles, fetchFavorites, saveTiles, addAlert }
+  return { screen, fetchTiles, fetchFavorites, saveTiles, uploadTileImage, addAlert }
 }
 
 describe('useStartScreen', () => {
@@ -136,7 +143,13 @@ describe('useStartScreen', () => {
     screen.resizeTile(1)
     await screen.saveEdit()
 
-    expect(saveTiles).toHaveBeenCalledWith([{ game_id: 1, tile_size: 'wide' }])
+    expect(saveTiles).toHaveBeenCalledWith([{
+      game_id: 1,
+      tile_size: 'wide',
+      image_small_path: null,
+      image_wide_path: null,
+      image_large_path: null,
+    }])
     expect(screen.tiles.value[0]?.tile_size).toBe('wide')
     expect(screen.isEditing.value).toBe(false)
     expect(addAlert).toHaveBeenCalledWith('开始屏幕已保存', 'success')
@@ -178,5 +191,54 @@ describe('useStartScreen', () => {
     screen.addTile(makeGame('b', 2))
     screen.addTile(makeGame('b', 2))
     expect(screen.tiles.value.map((tile) => tile.public_id)).toEqual(['a', 'b'])
+  })
+
+  it('keeps edit mode and reports the real reason when saving fails with 401', async () => {
+    const axiosError = Object.assign(new Error('Request failed with status code 401'), {
+      isAxiosError: true,
+      response: { status: 401, data: { error: '需要管理员登录' } },
+    })
+    const saveTiles = vi.fn().mockRejectedValue(axiosError)
+    const addAlert = vi.fn()
+    const { screen } = createScreen({
+      fetchTiles: vi.fn().mockResolvedValue([makeTile(1, 'a')]),
+      saveTiles,
+      addAlert,
+    })
+
+    screen.open()
+    await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
+    await screen.startEdit()
+    await screen.saveEdit()
+
+    expect(screen.isEditing.value).toBe(true)
+    expect(screen.saveError.value).toBe('保存失败：需要管理员登录')
+    expect(addAlert).toHaveBeenCalledWith('保存失败：需要管理员登录', 'error')
+  })
+
+  it('applies cropped images for all three tile sizes', async () => {
+    const uploadTileImage = vi.fn().mockResolvedValueOnce('/assets/start-screen/small.png')
+      .mockResolvedValueOnce('/assets/start-screen/wide.png')
+      .mockResolvedValueOnce('/assets/start-screen/large.png')
+    const addAlert = vi.fn()
+    const { screen } = createScreen({
+      fetchTiles: vi.fn().mockResolvedValue([makeTile(1, 'a')]),
+      uploadTileImage,
+      addAlert,
+    })
+
+    screen.open()
+    await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
+    await screen.applyTileCrop(1, {
+      small: new Blob(['s'], { type: 'image/png' }),
+      wide: new Blob(['w'], { type: 'image/png' }),
+      large: new Blob(['l'], { type: 'image/png' }),
+    })
+
+    expect(uploadTileImage).toHaveBeenCalledTimes(3)
+    expect(screen.tiles.value[0]?.image_small_path).toBe('/assets/start-screen/small.png')
+    expect(screen.tiles.value[0]?.image_wide_path).toBe('/assets/start-screen/wide.png')
+    expect(screen.tiles.value[0]?.image_large_path).toBe('/assets/start-screen/large.png')
+    expect(addAlert).toHaveBeenCalledWith('磁贴图片已更新', 'success')
   })
 })

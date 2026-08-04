@@ -1,33 +1,34 @@
 package services
 
 import (
+	"mime/multipart"
 	"strings"
 
 	"github.com/hao/game/internal/domain"
+	"github.com/hao/game/internal/files"
 	"github.com/hao/game/internal/repositories"
 )
 
 type StartScreenTilesService struct {
 	tilesRepo *repositories.StartScreenTilesRepository
 	gamesRepo *repositories.GamesRepository
+	store     *files.AssetStore
 }
 
 func NewStartScreenTilesService(
 	tilesRepo *repositories.StartScreenTilesRepository,
 	gamesRepo *repositories.GamesRepository,
+	store *files.AssetStore,
 ) *StartScreenTilesService {
 	return &StartScreenTilesService{
 		tilesRepo: tilesRepo,
 		gamesRepo: gamesRepo,
+		store:     store,
 	}
 }
 
 func (s *StartScreenTilesService) List() ([]domain.StartScreenTile, error) {
-	tiles, err := s.tilesRepo.List()
-	if err != nil {
-		return nil, err
-	}
-	return tiles, nil
+	return s.tilesRepo.List()
 }
 
 func (s *StartScreenTilesService) Update(tiles []domain.StartScreenTileWrite) ([]domain.StartScreenTile, error) {
@@ -60,10 +61,64 @@ func (s *StartScreenTilesService) validateTiles(tiles []domain.StartScreenTileWr
 		if _, err := s.gamesRepo.GetByID(tile.GameID); err != nil {
 			return nil, normalizeRepoError(err)
 		}
+
+		imageSmallPath, err := s.validateTileImagePath(tile.ImageSmallPath)
+		if err != nil {
+			return nil, err
+		}
+		imageWidePath, err := s.validateTileImagePath(tile.ImageWidePath)
+		if err != nil {
+			return nil, err
+		}
+		imageLargePath, err := s.validateTileImagePath(tile.ImageLargePath)
+		if err != nil {
+			return nil, err
+		}
+
 		normalized = append(normalized, domain.StartScreenTileWrite{
-			GameID:   tile.GameID,
-			TileSize: tileSize,
+			GameID:         tile.GameID,
+			TileSize:       tileSize,
+			ImageSmallPath: imageSmallPath,
+			ImageWidePath:  imageWidePath,
+			ImageLargePath: imageLargePath,
 		})
 	}
 	return normalized, nil
+}
+
+func (s *StartScreenTilesService) validateTileImagePath(path *string) (*string, error) {
+	if path == nil {
+		return nil, nil
+	}
+	trimmed := strings.TrimSpace(*path)
+	if trimmed == "" {
+		return nil, nil
+	}
+	if !strings.HasPrefix(trimmed, "/assets/") {
+		return nil, domain.ErrValidation
+	}
+	if s.store == nil || !s.store.AssetExists(trimmed) {
+		return nil, domain.ErrValidation
+	}
+	return &trimmed, nil
+}
+
+// UploadTileImage 保存磁贴裁剪图到 assets/start-screen/，返回 /assets/start-screen/{uid}.{ext} 路径。
+func (s *StartScreenTilesService) UploadTileImage(header *multipart.FileHeader) (string, error) {
+	if s.store == nil {
+		return "", domain.ErrMissingConfig
+	}
+	src, err := header.Open()
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+
+	contentType := header.Header.Get("Content-Type")
+	assetUID := newAssetUID()
+	stagingPath, err := s.store.SaveToStaging("start-screen", "cover", assetUID, src, contentType)
+	if err != nil {
+		return "", normalizeAssetError(err)
+	}
+	return s.store.MoveToPermanent(stagingPath, "start-screen")
 }

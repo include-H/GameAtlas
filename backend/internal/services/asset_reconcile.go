@@ -235,6 +235,12 @@ func (s *AssetReconcileService) loadAllReferencedAssetPaths() (map[string]struct
 			SELECT banner_image AS path FROM games WHERE COALESCE(TRIM(banner_image), '') != ''
 			UNION
 			SELECT path FROM game_assets WHERE COALESCE(TRIM(path), '') != ''
+			UNION
+			SELECT image_small_path AS path FROM start_screen_tiles WHERE COALESCE(TRIM(image_small_path), '') != ''
+			UNION
+			SELECT image_wide_path AS path FROM start_screen_tiles WHERE COALESCE(TRIM(image_wide_path), '') != ''
+			UNION
+			SELECT image_large_path AS path FROM start_screen_tiles WHERE COALESCE(TRIM(image_large_path), '') != ''
 		) refs
 	`); err != nil {
 		return nil, fmt.Errorf("load all referenced asset paths: %w", err)

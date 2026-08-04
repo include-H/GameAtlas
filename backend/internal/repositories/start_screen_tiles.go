@@ -20,8 +20,9 @@ func (r *StartScreenTilesRepository) List() ([]domain.StartScreenTile, error) {
 	var tiles []domain.StartScreenTile
 	err := r.db.Select(&tiles, `
 		SELECT
-			t.id, t.game_id, g.public_id, g.title, g.cover_image,
-			t.tile_size, t.sort_order, t.created_at, t.updated_at
+			t.id, t.game_id, g.public_id, g.title, g.cover_image, g.banner_image,
+			t.tile_size, t.image_small_path, t.image_wide_path, t.image_large_path,
+			t.sort_order, t.created_at, t.updated_at
 		FROM start_screen_tiles t
 		INNER JOIN games g ON g.id = t.game_id
 		ORDER BY t.sort_order ASC, t.id ASC
@@ -49,9 +50,11 @@ func (r *StartScreenTilesRepository) Replace(tiles []domain.StartScreenTileWrite
 
 	for index, tile := range tiles {
 		if _, err := tx.Exec(`
-			INSERT INTO start_screen_tiles (game_id, tile_size, sort_order)
-			VALUES (?, ?, ?)
-		`, tile.GameID, tile.TileSize, index); err != nil {
+			INSERT INTO start_screen_tiles (
+				game_id, tile_size, image_small_path, image_wide_path, image_large_path, sort_order
+			)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`, tile.GameID, tile.TileSize, tile.ImageSmallPath, tile.ImageWidePath, tile.ImageLargePath, index); err != nil {
 			return fmt.Errorf("insert start screen tile: %w", err)
 		}
 	}

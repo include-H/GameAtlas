@@ -377,11 +377,18 @@ export interface StartScreenTile {
   public_id: string
   title: string
   cover_image: string | null
+  banner_image: string | null
   tile_size: StartScreenTileSize
+  image_small_path: string | null
+  image_wide_path: string | null
+  image_large_path: string | null
   sort_order: number
 }
 
 export interface StartScreenTileWrite {
   game_id: number
   tile_size: StartScreenTileSize
+  image_small_path: string | null
+  image_wide_path: string | null
+  image_large_path: string | null
 }

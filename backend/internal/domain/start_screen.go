@@ -18,18 +18,25 @@ func IsAllowedStartScreenTileSize(value string) bool {
 }
 
 type StartScreenTile struct {
-	ID         int64   `db:"id"`
-	GameID     int64   `db:"game_id"`
-	PublicID   string  `db:"public_id"`
-	Title      string  `db:"title"`
-	CoverImage *string `db:"cover_image"`
-	TileSize   string  `db:"tile_size"`
-	SortOrder  int     `db:"sort_order"`
-	CreatedAt  string  `db:"created_at"`
-	UpdatedAt  string  `db:"updated_at"`
+	ID             int64   `db:"id"`
+	GameID         int64   `db:"game_id"`
+	PublicID       string  `db:"public_id"`
+	Title          string  `db:"title"`
+	CoverImage     *string `db:"cover_image"`
+	BannerImage    *string `db:"banner_image"`
+	TileSize       string  `db:"tile_size"`
+	ImageSmallPath *string `db:"image_small_path"`
+	ImageWidePath  *string `db:"image_wide_path"`
+	ImageLargePath *string `db:"image_large_path"`
+	SortOrder      int     `db:"sort_order"`
+	CreatedAt      string  `db:"created_at"`
+	UpdatedAt      string  `db:"updated_at"`
 }
 
 type StartScreenTileWrite struct {
-	GameID   int64
-	TileSize string
+	GameID         int64
+	TileSize       string
+	ImageSmallPath *string
+	ImageWidePath  *string
+	ImageLargePath *string
 }

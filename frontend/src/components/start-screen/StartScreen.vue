@@ -20,11 +20,10 @@
             </div>
 
             <div class="start-screen__header-actions">
-              <template v-if="!isEditing">
+              <template v-if="!isEditing && canEdit">
                 <a-button
                   class="app-text-action-btn"
                   type="text"
-                  :disabled="tiles.length === 0"
                   @click="emit('startEdit')"
                 >
                   <template #icon><icon-edit /></template>
@@ -43,8 +42,9 @@
           </header>
 
           <p v-if="isEditing" class="start-screen__edit-hint">
-            拖动排序 · 点击右上尺寸按钮切换 · × 移除 · + 添加
+            拖动排序 · 尺寸切换 · banner 裁剪 · × 移除 · + 添加
           </p>
+          <p v-if="isEditing && saveError" class="start-screen__save-error">{{ saveError }}</p>
 
           <div v-if="isLoading && tiles.length === 0" class="start-screen__state">
             <a-spin :size="28" />
@@ -62,9 +62,9 @@
             <p>{{ isEditing ? '还没有磁贴，点击 + 添加' : '还没有磁贴' }}</p>
             <a-space v-if="!isEditing">
               <a-button @click="handleBrowseGames">去游戏库逛逛</a-button>
-              <a-button type="primary" @click="emit('startEdit')">开始编辑</a-button>
+              <a-button v-if="canEdit" type="primary" @click="emit('startEdit')">开始编辑</a-button>
             </a-space>
-            <a-button v-else type="primary" @click="addVisible = true">添加磁贴</a-button>
+            <a-button v-else-if="canEdit" type="primary" @click="addVisible = true">添加磁贴</a-button>
           </div>
 
           <div v-else ref="metroAreaRef" class="start-screen__metro">
@@ -90,6 +90,7 @@
                   :color-index="index"
                   :editing="isEditing"
                   @select="handleTileSelect"
+                  @crop="handleCrop"
                   @resize="emit('resize', $event)"
                   @remove="emit('remove', $event)"
                 />
@@ -146,6 +147,13 @@
       </button>
     </div>
   </a-modal>
+
+  <tile-crop-modal
+    :visible="cropVisible"
+    :image-src="cropSource"
+    @confirm="handleCropConfirm"
+    @cancel="cropVisible = false"
+  />
 </template>
 
 <script setup lang="ts">
@@ -159,16 +167,19 @@ import {
   IconStar,
 } from '@arco-design/web-vue/es/icon'
 import MetroTile from './MetroTile.vue'
-import type { GameListItem, StartScreenTile } from '@/services/types'
+import TileCropModal from './TileCropModal.vue'
+import type { GameListItem, StartScreenTile, StartScreenTileSize } from '@/services/types'
 
 const props = defineProps<{
   visible: boolean
   tiles: StartScreenTile[]
   favoritePool: GameListItem[]
+  canEdit: boolean
   isLoading: boolean
   hasLoadFailure: boolean
   isEditing: boolean
   isSaving: boolean
+  saveError: string | null
 }>()
 
 const emit = defineEmits<{
@@ -182,13 +193,21 @@ const emit = defineEmits<{
   remove: [gameId: number]
   move: [fromIndex: number, toIndex: number]
   add: [game: GameListItem]
+  applyCrop: [gameId: number, blobs: Record<StartScreenTileSize, Blob>]
 }>()
 
 const router = useRouter()
 const wrapperRef = ref<HTMLElement | null>(null)
 const metroAreaRef = ref<HTMLElement | null>(null)
 const addVisible = ref(false)
+const cropVisible = ref(false)
+const cropGameId = ref<number | null>(null)
 const draggedIndex = ref<number | null>(null)
+
+const cropSource = computed(() => {
+  const tile = props.tiles.find((item) => item.game_id === cropGameId.value)
+  return tile?.banner_image || tile?.cover_image || ''
+})
 
 const addCandidates = computed(() => {
   const pinned = new Set(props.tiles.map((tile) => tile.game_id))
@@ -212,6 +231,18 @@ const handleBrowseGames = () => {
 const handleAdd = (game: GameListItem) => {
   emit('add', game)
   addVisible.value = false
+}
+
+const handleCrop = (gameId: number) => {
+  cropGameId.value = gameId
+  cropVisible.value = true
+}
+
+const handleCropConfirm = (blobs: Record<StartScreenTileSize, Blob>) => {
+  if (cropGameId.value === null) return
+  emit('applyCrop', cropGameId.value, blobs)
+  cropVisible.value = false
+  cropGameId.value = null
 }
 
 const handleWheel = (event: WheelEvent) => {
@@ -323,6 +354,15 @@ onUnmounted(() => {
   opacity: 0.7;
 }
 
+.start-screen__save-error {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(255, 77, 79, 0.16);
+  color: #ff7875;
+  font-size: 13px;
+}
+
 .start-screen__metro {
   flex: 1;
   min-height: 0;
@@ -344,6 +384,10 @@ onUnmounted(() => {
 .start-screen__tile-slot {
   min-width: 0;
   min-height: 0;
+  /* Win8 磁贴入场：back-out 回弹曲线，配合 onTileEnter 的错峰 delay */
+  transition:
+    opacity 260ms ease,
+    transform 480ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .start-screen__tile-slot--small {
@@ -384,12 +428,18 @@ onUnmounted(() => {
 .metro-tile-enter-from,
 .metro-tile-leave-to {
   opacity: 0;
-  transform: translateY(18px) scale(0.96);
+  transform: translateY(28px) scale(0.45);
 }
 
 .metro-tile-enter-to {
   opacity: 1;
   transform: translateY(0) scale(1);
+}
+
+.metro-tile-leave-active {
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
 }
 
 .metro-tile-leave-active {
@@ -434,14 +484,38 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.08);
 }
 
-.start-screen-overlay-enter-active,
-.start-screen-overlay-leave-active {
-  transition: opacity 220ms ease;
+.start-screen-overlay-enter-active {
+  transition:
+    opacity 260ms ease,
+    transform 340ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.start-screen-overlay-enter-from,
+.start-screen-overlay-enter-from {
+  opacity: 0;
+  transform: scale(0.96);
+}
+
+.start-screen-overlay-leave-active {
+  transition: opacity 180ms ease;
+}
+
 .start-screen-overlay-leave-to {
   opacity: 0;
+}
+
+.start-screen-overlay-enter-active .start-screen__header {
+  animation: start-screen-header-in 420ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
+}
+
+@keyframes start-screen-header-in {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .start-screen-add-list {
