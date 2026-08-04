@@ -100,7 +100,8 @@
 
         <a-layout-content class="content">
           <router-view v-slot="{ Component, route }">
-            <transition name="route-fade" mode="out-in">
+            <!-- Vue 3.5's out-in transition clones KeepAlive with null slots during route changes. -->
+            <transition name="route-fade">
               <keep-alive include="GamesView">
                 <component
                   :is="Component"
