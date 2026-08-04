@@ -9,7 +9,7 @@
         @keydown.esc="handleClose"
       >
         <shared-ambient-background />
-        <div class="start-screen-vignette" />
+        <div class="start-screen-scrim" @click="handleClose" />
 
         <div class="start-screen" @wheel.passive="handleWheel" @click.self="handleClose">
           <header class="start-screen__header">
@@ -358,15 +358,12 @@ onUnmounted(() => {
   z-index: 1600 !important;
 }
 
-.start-screen-vignette {
+.start-screen-scrim {
   position: absolute;
   inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  /* 与游戏店同款暗角氛围：不盖背景主体，只压边缘保证磁贴/文字可读 */
-  background:
-    linear-gradient(180deg, rgba(6, 8, 14, 0.42), transparent 26%),
-    radial-gradient(ellipse at 50% 46%, transparent 52%, rgba(5, 8, 14, 0.62) 100%);
+  /* 半透明遮罩：让开始屏幕透出当前全局背景（自定义 bg / 环境背景池），同时保证文字可读 */
+  background: rgba(8, 10, 16, 0.46);
+  backdrop-filter: blur(4px);
 }
 
 .start-screen {
@@ -619,6 +616,19 @@ onUnmounted(() => {
   transform: scale(0.94);
 }
 
+.start-screen-scrim {
+  /* 背景层比磁贴层更快定色：前 200ms 完成淡入 */
+  transition: opacity 200ms ease;
+}
+
+.start-screen-overlay-enter-from .start-screen-scrim {
+  opacity: 0;
+}
+
+.start-screen-overlay-leave-active .start-screen-scrim {
+  opacity: 0;
+}
+
 .start-screen-overlay-enter-active .start-screen__header {
   animation: start-screen-header-in 420ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
 }
@@ -639,6 +649,7 @@ onUnmounted(() => {
   .start-screen-overlay-enter-active,
   .start-screen-overlay-leave-active,
   .start-screen__tile-slot,
+  .start-screen-scrim,
   .start-screen__header {
     transition: none !important;
     animation: none !important;
