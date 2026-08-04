@@ -15,6 +15,17 @@
   <a-layout v-else class="app-layout">
     <a-layout-header class="pro-header glass-header">
       <div class="header-left">
+        <a-button
+          class="app-text-action-btn start-button"
+          type="text"
+          shape="circle"
+          :aria-label="startScreenVisible ? '关闭开始屏幕' : '打开开始屏幕'"
+          @click="toggleStartScreen"
+        >
+          <template #icon>
+            <icon-apps />
+          </template>
+        </a-button>
         <div class="logo">
           <icon-trophy :size="28" />
           <span class="logo-text">{{ appName }}</span>
@@ -125,6 +136,15 @@
     </a-layout>
   </a-layout>
 
+  <start-screen
+    :visible="startScreenVisible"
+    :games="startScreenGames"
+    :is-loading="startScreenLoading"
+    :has-load-failure="startScreenLoadFailed"
+    @close="closeStartScreen"
+    @retry="retryStartScreen"
+    @unpin="handleStartScreenUnpin"
+  />
 </template>
 
 <script setup lang="ts">
@@ -134,23 +154,52 @@ import { useRoute, useRouter } from 'vue-router'
 import useMenu from '@/hooks/useMenu'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
+import { useGamesStore } from '@/stores/games'
+import gamesService from '@/services/games.service'
 import AlertBanner from '@/components/AlertBanner.vue'
 import AppNavigationMenu from '@/components/AppNavigationMenu.vue'
 import SharedAmbientBackground from '@/components/SharedAmbientBackground.vue'
+import StartScreen from '@/components/start-screen/StartScreen.vue'
+import { useStartScreen } from '@/composables/useStartScreen'
 import {
   IconTrophy,
   IconMenuFold,
   IconMenuUnfold,
   IconUp,
+  IconApps,
 } from '@arco-design/web-vue/es/icon'
 
 const router = useRouter()
 const route = useRoute()
 const uiStore = useUiStore()
 const authStore = useAuthStore()
+const gamesStore = useGamesStore()
 const { menuList, activeKey, openKeys: routeOpenKeys } = useMenu()
 const { sidebarCollapsed } = storeToRefs(uiStore)
 const { isAdmin, adminDisplayName, authLoadFailed } = storeToRefs(authStore)
+const {
+  visible: startScreenVisible,
+  games: startScreenGames,
+  isLoading: startScreenLoading,
+  hasLoadFailure: startScreenLoadFailed,
+  close: closeStartScreen,
+  toggle: toggleStartScreen,
+  retry: retryStartScreen,
+  unpin: unpinStartScreen,
+} = useStartScreen({
+  fetchFavorites: async () => {
+    const result = await gamesService.getGames({
+      query: { favorite: true, page: 1, limit: 100 },
+    })
+    return result.data
+  },
+  removeFavorite: async (publicId: string) => {
+    await gamesStore.toggleFavorite(publicId)
+  },
+  addAlert: (message, type) => {
+    uiStore.addAlert(message, type)
+  },
+})
 
 const appName = 'GameAtlas'
 const sideWidth = 240
@@ -223,6 +272,10 @@ const scrollToTop = () => {
 
 const handleMenuClick = (key: string) => {
   router.push({ name: key })
+}
+
+const handleStartScreenUnpin = (publicId: string) => {
+  void unpinStartScreen(publicId)
 }
 
 const handleMobileMenuClick = (key: string) => {
@@ -324,6 +377,18 @@ onUnmounted(() => {
   border-radius: var(--radius-md);
   background: transparent;
   border: none;
+}
+
+.start-button {
+  margin-right: 6px;
+  color: var(--color-text-2);
+  background: transparent;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.start-button:hover {
+  color: var(--color-primary-6);
+  background: var(--app-header-hover);
 }
 
 .pro-header .logo :deep(.arco-icon) {
