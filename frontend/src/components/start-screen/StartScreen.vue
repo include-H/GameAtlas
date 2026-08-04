@@ -73,44 +73,53 @@
             class="start-screen__metro"
             @click.self="handleClose"
           >
-            <TransitionGroup
-              name="metro-tile"
-              tag="div"
-              class="start-screen__metro-grid"
-              @enter="onTileEnter"
-              @leave="onTileLeave"
-            >
+            <div class="start-screen__columns">
               <div
-                v-for="(tile, index) in tiles"
-                :key="tile.game_id"
-                :class="['start-screen__tile-slot', `start-screen__tile-slot--${tile.tile_size}`]"
-                :data-tile-index="index"
-                :draggable="isEditing"
-                @dragstart="onDragStart(index, $event)"
-                @dragover.prevent
-                @drop="onDrop(index)"
+                v-for="(column, columnIndex) in packedColumns"
+                :key="columnIndex"
+                class="start-screen__column"
               >
-                <MetroTile
-                  :tile="tile"
-                  :color-index="index"
-                  :editing="isEditing"
-                  @select="handleTileSelect"
-                  @crop="handleCrop"
-                  @resize="emit('resize', $event)"
-                  @remove="emit('remove', $event)"
-                />
+                <TransitionGroup
+                  name="metro-tile"
+                  tag="div"
+                  class="start-screen__column-grid"
+                  @enter="onTileEnter"
+                  @leave="onTileLeave"
+                >
+                  <div
+                    v-for="slot in column.slots"
+                    :key="slot.tile.game_id"
+                    :class="['start-screen__tile-slot', `start-screen__tile-slot--${slot.tile.tile_size}`]"
+                    :style="{ gridColumnStart: slot.col + 1, gridRowStart: slot.row + 1 }"
+                    :data-tile-index="slot.globalIndex"
+                    :draggable="isEditing"
+                    @dragstart="onDragStart(slot.globalIndex, $event)"
+                    @dragover.prevent
+                    @drop="onDrop(slot.globalIndex)"
+                  >
+                    <MetroTile
+                      :tile="slot.tile"
+                      :color-index="slot.globalIndex"
+                      :editing="isEditing"
+                      @select="handleTileSelect"
+                      @crop="handleCrop"
+                      @resize="emit('resize', $event)"
+                      @remove="emit('remove', $event)"
+                    />
+                  </div>
+                </TransitionGroup>
               </div>
 
               <div
-                v-if="isEditing"
-                class="start-screen__tile-slot start-screen__tile-slot--small start-screen__add-tile"
+                v-if="isEditing && tiles.length > 0"
+                class="start-screen__add-tile"
                 title="添加磁贴"
                 @click="addVisible = true"
               >
                 <icon-plus />
                 <span>添加</span>
               </div>
-            </TransitionGroup>
+            </div>
           </div>
 
           <div class="start-screen__desktop-hint" @click="handleClose">
@@ -174,6 +183,7 @@ import {
 import MetroTile from './MetroTile.vue'
 import TileCropModal from './TileCropModal.vue'
 import type { GameListItem, StartScreenTile, StartScreenTileSize } from '@/services/types'
+import { packStartScreenTiles } from '@/utils/start-screen-layout'
 
 const props = defineProps<{
   visible: boolean
@@ -218,6 +228,8 @@ const addCandidates = computed(() => {
   const pinned = new Set(props.tiles.map((tile) => tile.game_id))
   return props.favoritePool.filter((game) => !pinned.has(game.id))
 })
+
+const packedColumns = computed(() => packStartScreenTiles(props.tiles))
 
 const handleClose = () => {
   emit('close')
@@ -302,8 +314,8 @@ onUnmounted(() => {
 
 <style>
 /* 开始屏幕是沉浸式品牌页特例：全屏场景色、Win8 磁贴网格与动效留在组件内，不外溢到全局 token。
-   720p（1280x720）基准：单元格 110px、间距 14px，网格固定 4 行高；
-   1x1 磁贴行优先向右排列（第 N 个落在第 N 列），大磁贴 2x2 占两行高。 */
+   列模板：一列 = 1 个大正方形（2x2）+ 2 个宽长方形（2x1）+ 4 个小正方形（1x1），
+   列高 5 行、列宽 4 格，塞满就往右另开一列，列间距 50px。 */
 .start-screen-wrapper {
   position: fixed;
   inset: 0;
@@ -331,6 +343,9 @@ onUnmounted(() => {
   flex-direction: column;
   padding: 40px 56px 28px;
   color: #fff;
+  /* 列模板：一列 5 行高（大 2 行 + 宽 2 行 + 小 1 行），行高随视口高度自适应，720p 可整列放下 */
+  --start-cell: clamp(72px, 11vh, 110px);
+  --start-gap: clamp(8px, 1.2vh, 14px);
 }
 
 .start-screen__header {
@@ -385,13 +400,18 @@ onUnmounted(() => {
   scrollbar-width: thin;
 }
 
-.start-screen__metro-grid {
+.start-screen__columns {
+  display: flex;
+  align-items: flex-start;
+  gap: 50px;
+  width: max-content;
+}
+
+.start-screen__column-grid {
   display: grid;
-  grid-template-rows: repeat(4, 110px);
-  /* 行优先：1x1 磁贴先往右排，第 N 个落在第 N 列，与源码顺序一致 */
-  grid-auto-flow: row;
-  grid-auto-columns: 110px;
-  gap: 14px;
+  grid-template-columns: repeat(4, var(--start-cell));
+  grid-template-rows: repeat(5, var(--start-cell));
+  gap: var(--start-gap);
   width: max-content;
 }
 
@@ -425,6 +445,9 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 6px;
+  width: var(--start-cell);
+  height: var(--start-cell);
+  flex-shrink: 0;
   border: 2px dashed rgba(255, 255, 255, 0.45);
   border-radius: 6px;
   color: rgba(255, 255, 255, 0.75);
@@ -633,18 +656,6 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-@media (min-height: 900px) {
-  .start-screen__metro-grid {
-    grid-template-rows: repeat(5, 110px);
-  }
-}
-
-@media (min-height: 1080px) {
-  .start-screen__metro-grid {
-    grid-template-rows: repeat(6, 110px);
-  }
 }
 
 @media (max-width: 768px) {
