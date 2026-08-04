@@ -268,35 +268,8 @@ const onTileEnter = (el: Element) => {
   const element = el as HTMLElement
   const index = Number(element.dataset.tileIndex)
   if (Number.isNaN(index)) return
-
-  // Win8 入场：所有磁贴从视口中心起算位移，缓慢滑到各自的网格位置。
-  const rect = element.getBoundingClientRect()
-  const fromX = window.innerWidth / 2 - (rect.left + rect.width / 2)
-  const fromY = window.innerHeight / 2 - (rect.top + rect.height / 2)
-
-  element.style.transition = 'none'
-  element.style.transitionDelay = '0ms'
-  element.style.opacity = '0'
-  element.style.transform = `translate(${fromX}px, ${fromY}px) scale(0.55)`
-
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      element.style.transition = 'transform 820ms cubic-bezier(0.25, 0.8, 0.25, 1), opacity 340ms ease'
-      element.style.transitionDelay = `${Math.min(index, 24) * 40}ms`
-      element.style.opacity = '1'
-      element.style.transform = 'translate(0, 0) scale(1)'
-    })
-  })
-
-  const cleanup = (event: TransitionEvent) => {
-    if (event.propertyName !== 'transform') return
-    element.style.transition = ''
-    element.style.transitionDelay = ''
-    element.style.transform = ''
-    element.style.opacity = ''
-    element.removeEventListener('transitionend', cleanup)
-  }
-  element.addEventListener('transitionend', cleanup)
+  // Win8.1 磁贴层：延迟 50ms 起按序淡入，轻微上浮弹入由 CSS 过渡完成。
+  element.style.transitionDelay = `${50 + Math.min(index, 24) * 30}ms`
 }
 
 const onTileLeave = (el: Element) => {
@@ -419,11 +392,10 @@ onUnmounted(() => {
 .start-screen__tile-slot {
   min-width: 0;
   min-height: 0;
-  /* Win8 磁贴入场由 onTileEnter 内联控制（中心飞入 + 长滑行），
-     这里的 transition 作为离场/常规状态下的兜底 */
+  /* Win8.1 磁贴层：上浮 10px 弹入（back-out 轻微过冲）+ 淡入 */
   transition:
-    opacity 260ms ease,
-    transform 260ms ease;
+    opacity 280ms ease,
+    transform 340ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .start-screen__tile-slot--small {
@@ -464,7 +436,7 @@ onUnmounted(() => {
 .metro-tile-enter-from,
 .metro-tile-leave-to {
   opacity: 0;
-  transform: scale(0.55);
+  transform: translateY(10px) scale(0.96);
 }
 
 .metro-tile-enter-to {
@@ -473,13 +445,19 @@ onUnmounted(() => {
 }
 
 .metro-tile-leave-active {
+  /* 退出时磁贴先快速淡出并下压 */
   transition:
-    opacity 160ms ease,
-    transform 160ms ease;
+    opacity 140ms ease,
+    transform 160ms cubic-bezier(0.4, 0, 1, 1);
 }
 
 .metro-tile-leave-active {
   position: absolute;
+}
+
+.metro-tile-leave-to {
+  opacity: 0;
+  transform: translateY(6px) scale(0.97);
 }
 
 .start-screen__state {
@@ -521,21 +499,41 @@ onUnmounted(() => {
 }
 
 .start-screen-overlay-enter-active {
+  /* Win8.1：从"中心偏下约 1/3"的锚点由 88% 放大到 100%，ease-out 先快后慢 */
   transition:
-    opacity 260ms ease,
-    transform 340ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 350ms ease,
+    transform 350ms cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: 50% 66%;
 }
 
 .start-screen-overlay-enter-from {
   opacity: 0;
-  transform: scale(0.96);
+  transform: scale(0.88);
 }
 
 .start-screen-overlay-leave-active {
-  transition: opacity 180ms ease;
+  /* 退出：整屏向锚点"吸回" */
+  transition:
+    opacity 260ms ease,
+    transform 260ms cubic-bezier(0.4, 0, 0.6, 1);
+  transform-origin: 50% 66%;
 }
 
 .start-screen-overlay-leave-to {
+  opacity: 0;
+  transform: scale(0.94);
+}
+
+.start-screen-scrim {
+  /* 背景层比磁贴层更快定色：前 200ms 完成淡入 */
+  transition: opacity 200ms ease;
+}
+
+.start-screen-overlay-enter-from .start-screen-scrim {
+  opacity: 0;
+}
+
+.start-screen-overlay-leave-active .start-screen-scrim {
   opacity: 0;
 }
 
@@ -551,6 +549,26 @@ onUnmounted(() => {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* 性能/偏好容错：系统要求减少动效时直接瞬显，保留缩放节奏兜底 */
+@media (prefers-reduced-motion: reduce) {
+  .start-screen-overlay-enter-active,
+  .start-screen-overlay-leave-active,
+  .start-screen__tile-slot,
+  .start-screen-scrim,
+  .start-screen__header {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .start-screen-overlay-enter-from,
+  .start-screen-overlay-leave-to,
+  .metro-tile-enter-from,
+  .metro-tile-leave-to {
+    opacity: 1;
+    transform: none;
   }
 }
 
