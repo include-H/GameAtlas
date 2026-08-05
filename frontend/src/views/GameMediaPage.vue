@@ -57,6 +57,8 @@
           :logos="form.logos"
           :dragged-logo-key="draggedLogoKey"
           :drag-over-logo-key="dragOverLogoKey"
+          :dragged-video-key="draggedVideoKey"
+          :drag-over-video-key="dragOverVideoKey"
           :show-summary-selector="showSummarySelector"
           :steam-summary-search-query="steamSummarySearchQuery"
           :is-searching-steam-summary="isSearchingSteamSummary"
@@ -150,7 +152,10 @@
           @logo-drop="handleLogoDrop"
           @logo-drag-end="handleLogoDragEnd"
           @video-file-change="handleVideoFileChange"
-          @reorder-video="reorderEditableVideos($event.key, $event.direction)"
+          @video-drag-start="handleVideoDragStart"
+          @video-drag-enter="handleVideoDragEnter"
+          @video-drop="handleVideoDrop"
+          @video-drag-end="handleVideoDragEnd"
           @remove-video="removePreviewVideo"
           @open-screenshot-selector="showScreenshotSelector = true"
           @remove-screenshot="removeScreenshot"
@@ -317,6 +322,8 @@ const {
   dragOverBannerKey,
   draggedLogoKey,
   dragOverLogoKey,
+  draggedVideoKey,
+  dragOverVideoKey,
   editingLogo,
   form,
   handleBannerSearchClear,
@@ -338,6 +345,10 @@ const {
   handleLogoDragEnter,
   handleLogoDrop,
   handleLogoDragEnd,
+  handleVideoDragStart,
+  handleVideoDragEnter,
+  handleVideoDrop,
+  handleVideoDragEnd,
   handleLogoSearchClear,
   handleLogoPositionConfirm,
   handleLogoUploadError,
@@ -390,7 +401,6 @@ const {
   removeLogo,
   removePreviewVideo,
   removeScreenshot,
-  reorderEditableVideos,
   searchLogos,
   searchSteamForBanner,
   searchSteamForCover,

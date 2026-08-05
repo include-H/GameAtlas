@@ -453,62 +453,15 @@
           </div>
           <a-progress :percent="videoUploadProgress" :show-text="false" size="small" />
         </div>
-        <div v-if="previewVideos.length > 0" class="video-library-list">
-          <div
-            v-for="(video, index) in previewVideos"
-            :key="video.asset_uid || video.path"
-            class="video-library-item"
-            :class="{ 'is-primary': index === 0 }"
-          >
-            <div class="video-library-item__icon">
-              <icon-video-camera />
-            </div>
-            <div class="video-library-item__info">
-              <div class="video-library-item__title-row">
-                <span class="video-library-item__title">预告片 {{ index + 1 }}</span>
-                <a-tag v-if="index === 0" size="small" color="arcoblue">首个展示</a-tag>
-              </div>
-              <span class="video-library-item__name">{{ getVideoFileName(video.path) }}</span>
-            </div>
-            <div class="video-library-item__actions">
-              <a-button
-                class="app-text-action-btn"
-                type="text"
-                shape="circle"
-                size="small"
-                html-type="button"
-                title="上移"
-                :disabled="index === 0"
-                @click="emit('reorder-video', { key: video.asset_uid || video.path, direction: -1 })"
-              >
-                <icon-arrow-up />
-              </a-button>
-              <a-button
-                class="app-text-action-btn"
-                type="text"
-                shape="circle"
-                size="small"
-                html-type="button"
-                title="下移"
-                :disabled="index === previewVideos.length - 1"
-                @click="emit('reorder-video', { key: video.asset_uid || video.path, direction: 1 })"
-              >
-                <icon-arrow-down />
-              </a-button>
-              <a-button
-                class="app-text-action-btn"
-                type="text"
-                status="danger"
-                shape="circle"
-                size="small"
-                html-type="button"
-                title="删除预告片"
-                @click="confirmRemoveAsset('这个预告片', () => emit('remove-video', video.asset_uid))"
-              >
-                <icon-delete />
-              </a-button>
-            </div>
-          </div>
+        <div v-if="previewVideos.length > 0" class="media-card__preview media-card__preview--video">
+          <video
+            :src="previewVideos[0].path"
+            :poster="previewVideos[0].poster_path || undefined"
+            class="video-card__player"
+            controls
+            preload="metadata"
+          />
+          <div class="media-card__preview-badge">首个展示</div>
         </div>
         <div
           v-else
@@ -523,6 +476,62 @@
           <span class="media-card__empty-title">未设置预告片</span>
           <span class="media-card__empty-subtitle">上传 MP4 或 WebM 视频</span>
         </div>
+        <div
+          v-if="previewVideos.length > 0"
+          ref="videosScrollRef"
+          class="media-card__thumbs"
+          @dragover="onGridDragOver($event, videosScrollRef)"
+          @dragleave="stopGridAutoScroll"
+          @dragend="stopGridAutoScroll"
+        >
+          <div
+            v-for="(video, index) in previewVideos"
+            :key="video.asset_uid || video.path"
+            class="media-thumb media-thumb--video"
+            :class="getThumbClass(video.asset_uid || video.path, index === 0, draggedVideoKey, dragOverVideoKey)"
+            @dragenter.prevent="emit('video-drag-enter', video.asset_uid || video.path)"
+            @dragover.prevent
+            @drop.prevent="emit('video-drop', video.asset_uid || video.path)"
+          >
+            <img
+              v-if="video.poster_path"
+              :src="video.poster_path"
+              class="media-thumb--video__poster"
+              alt=""
+            />
+            <div v-else class="media-thumb--video__placeholder">
+              <icon-video-camera />
+            </div>
+            <div v-if="index === 0" class="media-thumb__badge">首个展示</div>
+            <div class="media-thumb__actions">
+              <a-button
+                class="app-text-action-btn media-action-button media-drag-handle"
+                type="text"
+                shape="circle"
+                size="small"
+                html-type="button"
+                title="拖拽排序"
+                draggable="true"
+                @dragstart="emit('video-drag-start', video.asset_uid || video.path)"
+                @dragend="emit('video-drag-end')"
+              >
+                <icon-drag-arrow />
+              </a-button>
+              <a-button
+                class="app-text-action-btn media-action-button media-action-button--danger"
+                type="text"
+                status="danger"
+                shape="circle"
+                size="small"
+                html-type="button"
+                title="删除预告片"
+                @click.stop="confirmRemoveAsset('这个预告片', () => emit('remove-video', video.asset_uid))"
+              >
+                <icon-delete />
+              </a-button>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   </div>
@@ -532,8 +541,6 @@
 import { onBeforeUnmount, ref } from 'vue'
 import { Modal } from '@arco-design/web-vue'
 import {
-  IconArrowDown,
-  IconArrowUp,
   IconDelete,
   IconDragArrow,
   IconEdit,
@@ -572,6 +579,7 @@ interface EditableScreenshot {
 interface EditableVideo {
   asset_uid?: string
   path: string
+  poster_path?: string | null
 }
 
 const emit = defineEmits<{
@@ -594,7 +602,10 @@ const emit = defineEmits<{
   'logo-drop': [key: string]
   'logo-drag-end': []
   'video-file-change': [event: Event]
-  'reorder-video': [payload: { key: string; direction: -1 | 1 }]
+  'video-drag-start': [key: string]
+  'video-drag-enter': [key: string]
+  'video-drop': [key: string]
+  'video-drag-end': []
   'remove-video': [assetUid?: string]
   'open-screenshot-selector': []
   'remove-screenshot': [clientKey: string]
@@ -626,12 +637,15 @@ defineProps<{
   dragOverBannerKey: string | null
   draggedLogoKey: string | null
   dragOverLogoKey: string | null
+  draggedVideoKey: string | null
+  dragOverVideoKey: string | null
 }>()
 
 const videoFileInput = ref<HTMLInputElement | null>(null)
 const coversScrollRef = ref<HTMLElement | null>(null)
 const bannersScrollRef = ref<HTMLElement | null>(null)
 const logosScrollRef = ref<HTMLElement | null>(null)
+const videosScrollRef = ref<HTMLElement | null>(null)
 let dragScrollRaf = 0
 
 const SCROLL_ZONE = 60
@@ -681,10 +695,6 @@ const getThumbClass = (
 
 const openVideoFilePicker = () => {
   videoFileInput.value?.click()
-}
-
-const getVideoFileName = (path: string) => {
-  return path.split(/[\\/]/).pop() || path
 }
 
 const confirmRemoveAsset = (label: string, onConfirm: () => void) => {
@@ -798,6 +808,18 @@ onBeforeUnmount(stopGridAutoScroll)
   height: clamp(180px, 22vh, 320px);
 }
 
+.media-card__preview--video {
+  height: clamp(240px, 28vh, 400px);
+}
+
+.video-card__player {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--color-media-bg);
+}
+
 .media-card__preview :deep(.arco-image),
 .media-thumb :deep(.arco-image) {
   display: flex;
@@ -902,6 +924,29 @@ onBeforeUnmount(stopGridAutoScroll)
 .media-thumb--logo {
   width: 200px;
   aspect-ratio: 16 / 9;
+}
+
+.media-thumb--video {
+  width: 220px;
+  aspect-ratio: 16 / 9;
+}
+
+.media-thumb--video__poster {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-thumb--video__placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-3);
+  background: color-mix(in srgb, var(--app-card-surface) 90%, transparent);
+  font-size: 22px;
 }
 
 .media-thumb.is-primary {

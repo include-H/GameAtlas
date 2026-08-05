@@ -133,6 +133,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.POST("/assets/cover", assetsHandler.Upload("cover"))
 	api.POST("/assets/banner", assetsHandler.Upload("banner"))
 	api.POST("/assets/video", assetsHandler.Upload("video"))
+	api.POST("/assets/poster", assetsHandler.Upload("poster"))
 	api.POST("/assets/screenshot", assetsHandler.Upload("screenshot"))
 	api.POST("/assets/logo", assetsHandler.Upload("logo"))
 	api.GET("/directory/default", directoryHandler.Default)

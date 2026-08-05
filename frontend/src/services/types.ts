@@ -131,6 +131,7 @@ export interface VideoAssetItem {
   id: number
   asset_uid: string
   path: string
+  poster_path: string | null
   sort_order: number
 }
 
@@ -245,6 +246,7 @@ export interface GameAggregateNewAsset {
   asset_uid: string
   asset_type: string
   path: string
+  poster_path?: string | null
 }
 
 export interface GameAggregateUpdateRequest {

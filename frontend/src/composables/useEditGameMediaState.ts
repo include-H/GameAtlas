@@ -57,19 +57,8 @@ export const useEditGameMediaState = (options: UseEditGameMediaStateOptions) => 
   const dragOverBannerKey = ref<string | null>(null)
   const draggedLogoKey = ref<string | null>(null)
   const dragOverLogoKey = ref<string | null>(null)
-
-  const reorderEditableVideos = (targetKey: string, direction: -1 | 1) => {
-    const videos = [...options.form.value.preview_videos]
-    const index = videos.findIndex((item) => getEditableVideoKey(item) === targetKey)
-    if (index === -1) return
-
-    const nextIndex = index + direction
-    if (nextIndex < 0 || nextIndex >= videos.length) return
-
-    const [moved] = videos.splice(index, 1)
-    videos.splice(nextIndex, 0, moved)
-    options.form.value.preview_videos = videos
-  }
+  const draggedVideoKey = ref<string | null>(null)
+  const dragOverVideoKey = ref<string | null>(null)
 
   const handleScreenshotDragStart = (clientKey: string) => {
     draggedScreenshotKey.value = clientKey
@@ -179,6 +168,33 @@ export const useEditGameMediaState = (options: UseEditGameMediaStateOptions) => 
     dragOverLogoKey.value = null
   }
 
+  const handleVideoDragStart = (key: string) => {
+    draggedVideoKey.value = key
+    dragOverVideoKey.value = key
+  }
+
+  const handleVideoDragEnter = (key: string) => {
+    if (!draggedVideoKey.value || draggedVideoKey.value === key) return
+    dragOverVideoKey.value = key
+  }
+
+  const handleVideoDrop = (key: string) => {
+    if (!draggedVideoKey.value) return
+    options.form.value.preview_videos = reorderByKey(
+      options.form.value.preview_videos,
+      draggedVideoKey.value,
+      key,
+      getEditableVideoKey,
+    )
+    draggedVideoKey.value = null
+    dragOverVideoKey.value = null
+  }
+
+  const handleVideoDragEnd = () => {
+    draggedVideoKey.value = null
+    dragOverVideoKey.value = null
+  }
+
   return {
     draggedScreenshotKey,
     dragOverScreenshotKey,
@@ -188,7 +204,8 @@ export const useEditGameMediaState = (options: UseEditGameMediaStateOptions) => 
     dragOverBannerKey,
     draggedLogoKey,
     dragOverLogoKey,
-    reorderEditableVideos,
+    draggedVideoKey,
+    dragOverVideoKey,
     handleScreenshotDragStart,
     handleScreenshotDragEnter,
     handleScreenshotDrop,
@@ -205,5 +222,9 @@ export const useEditGameMediaState = (options: UseEditGameMediaStateOptions) => 
     handleLogoDragEnter,
     handleLogoDrop,
     handleLogoDragEnd,
+    handleVideoDragStart,
+    handleVideoDragEnter,
+    handleVideoDrop,
+    handleVideoDragEnd,
   }
 }

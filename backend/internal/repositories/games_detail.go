@@ -98,7 +98,7 @@ func (r *GamesRepository) IncrementDownloads(id int64) error {
 func (r *GamesRepository) ListAllAssets(gameID int64) ([]domain.GameAsset, error) {
 	var assets []domain.GameAsset
 	err := r.db.Select(&assets, `
-		SELECT id, game_id, asset_uid, asset_type, path, sort_order, position_x, position_y, width_pct, created_at
+		SELECT id, game_id, asset_uid, asset_type, path, poster_path, sort_order, position_x, position_y, width_pct, created_at
 		FROM game_assets
 		WHERE game_id = ?
 		ORDER BY asset_type ASC, sort_order ASC, id ASC
@@ -112,7 +112,7 @@ func (r *GamesRepository) ListAllAssets(gameID int64) ([]domain.GameAsset, error
 func (r *GamesRepository) listAssetsByType(gameID int64, assetType string) ([]domain.GameAsset, error) {
 	var assets []domain.GameAsset
 	err := r.db.Select(&assets, `
-		SELECT id, game_id, asset_uid, asset_type, path, sort_order, position_x, position_y, width_pct, created_at
+		SELECT id, game_id, asset_uid, asset_type, path, poster_path, sort_order, position_x, position_y, width_pct, created_at
 		FROM game_assets
 		WHERE game_id = ? AND asset_type = ?
 		ORDER BY sort_order ASC, id ASC
@@ -157,7 +157,7 @@ func (r *GamesRepository) ListVideosByPublicIDs(publicIDs []string) ([]videoAsse
 
 	query, boundArgs, err := sqlx.In(`
 		SELECT g.public_id, g.visibility,
-			ga.id, ga.game_id, ga.asset_uid, ga.asset_type, ga.path,
+			ga.id, ga.game_id, ga.asset_uid, ga.asset_type, ga.path, ga.poster_path,
 			ga.sort_order, ga.position_x, ga.position_y, ga.width_pct, ga.created_at
 		FROM game_assets ga
 		INNER JOIN games g ON g.id = ga.game_id

@@ -18,6 +18,8 @@
       :logos="logos"
       :dragged-logo-key="draggedLogoKey"
       :drag-over-logo-key="dragOverLogoKey"
+      :dragged-video-key="draggedVideoKey"
+      :drag-over-video-key="dragOverVideoKey"
       @open-cover-selector="emit('open-cover-selector')"
       @remove-cover="(index) => emit('remove-cover', index)"
       @set-primary-cover="(index) => emit('set-primary-cover', index)"
@@ -37,7 +39,10 @@
       @logo-drop="(key) => emit('logo-drop', key)"
       @logo-drag-end="emit('logo-drag-end')"
       @video-file-change="emit('video-file-change', $event)"
-      @reorder-video="emit('reorder-video', $event)"
+      @video-drag-start="emit('video-drag-start', $event)"
+      @video-drag-enter="emit('video-drag-enter', $event)"
+      @video-drop="emit('video-drop', $event)"
+      @video-drag-end="emit('video-drag-end')"
       @remove-video="emit('remove-video', $event)"
       @open-screenshot-selector="emit('open-screenshot-selector')"
       @remove-screenshot="emit('remove-screenshot', $event)"
@@ -269,6 +274,8 @@ defineProps<{
   dragOverBannerKey: string | null
   draggedLogoKey: string | null
   dragOverLogoKey: string | null
+  draggedVideoKey: string | null
+  dragOverVideoKey: string | null
 
   showSummarySelector: boolean
   steamSummarySearchQuery: string
@@ -371,7 +378,10 @@ const emit = defineEmits<{
   'logo-drop': [key: string]
   'logo-drag-end': []
   'video-file-change': [event: Event]
-  'reorder-video': [payload: { key: string; direction: -1 | 1 }]
+  'video-drag-start': [key: string]
+  'video-drag-enter': [key: string]
+  'video-drop': [key: string]
+  'video-drag-end': []
   'remove-video': [assetUid?: string]
   'open-screenshot-selector': []
   'remove-screenshot': [clientKey: string]

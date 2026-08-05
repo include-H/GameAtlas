@@ -81,16 +81,17 @@ type MetadataGameSummary struct {
 }
 
 type GameAsset struct {
-	ID        int64    `db:"id"`
-	GameID    int64    `db:"game_id"`
-	AssetUID  string   `db:"asset_uid"`
-	AssetType string   `db:"asset_type"`
-	Path      string   `db:"path"`
-	SortOrder int      `db:"sort_order"`
-	PositionX *float64 `db:"position_x"`
-	PositionY *float64 `db:"position_y"`
-	WidthPct  *float64 `db:"width_pct"`
-	CreatedAt string   `db:"created_at"`
+	ID         int64    `db:"id"`
+	GameID     int64    `db:"game_id"`
+	AssetUID   string   `db:"asset_uid"`
+	AssetType  string   `db:"asset_type"`
+	Path       string   `db:"path"`
+	PosterPath *string  `db:"poster_path"`
+	SortOrder  int      `db:"sort_order"`
+	PositionX  *float64 `db:"position_x"`
+	PositionY  *float64 `db:"position_y"`
+	WidthPct   *float64 `db:"width_pct"`
+	CreatedAt  string   `db:"created_at"`
 }
 
 type GameFile struct {
@@ -255,9 +256,10 @@ type GameAggregateAssetsInput struct {
 }
 
 type NewAssetEntry struct {
-	AssetUID  string
-	AssetType string
-	Path      string
+	AssetUID   string
+	AssetType  string
+	Path       string
+	PosterPath *string
 }
 
 type WikiWriteInput struct {

@@ -976,3 +976,46 @@ func TestGamesServiceUpdateAggregateKeepsAssetFileReferencedByStartScreenTile(t 
 		t.Fatalf("asset file should remain while start-screen tile references it, got err=%v", err)
 	}
 }
+
+func TestGamesServiceUpdateAggregatePersistsVideoPosterPath(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	assetsDir := filepath.Join(t.TempDir(), "assets")
+	gameID := insertServicesTestGame(t, db, "aggregate-video-poster", "Video Poster", domain.GameVisibilityPublic)
+	writeServicesAssetFile(t, assetsDir, "aggregate-video-poster", "video.mp4", []byte("video"))
+	posterPath := "/assets/aggregate-video-poster/poster.jpg"
+	writeServicesAssetFile(t, assetsDir, "aggregate-video-poster", "poster.jpg", []byte("poster"))
+
+	service := newServicesAggregateService(db, config.Config{AssetsDir: assetsDir})
+	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
+		Game: domain.GameAggregateCoreUpdateInput{
+			GameCoreInput: domain.GameCoreInput{Title: "Video Poster", Visibility: domain.GameVisibilityPublic},
+		},
+		Assets: domain.GameAggregateAssetsInput{
+			VideoOrderAssetUIDs: []string{"video-1"},
+			NewAssets: []domain.NewAssetEntry{
+				{
+					AssetUID:   "video-1",
+					AssetType:  "video",
+					Path:       "/assets/aggregate-video-poster/video.mp4",
+					PosterPath: &posterPath,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("UpdateAggregate returned error: %v", err)
+	}
+
+	videos, err := repositories.NewGamesRepository(db).ListVideos(gameID)
+	if err != nil {
+		t.Fatalf("ListVideos returned error: %v", err)
+	}
+	if len(videos) != 1 {
+		t.Fatalf("len(videos) = %d, want 1", len(videos))
+	}
+	if videos[0].PosterPath == nil || *videos[0].PosterPath != posterPath {
+		t.Fatalf("PosterPath = %v, want %q", videos[0].PosterPath, posterPath)
+	}
+}

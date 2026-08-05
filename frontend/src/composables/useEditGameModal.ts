@@ -375,6 +375,7 @@ export const useEditGameModal = ({
       id: 'id' in asset ? asset.id : undefined,
       asset_uid: asset.asset_uid,
       path: asset.path,
+      poster_path: 'poster_path' in asset ? (asset.poster_path ?? null) : null,
     }
   }
 
@@ -424,7 +425,8 @@ export const useEditGameModal = ({
     dragOverBannerKey,
     draggedLogoKey,
     dragOverLogoKey,
-    reorderEditableVideos,
+    draggedVideoKey,
+    dragOverVideoKey,
     handleScreenshotDragStart,
     handleScreenshotDragEnter,
     handleScreenshotDrop,
@@ -441,6 +443,10 @@ export const useEditGameModal = ({
     handleLogoDragEnter,
     handleLogoDrop,
     handleLogoDragEnd,
+    handleVideoDragStart,
+    handleVideoDragEnter,
+    handleVideoDrop,
+    handleVideoDragEnd,
   } = useEditGameMediaState({
     form,
   })
@@ -764,6 +770,8 @@ export const useEditGameModal = ({
     dragOverBannerKey,
     draggedLogoKey,
     dragOverLogoKey,
+    draggedVideoKey,
+    dragOverVideoKey,
     filteredDeveloperOptions,
     filteredPublisherOptions,
     filteredSeriesOptions,
@@ -798,6 +806,10 @@ export const useEditGameModal = ({
     handleLogoDragEnter,
     handleLogoDragStart,
     handleLogoDrop,
+    handleVideoDragEnd,
+    handleVideoDragEnter,
+    handleVideoDragStart,
+    handleVideoDrop,
     handleScreenshotDragEnd,
     handleScreenshotDragEnter,
     handleScreenshotDragStart,
@@ -867,7 +879,6 @@ export const useEditGameModal = ({
     removeFilePath,
     removePreviewVideo,
     removeScreenshot,
-    reorderEditableVideos,
     setPrimaryCover,
     setPrimaryBanner,
     setPrimaryLogo,

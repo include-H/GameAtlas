@@ -61,10 +61,11 @@ func toGamePreviewVideosResponses(bundles []services.GamePreviewVideoBundle) []g
 		videos := make([]gameAssetResponse, 0, len(bundle.PreviewVideos))
 		for _, asset := range bundle.PreviewVideos {
 			videos = append(videos, gameAssetResponse{
-				ID:        asset.ID,
-				AssetUID:  asset.AssetUID,
-				Path:      asset.Path,
-				SortOrder: asset.SortOrder,
+				ID:         asset.ID,
+				AssetUID:   asset.AssetUID,
+				Path:       asset.Path,
+				PosterPath: asset.PosterPath,
+				SortOrder:  asset.SortOrder,
 			})
 		}
 		result = append(result, gamePreviewVideosResponse{
@@ -152,10 +153,11 @@ func toGameDetailResponse(detail *services.GameDetail, includePaths bool) gameDe
 	previewVideos := make([]gameAssetResponse, 0, len(detail.PreviewVideos))
 	for _, asset := range detail.PreviewVideos {
 		previewVideos = append(previewVideos, gameAssetResponse{
-			ID:        asset.ID,
-			AssetUID:  asset.AssetUID,
-			Path:      asset.Path,
-			SortOrder: asset.SortOrder,
+			ID:         asset.ID,
+			AssetUID:   asset.AssetUID,
+			Path:       asset.Path,
+			PosterPath: asset.PosterPath,
+			SortOrder:  asset.SortOrder,
 		})
 	}
 

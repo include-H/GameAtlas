@@ -10,6 +10,7 @@ import type {
 import { uploadAsset, type UploadedAssetResult } from '@/services/assets'
 import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
 import { getHttpErrorMessage } from '@/utils/http-error'
+import { extractVideoPoster } from '@/utils/video-poster'
 
 type AlertType = 'success' | 'warning' | 'error'
 
@@ -135,7 +136,20 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
         const uploaded = await uploadAsset('video', gameId, file, options.form.value.preview_videos.length, (percent) => {
           options.videoUploadProgress.value = percent
         })
-        appendPreviewVideo(options.createEditableVideo(uploaded))
+        const video = options.createEditableVideo(uploaded)
+        if (file.type.startsWith('video/')) {
+          try {
+            const posterBlob = await extractVideoPoster(file)
+            const posterFile = new File([posterBlob], `poster-${Date.now()}.jpg`, {
+              type: 'image/jpeg',
+            })
+            const poster = await uploadAsset('poster', gameId, posterFile)
+            video.poster_path = poster.path
+          } catch {
+            // 封面帧抽取是增强能力，失败时预告片仍可正常使用。
+          }
+        }
+        appendPreviewVideo(video)
         await options.onAssetPersisted?.()
       }
       options.videoUploadProgress.value = 100

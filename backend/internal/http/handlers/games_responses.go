@@ -113,13 +113,14 @@ type gamePreviewVideosResponse struct {
 }
 
 type gameAssetResponse struct {
-	ID        int64    `json:"id"`
-	AssetUID  string   `json:"asset_uid"`
-	Path      string   `json:"path"`
-	SortOrder int      `json:"sort_order"`
-	PositionX *float64 `json:"position_x"`
-	PositionY *float64 `json:"position_y"`
-	WidthPct  *float64 `json:"width_pct"`
+	ID         int64    `json:"id"`
+	AssetUID   string   `json:"asset_uid"`
+	Path       string   `json:"path"`
+	PosterPath *string  `json:"poster_path,omitempty"`
+	SortOrder  int      `json:"sort_order"`
+	PositionX  *float64 `json:"position_x"`
+	PositionY  *float64 `json:"position_y"`
+	WidthPct   *float64 `json:"width_pct"`
 }
 
 type metadataItemResponse struct {

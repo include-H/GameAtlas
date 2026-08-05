@@ -11,6 +11,7 @@ export interface EditGameEditableVideo {
   id?: number
   asset_uid?: string
   path: string
+  poster_path?: string | null
 }
 
 export interface EditGameEditableCover {

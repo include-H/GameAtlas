@@ -92,7 +92,12 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       }
       for (const v of options.form.value.preview_videos) {
         if (v.asset_uid && v.path) {
-          newAssets.push({ asset_uid: v.asset_uid, asset_type: 'video', path: v.path })
+          newAssets.push({
+            asset_uid: v.asset_uid,
+            asset_type: 'video',
+            path: v.path,
+            poster_path: v.poster_path || null,
+          })
         }
       }
       for (const c of options.form.value.covers) {

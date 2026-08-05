@@ -311,11 +311,12 @@ func (r *GamesRepository) diffAndDeleteAssetsTx(tx *sqlx.Tx, gameID int64, asset
 
 		// Query current DB assets of this type.
 		var currentAssets []struct {
-			Path     string         `db:"path"`
-			AssetUID sql.NullString `db:"asset_uid"`
+			Path       string         `db:"path"`
+			AssetUID   sql.NullString `db:"asset_uid"`
+			PosterPath sql.NullString `db:"poster_path"`
 		}
 		if err := tx.Select(&currentAssets, `
-			SELECT path, asset_uid FROM game_assets
+			SELECT path, asset_uid, poster_path FROM game_assets
 			WHERE game_id = ? AND asset_type = ?
 		`, gameID, assetType); err != nil {
 			return nil, fmt.Errorf("list current %s assets: %w", assetType, err)
@@ -339,6 +340,9 @@ func (r *GamesRepository) diffAndDeleteAssetsTx(tx *sqlx.Tx, gameID int64, asset
 			if current.Path != "" {
 				deletedPaths = append(deletedPaths, current.Path)
 			}
+			if posterPath := strings.TrimSpace(current.PosterPath.String); posterPath != "" {
+				deletedPaths = append(deletedPaths, posterPath)
+			}
 		}
 	}
 
@@ -356,10 +360,17 @@ func (r *GamesRepository) ensureAssetsExistTx(tx *sqlx.Tx, gameID int64, newAsse
 			continue
 		}
 
+		var posterPath any
+		if asset.PosterPath != nil {
+			trimmedPoster := strings.TrimSpace(*asset.PosterPath)
+			if trimmedPoster != "" {
+				posterPath = trimmedPoster
+			}
+		}
 		if _, err := tx.Exec(`
-			INSERT OR IGNORE INTO game_assets (game_id, asset_uid, asset_type, path, sort_order)
-			VALUES (?, ?, ?, ?, 0)
-		`, gameID, trimmedUID, trimmedType, trimmedPath); err != nil {
+			INSERT OR IGNORE INTO game_assets (game_id, asset_uid, asset_type, path, poster_path, sort_order)
+			VALUES (?, ?, ?, ?, ?, 0)
+		`, gameID, trimmedUID, trimmedType, trimmedPath, posterPath); err != nil {
 			return fmt.Errorf("insert new %s asset %s: %w", trimmedType, trimmedUID, err)
 		}
 	}

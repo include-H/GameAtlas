@@ -27,20 +27,21 @@ type gameAggregateCoreUpdateRequest struct {
 }
 
 type gameAggregateAssetsRequest struct {
-	Files                    []gameAggregateFileRequest        `json:"files"`
-	ScreenshotOrderAssetUIDs []string                          `json:"screenshot_order_asset_uids"`
-	VideoOrderAssetUIDs      []string                          `json:"video_order_asset_uids"`
-	CoverOrderAssetUIDs      []string                          `json:"cover_order_asset_uids"`
-	LogoOrderAssetUIDs       []string                          `json:"logo_order_asset_uids"`
-	BannerOrderAssetUIDs     []string                          `json:"banner_order_asset_uids"`
-	LogoPositions            []logoPositionRequest             `json:"logo_positions"`
-	NewAssets                []newAssetEntryRequest            `json:"new_assets"`
+	Files                    []gameAggregateFileRequest `json:"files"`
+	ScreenshotOrderAssetUIDs []string                   `json:"screenshot_order_asset_uids"`
+	VideoOrderAssetUIDs      []string                   `json:"video_order_asset_uids"`
+	CoverOrderAssetUIDs      []string                   `json:"cover_order_asset_uids"`
+	LogoOrderAssetUIDs       []string                   `json:"logo_order_asset_uids"`
+	BannerOrderAssetUIDs     []string                   `json:"banner_order_asset_uids"`
+	LogoPositions            []logoPositionRequest      `json:"logo_positions"`
+	NewAssets                []newAssetEntryRequest     `json:"new_assets"`
 }
 
 type newAssetEntryRequest struct {
-	AssetUID  string `json:"asset_uid"`
-	AssetType string `json:"asset_type"`
-	Path      string `json:"path"`
+	AssetUID   string  `json:"asset_uid"`
+	AssetType  string  `json:"asset_type"`
+	Path       string  `json:"path"`
+	PosterPath *string `json:"poster_path"`
 }
 
 type logoPositionRequest struct {
@@ -115,9 +116,10 @@ func (request gameAggregateAssetsRequest) toDomain() domain.GameAggregateAssetsI
 	newAssets := make([]domain.NewAssetEntry, 0, len(request.NewAssets))
 	for _, item := range request.NewAssets {
 		newAssets = append(newAssets, domain.NewAssetEntry{
-			AssetUID:  item.AssetUID,
-			AssetType: item.AssetType,
-			Path:      item.Path,
+			AssetUID:   item.AssetUID,
+			AssetType:  item.AssetType,
+			Path:       item.Path,
+			PosterPath: item.PosterPath,
 		})
 	}
 
