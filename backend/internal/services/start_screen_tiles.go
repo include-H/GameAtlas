@@ -54,6 +54,11 @@ func (s *StartScreenTilesService) Update(
 	if err != nil {
 		return nil, err
 	}
+	for i := range normalized {
+		if err := s.moveTileImagesToPermanent(&normalized[i]); err != nil {
+			return nil, err
+		}
+	}
 	if err := s.columnsRepo.Replace(normalizedColumns); err != nil {
 		return nil, err
 	}
@@ -61,6 +66,22 @@ func (s *StartScreenTilesService) Update(
 		return nil, err
 	}
 	return s.List(true)
+}
+
+// moveTileImagesToPermanent 与游戏素材编辑一致：上传只进 staging，保存布局时才把
+// 本次引用的裁剪图转正到 assets/start-screen/，未保存的裁剪图留在 staging 由启动清理兜底。
+func (s *StartScreenTilesService) moveTileImagesToPermanent(tile *domain.StartScreenTileWrite) error {
+	for _, path := range []*string{tile.ImageSmallPath, tile.ImageWidePath, tile.ImageLargePath} {
+		if path == nil || strings.TrimSpace(*path) == "" {
+			continue
+		}
+		moved, err := s.store.MoveToPermanent(*path, "start-screen")
+		if err != nil {
+			return err
+		}
+		*path = moved
+	}
+	return nil
 }
 
 // AddTile 从游戏库卡片入口追加一个磁贴到末尾；已在开始屏幕时幂等返回当前布局。
@@ -165,7 +186,8 @@ func (s *StartScreenTilesService) validateTileImagePath(path *string) (*string, 
 	return &trimmed, nil
 }
 
-// UploadTileImage 保存磁贴裁剪图到 assets/start-screen/，返回 /assets/start-screen/{uid}.{ext} 路径。
+// UploadTileImage 保存磁贴裁剪图到 staging，返回 /assets/start-screen/{uid}.{ext} 路径；
+// 文件在布局保存（Update）时才转正到 assets/start-screen/。
 func (s *StartScreenTilesService) UploadTileImage(header *multipart.FileHeader) (string, error) {
 	if s.store == nil {
 		return "", domain.ErrMissingConfig
@@ -182,5 +204,5 @@ func (s *StartScreenTilesService) UploadTileImage(header *multipart.FileHeader) 
 	if err != nil {
 		return "", normalizeAssetError(err)
 	}
-	return s.store.MoveToPermanent(stagingPath, "start-screen")
+	return stagingPath, nil
 }

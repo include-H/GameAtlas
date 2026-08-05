@@ -1,7 +1,10 @@
 package services
 
 import (
+	"bytes"
 	"errors"
+	"mime/multipart"
+	"net/textproto"
 	"os"
 	"path/filepath"
 	"strings"
@@ -157,6 +160,106 @@ func TestStartScreenTilesUpdateValidatesTileImages(t *testing.T) {
 	if len(layout.Tiles) != 1 || layout.Tiles[0].ImageSmallPath == nil || *layout.Tiles[0].ImageSmallPath != imagePath {
 		t.Fatalf("tiles = %+v, want image path %q", layout.Tiles, imagePath)
 	}
+}
+
+func TestStartScreenTilesUpdateMovesStagedImagesToPermanent(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	assetsDir := t.TempDir()
+	gameID := insertServicesTestGame(t, db, "tile-stage-move", "Tile Stage Move", domain.GameVisibilityPublic)
+
+	filename := "22222222-2222-4222-8222-222222222222.jpg"
+	stagingFile := filepath.Join(assetsDir, "_staging", filename)
+	if err := os.MkdirAll(filepath.Dir(stagingFile), 0o755); err != nil {
+		t.Fatalf("create staging dir: %v", err)
+	}
+	if err := os.WriteFile(stagingFile, []byte("fake-image"), 0o644); err != nil {
+		t.Fatalf("write staged image: %v", err)
+	}
+
+	service := NewStartScreenTilesService(
+		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewStartScreenColumnsRepository(db),
+		repositories.NewGamesRepository(db),
+		files.NewAssetStore(assetsDir),
+	)
+
+	imagePath := "/assets/start-screen/" + filename
+	layout, err := service.Update(nil, []domain.StartScreenTileWrite{{
+		GameID:         gameID,
+		TileSize:       "small",
+		ImageSmallPath: &imagePath,
+	}})
+	if err != nil {
+		t.Fatalf("Update returned error: %v", err)
+	}
+	if len(layout.Tiles) != 1 || layout.Tiles[0].ImageSmallPath == nil || *layout.Tiles[0].ImageSmallPath != imagePath {
+		t.Fatalf("tiles = %+v, want image path %q", layout.Tiles, imagePath)
+	}
+	if _, err := os.Stat(filepath.Join(assetsDir, "start-screen", filename)); err != nil {
+		t.Fatalf("permanent image missing after save: %v", err)
+	}
+	if _, err := os.Stat(stagingFile); !os.IsNotExist(err) {
+		t.Fatalf("staging image still present after save, want moved to permanent")
+	}
+}
+
+func TestStartScreenTilesUploadTileImageStagesOnly(t *testing.T) {
+	assetsDir := t.TempDir()
+	service := NewStartScreenTilesService(
+		nil,
+		nil,
+		nil,
+		files.NewAssetStore(assetsDir),
+	)
+
+	path, err := service.UploadTileImage(buildTileImageUploadHeader(t, "tile.png"))
+	if err != nil {
+		t.Fatalf("UploadTileImage returned error: %v", err)
+	}
+	if !strings.HasPrefix(path, "/assets/start-screen/") {
+		t.Fatalf("path = %q, want /assets/start-screen/ prefix", path)
+	}
+
+	filename := filepath.Base(path)
+	if _, err := os.Stat(filepath.Join(assetsDir, "_staging", filename)); err != nil {
+		t.Fatalf("staged image missing after upload: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(assetsDir, "start-screen", filename)); !os.IsNotExist(err) {
+		t.Fatalf("permanent image exists before layout save, want staged only")
+	}
+}
+
+func buildTileImageUploadHeader(t *testing.T, filename string) *multipart.FileHeader {
+	t.Helper()
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	partHeader := textproto.MIMEHeader{}
+	partHeader.Set("Content-Disposition", `form-data; name="file"; filename="`+filename+`"`)
+	partHeader.Set("Content-Type", "image/png")
+	part, err := writer.CreatePart(partHeader)
+	if err != nil {
+		t.Fatalf("CreatePart returned error: %v", err)
+	}
+	if _, err := part.Write([]byte("fake-image")); err != nil {
+		t.Fatalf("Write file part returned error: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer.Close returned error: %v", err)
+	}
+
+	form, err := multipart.NewReader(body, writer.Boundary()).ReadForm(1 << 20)
+	if err != nil {
+		t.Fatalf("ReadForm returned error: %v", err)
+	}
+	t.Cleanup(func() { _ = form.RemoveAll() })
+	files := form.File["file"]
+	if len(files) != 1 {
+		t.Fatalf("form file count = %d, want 1", len(files))
+	}
+	return files[0]
 }
 
 func TestStartScreenTilesAddTileAppendsAtEnd(t *testing.T) {

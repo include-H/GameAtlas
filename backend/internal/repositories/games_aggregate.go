@@ -349,8 +349,10 @@ func (r *GamesRepository) diffAndDeleteAssetsTx(tx *sqlx.Tx, gameID int64, asset
 	return deletedPaths, nil
 }
 
-// ensureAssetsExistTx inserts DB rows for new assets that don't exist yet.
-// It matches by asset_uid — if a row with that UID already exists for this game, it's skipped.
+// ensureAssetsExistTx inserts DB rows for new assets that don't exist yet and
+// backfills poster_path on rows that already exist. It matches by asset_uid —
+// existing rows are skipped by INSERT OR IGNORE, then poster_path is filled in
+// only when currently empty (older trailers without a poster frame).
 func (r *GamesRepository) ensureAssetsExistTx(tx *sqlx.Tx, gameID int64, newAssets []domain.NewAssetEntry) error {
 	for _, asset := range newAssets {
 		trimmedUID := strings.TrimSpace(asset.AssetUID)
@@ -360,9 +362,10 @@ func (r *GamesRepository) ensureAssetsExistTx(tx *sqlx.Tx, gameID int64, newAsse
 			continue
 		}
 
+		trimmedPoster := ""
 		var posterPath any
 		if asset.PosterPath != nil {
-			trimmedPoster := strings.TrimSpace(*asset.PosterPath)
+			trimmedPoster = strings.TrimSpace(*asset.PosterPath)
 			if trimmedPoster != "" {
 				posterPath = trimmedPoster
 			}
@@ -372,6 +375,19 @@ func (r *GamesRepository) ensureAssetsExistTx(tx *sqlx.Tx, gameID int64, newAsse
 			VALUES (?, ?, ?, ?, ?, 0)
 		`, gameID, trimmedUID, trimmedType, trimmedPath, posterPath); err != nil {
 			return fmt.Errorf("insert new %s asset %s: %w", trimmedType, trimmedUID, err)
+		}
+
+		// 已存在的资产行（INSERT OR IGNORE 跳过）只补 poster_path，且仅在
+		// 当前为空时写入，避免覆盖已有封面。前端上传新视频时走 INSERT 分支，
+		// 这里主要是为老预告片补生成封面帧的聚合更新路径。
+		if trimmedPoster != "" {
+			if _, err := tx.Exec(`
+				UPDATE game_assets SET poster_path = ?
+				WHERE game_id = ? AND asset_uid = ? AND asset_type = ?
+				  AND (poster_path IS NULL OR trim(poster_path) = '')
+			`, trimmedPoster, gameID, trimmedUID, trimmedType); err != nil {
+				return fmt.Errorf("update %s asset %s poster_path: %w", trimmedType, trimmedUID, err)
+			}
 		}
 	}
 	return nil

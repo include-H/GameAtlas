@@ -281,6 +281,8 @@ const handleClose = () => {
     endDrag()
     return
   }
+  // 编辑中禁用空白处/ESC 退出，避免误操作丢掉编辑现场；只能通过"取消/保存"离开。
+  if (props.isEditing) return
   emit('close')
 }
 

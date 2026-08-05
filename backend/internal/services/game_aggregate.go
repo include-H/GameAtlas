@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hao/game/internal/config"
@@ -112,6 +113,13 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 	for _, asset := range input.Assets.NewAssets {
 		if _, err := s.assetStore.MoveToPermanent(asset.Path, game.PublicID); err != nil {
 			return nil, nil, fmt.Errorf("move staging asset to permanent: %w", err)
+		}
+		// 预告片封面帧同样从 staging 移入正式目录；否则会被启动时的
+		// CleanStaging（1 小时过期）清理掉。
+		if asset.PosterPath != nil && strings.TrimSpace(*asset.PosterPath) != "" {
+			if _, err := s.assetStore.MoveToPermanent(*asset.PosterPath, game.PublicID); err != nil {
+				return nil, nil, fmt.Errorf("move staging poster to permanent: %w", err)
+			}
 		}
 	}
 
