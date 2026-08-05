@@ -20,6 +20,12 @@
   color: var(--color-danger-6);
 }
 
+.media-tab-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 0 10px;
+}
+
 :deep(.arco-btn.arco-btn-text.arco-btn-status-danger:hover) {
   background-color: color-mix(in srgb, var(--color-danger-6) 10%, transparent);
 }
@@ -916,4 +922,3 @@
 .edit-modal-tabs :deep(.arco-tabs-pane) {
   padding-top: 4px;
 }
-

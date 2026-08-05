@@ -79,6 +79,7 @@ declare module 'vue' {
     GameRowSection: typeof import('./components/dashboard/GameRowSection.vue')['default']
     LogoSelectorModal: typeof import('./components/edit-game/import-modals/LogoSelectorModal.vue')['default']
     MarkdownRenderer: typeof import('./components/MarkdownRenderer.vue')['default']
+    MediaManagementPanel: typeof import('./components/edit-game/MediaManagementPanel.vue')['default']
     MediaScreenshotSection: typeof import('./components/edit-game/MediaScreenshotSection.vue')['default']
     MetroTile: typeof import('./components/start-screen/MetroTile.vue')['default']
     PendingOverview: typeof import('./components/dashboard/PendingOverview.vue')['default']

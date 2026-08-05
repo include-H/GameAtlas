@@ -48,6 +48,18 @@
               </template>
               编辑
             </a-button>
+
+            <a-button
+              v-if="canEdit"
+              class="app-text-action-btn"
+              type="text"
+              @click="router.push({ name: 'game-media', params: { publicId: game.public_id } })"
+            >
+              <template #icon>
+                <icon-image />
+              </template>
+              素材管理
+            </a-button>
           </div>
         </div>
       </div>
@@ -251,6 +263,7 @@ import { useGameDetailView } from '@/composables/useGameDetailView'
 import {
   IconEdit,
   IconLeft,
+  IconImage,
   IconDownload,
   IconHeart,
   IconHeartFill

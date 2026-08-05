@@ -42,6 +42,21 @@ export const gameDetailRoute = {
 } as RouteRecordRaw
 
 /**
+ * Standalone media management route
+ */
+export const gameMediaRoute = {
+  path: '/games/:publicId/media',
+  name: 'game-media',
+  component: () => import('@/views/GameMediaPage.vue'),
+  meta: {
+    title: '素材管理',
+    requiresAdmin: true,
+    hideInMenu: true,
+    activeMenu: 'games',
+  },
+} as RouteRecordRaw
+
+/**
  * Pending center route
  */
 export const pendingCenterRoute = {
