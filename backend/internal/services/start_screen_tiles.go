@@ -10,10 +10,10 @@ import (
 )
 
 type StartScreenTilesService struct {
-	tilesRepo *repositories.StartScreenTilesRepository
+	tilesRepo   *repositories.StartScreenTilesRepository
 	columnsRepo *repositories.StartScreenColumnsRepository
-	gamesRepo *repositories.GamesRepository
-	store     *files.AssetStore
+	gamesRepo   *repositories.GamesRepository
+	store       *files.AssetStore
 }
 
 func NewStartScreenTilesService(
@@ -23,10 +23,10 @@ func NewStartScreenTilesService(
 	store *files.AssetStore,
 ) *StartScreenTilesService {
 	return &StartScreenTilesService{
-		tilesRepo: tilesRepo,
+		tilesRepo:   tilesRepo,
 		columnsRepo: columnsRepo,
-		gamesRepo: gamesRepo,
-		store:     store,
+		gamesRepo:   gamesRepo,
+		store:       store,
 	}
 }
 
@@ -73,6 +73,17 @@ func (s *StartScreenTilesService) AddTile(tile domain.StartScreenTileWrite) (*do
 		return nil, domain.ErrValidation
 	}
 	if _, err := s.tilesRepo.Append(normalized[0]); err != nil {
+		return nil, err
+	}
+	return s.List(true)
+}
+
+// RemoveTile 从开始屏幕移除一个游戏的磁贴；不存在时幂等返回当前布局。
+func (s *StartScreenTilesService) RemoveTile(gameID int64) (*domain.StartScreenLayout, error) {
+	if gameID <= 0 {
+		return nil, domain.ErrValidation
+	}
+	if _, err := s.tilesRepo.RemoveByGameID(gameID); err != nil {
 		return nil, err
 	}
 	return s.List(true)

@@ -71,7 +71,7 @@
               <icon-heart-fill v-else />
             </template>
           </a-button>
-          <a-dropdown v-if="isAdmin">
+          <a-dropdown v-if="isAdmin && (canDelete || canAddToStartScreen)">
             <a-button
               class="app-text-action-btn"
               type="text"
@@ -83,13 +83,13 @@
               </template>
             </a-button>
             <template #content>
-              <a-doption v-if="hasAddToStartScreen" @click="handleAddToStartScreen">
+              <a-doption v-if="canAddToStartScreen" @click="handleStartScreenToggle">
                 <template #icon>
                   <icon-apps />
                 </template>
-                添加到开始屏幕
+                {{ isOnStartScreen ? '从开始菜单移除' : '添加到开始屏幕' }}
               </a-doption>
-              <a-doption @click="handleDelete" style="color: rgb(var(--danger-6));">
+              <a-doption v-if="canDelete" @click="handleDelete" style="color: rgb(var(--danger-6));">
                 <template #icon>
                   <icon-delete />
                 </template>
@@ -105,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, useAttrs } from 'vue'
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { GameListItem, TimelineGame } from '@/services/types'
 import { useAuthStore } from '@/stores/auth'
@@ -121,17 +121,21 @@ interface Props {
   game: (GameListItem | TimelineGame) & { isFavorite?: boolean }
   isList?: boolean
   coverOnly?: boolean
+  canAddToStartScreen?: boolean
+  canDelete?: boolean
+  isOnStartScreen?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isList: false,
   coverOnly: false,
+  canAddToStartScreen: false,
+  canDelete: false,
+  isOnStartScreen: false,
 })
 
 const authStore = useAuthStore()
 const { isAdmin } = storeToRefs(authStore)
-const attrs = useAttrs()
-const hasAddToStartScreen = computed(() => typeof attrs.onAddToStartScreen === 'function')
 
 const emit = defineEmits<{
   view: [id: string]
@@ -139,6 +143,7 @@ const emit = defineEmits<{
   'toggle-favorite': [id: string]
   delete: [id: string]
   'add-to-start-screen': [id: number]
+  'remove-from-start-screen': [id: number]
 }>()
 
 const handleView = () => {
@@ -161,7 +166,11 @@ const handleDelete = () => {
   emit('delete', props.game.public_id)
 }
 
-const handleAddToStartScreen = () => {
+const handleStartScreenToggle = () => {
+  if (props.isOnStartScreen) {
+    emit('remove-from-start-screen', props.game.id)
+    return
+  }
   emit('add-to-start-screen', props.game.id)
 }
 

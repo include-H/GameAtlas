@@ -71,6 +71,19 @@ func (r *StartScreenTilesRepository) Replace(tiles []domain.StartScreenTileWrite
 	return nil
 }
 
+// RemoveByGameID 删除指定游戏的磁贴；不存在时返回 false。
+func (r *StartScreenTilesRepository) RemoveByGameID(gameID int64) (bool, error) {
+	result, err := r.db.Exec(`DELETE FROM start_screen_tiles WHERE game_id = ?`, gameID)
+	if err != nil {
+		return false, fmt.Errorf("remove start screen tile: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("read removed start screen tile rows: %w", err)
+	}
+	return rows > 0, nil
+}
+
 // Append 在末尾追加一个磁贴；game_id 已存在时不做任何修改并返回 false。
 func (r *StartScreenTilesRepository) Append(tile domain.StartScreenTileWrite) (bool, error) {
 	var maxOrder sql.NullInt64

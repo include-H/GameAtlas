@@ -52,8 +52,8 @@ func TestStartScreenTilesUpdatePersistsOrderAndSizes(t *testing.T) {
 	layout, err := service.Update(
 		[]domain.StartScreenColumnWrite{{Name: "第一列"}},
 		[]domain.StartScreenTileWrite{
-		{GameID: secondID, TileSize: "wide"},
-		{GameID: firstID, TileSize: "large"},
+			{GameID: secondID, TileSize: "wide"},
+			{GameID: firstID, TileSize: "large"},
 		},
 	)
 	if err != nil {
@@ -217,6 +217,52 @@ func TestStartScreenTilesAddTileRejectsInvalidInput(t *testing.T) {
 	}
 	if _, err := service.AddTile(domain.StartScreenTileWrite{GameID: 999999, TileSize: "small"}); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("missing game error = %v, want ErrNotFound", err)
+	}
+}
+
+func TestStartScreenTilesRemoveTile(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	firstID := insertServicesTestGame(t, db, "tile-rm-a", "Tile Remove A", domain.GameVisibilityPublic)
+	secondID := insertServicesTestGame(t, db, "tile-rm-b", "Tile Remove B", domain.GameVisibilityPublic)
+
+	service := NewStartScreenTilesService(
+		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewStartScreenColumnsRepository(db),
+		repositories.NewGamesRepository(db),
+		files.NewAssetStore(t.TempDir()),
+	)
+
+	if _, err := service.Update(
+		[]domain.StartScreenColumnWrite{{Name: "第一列"}},
+		[]domain.StartScreenTileWrite{
+			{GameID: firstID, TileSize: "small"},
+			{GameID: secondID, TileSize: "wide"},
+		},
+	); err != nil {
+		t.Fatalf("initial Update returned error: %v", err)
+	}
+
+	layout, err := service.RemoveTile(firstID)
+	if err != nil {
+		t.Fatalf("RemoveTile returned error: %v", err)
+	}
+	if len(layout.Tiles) != 1 || layout.Tiles[0].GameID != secondID {
+		t.Fatalf("after RemoveTile = %d tiles, want only second game", len(layout.Tiles))
+	}
+
+	// 移除不存在的磁贴：幂等，返回当前布局。
+	layout, err = service.RemoveTile(firstID)
+	if err != nil {
+		t.Fatalf("idempotent RemoveTile returned error: %v", err)
+	}
+	if len(layout.Tiles) != 1 {
+		t.Fatalf("idempotent RemoveTile returned %d tiles, want 1", len(layout.Tiles))
+	}
+
+	if _, err := service.RemoveTile(0); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("invalid RemoveTile error = %v, want ErrValidation", err)
 	}
 }
 

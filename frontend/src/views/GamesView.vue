@@ -160,11 +160,15 @@
         >
           <game-card
             :game="game"
+            can-add-to-start-screen
+            can-delete
+            :is-on-start-screen="startScreenGameIds.has(game.id)"
             @view="viewGame"
             @view-series="viewSeries"
             @toggle-favorite="toggleFavorite"
             @delete="handleDelete($event, game.title)"
             @add-to-start-screen="handleAddToStartScreen"
+            @remove-from-start-screen="handleRemoveFromStartScreen"
           />
         </div>
       </div>
@@ -179,11 +183,15 @@
           <game-card
             :game="game"
             is-list
+            can-add-to-start-screen
+            can-delete
+            :is-on-start-screen="startScreenGameIds.has(game.id)"
             @view="viewGame"
             @view-series="viewSeries"
             @toggle-favorite="toggleFavorite"
             @delete="handleDelete($event, game.title)"
             @add-to-start-screen="handleAddToStartScreen"
+            @remove-from-start-screen="handleRemoveFromStartScreen"
           />
         </a-col>
       </a-row>
@@ -245,6 +253,7 @@
 </template>
 
 <script setup lang="ts">
+import { onActivated, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
@@ -254,6 +263,7 @@ import GameCard from '@/components/GameCard.vue'
 import AddGameModal from '@/components/AddGameModal.vue'
 import { useGamesView } from '@/composables/useGamesView'
 import startScreenService from '@/services/start-screen.service'
+import type { StartScreenLayout } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import { IconApps, IconHeart, IconHeartFill, IconList, IconLock, IconPlus, IconSearch, IconSort, IconTrophy } from '@arco-design/web-vue/es/icon'
 
@@ -268,14 +278,42 @@ const authStore = useAuthStore()
 const uiStore = useUiStore()
 const { isAdmin } = storeToRefs(authStore)
 
+const startScreenGameIds = ref<Set<number>>(new Set())
+
+const syncStartScreenLayout = (layout: StartScreenLayout) => {
+  startScreenGameIds.value = new Set(layout.tiles.map((tile) => tile.game_id))
+}
+
+const refreshStartScreenTiles = async () => {
+  if (!isAdmin.value) return
+  try {
+    syncStartScreenLayout(await startScreenService.getTiles())
+  } catch {
+    // 开始屏幕状态加载失败时保持当前状态，不打断游戏库浏览
+  }
+}
+
 const handleAddToStartScreen = async (gameId: number) => {
   try {
-    await startScreenService.addTile(gameId, 'small')
+    syncStartScreenLayout(await startScreenService.addTile(gameId, 'small'))
     uiStore.addAlert('已添加到开始屏幕', 'success')
   } catch (error) {
     uiStore.addAlert(`添加到开始屏幕失败：${getHttpErrorMessage(error, '未知错误')}`, 'error')
   }
 }
+
+const handleRemoveFromStartScreen = async (gameId: number) => {
+  try {
+    syncStartScreenLayout(await startScreenService.removeTile(gameId))
+    uiStore.addAlert('已从开始菜单移除', 'success')
+  } catch (error) {
+    uiStore.addAlert(`从开始菜单移除失败：${getHttpErrorMessage(error, '未知错误')}`, 'error')
+  }
+}
+
+onActivated(() => {
+  void refreshStartScreenTiles()
+})
 
 const {
   clearFilters,

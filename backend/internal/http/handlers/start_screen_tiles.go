@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -101,6 +102,25 @@ func (h *StartScreenTilesHandler) AddTile(c *gin.Context) {
 		return
 	}
 	writeJSONSuccess(c, http.StatusCreated, toStartScreenLayoutResponse(result))
+}
+
+func (h *StartScreenTilesHandler) RemoveTile(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
+
+	gameID, err := strconv.ParseInt(c.Param("gameId"), 10, 64)
+	if err != nil || gameID <= 0 {
+		writeJSONError(c, http.StatusBadRequest, "无效的游戏 ID")
+		return
+	}
+
+	result, err := h.service.RemoveTile(gameID)
+	if err != nil {
+		writeServiceError(c, err, "从开始屏幕移除失败")
+		return
+	}
+	writeJSONSuccess(c, http.StatusOK, toStartScreenLayoutResponse(result))
 }
 
 func (h *StartScreenTilesHandler) UploadImage(c *gin.Context) {

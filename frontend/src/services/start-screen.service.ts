@@ -1,4 +1,4 @@
-import { get, post, put } from './api'
+import { del, get, post, put } from './api'
 import type {
   ApiEnvelope,
   StartScreenLayout,
@@ -28,6 +28,14 @@ const startScreenService = {
       game_id: gameId,
       tile_size: tileSize,
     })
+    return {
+      columns: response.data?.columns ?? [],
+      tiles: response.data?.tiles ?? [],
+    }
+  },
+
+  async removeTile(gameId: number): Promise<StartScreenLayout> {
+    const response = await del<ApiEnvelope<StartScreenLayout>>(`/start-screen/tiles/${gameId}`)
     return {
       columns: response.data?.columns ?? [],
       tiles: response.data?.tiles ?? [],
