@@ -43,6 +43,7 @@ const SUPPORTED_ROUTE_NAMES = new Set([
   'games',
   'games-timeline',
   'game-detail',
+  'game-media',
   'pending-center',
   'series-library',
   'series-detail',
