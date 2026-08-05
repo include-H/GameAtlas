@@ -170,7 +170,7 @@ onBeforeUnmount(() => {
 .media-block {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  flex: 0 0 auto;
   gap: 10px;
   min-width: 0;
 }
@@ -197,7 +197,8 @@ onBeforeUnmount(() => {
 }
 
 .media-frame--screenshots {
-  flex: 1;
+  flex: 0 0 126px;
+  height: 126px;
   min-height: 126px;
 }
 
@@ -275,6 +276,7 @@ onBeforeUnmount(() => {
   gap: 10px;
   width: max-content;
   min-width: 100%;
+  padding-top: 6px;
 }
 
 .screenshot-thumb {

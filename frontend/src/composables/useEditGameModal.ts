@@ -121,13 +121,10 @@ export const useEditGameModal = ({
   const logoPath = computed(() => editingLogo.value?.path || '')
 
   const openLogoSelector = () => {
+    editingLogoKey.value = form.value.logos[0]
+      ? (form.value.logos[0].asset_uid || form.value.logos[0].path)
+      : null
     logoInitialTab.value = 'import'
-    showLogoSelector.value = true
-  }
-
-  const openLogoPositionEditor = (key: string) => {
-    editingLogoKey.value = key
-    logoInitialTab.value = 'position'
     showLogoSelector.value = true
   }
 
@@ -676,6 +673,7 @@ export const useEditGameModal = ({
     removeScreenshot,
     removePreviewVideo,
     handleLogoPositionConfirm,
+    handleLogoPositionChange,
     resetVideoUploadState,
   } = useEditGameAssets({
     form,
@@ -866,7 +864,6 @@ export const useEditGameModal = ({
     editingLogoKey,
     logoInitialTab,
     openLogoSelector,
-    openLogoPositionEditor,
     logoBannerSrc,
     logoPath,
     releaseDate,
@@ -877,6 +874,7 @@ export const useEditGameModal = ({
     removePreviewVideo,
     removeScreenshot,
     handleLogoPositionConfirm,
+    handleLogoPositionChange,
     rules,
     screenshotPreviewUrl,
     screenshotSearchUrl,

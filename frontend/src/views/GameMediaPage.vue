@@ -1,6 +1,6 @@
 <template>
   <div class="game-media-page">
-    <header class="game-media-page__header">
+    <header class="game-media-page__header glass-header">
       <div class="game-media-page__heading">
         <a-button
           class="app-text-action-btn game-media-page__back"
@@ -16,11 +16,24 @@
         </h1>
       </div>
       <div class="game-media-page__actions">
-        <a-button class="app-text-action-btn" type="text" html-type="button" @click="goBack">
-          取消
-        </a-button>
-        <a-button type="primary" html-type="button" :loading="isSubmitting" @click="handleSubmit">
+        <a-button
+          class="app-text-action-btn"
+          type="text"
+          html-type="button"
+          :disabled="isSubmitting"
+          @click="handleSave"
+        >
+          <template #icon><icon-save /></template>
           保存
+        </a-button>
+        <a-button
+          type="primary"
+          html-type="button"
+          :loading="isSubmitting"
+          @click="handleSaveAndExit"
+        >
+          <template #icon><icon-save /></template>
+          保存并退出
         </a-button>
       </div>
     </header>
@@ -160,7 +173,7 @@
           @screenshot-drop="handleScreenshotDrop"
           @screenshot-drag-end="handleScreenshotDragEnd"
           @open-logo-selector="openLogoSelector"
-          @open-logo-position-editor="openLogoPositionEditor"
+          @logo-position-change="handleLogoPositionChange"
           @remove-logo="removeLogo"
           @update:show-summary-selector="showSummarySelector = $event"
           @update:steam-summary-search-query="steamSummarySearchQuery = $event"
@@ -238,13 +251,14 @@
         />
       </template>
     </main>
+
   </div>
 </template>
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { IconLeft } from '@arco-design/web-vue/es/icon'
+import { IconLeft, IconSave } from '@arco-design/web-vue/es/icon'
 import gamesService from '@/services/games.service'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -276,10 +290,19 @@ const modalProps = reactive({
   game,
 })
 
+const pendingSaveMode = ref<'stay' | 'exit'>('exit')
+
+const goBack = () => {
+  router.push({ name: 'game-detail', params: { publicId: publicId.value } })
+}
+
 const modalEmit = (event: 'update:visible' | 'success' | 'sync', _value?: boolean) => {
-  if (event === 'success') {
-    void loadGame()
+  if (event !== 'success') return
+  if (pendingSaveMode.value === 'exit') {
+    goBack()
+    return
   }
+  void loadGame()
 }
 
 const {
@@ -343,6 +366,7 @@ const {
   handleVideoDragEnd,
   handleLogoSearchClear,
   handleLogoPositionConfirm,
+  handleLogoPositionChange,
   handleLogoUploadError,
   handleLogoUploadSuccess,
   handleScreenshotDragEnd,
@@ -387,7 +411,6 @@ const {
   logoUploadAction,
   logoUploadData,
   openLogoSelector,
-  openLogoPositionEditor,
   removeBanner,
   removeCover,
   removeLogo,
@@ -456,8 +479,14 @@ const {
   activeTab,
 })
 
-const goBack = () => {
-  router.push({ name: 'game-detail', params: { publicId: publicId.value } })
+const handleSave = () => {
+  pendingSaveMode.value = 'stay'
+  void handleSubmit()
+}
+
+const handleSaveAndExit = () => {
+  pendingSaveMode.value = 'exit'
+  void handleSubmit()
 }
 
 const syncAmbientBackground = () => {
@@ -526,13 +555,14 @@ if (!authStore.isAdmin) {
   position: sticky;
   top: 0;
   z-index: 20;
-  padding: 12px 0;
-  background: var(--color-bg-1);
+  margin: -16px -24px 0;
+  padding: 12px 24px;
 }
 
 .game-media-page__heading {
   display: flex;
   align-items: center;
+  flex: 1 1 auto;
   gap: 12px;
   min-width: 0;
 }
@@ -554,8 +584,11 @@ if (!authStore.isAdmin) {
 .game-media-page__actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  margin-left: auto;
+  flex-wrap: wrap;
   gap: 8px;
-  flex-shrink: 0;
 }
 
 .game-media-page__body {
@@ -584,6 +617,21 @@ if (!authStore.isAdmin) {
 @media (max-width: 768px) {
   .game-media-page {
     padding: 12px 12px 24px;
+  }
+
+  .game-media-page__header {
+    align-items: flex-start;
+    margin: -12px -12px 0;
+    padding: 12px;
+  }
+
+  .game-media-page__heading,
+  .game-media-page__actions {
+    width: 100%;
+  }
+
+  .game-media-page__actions {
+    justify-content: flex-end;
   }
 }
 </style>

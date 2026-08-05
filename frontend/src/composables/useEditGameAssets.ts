@@ -6,6 +6,7 @@ import type {
   EditGameEditableScreenshot,
   EditGameEditableVideo,
   EditGameForm,
+  LogoPositionChange,
 } from '@/utils/edit-game-form'
 import { uploadAsset, type UploadedAssetResult } from '@/services/assets'
 import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
@@ -175,15 +176,25 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     options.form.value.logos = options.form.value.logos.filter((_, i) => i !== index)
   }
 
-  const handleLogoPositionConfirm = (payload: { position_x: number; position_y: number; width_pct: number; logo_visible: boolean }) => {
+  const applyLogoPositionChange = (key: string, payload: Omit<LogoPositionChange, 'key'>) => {
     const logo = options.form.value.logos.find(
-      (item) => (item.asset_uid || item.path) === options.editingLogoKey.value,
+      (item) => (item.asset_uid || item.path) === key,
     )
     if (!logo) return
     logo.position_x = payload.position_x
     logo.position_y = payload.position_y
     logo.width_pct = payload.width_pct
     options.form.value.logo_visible = payload.logo_visible
+  }
+
+  const handleLogoPositionConfirm = (payload: Omit<LogoPositionChange, 'key'>) => {
+    const key = options.editingLogoKey.value
+    if (!key) return
+    applyLogoPositionChange(key, payload)
+  }
+
+  const handleLogoPositionChange = (change: LogoPositionChange) => {
+    applyLogoPositionChange(change.key, change)
   }
 
   const removeBanner = (index: number) => {
@@ -226,6 +237,7 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     removeScreenshot,
     removePreviewVideo,
     handleLogoPositionConfirm,
+    handleLogoPositionChange,
     resetVideoUploadState,
   }
 }

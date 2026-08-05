@@ -35,6 +35,14 @@ export interface EditGameEditableLogo {
   width_pct: number | null
 }
 
+export interface LogoPositionChange {
+  key: string
+  position_x: number
+  position_y: number
+  width_pct: number
+  logo_visible: boolean
+}
+
 export interface EditGameForm {
   title: string
   title_alt: string

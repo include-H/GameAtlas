@@ -20,6 +20,7 @@
       :drag-over-logo-key="dragOverLogoKey"
       :dragged-video-key="draggedVideoKey"
       :drag-over-video-key="dragOverVideoKey"
+      :logo-visible="logoVisible"
       @open-cover-selector="emit('open-cover-selector')"
       @remove-cover="(index) => emit('remove-cover', index)"
       @cover-drag-start="(key) => emit('cover-drag-start', key)"
@@ -49,7 +50,7 @@
       @screenshot-drop="emit('screenshot-drop', $event)"
       @screenshot-drag-end="emit('screenshot-drag-end')"
       @open-logo-selector="emit('open-logo-selector')"
-      @open-logo-position-editor="emit('open-logo-position-editor', $event)"
+      @logo-position-change="emit('logo-position-change', $event)"
       @remove-logo="emit('remove-logo', $event)"
     />
 
@@ -209,6 +210,7 @@ import GameMediaSection from './GameMediaSection.vue'
 import EditGameAssetImportModals from './EditGameAssetImportModals.vue'
 import type { ImportSource } from '@/composables/useSteamImport'
 import type { SteamGameSearchResult } from '@/services/types'
+import type { LogoPositionChange } from '@/utils/edit-game-form'
 import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
 
 interface EditableCover {
@@ -376,7 +378,7 @@ const emit = defineEmits<{
   'screenshot-drop': [clientKey: string]
   'screenshot-drag-end': []
   'open-logo-selector': []
-  'open-logo-position-editor': [key: string]
+  'logo-position-change': [payload: LogoPositionChange]
   'remove-logo': [index: number]
 
   'update:show-summary-selector': [value: boolean]

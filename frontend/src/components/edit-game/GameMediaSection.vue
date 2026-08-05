@@ -84,8 +84,8 @@
               >
                 <icon-drag-arrow />
               </a-button>
-                      <a-button
-                        class="app-text-action-btn media-action-button media-action-button--danger"
+              <a-button
+                class="app-text-action-btn media-action-button media-action-button--danger"
                 type="text"
                 status="danger"
                 shape="circle"
@@ -186,8 +186,8 @@
               >
                 <icon-drag-arrow />
               </a-button>
-                      <a-button
-                        class="app-text-action-btn media-action-button media-action-button--danger"
+              <a-button
+                class="app-text-action-btn media-action-button media-action-button--danger"
                 type="text"
                 status="danger"
                 shape="circle"
@@ -287,16 +287,51 @@
         </div>
       </header>
       <div class="media-card__body">
-        <div v-if="logos.length > 0" class="media-card__preview media-card__preview--logo">
-          <a-image
-            :src="logos[0].path"
-            width="100%"
-            height="100%"
-            fit="contain"
-            hide-footer
-            :preview="false"
-          />
-          <div v-if="logos.length > 1" class="media-card__preview-badge">主 Logo</div>
+        <div
+          v-if="logos.length > 0"
+          class="media-card__preview media-card__preview--logo"
+          @pointerdown="handleLogoPositionPointerDown"
+        >
+          <div ref="logoPositionEditorRef" class="logo-position-editor__canvas">
+            <img
+              v-if="logoBannerSrc"
+              :src="logoBannerSrc"
+              class="logo-position-editor__banner"
+              alt=""
+              draggable="false"
+            />
+            <div v-else class="logo-position-editor__banner-empty">
+              <icon-image />
+              <span>无横幅图</span>
+            </div>
+            <img
+              v-if="logoVisible"
+              :src="logos[0].path"
+              class="logo-position-editor__logo"
+              :style="logoPositionStyle"
+              alt=""
+              draggable="false"
+            />
+            <div v-else class="logo-position-editor__logo-hidden">Logo 已隐藏</div>
+          </div>
+          <div class="logo-position-editor__controls">
+            <span class="logo-position-editor__label">大小</span>
+            <a-slider
+              :model-value="logoWidthPct"
+              :min="10"
+              :max="80"
+              :step="1"
+              :style="{ flex: 1 }"
+              @update:model-value="handleLogoWidthChange"
+            />
+            <span class="logo-position-editor__value">{{ logoWidthPct }}%</span>
+            <span class="logo-position-editor__label">显示 Logo</span>
+            <a-switch
+              :model-value="logoVisible"
+              size="small"
+              @update:model-value="handleLogoVisibilityChange"
+            />
+          </div>
         </div>
         <div
           v-else
@@ -336,7 +371,6 @@
               hide-footer
               :preview="false"
             />
-            <div v-if="index === 0" class="media-thumb__badge">主 Logo</div>
             <div class="media-thumb__actions">
               <a-button
                 class="app-text-action-btn media-action-button media-drag-handle"
@@ -352,18 +386,7 @@
                 <icon-drag-arrow />
               </a-button>
               <a-button
-                class="app-text-action-btn media-action-button"
-                type="text"
-                shape="circle"
-                size="small"
-                html-type="button"
-                title="调整位置"
-                @click.stop="emit('open-logo-position-editor', logo.asset_uid || logo.path)"
-              >
-                <icon-edit />
-              </a-button>
-                      <a-button
-                        class="app-text-action-btn media-action-button media-action-button--danger"
+                class="app-text-action-btn media-action-button media-action-button--danger"
                 type="text"
                 status="danger"
                 shape="circle"
@@ -502,17 +525,17 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { Modal } from '@arco-design/web-vue'
 import {
   IconDelete,
   IconDragArrow,
-  IconEdit,
   IconImage,
   IconPlus,
   IconUpload,
   IconVideoCamera,
 } from '@arco-design/web-vue/es/icon'
+import type { LogoPositionChange } from '@/utils/edit-game-form'
 import MediaScreenshotSection from './MediaScreenshotSection.vue'
 
 interface EditableCover {
@@ -575,11 +598,11 @@ const emit = defineEmits<{
   'screenshot-drop': [clientKey: string]
   'screenshot-drag-end': []
   'open-logo-selector': []
-  'open-logo-position-editor': [key: string]
+  'logo-position-change': [payload: LogoPositionChange]
   'remove-logo': [index: number]
 }>()
 
-defineProps<{
+const props = defineProps<{
   title: string
   covers: EditableCover[]
   banners: EditableBanner[]
@@ -599,6 +622,7 @@ defineProps<{
   dragOverLogoKey: string | null
   draggedVideoKey: string | null
   dragOverVideoKey: string | null
+  logoVisible: boolean
 }>()
 
 const videoFileInput = ref<HTMLInputElement | null>(null)
@@ -606,7 +630,83 @@ const coversScrollRef = ref<HTMLElement | null>(null)
 const bannersScrollRef = ref<HTMLElement | null>(null)
 const logosScrollRef = ref<HTMLElement | null>(null)
 const videosScrollRef = ref<HTMLElement | null>(null)
+const logoPositionEditorRef = ref<HTMLElement | null>(null)
 let dragScrollRaf = 0
+let logoPositionDragCleanup: (() => void) | null = null
+
+const primaryLogo = computed(() => props.logos[0] ?? null)
+const logoBannerSrc = computed(() => props.banners[0]?.path || props.covers[0]?.path || '')
+const logoPositionX = computed(() => primaryLogo.value?.position_x ?? 50)
+const logoPositionY = computed(() => primaryLogo.value?.position_y ?? 50)
+const logoWidthPct = computed(() => primaryLogo.value?.width_pct ?? 30)
+const logoPositionStyle = computed(() => ({
+  left: `${logoPositionX.value}%`,
+  top: `${logoPositionY.value}%`,
+  width: `${logoWidthPct.value}%`,
+  transform: 'translate(-50%, -50%)',
+}))
+
+const emitLogoPositionChange = (changes: Partial<Omit<LogoPositionChange, 'key'>>) => {
+  const logo = primaryLogo.value
+  if (!logo) return
+  emit('logo-position-change', {
+    key: logo.asset_uid || logo.path,
+    position_x: changes.position_x ?? logoPositionX.value,
+    position_y: changes.position_y ?? logoPositionY.value,
+    width_pct: changes.width_pct ?? logoWidthPct.value,
+    logo_visible: changes.logo_visible ?? props.logoVisible,
+  })
+}
+
+const handleLogoWidthChange = (value: number | number[]) => {
+  const width = Array.isArray(value) ? value[0] : value
+  if (typeof width === 'number' && Number.isFinite(width)) {
+    emitLogoPositionChange({ width_pct: width })
+  }
+}
+
+const handleLogoVisibilityChange = (value: string | number | boolean) => {
+  if (typeof value === 'boolean') {
+    emitLogoPositionChange({ logo_visible: value })
+  }
+}
+
+const stopLogoPositionDrag = () => {
+  logoPositionDragCleanup?.()
+  logoPositionDragCleanup = null
+}
+
+const handleLogoPositionPointerDown = (event: PointerEvent) => {
+  const target = event.target as HTMLElement
+  if (!props.logoVisible || !target.classList.contains('logo-position-editor__logo')) return
+  const editor = logoPositionEditorRef.value
+  if (!editor) return
+
+  event.preventDefault()
+  stopLogoPositionDrag()
+
+  const startMouseX = event.clientX
+  const startMouseY = event.clientY
+  const startPosX = logoPositionX.value
+  const startPosY = logoPositionY.value
+  const rect = editor.getBoundingClientRect()
+
+  const onMove = (moveEvent: PointerEvent) => {
+    const dx = moveEvent.clientX - startMouseX
+    const dy = moveEvent.clientY - startMouseY
+    const nextX = Math.round(Math.min(95, Math.max(5, startPosX + (dx / rect.width) * 100)) * 10) / 10
+    const nextY = Math.round(Math.min(95, Math.max(5, startPosY + (dy / rect.height) * 100)) * 10) / 10
+    emitLogoPositionChange({ position_x: nextX, position_y: nextY })
+  }
+
+  const onUp = () => stopLogoPositionDrag()
+  window.addEventListener('pointermove', onMove)
+  window.addEventListener('pointerup', onUp, { once: true })
+  logoPositionDragCleanup = () => {
+    window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerup', onUp)
+  }
+}
 
 const SCROLL_ZONE = 60
 const SCROLL_SPEED = 12
@@ -668,14 +768,18 @@ const confirmRemoveAsset = (label: string, onConfirm: () => void) => {
   })
 }
 
-onBeforeUnmount(stopGridAutoScroll)
+onBeforeUnmount(() => {
+  stopLogoPositionDrag()
+  stopGridAutoScroll()
+})
 </script>
 
 <style scoped>
 .media-page {
   display: grid;
-  grid-template-columns: repeat(11, minmax(0, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 12px;
+  align-items: stretch;
   padding: 2px;
 }
 
@@ -749,14 +853,17 @@ onBeforeUnmount(stopGridAutoScroll)
 .media-card__body {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  flex: 1 1 auto;
   gap: 8px;
   padding: 8px 12px 12px;
   min-width: 0;
+  min-height: 0;
 }
 
 .media-card__preview {
   position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
   border: 1px solid var(--app-card-border);
   border-radius: 10px;
@@ -769,24 +876,126 @@ onBeforeUnmount(stopGridAutoScroll)
   justify-content: center;
 }
 
-.media-card__preview--cover {
-  aspect-ratio: 2 / 3;
-}
-
-.media-card__preview--banner {
+.media-card__preview--banner,
+.media-card__preview--screenshot {
+  height: auto;
   aspect-ratio: 16 / 9;
 }
 
-.media-card__preview--screenshot {
-  height: clamp(160px, 20vh, 260px);
+.media-card__preview--cover {
+  height: clamp(240px, 30vh, 380px);
+}
+
+.media-card__preview--logo,
+.media-card__preview--video {
+  height: clamp(180px, 22vh, 300px);
 }
 
 .media-card__preview--logo {
-  height: clamp(120px, 16vh, 220px);
+  flex: 0 0 auto;
+  height: auto;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 8px;
 }
 
-.media-card__preview--video {
-  height: clamp(340px, 38vh, 500px);
+.logo-position-editor__canvas {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 0;
+  width: 100%;
+  aspect-ratio: 460 / 215;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--color-media-bg);
+  user-select: none;
+  touch-action: none;
+}
+
+.logo-position-editor__banner {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.logo-position-editor__banner-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 4px;
+  color: var(--color-text-4);
+  font-size: 24px;
+}
+
+.logo-position-editor__banner-empty span,
+.logo-position-editor__logo-hidden {
+  font-size: 12px;
+}
+
+.logo-position-editor__logo {
+  position: absolute;
+  max-width: 90%;
+  max-height: 90%;
+  height: auto;
+  object-fit: contain;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  z-index: 2;
+}
+
+.logo-position-editor__logo:active {
+  cursor: grabbing;
+}
+
+.logo-position-editor__logo-hidden {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: var(--color-text-2);
+  background: var(--app-scrim-light);
+  white-space: nowrap;
+}
+
+.logo-position-editor__controls {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  gap: 8px;
+  min-height: 28px;
+  color: var(--color-text-2);
+}
+
+.logo-position-editor__controls :deep(.arco-slider) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.logo-position-editor__label {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--color-text-3);
+  white-space: nowrap;
+}
+
+.logo-position-editor__value {
+  flex-shrink: 0;
+  min-width: 34px;
+  font-size: 12px;
+  color: var(--color-text-2);
+  text-align: right;
 }
 
 .video-card__player {
@@ -827,6 +1036,7 @@ onBeforeUnmount(stopGridAutoScroll)
 }
 
 .media-card__empty {
+  flex: 1 1 auto;
   width: 100%;
   min-height: 180px;
   border: 1px dashed var(--color-border-2);
@@ -871,8 +1081,8 @@ onBeforeUnmount(stopGridAutoScroll)
 .media-card__thumbs {
   display: flex;
   gap: 8px;
-  flex: 1;
-  align-items: stretch;
+  flex: 0 0 auto;
+  align-items: flex-start;
   min-height: 0;
   overflow-x: auto;
   padding: 4px 2px;
@@ -882,6 +1092,7 @@ onBeforeUnmount(stopGridAutoScroll)
 .media-thumb {
   position: relative;
   flex: 0 0 auto;
+  align-self: flex-start;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--app-card-border);
@@ -892,7 +1103,7 @@ onBeforeUnmount(stopGridAutoScroll)
 }
 
 .media-thumb--cover {
-  width: 108px;
+  width: 84px;
   aspect-ratio: 2 / 3;
 }
 
@@ -965,6 +1176,8 @@ onBeforeUnmount(stopGridAutoScroll)
   align-items: center;
   justify-content: center;
   gap: 4px;
+  padding: 0;
+  border-radius: 0;
   background: var(--app-scrim);
   opacity: 0;
   transition: opacity 0.18s ease;
@@ -1086,9 +1299,12 @@ onBeforeUnmount(stopGridAutoScroll)
 @media (hover: none) {
   .media-thumb__actions {
     opacity: 1;
+    inset: auto 0 0;
+    min-height: 40px;
     align-items: flex-end;
-    background: linear-gradient(180deg, transparent 0%, var(--app-scrim) 60%);
     padding: 6px;
+    box-sizing: border-box;
+    background: linear-gradient(180deg, transparent 0%, var(--app-scrim) 60%);
   }
 }
 
