@@ -292,6 +292,11 @@ func (s *AssetReconcileService) deleteUnreferencedFiles(referenced map[string]st
 		if !isKnownAssetFile(d.Name()) {
 			return nil
 		}
+		// Derived thumbnails live next to their original and must never be
+		// quarantined independently of it.
+		if strings.Contains(d.Name(), ".thumb.") {
+			return nil
+		}
 
 		assetPath, pathErr := fsPathToAssetPath(baseDir, path)
 		if pathErr != nil {

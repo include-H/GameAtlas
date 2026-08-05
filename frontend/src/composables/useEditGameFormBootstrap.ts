@@ -75,7 +75,9 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
         options.createEditableCover(asset),
       ),
       banners,
-      logo: game.logos[0] ? options.createEditableLogo(game.logos[0]) : null,
+      logos: game.logos.map((asset) =>
+        options.createEditableLogo(asset),
+      ),
       logo_visible: game.logo_visible ?? true,
       preview_videos: game.preview_videos.map((asset) =>
         options.createEditableVideo(asset),

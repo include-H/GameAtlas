@@ -6,10 +6,11 @@
     :width="modalWidth"
     :footer="false"
     :align-center="false"
+    :body-style="modalBodyStyle"
     @cancel="handleCancel"
   >
     <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" @submit="handleSubmit">
-      <a-tabs default-active-key="info" class="edit-modal-tabs">
+      <a-tabs v-model:active-key="activeTab" class="edit-modal-tabs">
         <a-tab-pane key="info" title="游戏信息">
           <a-row :gutter="12">
             <a-col :span="12">
@@ -203,14 +204,31 @@
             :screenshots="form.screenshots"
             :dragged-screenshot-key="draggedScreenshotKey"
             :drag-over-screenshot-key="dragOverScreenshotKey"
-            :logo-image="form.logo?.path || ''"
+            :dragged-cover-key="draggedCoverKey"
+            :drag-over-cover-key="dragOverCoverKey"
+            :dragged-banner-key="draggedBannerKey"
+            :drag-over-banner-key="dragOverBannerKey"
+            :logos="form.logos"
+            :dragged-logo-key="draggedLogoKey"
+            :drag-over-logo-key="dragOverLogoKey"
             @open-cover-selector="showCoverSelector = true"
             @remove-cover="removeCover"
             @set-primary-cover="setPrimaryCover"
-            @reorder-cover="reorderEditableCovers($event.key, $event.direction)"
+            @cover-drag-start="handleCoverDragStart"
+            @cover-drag-enter="handleCoverDragEnter"
+            @cover-drop="handleCoverDrop"
+            @cover-drag-end="handleCoverDragEnd"
             @open-banner-selector="showBannerSelector = true"
             @remove-banner="removeBanner"
             @set-primary-banner="handleSetPrimaryBanner"
+            @banner-drag-start="handleBannerDragStart"
+            @banner-drag-enter="handleBannerDragEnter"
+            @banner-drop="handleBannerDrop"
+            @banner-drag-end="handleBannerDragEnd"
+            @logo-drag-start="handleLogoDragStart"
+            @logo-drag-enter="handleLogoDragEnter"
+            @logo-drop="handleLogoDrop"
+            @logo-drag-end="handleLogoDragEnd"
             @video-file-change="handleVideoFileChange"
             @reorder-video="reorderEditableVideos($event.key, $event.direction)"
             @remove-video="removePreviewVideo"
@@ -220,8 +238,10 @@
             @screenshot-drag-enter="handleScreenshotDragEnter"
             @screenshot-drop="handleScreenshotDrop"
             @screenshot-drag-end="handleScreenshotDragEnd"
-            @open-logo-selector="showLogoSelector = true"
+            @open-logo-selector="openLogoSelector"
+            @open-logo-position-editor="openLogoPositionEditor"
             @remove-logo="removeLogo"
+            @set-primary-logo="setPrimaryLogo"
           />
         </a-tab-pane>
       </a-tabs>
@@ -310,11 +330,12 @@
       :logo-preview-url="logoPreviewUrl"
       :is-downloading-logo="isDownloadingLogo"
       :logo-banner-src="logoBannerSrc"
-      :logo-path="logoPath"
-      :logo-position-x="primaryLogo?.position_x ?? null"
-      :logo-position-y="primaryLogo?.position_y ?? null"
-      :logo-width-pct="primaryLogo?.width_pct ?? null"
+      :logo-path="editingLogo?.path ?? ''"
+      :logo-position-x="editingLogo?.position_x ?? null"
+      :logo-position-y="editingLogo?.position_y ?? null"
+      :logo-width-pct="editingLogo?.width_pct ?? null"
       :logo-visible="form.logo_visible ?? true"
+      :logo-initial-tab="logoInitialTab"
       @update:show-summary-selector="showSummarySelector = $event"
       @update:steam-summary-search-query="steamSummarySearchQuery = $event"
       @search-summary="searchSteamForSummary"
@@ -409,7 +430,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useUiStore } from '@/stores/ui'
 import type { AdminGameDetail } from '@/services/types'
 import FileBrowserModal from '@/components/FileBrowserModal.vue'
@@ -437,6 +458,12 @@ const emit = defineEmits<{
 const uiStore = useUiStore()
 const formRef = ref()
 const isSubmitting = ref(false)
+const activeTab = ref('info')
+const modalBodyStyle = computed(() => (
+  activeTab.value === 'media'
+    ? { maxHeight: 'calc(85vh - 120px)', overflowY: 'auto' as const }
+    : undefined
+))
 
 const {
   CREATE_DEVELOPER_OPTION_VALUE,
@@ -471,6 +498,12 @@ const {
   downloadSelectedLogo,
   draggedScreenshotKey,
   dragOverScreenshotKey,
+  draggedCoverKey,
+  dragOverCoverKey,
+  draggedBannerKey,
+  dragOverBannerKey,
+  draggedLogoKey,
+  dragOverLogoKey,
   filteredDeveloperOptions,
   filteredPublisherOptions,
   filteredSeriesOptions,
@@ -488,6 +521,18 @@ const {
   handleCoverSearchClear,
   handleCoverUploadError,
   handleCoverUploadSuccess,
+  handleCoverDragStart,
+  handleCoverDragEnter,
+  handleCoverDrop,
+  handleCoverDragEnd,
+  handleBannerDragStart,
+  handleBannerDragEnter,
+  handleBannerDrop,
+  handleBannerDragEnd,
+  handleLogoDragStart,
+  handleLogoDragEnter,
+  handleLogoDrop,
+  handleLogoDragEnd,
   handleDeveloperSearch,
   handleDeveloperSelection,
   handleFilePathItemUpdate,
@@ -544,10 +589,13 @@ const {
   logoUploadAction,
   logoUploadData,
   logoBannerSrc,
-  logoPath,
+  editingLogo,
+  logoInitialTab,
+  openLogoSelector,
+  openLogoPositionEditor,
   modalWidth,
   openFileBrowser,
-  primaryLogo,
+  setPrimaryLogo,
   releaseDate,
   removeBanner,
   removeCover,
@@ -555,7 +603,6 @@ const {
   removeLogo,
   removePreviewVideo,
   removeScreenshot,
-  reorderEditableCovers,
   reorderEditableVideos,
   setPrimaryCover,
   rules,
@@ -632,6 +679,7 @@ const {
   uiStore,
   formRef,
   isSubmitting,
+  activeTab,
 })
 
 const showBannerCropModal = ref(false)

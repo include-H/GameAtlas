@@ -3,6 +3,10 @@ package files
 import (
 	"errors"
 	"fmt"
+	"image"
+	_ "image/gif"
+	"image/jpeg"
+	_ "image/png"
 	"io"
 	"mime"
 	"os"
@@ -10,6 +14,9 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	xdraw "golang.org/x/image/draw"
+	_ "golang.org/x/image/webp"
 )
 
 var allowedImageContentTypes = map[string]string{
@@ -30,6 +37,8 @@ var ErrInvalidAssetName = errors.New("invalid asset name")
 var ErrInvalidRemoteURL = errors.New("invalid remote image url")
 
 var uuidAssetNamePattern = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$`)
+
+const thumbnailMaxWidth = 480
 
 // AssetStore 只负责本地素材的 staging/permanent 两阶段存取。
 // 远程素材下载已收敛到 /api/steam/proxy + 前端重新上传的单一路径，
@@ -113,6 +122,7 @@ func (s *AssetStore) MoveToPermanent(permanentPath string, gamePublicID string) 
 	if _, err := os.Stat(permFile); err == nil {
 		// Clean up staging file if it exists.
 		_ = os.Remove(stagingFile)
+		s.moveThumbnailToPermanent(permDir, permanentPath)
 		return "/" + filepath.ToSlash(filepath.Join("assets", dir, filename)), nil
 	}
 
@@ -120,8 +130,26 @@ func (s *AssetStore) MoveToPermanent(permanentPath string, gamePublicID string) 
 	if err := os.Rename(stagingFile, permFile); err != nil {
 		return "", fmt.Errorf("move staging to permanent: %w", err)
 	}
+	s.moveThumbnailToPermanent(permDir, permanentPath)
 
 	return "/" + filepath.ToSlash(filepath.Join("assets", dir, filename)), nil
+}
+
+// moveThumbnailToPermanent moves the deterministic thumbnail file from staging
+// into the permanent game directory when one was generated.
+func (s *AssetStore) moveThumbnailToPermanent(permDir string, permanentPath string) {
+	thumbURL := ThumbURLFor(permanentPath)
+	thumbFilename := filepath.Base(thumbURL)
+	thumbStaging := filepath.Join(s.baseDir, "_staging", thumbFilename)
+	thumbPerm := filepath.Join(permDir, thumbFilename)
+
+	if _, err := os.Stat(thumbPerm); err == nil {
+		_ = os.Remove(thumbStaging)
+		return
+	}
+	if _, err := os.Stat(thumbStaging); err == nil {
+		_ = os.Rename(thumbStaging, thumbPerm)
+	}
 }
 
 // BaseDir returns the root directory for asset storage.
@@ -173,7 +201,74 @@ func (s *AssetStore) DeleteAsset(assetPath string) error {
 	if err := os.Remove(targetPath); err != nil {
 		return err
 	}
+	if thumbPath, thumbErr := s.resolveAssetPath(ThumbURLFor(assetPath)); thumbErr == nil {
+		_ = os.Remove(thumbPath)
+	}
 	return nil
+}
+
+// ThumbURLFor returns the deterministic thumbnail URL for an asset path.
+// Thumbnails are only generated for images; video paths fall back to themselves.
+func ThumbURLFor(assetPath string) string {
+	ext := filepath.Ext(assetPath)
+	if ext == "" {
+		return assetPath
+	}
+	return strings.TrimSuffix(assetPath, ext) + ".thumb.jpg"
+}
+
+// WriteThumbnail generates a small JPEG thumbnail next to the original asset.
+// It is a no-op for videos and for images already at or below the max width.
+func (s *AssetStore) WriteThumbnail(assetPath string) error {
+	srcPath, err := s.resolveAssetPath(assetPath)
+	if err != nil {
+		return err
+	}
+	if _, statErr := os.Stat(srcPath); os.IsNotExist(statErr) {
+		srcPath = filepath.Join(s.baseDir, "_staging", filepath.Base(srcPath))
+	}
+	thumbPath, err := s.resolveAssetPath(ThumbURLFor(assetPath))
+	if err != nil {
+		return err
+	}
+	if _, statErr := os.Stat(thumbPath); os.IsNotExist(statErr) {
+		thumbPath = filepath.Join(s.baseDir, "_staging", filepath.Base(thumbPath))
+	}
+	return generateThumbnail(srcPath, thumbPath)
+}
+
+func generateThumbnail(srcPath string, dstPath string) error {
+	src, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	img, _, err := image.Decode(src)
+	if err != nil {
+		return err
+	}
+
+	bounds := img.Bounds()
+	if bounds.Dx() <= thumbnailMaxWidth {
+		return nil
+	}
+
+	width := thumbnailMaxWidth
+	height := bounds.Dy() * width / bounds.Dx()
+	if height < 1 {
+		height = 1
+	}
+
+	dst := image.NewRGBA(image.Rect(0, 0, width, height))
+	xdraw.CatmullRom.Scale(dst, dst.Bounds(), img, bounds, xdraw.Over, nil)
+
+	out, err := os.Create(dstPath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	return jpeg.Encode(out, dst, &jpeg.Options{Quality: 80})
 }
 
 // AssetExists treats invalid or escaped asset paths as missing so callers can safely prune

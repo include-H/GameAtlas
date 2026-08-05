@@ -147,6 +147,7 @@
     :logo-position-y="logoPositionY"
     :logo-width-pct="logoWidthPct"
     :logo-visible="logoVisible"
+    :initial-tab="logoInitialTab"
     @update:visible="emit('update:show-logo-selector', $event)"
     @source-change="emit('source-change-logo', $event)"
     @update:logo-search-query="emit('update:logo-search-query', $event)"
@@ -256,6 +257,7 @@ defineProps<{
   logoPositionY: number | null
   logoWidthPct: number | null
   logoVisible: boolean
+  logoInitialTab: 'import' | 'position'
 }>()
 
 const emit = defineEmits<{

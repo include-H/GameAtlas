@@ -31,7 +31,7 @@ interface ScreenshotCandidatesData {
 }
 
 interface UseSteamImportOptions {
-  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'developer_ids' | 'publisher_ids' | 'covers' | 'logo' | 'banners' | 'screenshots'>>
+  form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'developer_ids' | 'publisher_ids' | 'covers' | 'logos' | 'banners' | 'screenshots'>>
   gameId: Ref<number | undefined>
   getWikiContent: () => string
   uploadAssetFromUrl: (
@@ -502,7 +502,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     isDownloadingLogos.value = true
     try {
       const uploaded = await options.uploadAssetFromUrl(selectedLogoImage.value, 'logo')
-      options.form.value.logo = options.createEditableLogo(uploaded)
+      options.form.value.logos.push(options.createEditableLogo(uploaded))
       await options.onAssetPersisted?.()
       showLogoSelector.value = false
       backToLogoGameSearch()
@@ -523,7 +523,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     isDownloadingLogo.value = true
     try {
       const uploaded = await options.uploadAssetFromUrl(logoSearchUrl.value, 'logo')
-      options.form.value.logo = options.createEditableLogo(uploaded)
+      options.form.value.logos.push(options.createEditableLogo(uploaded))
       await options.onAssetPersisted?.()
       showLogoSelector.value = false
       logoSearchUrl.value = ''

@@ -904,3 +904,75 @@ func TestGamesServiceUpdateAggregateDeletesFirstVideoAndKeepsNextVideo(t *testin
 		t.Fatalf("expected fallback video file to remain, got err=%v", err)
 	}
 }
+
+func TestGamesServiceUpdateAggregateKeepsSharedAssetFileWhenOtherGameReferencesIt(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	assetsDir := filepath.Join(t.TempDir(), "assets")
+	sharedPath := "/assets/shared/cover.png"
+	gameA := insertServicesTestGame(t, db, "aggregate-shared-a", "Shared A", domain.GameVisibilityPublic)
+	gameB := insertServicesTestGame(t, db, "aggregate-shared-b", "Shared B", domain.GameVisibilityPublic)
+	insertServicesGameAsset(t, db, gameA, "shared-a", "cover", sharedPath, 0)
+	insertServicesGameAsset(t, db, gameB, "shared-b", "cover", sharedPath, 0)
+	writeServicesAssetFile(t, assetsDir, "shared", "cover.png", []byte("cover"))
+
+	service := newServicesAggregateService(db, config.Config{AssetsDir: assetsDir})
+	_, _, err := service.Update(gameA, domain.GameAggregateUpdateInput{
+		Game: domain.GameAggregateCoreUpdateInput{
+			GameCoreInput: domain.GameCoreInput{Title: "Shared A Updated", Visibility: domain.GameVisibilityPublic},
+		},
+		Assets: domain.GameAggregateAssetsInput{
+			CoverOrderAssetUIDs: []string{},
+		},
+	})
+	if err != nil {
+		t.Fatalf("UpdateAggregate returned error: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(assetsDir, "shared", "cover.png")); err != nil {
+		t.Fatalf("shared asset file should remain while game B references it, got err=%v", err)
+	}
+
+	referenced, err := repositories.NewGamesRepository(db).IsAssetPathReferenced(sharedPath)
+	if err != nil {
+		t.Fatalf("IsAssetPathReferenced returned error: %v", err)
+	}
+	if !referenced {
+		t.Fatal("shared path should still be referenced by game B")
+	}
+}
+
+func TestGamesServiceUpdateAggregateKeepsAssetFileReferencedByStartScreenTile(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	assetsDir := filepath.Join(t.TempDir(), "assets")
+	assetPath := "/assets/tile-game/cover.png"
+	gameID := insertServicesTestGame(t, db, "aggregate-tile-game", "Tile Game", domain.GameVisibilityPublic)
+	insertServicesGameAsset(t, db, gameID, "tile-cover", "cover", assetPath, 0)
+	writeServicesAssetFile(t, assetsDir, "tile-game", "cover.png", []byte("cover"))
+	if _, err := db.Exec(`
+		INSERT INTO start_screen_tiles (game_id, tile_size, image_small_path)
+		VALUES (?, 'small', ?)
+	`, gameID, assetPath); err != nil {
+		t.Fatalf("insert start screen tile: %v", err)
+	}
+
+	service := newServicesAggregateService(db, config.Config{AssetsDir: assetsDir})
+	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
+		Game: domain.GameAggregateCoreUpdateInput{
+			GameCoreInput: domain.GameCoreInput{Title: "Tile Game Updated", Visibility: domain.GameVisibilityPublic},
+		},
+		Assets: domain.GameAggregateAssetsInput{
+			CoverOrderAssetUIDs: []string{},
+		},
+	})
+	if err != nil {
+		t.Fatalf("UpdateAggregate returned error: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(assetsDir, "tile-game", "cover.png")); err != nil {
+		t.Fatalf("asset file should remain while start-screen tile references it, got err=%v", err)
+	}
+}

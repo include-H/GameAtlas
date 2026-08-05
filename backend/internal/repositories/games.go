@@ -54,6 +54,33 @@ func NewGamesRepository(db *sqlx.DB) *GamesRepository {
 	return &GamesRepository{db: db}
 }
 
+// IsAssetPathReferenced reports whether an asset file path is still referenced
+// by any game row, game asset row, or start-screen tile after the originating
+// game_assets row has been detached. Physical deletion must be skipped when true.
+func (r *GamesRepository) IsAssetPathReferenced(assetPath string) (bool, error) {
+	trimmed := strings.TrimSpace(assetPath)
+	if trimmed == "" {
+		return false, nil
+	}
+
+	var count int
+	if err := r.db.Get(&count, `
+		SELECT COUNT(*) FROM (
+			SELECT 1 FROM games
+			WHERE cover_image = ? OR banner_image = ?
+			UNION ALL
+			SELECT 1 FROM game_assets WHERE path = ?
+			UNION ALL
+			SELECT 1 FROM start_screen_tiles
+			WHERE image_small_path = ? OR image_wide_path = ? OR image_large_path = ?
+		) refs
+	`, trimmed, trimmed, trimmed, trimmed, trimmed, trimmed); err != nil {
+		return false, fmt.Errorf("check asset path references: %w", err)
+	}
+
+	return count > 0, nil
+}
+
 func (r *GamesRepository) DB() *sqlx.DB {
 	return r.db
 }

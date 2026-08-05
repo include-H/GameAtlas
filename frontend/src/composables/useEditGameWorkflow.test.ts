@@ -69,7 +69,7 @@ const buildOptions = () => {
         summary: '',
         banners: [],
         covers: [],
-        logo: null,
+        logos: [],
         logo_visible: true,
         preview_videos: [],
         screenshots: [],

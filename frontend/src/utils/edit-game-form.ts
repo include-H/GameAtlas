@@ -47,7 +47,8 @@ export interface EditGameForm {
   covers: EditGameEditableCover[]
   // The first item is always the primary banner.
   banners: EditGameEditableBanner[]
-  logo: EditGameEditableLogo | null
+  // The first item is always the primary logo.
+  logos: EditGameEditableLogo[]
   logo_visible: boolean
   // The first item is always the canonical preview video.
   preview_videos: EditGameEditableVideo[]
@@ -66,7 +67,7 @@ export const createEmptyEditGameForm = (): EditGameForm => ({
   summary: '',
   covers: [],
   banners: [],
-  logo: null,
+  logos: [],
   logo_visible: true,
   preview_videos: [],
   screenshots: [],

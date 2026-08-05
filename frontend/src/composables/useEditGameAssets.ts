@@ -20,12 +20,13 @@ interface UploadResponseLike {
 }
 
 interface UseEditGameAssetsOptions {
-  form: Ref<Pick<EditGameForm, 'covers' | 'logo' | 'logo_visible' | 'banners' | 'screenshots' | 'preview_videos'>>
+  form: Ref<Pick<EditGameForm, 'covers' | 'logos' | 'logo_visible' | 'banners' | 'screenshots' | 'preview_videos'>>
   gameId: Ref<number | undefined>
   showCoverSelector: Ref<boolean>
   showBannerSelector: Ref<boolean>
   showScreenshotSelector: Ref<boolean>
   showLogoSelector: Ref<boolean>
+  editingLogoKey: Ref<string | null>
   isUploadingVideo: Ref<boolean>
   videoUploadProgress: Ref<number>
   videoUploadFileName: Ref<string>
@@ -67,7 +68,7 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
   const handleLogoUploadSuccess = (fileItem: FileItem) => {
     const response = fileItem.response as UploadResponseLike | undefined
     if (response?.success && response.data) {
-      options.form.value.logo = options.createEditableLogo(response.data)
+      options.form.value.logos.push(options.createEditableLogo(response.data))
       void options.onAssetPersisted?.()
       options.showLogoSelector.value = false
       options.addAlert('Logo 上传成功', 'success')
@@ -162,14 +163,24 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     options.form.value.covers = covers
   }
 
-  const removeLogo = () => {
-    const logo = options.form.value.logo
+  const removeLogo = (index: number) => {
+    const logo = options.form.value.logos[index]
     if (!logo) return
-    options.form.value.logo = null
+    options.form.value.logos = options.form.value.logos.filter((_, i) => i !== index)
+  }
+
+  const setPrimaryLogo = (index: number) => {
+    if (index <= 0 || index >= options.form.value.logos.length) return
+    const logos = [...options.form.value.logos]
+    const [moved] = logos.splice(index, 1)
+    logos.splice(0, 0, moved)
+    options.form.value.logos = logos
   }
 
   const handleLogoPositionConfirm = (payload: { position_x: number; position_y: number; width_pct: number; logo_visible: boolean }) => {
-    const logo = options.form.value.logo
+    const logo = options.form.value.logos.find(
+      (item) => (item.asset_uid || item.path) === options.editingLogoKey.value,
+    )
     if (!logo) return
     logo.position_x = payload.position_x
     logo.position_y = payload.position_y
@@ -226,6 +237,7 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     removePreviewVideo,
     setPrimaryCover,
     setPrimaryBanner,
+    setPrimaryLogo,
     handleLogoPositionConfirm,
     resetVideoUploadState,
   }

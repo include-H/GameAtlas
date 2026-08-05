@@ -202,6 +202,7 @@ interface Props {
   logoPositionY: number | null
   logoWidthPct: number | null
   logoVisible: boolean
+  initialTab: 'import' | 'position'
 }
 
 const props = defineProps<Props>()
@@ -242,7 +243,7 @@ watch(() => props.visible, (v) => {
     logoPosY.value = props.logoPositionY ?? 50
     logoPosWidth.value = props.logoWidthPct ?? 30
     logoVisible.value = props.logoVisible ?? true
-    logoTabKey.value = 'import'
+    logoTabKey.value = props.initialTab
   }
 })
 

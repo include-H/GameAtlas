@@ -56,6 +56,7 @@ interface UseEditGameModalOptions {
   uiStore: ReturnType<typeof useUiStore>
   formRef: Ref<{ validate?: () => Promise<unknown> } | undefined>
   isSubmitting: Ref<boolean>
+  activeTab: Ref<string>
 }
 
 const CREATE_SERIES_OPTION_VALUE = '__create_series__'
@@ -68,6 +69,7 @@ export const useEditGameModal = ({
   uiStore,
   formRef,
   isSubmitting,
+  activeTab,
 }: UseEditGameModalOptions) => {
   const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1280)
   const isUploadingVideo = ref(false)
@@ -107,15 +109,32 @@ export const useEditGameModal = ({
   const canCreateDeveloperOption = developerPicker.canCreate
   const canCreatePublisherOption = publisherPicker.canCreate
 
-  const primaryLogo = computed(() => {
-    return form.value.logo || null
-  })
-
   const logoBannerSrc = computed(() => form.value.banners[0]?.path || form.value.covers[0]?.path || '')
-  const logoPath = computed(() => form.value.logo?.path || '')
+  const editingLogoKey = ref<string | null>(null)
+  const logoInitialTab = ref<'import' | 'position'>('import')
+  const editingLogo = computed(() => {
+    if (!editingLogoKey.value) return null
+    return form.value.logos.find(
+      (item) => (item.asset_uid || item.path) === editingLogoKey.value,
+    ) ?? null
+  })
+  const logoPath = computed(() => editingLogo.value?.path || '')
+
+  const openLogoSelector = () => {
+    logoInitialTab.value = 'import'
+    showLogoSelector.value = true
+  }
+
+  const openLogoPositionEditor = (key: string) => {
+    editingLogoKey.value = key
+    logoInitialTab.value = 'position'
+    showLogoSelector.value = true
+  }
 
   const modalWidth = computed(() => {
+    const isMediaTab = activeTab.value === 'media'
     if (viewportWidth.value <= 576) return 'calc(100vw - 24px)'
+    if (isMediaTab) return 'min(70vw, 1400px)'
     if (viewportWidth.value <= 912) return 'min(800px, calc(100vw - 48px))'
     return 800
   })
@@ -153,8 +172,17 @@ export const useEditGameModal = ({
     uiStore.addAlert(message, type)
   }
 
-  const emitAssetSync = async () => {
-    emit('sync')
+  let assetSyncTimer: ReturnType<typeof setTimeout> | undefined
+  const emitAssetSync = () => {
+    if (typeof window === 'undefined') {
+      emit('sync')
+      return
+    }
+    if (assetSyncTimer) clearTimeout(assetSyncTimer)
+    assetSyncTimer = setTimeout(() => {
+      assetSyncTimer = undefined
+      emit('sync')
+    }, 600)
   }
 
   const syncViewportWidth = () => {
@@ -170,6 +198,7 @@ export const useEditGameModal = ({
   onUnmounted(() => {
     if (typeof window === 'undefined') return
     window.removeEventListener('resize', syncViewportWidth)
+    if (assetSyncTimer) clearTimeout(assetSyncTimer)
   })
 
   const handleSeriesSearch = async (query: string) => {
@@ -389,12 +418,29 @@ export const useEditGameModal = ({
   const {
     draggedScreenshotKey,
     dragOverScreenshotKey,
-    reorderEditableCovers,
+    draggedCoverKey,
+    dragOverCoverKey,
+    draggedBannerKey,
+    dragOverBannerKey,
+    draggedLogoKey,
+    dragOverLogoKey,
     reorderEditableVideos,
     handleScreenshotDragStart,
     handleScreenshotDragEnter,
     handleScreenshotDrop,
     handleScreenshotDragEnd,
+    handleCoverDragStart,
+    handleCoverDragEnter,
+    handleCoverDrop,
+    handleCoverDragEnd,
+    handleBannerDragStart,
+    handleBannerDragEnter,
+    handleBannerDrop,
+    handleBannerDragEnd,
+    handleLogoDragStart,
+    handleLogoDragEnter,
+    handleLogoDrop,
+    handleLogoDragEnd,
   } = useEditGameMediaState({
     form,
   })
@@ -625,6 +671,7 @@ export const useEditGameModal = ({
     removePreviewVideo,
     setPrimaryCover,
     setPrimaryBanner,
+    setPrimaryLogo,
     handleLogoPositionConfirm,
     resetVideoUploadState,
   } = useEditGameAssets({
@@ -634,6 +681,7 @@ export const useEditGameModal = ({
     showBannerSelector,
     showScreenshotSelector,
     showLogoSelector,
+    editingLogoKey,
     isUploadingVideo,
     videoUploadProgress,
     videoUploadFileName,
@@ -710,6 +758,12 @@ export const useEditGameModal = ({
     confirmLogoSelection,
     draggedScreenshotKey,
     dragOverScreenshotKey,
+    draggedCoverKey,
+    dragOverCoverKey,
+    draggedBannerKey,
+    dragOverBannerKey,
+    draggedLogoKey,
+    dragOverLogoKey,
     filteredDeveloperOptions,
     filteredPublisherOptions,
     filteredSeriesOptions,
@@ -732,6 +786,18 @@ export const useEditGameModal = ({
     handleFileSelect,
     handlePublisherSearch,
     handlePublisherSelection,
+    handleCoverDragEnd,
+    handleCoverDragEnter,
+    handleCoverDragStart,
+    handleCoverDrop,
+    handleBannerDragEnd,
+    handleBannerDragEnter,
+    handleBannerDragStart,
+    handleBannerDrop,
+    handleLogoDragEnd,
+    handleLogoDragEnter,
+    handleLogoDragStart,
+    handleLogoDrop,
     handleScreenshotDragEnd,
     handleScreenshotDragEnter,
     handleScreenshotDragStart,
@@ -787,7 +853,11 @@ export const useEditGameModal = ({
     selectedLogoGame,
     modalWidth,
     openFileBrowser,
-    primaryLogo,
+    editingLogo,
+    editingLogoKey,
+    logoInitialTab,
+    openLogoSelector,
+    openLogoPositionEditor,
     logoBannerSrc,
     logoPath,
     releaseDate,
@@ -797,10 +867,10 @@ export const useEditGameModal = ({
     removeFilePath,
     removePreviewVideo,
     removeScreenshot,
-    reorderEditableCovers,
     reorderEditableVideos,
     setPrimaryCover,
     setPrimaryBanner,
+    setPrimaryLogo,
     handleLogoPositionConfirm,
     rules,
     screenshotPreviewUrl,

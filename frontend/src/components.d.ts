@@ -93,6 +93,7 @@ declare module 'vue' {
     StatOverview: typeof import('./components/dashboard/StatOverview.vue')['default']
     SteamSearchPanel: typeof import('./components/SteamSearchPanel.vue')['default']
     SummaryImportModal: typeof import('./components/edit-game/import-modals/SummaryImportModal.vue')['default']
+    ThumbImage: typeof import('./components/edit-game/ThumbImage.vue')['default']
     TileCropModal: typeof import('./components/start-screen/TileCropModal.vue')['default']
     WikiEditor: typeof import('./components/WikiEditor.vue')['default']
     WikiToc: typeof import('./components/WikiToc.vue')['default']

@@ -45,7 +45,7 @@ const buildForm = () => ref<EditGameForm>({
   summary: '',
   covers: [],
   banners: [],
-  logo: null,
+  logos: [],
   logo_visible: true,
   preview_videos: [],
   screenshots: [],
@@ -201,6 +201,7 @@ describe('useSteamImport', () => {
     await steamImport.downloadSelectedLogo()
 
     expect(uploadAssetFromUrl).toHaveBeenCalledWith('https://cdn.example.com/logo-1.png', 'logo')
-    expect(form.value.logo?.path).toBe('/assets/logo-1.png')
+    expect(form.value.logos).toHaveLength(1)
+    expect(form.value.logos[0]?.path).toBe('/assets/logo-1.png')
   })
 })

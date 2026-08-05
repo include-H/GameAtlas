@@ -72,14 +72,17 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       const orderedBannerUids = options.form.value.banners
         .map((item) => item.asset_uid)
         .filter((assetUid): assetUid is string => Boolean(assetUid))
-      const logo = options.form.value.logo
-      const orderedLogoUids = logo?.asset_uid ? [logo.asset_uid] : []
-      const logoPositions = logo?.asset_uid ? [{
-        asset_uid: logo.asset_uid,
-        position_x: logo.position_x ?? null,
-        position_y: logo.position_y ?? null,
-        width_pct: logo.width_pct ?? null,
-      }] : []
+      const orderedLogoUids = options.form.value.logos
+        .map((item) => item.asset_uid)
+        .filter((assetUid): assetUid is string => Boolean(assetUid))
+      const logoPositions = options.form.value.logos
+        .filter((item) => item.asset_uid)
+        .map((item) => ({
+          asset_uid: item.asset_uid as string,
+          position_x: item.position_x ?? null,
+          position_y: item.position_y ?? null,
+          width_pct: item.width_pct ?? null,
+        }))
 
       const newAssets: GameAggregateNewAsset[] = []
       for (const s of options.form.value.screenshots) {
@@ -102,8 +105,10 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
           newAssets.push({ asset_uid: b.asset_uid, asset_type: 'banner', path: b.path })
         }
       }
-      if (logo?.asset_uid && logo.path) {
-        newAssets.push({ asset_uid: logo.asset_uid, asset_type: 'logo', path: logo.path })
+      for (const l of options.form.value.logos) {
+        if (l.asset_uid && l.path) {
+          newAssets.push({ asset_uid: l.asset_uid, asset_type: 'logo', path: l.path })
+        }
       }
 
       if (!game.public_id) {

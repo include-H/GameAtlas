@@ -138,6 +138,15 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 
 	assetDeleteWarnings := make([]string, 0)
 	for _, path := range deletedAssetPaths {
+		// 2026-08-05: keep physical files that are still referenced elsewhere
+		// (other games or start-screen tiles); only the detached DB row is gone.
+		referenced, err := s.gamesRepo.IsAssetPathReferenced(path)
+		if err != nil {
+			return nil, nil, err
+		}
+		if referenced {
+			continue
+		}
 		warning, err := cleanupAssetPath(s.assetStore, s.assetCleanupTasksRepo, path, "games.update_aggregate")
 		if err != nil {
 			return nil, nil, err
@@ -174,6 +183,13 @@ func (s *GameAggregateService) Delete(id int64) (*GameDeleteResult, error) {
 		// 2026-04-04: keep asset deletion best-effort because the game row has already been removed,
 		// and leftover files can be retried from cleanup tasks without reviving the deleted resource.
 		// Impact: only asset file removal is deferred; the game stays deleted.
+		referenced, err := s.gamesRepo.IsAssetPathReferenced(path)
+		if err != nil {
+			return nil, err
+		}
+		if referenced {
+			continue
+		}
 		warning, err := cleanupAssetPath(s.assetStore, s.assetCleanupTasksRepo, path, "games.delete")
 		if err != nil {
 			return nil, err

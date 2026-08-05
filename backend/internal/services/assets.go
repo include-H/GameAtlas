@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"mime/multipart"
 	"time"
 
@@ -27,6 +28,13 @@ type UploadResult struct {
 	AssetUID string
 }
 
+const (
+	maxImageUploadBytes int64 = 20 << 20  // 20 MiB
+	maxVideoUploadBytes int64 = 500 << 20 // 500 MiB
+)
+
+var errAssetTooLarge = errors.New("asset too large")
+
 func NewAssetsService(cfg config.Config, gamesRepo assetGameRepository) *AssetsService {
 	return &AssetsService{
 		gamesRepo: gamesRepo,
@@ -40,6 +48,19 @@ func NewAssetsService(cfg config.Config, gamesRepo assetGameRepository) *AssetsS
 // one upload entrypoint, extracting an io.Reader interface adds indirection
 // without practical testability gain.
 func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart.FileHeader) (*UploadResult, error) {
+	limit := maxImageUploadBytes
+	if assetType == "video" {
+		limit = maxVideoUploadBytes
+	}
+	if header.Size > limit {
+		return nil, normalizeAssetError(fmt.Errorf(
+			"%w: %d bytes exceeds limit %d",
+			errAssetTooLarge,
+			header.Size,
+			limit,
+		))
+	}
+
 	game, err := s.gamesRepo.GetByID(gameID)
 	if err != nil {
 		return nil, normalizeRepoError(err)
@@ -57,6 +78,12 @@ func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart
 	path, err := s.store.SaveToStaging(game.PublicID, assetType, assetName, src, contentType)
 	if err != nil {
 		return nil, normalizeAssetError(err)
+	}
+	if assetType != "video" {
+		if thumbErr := s.store.WriteThumbnail(path); thumbErr != nil {
+			// Thumbnail is best-effort: the original asset stays usable without it.
+			log.Printf("generate thumbnail for %s failed: %v", path, thumbErr)
+		}
 	}
 
 	return &UploadResult{Path: path, AssetUID: assetUID}, nil
@@ -102,6 +129,8 @@ func normalizeAssetError(err error) error {
 	case errors.Is(err, files.ErrInvalidImageType):
 		return domain.ErrValidation
 	case errors.Is(err, files.ErrInvalidAssetName):
+		return domain.ErrValidation
+	case errors.Is(err, errAssetTooLarge):
 		return domain.ErrValidation
 	default:
 		return err
