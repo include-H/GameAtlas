@@ -269,6 +269,7 @@ import {
   getAmbientBackgroundPoolFromGameDetail,
   hasAmbientBackgroundPoolImages,
 } from '@/utils/ambient-background'
+import { navigateBackOrFallback } from '@/utils/navigation'
 
 const route = useRoute()
 const router = useRouter()
@@ -293,7 +294,10 @@ const modalProps = reactive({
 const pendingSaveMode = ref<'stay' | 'exit'>('exit')
 
 const goBack = () => {
-  router.push({ name: 'game-detail', params: { publicId: publicId.value } })
+  navigateBackOrFallback(router, {
+    name: 'game-detail',
+    params: { publicId: publicId.value },
+  })
 }
 
 const modalEmit = (event: 'update:visible' | 'success' | 'sync', _value?: boolean) => {
