@@ -244,7 +244,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, reactive, ref } from 'vue'
+import { nextTick, onBeforeUnmount, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { IconLeft } from '@arco-design/web-vue/es/icon'
 import gamesService from '@/services/games.service'
@@ -254,6 +254,10 @@ import { useUiStore } from '@/stores/ui'
 import { useEditGameModal } from '@/composables/useEditGameModal'
 import MediaManagementPanel from '@/components/edit-game/MediaManagementPanel.vue'
 import type { AdminGameDetail } from '@/services/types'
+import {
+  getAmbientBackgroundPoolFromGameDetail,
+  hasAmbientBackgroundPoolImages,
+} from '@/utils/ambient-background'
 
 const route = useRoute()
 const router = useRouter()
@@ -264,6 +268,7 @@ const publicId = ref(String(route.params.publicId || ''))
 const game = ref<AdminGameDetail | null>(null)
 const loading = ref(true)
 const loadError = ref(false)
+const AMBIENT_BACKGROUND_OWNER = 'game-media'
 
 const formRef = ref()
 const isSubmitting = ref(false)
@@ -501,6 +506,23 @@ const goBack = () => {
   router.push({ name: 'game-detail', params: { publicId: publicId.value } })
 }
 
+const syncAmbientBackground = () => {
+  if (!game.value?.public_id) {
+    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+    return
+  }
+  const pool = getAmbientBackgroundPoolFromGameDetail(game.value)
+  if (!hasAmbientBackgroundPoolImages(pool)) {
+    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+    return
+  }
+  uiStore.setAmbientBackgroundSource({
+    owner: AMBIENT_BACKGROUND_OWNER,
+    key: game.value.public_id,
+    pool,
+  })
+}
+
 const loadGame = async () => {
   if (!publicId.value) return
   loading.value = true
@@ -508,14 +530,20 @@ const loadGame = async () => {
   try {
     const detail = await gamesService.getAdminGameDetail(publicId.value)
     game.value = detail
+    syncAmbientBackground()
     await nextTick()
   } catch {
     loadError.value = true
+    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
     uiStore.addAlert('加载素材失败', 'error')
   } finally {
     loading.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+})
 
 if (!authStore.isAdmin) {
   void router.replace({ name: 'game-detail', params: { publicId: publicId.value } })

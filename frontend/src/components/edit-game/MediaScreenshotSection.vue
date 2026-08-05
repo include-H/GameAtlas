@@ -18,55 +18,53 @@
     </div>
     <div v-else class="media-frame media-frame--screenshots screenshots-frame">
       <div ref="screenshotsScrollRef" class="screenshots-scroll" @dragover="onScreenshotsDragOver" @dragend="onScreenshotsDragEnd">
-        <a-image-preview-group infinite>
-          <div class="screenshots-grid">
-            <div
-              v-for="(screenshot, index) in screenshots"
-              :key="screenshot.asset_uid || screenshot.client_key"
-              class="screenshot-thumb"
-              :class="{
-                'is-primary': index === 0,
-                'is-dragging': draggedScreenshotKey === screenshot.client_key,
-                'is-drop-target': dragOverScreenshotKey === screenshot.client_key,
-              }"
-              @dragenter.prevent="emit('screenshot-drag-enter', screenshot.client_key)"
-              @dragover.prevent
-              @drop.prevent="emit('screenshot-drop', screenshot.client_key)"
-            >
-              <ThumbImage :src="screenshot.path" />
-              <div v-if="index === 0" class="screenshot-primary-badge">主图</div>
-              <div class="screenshot-overlay">
-                <div class="screenshot-overlay-actions">
-                  <a-button
-                    class="app-text-action-btn media-action-button screenshot-drag-handle"
-                    type="text"
-                    shape="circle"
-                    size="small"
-                    html-type="button"
-                    title="拖拽排序"
-                    draggable="true"
-                    @dragstart="emit('screenshot-drag-start', screenshot.client_key)"
-                    @dragend="emit('screenshot-drag-end')"
-                  >
-                    <icon-drag-arrow />
-                  </a-button>
-                  <a-button
-                    class="app-text-action-btn media-action-button media-action-button--danger"
-                    type="text"
-                    status="danger"
-                    shape="circle"
-                    size="small"
-                    html-type="button"
-                    title="删除截图"
-                    @click.stop="confirmRemoveScreenshot(screenshot.client_key)"
-                  >
-                    <icon-delete />
-                  </a-button>
-                </div>
+        <div class="screenshots-grid">
+          <div
+            v-for="(screenshot, index) in screenshots"
+            :key="screenshot.asset_uid || screenshot.client_key"
+            class="screenshot-thumb"
+            :class="{
+              'is-primary': index === 0,
+              'is-dragging': draggedScreenshotKey === screenshot.client_key,
+              'is-drop-target': dragOverScreenshotKey === screenshot.client_key,
+            }"
+            @dragenter.prevent="emit('screenshot-drag-enter', screenshot.client_key)"
+            @dragover.prevent
+            @drop.prevent="emit('screenshot-drop', screenshot.client_key)"
+          >
+            <ThumbImage :src="screenshot.path" />
+            <div v-if="index === 0" class="screenshot-primary-badge">主图</div>
+            <div class="screenshot-overlay">
+              <div class="screenshot-overlay-actions">
+                <a-button
+                  class="app-text-action-btn media-action-button screenshot-drag-handle"
+                  type="text"
+                  shape="circle"
+                  size="small"
+                  html-type="button"
+                  title="拖拽排序"
+                  draggable="true"
+                  @dragstart="emit('screenshot-drag-start', screenshot.client_key)"
+                  @dragend="emit('screenshot-drag-end')"
+                >
+                  <icon-drag-arrow />
+                </a-button>
+                <a-button
+                  class="app-text-action-btn media-action-button media-action-button--danger"
+                  type="text"
+                  status="danger"
+                  shape="circle"
+                  size="small"
+                  html-type="button"
+                  title="删除截图"
+                  @click.stop="confirmRemoveScreenshot(screenshot.client_key)"
+                >
+                  <icon-delete />
+                </a-button>
               </div>
             </div>
           </div>
-        </a-image-preview-group>
+        </div>
       </div>
     </div>
   </section>
@@ -264,16 +262,12 @@ onBeforeUnmount(() => {
   border-radius: 3px;
 }
 
-.screenshots-scroll :deep(.arco-image-preview-group) {
-  display: block;
-  width: max-content;
-  min-width: 100%;
-}
-
 .screenshots-grid {
   display: flex;
   align-items: stretch;
   gap: 10px;
+  width: max-content;
+  min-width: 100%;
 }
 
 .screenshot-thumb {

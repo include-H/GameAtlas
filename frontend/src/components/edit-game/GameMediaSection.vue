@@ -21,7 +21,14 @@
       </header>
       <div class="media-card__body">
         <div v-if="covers.length > 0" class="media-card__preview media-card__preview--cover">
-          <a-image :src="covers[0].path" width="100%" height="100%" fit="contain" hide-footer />
+          <a-image
+            :src="covers[0].path"
+            width="100%"
+            height="100%"
+            fit="contain"
+            hide-footer
+            :preview="false"
+          />
           <div v-if="covers.length > 1" class="media-card__preview-badge">主封面</div>
         </div>
         <div
@@ -121,7 +128,14 @@
       </header>
       <div class="media-card__body">
         <div v-if="banners.length > 0" class="media-card__preview media-card__preview--banner">
-          <a-image :src="banners[0].path" width="100%" height="100%" fit="contain" hide-footer />
+          <a-image
+            :src="banners[0].path"
+            width="100%"
+            height="100%"
+            fit="contain"
+            hide-footer
+            :preview="false"
+          />
           <div v-if="banners.length > 1" class="media-card__preview-badge">主横幅</div>
         </div>
         <div
@@ -230,6 +244,7 @@
             height="100%"
             fit="contain"
             hide-footer
+            :preview="false"
           />
           <div class="media-card__preview-badge">截图 1</div>
         </div>
@@ -283,7 +298,14 @@
       </header>
       <div class="media-card__body">
         <div v-if="logos.length > 0" class="media-card__preview media-card__preview--logo">
-          <a-image :src="logos[0].path" width="100%" height="100%" fit="contain" hide-footer />
+          <a-image
+            :src="logos[0].path"
+            width="100%"
+            height="100%"
+            fit="contain"
+            hide-footer
+            :preview="false"
+          />
           <div v-if="logos.length > 1" class="media-card__preview-badge">主 Logo</div>
         </div>
         <div

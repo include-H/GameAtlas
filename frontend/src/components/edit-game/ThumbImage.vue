@@ -29,7 +29,7 @@ const props = withDefaults(defineProps<{
   preview?: boolean
 }>(), {
   alt: '',
-  preview: true,
+  preview: false,
 })
 
 const thumbSrc = computed(() => getAssetThumbUrl(props.src))

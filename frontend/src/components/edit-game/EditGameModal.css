@@ -20,12 +20,6 @@
   color: var(--color-danger-6);
 }
 
-.media-tab-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  padding: 4px 0 10px;
-}
-
 :deep(.arco-btn.arco-btn-text.arco-btn-status-danger:hover) {
   background-color: color-mix(in srgb, var(--color-danger-6) 10%, transparent);
 }
@@ -905,20 +899,7 @@
   object-fit: contain;
 }
 
-/* Edit modal tabs */
 .edit-modal-footer {
   justify-content: flex-end;
   width: 100%;
-}
-
-.edit-modal-tabs :deep(.arco-tabs-nav) {
-  margin-bottom: 10px;
-}
-
-.edit-modal-tabs :deep(.arco-tabs-content) {
-  padding: 0;
-}
-
-.edit-modal-tabs :deep(.arco-tabs-pane) {
-  padding-top: 4px;
 }
