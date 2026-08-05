@@ -122,6 +122,17 @@ Outputs to `release/game-release-<version>/`. The script:
 - **Migrations**: forward-only, numbered, never edit existing ones. Run `bash check.sh` to verify.
 - **Error handling**: repo returns raw errors, service normalizes (e.g., `ErrNotFound`), handler maps to HTTP.
 
+### Git Commit Messages
+- **Conventional Commits**: `type(scope): 中文描述`，如 `fix(ui): ...`、`feat(media): ...`；type 使用 fix/feat/docs/style/perf/refactor/chore/ci/release。
+- **标题一句概括**：讲清"改了什么、解决了什么"，不堆砌、不省略关键信息。
+- **正文四段式**（重要修复/复杂变更必须写，简单变更可省略）：
+  - `背景`：问题从哪来、涉及的历史提交
+  - `根因`：真正的成因，含代码/机制层面的细节
+  - `修复`：具体改动、影响范围、为什么这样修
+  - `验证`：跑过的测试、构建与手工验证结果
+- **参考范例**：`30baa74`（fix(ui): 修复全站弹窗内下拉框被自身遮罩遮挡不可见）。
+- **发布**：主线上修复/功能按语义化版本打 annotated tag（如 `v1.1.1`），推送 GitHub 触发 Release 工作流，并同步 Gitea 镜像。
+
 ### Pre-commit Checks
 - Frontend: `npm run lint` must pass
 - Backend: `cd backend && bash check.sh` must pass
