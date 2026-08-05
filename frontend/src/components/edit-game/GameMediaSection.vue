@@ -84,20 +84,8 @@
               >
                 <icon-drag-arrow />
               </a-button>
-              <a-button
-                v-if="index !== 0"
-                class="app-text-action-btn media-action-button"
-                type="text"
-                shape="circle"
-                size="small"
-                html-type="button"
-                title="设为主封面"
-                @click.stop="emit('set-primary-cover', index)"
-              >
-                <icon-star />
-              </a-button>
-              <a-button
-                class="app-text-action-btn media-action-button media-action-button--danger"
+                      <a-button
+                        class="app-text-action-btn media-action-button media-action-button--danger"
                 type="text"
                 status="danger"
                 shape="circle"
@@ -198,20 +186,8 @@
               >
                 <icon-drag-arrow />
               </a-button>
-              <a-button
-                v-if="index !== 0"
-                class="app-text-action-btn media-action-button"
-                type="text"
-                shape="circle"
-                size="small"
-                html-type="button"
-                title="设为主横幅"
-                @click.stop="emit('set-primary-banner', index)"
-              >
-                <icon-star />
-              </a-button>
-              <a-button
-                class="app-text-action-btn media-action-button media-action-button--danger"
+                      <a-button
+                        class="app-text-action-btn media-action-button media-action-button--danger"
                 type="text"
                 status="danger"
                 shape="circle"
@@ -386,20 +362,8 @@
               >
                 <icon-edit />
               </a-button>
-              <a-button
-                v-if="index !== 0"
-                class="app-text-action-btn media-action-button"
-                type="text"
-                shape="circle"
-                size="small"
-                html-type="button"
-                title="设为主 Logo"
-                @click.stop="emit('set-primary-logo', index)"
-              >
-                <icon-star />
-              </a-button>
-              <a-button
-                class="app-text-action-btn media-action-button media-action-button--danger"
+                      <a-button
+                        class="app-text-action-btn media-action-button media-action-button--danger"
                 type="text"
                 status="danger"
                 shape="circle"
@@ -546,7 +510,6 @@ import {
   IconEdit,
   IconImage,
   IconPlus,
-  IconStar,
   IconUpload,
   IconVideoCamera,
 } from '@arco-design/web-vue/es/icon'
@@ -585,14 +548,12 @@ interface EditableVideo {
 const emit = defineEmits<{
   'open-cover-selector': []
   'remove-cover': [index: number]
-  'set-primary-cover': [index: number]
   'cover-drag-start': [key: string]
   'cover-drag-enter': [key: string]
   'cover-drop': [key: string]
   'cover-drag-end': []
   'open-banner-selector': []
   'remove-banner': [index: number]
-  'set-primary-banner': [index: number]
   'banner-drag-start': [key: string]
   'banner-drag-enter': [key: string]
   'banner-drop': [key: string]
@@ -616,7 +577,6 @@ const emit = defineEmits<{
   'open-logo-selector': []
   'open-logo-position-editor': [key: string]
   'remove-logo': [index: number]
-  'set-primary-logo': [index: number]
 }>()
 
 defineProps<{
@@ -825,7 +785,7 @@ onBeforeUnmount(stopGridAutoScroll)
 }
 
 .media-card__preview--video {
-  height: clamp(160px, 20vh, 280px);
+  height: clamp(220px, 28vh, 380px);
 }
 
 .video-card__player {
@@ -928,22 +888,22 @@ onBeforeUnmount(stopGridAutoScroll)
 }
 
 .media-thumb--cover {
-  width: 132px;
+  width: 108px;
   aspect-ratio: 2 / 3;
 }
 
 .media-thumb--banner {
-  width: 180px;
+  width: 150px;
   aspect-ratio: 16 / 9;
 }
 
 .media-thumb--logo {
-  width: 200px;
+  width: 160px;
   aspect-ratio: 16 / 9;
 }
 
 .media-thumb--video {
-  width: 220px;
+  width: 170px;
   aspect-ratio: 16 / 9;
 }
 

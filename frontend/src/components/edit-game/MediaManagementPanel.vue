@@ -22,14 +22,12 @@
       :drag-over-video-key="dragOverVideoKey"
       @open-cover-selector="emit('open-cover-selector')"
       @remove-cover="(index) => emit('remove-cover', index)"
-      @set-primary-cover="(index) => emit('set-primary-cover', index)"
       @cover-drag-start="(key) => emit('cover-drag-start', key)"
       @cover-drag-enter="(key) => emit('cover-drag-enter', key)"
       @cover-drop="(key) => emit('cover-drop', key)"
       @cover-drag-end="emit('cover-drag-end')"
       @open-banner-selector="emit('open-banner-selector')"
       @remove-banner="(index) => emit('remove-banner', index)"
-      @set-primary-banner="(index) => emit('set-primary-banner', index)"
       @banner-drag-start="(key) => emit('banner-drag-start', key)"
       @banner-drag-enter="(key) => emit('banner-drag-enter', key)"
       @banner-drop="(key) => emit('banner-drop', key)"
@@ -53,7 +51,6 @@
       @open-logo-selector="emit('open-logo-selector')"
       @open-logo-position-editor="emit('open-logo-position-editor', $event)"
       @remove-logo="emit('remove-logo', $event)"
-      @set-primary-logo="emit('set-primary-logo', $event)"
     />
 
     <edit-game-asset-import-modals
@@ -204,19 +201,12 @@
       @confirm-logo-position="emit('confirm-logo-position', $event)"
     />
 
-    <banner-crop-modal
-      :visible="showBannerCropModal"
-      :image-src="bannerCropSrc"
-      @confirm="emit('banner-crop-confirm', $event)"
-      @cancel="emit('banner-crop-cancel')"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 import GameMediaSection from './GameMediaSection.vue'
 import EditGameAssetImportModals from './EditGameAssetImportModals.vue'
-import BannerCropModal from './BannerCropModal.vue'
 import type { ImportSource } from '@/composables/useSteamImport'
 import type { SteamGameSearchResult } from '@/services/types'
 import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
@@ -354,21 +344,17 @@ defineProps<{
   logoVisible: boolean
   logoInitialTab: 'import' | 'position'
 
-  showBannerCropModal: boolean
-  bannerCropSrc: string
 }>()
 
 const emit = defineEmits<{
   'open-cover-selector': []
   'remove-cover': [index: number]
-  'set-primary-cover': [index: number]
   'cover-drag-start': [key: string]
   'cover-drag-enter': [key: string]
   'cover-drop': [key: string]
   'cover-drag-end': []
   'open-banner-selector': []
   'remove-banner': [index: number]
-  'set-primary-banner': [index: number]
   'banner-drag-start': [key: string]
   'banner-drag-enter': [key: string]
   'banner-drop': [key: string]
@@ -392,7 +378,6 @@ const emit = defineEmits<{
   'open-logo-selector': []
   'open-logo-position-editor': [key: string]
   'remove-logo': [index: number]
-  'set-primary-logo': [index: number]
 
   'update:show-summary-selector': [value: boolean]
   'update:steam-summary-search-query': [value: string]
@@ -467,8 +452,6 @@ const emit = defineEmits<{
   'load-logo-from-url': []
   'confirm-logo-selection': []
   'confirm-logo-position': [payload: { position_x: number; position_y: number; width_pct: number; logo_visible: boolean }]
-  'banner-crop-confirm': [blob: Blob]
-  'banner-crop-cancel': []
 }>()
 </script>
 

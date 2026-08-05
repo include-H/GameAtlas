@@ -131,18 +131,14 @@
           :logo-width-pct="editingLogo?.width_pct ?? null"
           :logo-visible="form.logo_visible ?? true"
           :logo-initial-tab="logoInitialTab"
-          :show-banner-crop-modal="showBannerCropModal"
-          :banner-crop-src="bannerCropSrc"
           @open-cover-selector="showCoverSelector = true"
           @remove-cover="removeCover"
-          @set-primary-cover="setPrimaryCover"
           @cover-drag-start="handleCoverDragStart"
           @cover-drag-enter="handleCoverDragEnter"
           @cover-drop="handleCoverDrop"
           @cover-drag-end="handleCoverDragEnd"
           @open-banner-selector="showBannerSelector = true"
           @remove-banner="removeBanner"
-          @set-primary-banner="handleSetPrimaryBanner"
           @banner-drag-start="handleBannerDragStart"
           @banner-drag-enter="handleBannerDragEnter"
           @banner-drop="handleBannerDrop"
@@ -166,7 +162,6 @@
           @open-logo-selector="openLogoSelector"
           @open-logo-position-editor="openLogoPositionEditor"
           @remove-logo="removeLogo"
-          @set-primary-logo="setPrimaryLogo"
           @update:show-summary-selector="showSummarySelector = $event"
           @update:steam-summary-search-query="steamSummarySearchQuery = $event"
           @search-summary="searchSteamForSummary"
@@ -240,8 +235,6 @@
           @load-logo-from-url="loadLogoFromUrl"
           @confirm-logo-selection="confirmLogoSelection"
           @confirm-logo-position="handleLogoPositionConfirm"
-          @banner-crop-confirm="handleBannerCropConfirm"
-          @banner-crop-cancel="showBannerCropModal = false"
         />
       </template>
     </main>
@@ -253,7 +246,6 @@ import { nextTick, onBeforeUnmount, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { IconLeft } from '@arco-design/web-vue/es/icon'
 import gamesService from '@/services/games.service'
-import { uploadAsset } from '@/services/assets'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { useEditGameModal } from '@/composables/useEditGameModal'
@@ -424,8 +416,6 @@ const {
   selectedScreenshotGame,
   selectedRemoteScreenshots,
   selectedSteamSummaryGame,
-  setPrimaryCover,
-  setPrimaryLogo,
   sgdbAvailable,
   showBannerSelector,
   showCoverSelector,
@@ -465,52 +455,6 @@ const {
   isSubmitting,
   activeTab,
 })
-
-const showBannerCropModal = ref(false)
-const bannerCropSrc = ref('')
-
-const handleSetPrimaryBanner = (index: number) => {
-  const banner = form.value.banners[index]
-  if (!banner) return
-
-  const img = new Image()
-  img.src = banner.path
-  img.onload = () => {
-    if (img.naturalWidth / img.naturalHeight > 1.6) {
-      bannerCropSrc.value = banner.path
-      showBannerCropModal.value = true
-    } else {
-      setPrimaryBanner(index)
-    }
-  }
-  img.onerror = () => {
-    setPrimaryBanner(index)
-  }
-}
-
-const handleBannerCropConfirm = async (blob: Blob) => {
-  const gameId = game.value?.id
-  if (!gameId) return
-
-  showBannerCropModal.value = false
-  try {
-    const file = new File([blob], 'banner-crop.png', { type: 'image/png' })
-    const result = await uploadAsset('banner', gameId, file)
-    if (result) {
-      form.value.banners.unshift({ asset_uid: result.asset_uid, path: result.path })
-    }
-  } catch {
-    uiStore.addAlert('横幅裁剪上传失败', 'error')
-  }
-}
-
-const setPrimaryBanner = (index: number) => {
-  if (index <= 0 || index >= form.value.banners.length) return
-  const banners = [...form.value.banners]
-  const [moved] = banners.splice(index, 1)
-  banners.splice(0, 0, moved)
-  form.value.banners = banners
-}
 
 const goBack = () => {
   router.push({ name: 'game-detail', params: { publicId: publicId.value } })

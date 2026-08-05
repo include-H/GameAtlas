@@ -169,26 +169,10 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     options.form.value.covers = options.form.value.covers.filter((_, i) => i !== index)
   }
 
-  const setPrimaryCover = (index: number) => {
-    if (index <= 0 || index >= options.form.value.covers.length) return
-    const covers = [...options.form.value.covers]
-    const [moved] = covers.splice(index, 1)
-    covers.splice(0, 0, moved)
-    options.form.value.covers = covers
-  }
-
   const removeLogo = (index: number) => {
     const logo = options.form.value.logos[index]
     if (!logo) return
     options.form.value.logos = options.form.value.logos.filter((_, i) => i !== index)
-  }
-
-  const setPrimaryLogo = (index: number) => {
-    if (index <= 0 || index >= options.form.value.logos.length) return
-    const logos = [...options.form.value.logos]
-    const [moved] = logos.splice(index, 1)
-    logos.splice(0, 0, moved)
-    options.form.value.logos = logos
   }
 
   const handleLogoPositionConfirm = (payload: { position_x: number; position_y: number; width_pct: number; logo_visible: boolean }) => {
@@ -206,14 +190,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     const banner = options.form.value.banners[index]
     if (!banner) return
     options.form.value.banners = options.form.value.banners.filter((_, i) => i !== index)
-  }
-
-  const setPrimaryBanner = (index: number) => {
-    if (index <= 0 || index >= options.form.value.banners.length) return
-    const banners = [...options.form.value.banners]
-    const [moved] = banners.splice(index, 1)
-    banners.splice(0, 0, moved)
-    options.form.value.banners = banners
   }
 
   const removeScreenshot = (clientKey: string) => {
@@ -249,9 +225,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     removeBanner,
     removeScreenshot,
     removePreviewVideo,
-    setPrimaryCover,
-    setPrimaryBanner,
-    setPrimaryLogo,
     handleLogoPositionConfirm,
     resetVideoUploadState,
   }

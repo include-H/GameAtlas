@@ -196,8 +196,8 @@ onBeforeUnmount(() => {
 }
 
 .media-frame--screenshots {
-  height: 128px;
-  min-height: 128px;
+  height: 100px;
+  min-height: 100px;
 }
 
 .media-empty-action {
@@ -277,7 +277,7 @@ onBeforeUnmount(() => {
 }
 
 .screenshot-thumb {
-  width: 220px;
+  width: 170px;
   flex: 0 0 auto;
   aspect-ratio: 16 / 9;
   border-radius: 10px;
@@ -377,7 +377,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 768px) {
   .screenshot-thumb {
-    width: 180px;
+    width: 150px;
   }
 }
 
