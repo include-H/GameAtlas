@@ -17,8 +17,6 @@
             alt="新到货"
             decoding="async"
           >
-          <span class="store-poster__kicker">NEW</span>
-          <span class="store-poster__line">新到货</span>
         </div>
         <div class="store-poster store-poster--right">
           <img
@@ -28,8 +26,6 @@
             alt="畅销榜"
             decoding="async"
           >
-          <span class="store-poster__kicker">BEST</span>
-          <span class="store-poster__line">畅销榜</span>
         </div>
         <div class="store-sign">
           ATLAS&nbsp;GAMES
@@ -96,9 +92,9 @@
               :src="crtVideoUrl || undefined"
               autoplay
               muted
-              loop
               playsinline
               preload="auto"
+              @ended="handleCrtVideoEnded"
             />
             <div class="store-crt__glass" />
           </div>
@@ -225,6 +221,8 @@ const stageDim = ref(false)
 const inspectSettled = ref(false)
 const gameStoreSessionGames = ref<StoreShelfGame[]>([])
 const crtVideoUrl = ref('')
+const crtPlaylist = ref<string[]>([])
+let crtPlaylistIndex = 0
 const crtPowered = ref(true)
 const crtPaused = ref(false)
 const crtVideoRef = ref<HTMLVideoElement | null>(null)
@@ -307,12 +305,11 @@ const loadStoreSession = async () => {
       coverUrl: game.cover_image || '',
     }))
 
-    // CRT 播放真实预告：优先取本次 Session 里第一个带视频的游戏
+    // CRT 播放真实预告：把本次 Session 所有预告片拍平成轮播列表，播完自动换下一个
     const videoBundles = await gamesService.getPreviewVideos(picked.map((game) => game.public_id))
-    const firstVideo = videoBundles.find((bundle) => bundle.preview_videos.length > 0)?.preview_videos[0]?.path
-    if (firstVideo) {
-      crtVideoUrl.value = firstVideo
-    }
+    crtPlaylist.value = videoBundles.flatMap((bundle) => bundle.preview_videos.map((video) => video.path))
+    crtPlaylistIndex = 0
+    crtVideoUrl.value = crtPlaylist.value[0] ?? ''
   } catch {
     // 拉取失败时保留空货架，避免展示 mock 数据
     uiStore.addAlert('游戏店数据加载失败，货架暂时为空', 'warning')
@@ -612,6 +609,12 @@ const pickGame = (game: StoreShelfGame, event: MouseEvent) => {
   })
 }
 
+const handleCrtVideoEnded = () => {
+  if (crtPlaylist.value.length === 0) return
+  crtPlaylistIndex = (crtPlaylistIndex + 1) % crtPlaylist.value.length
+  crtVideoUrl.value = crtPlaylist.value[crtPlaylistIndex]
+}
+
 const toggleCrtPower = () => {
   crtPowered.value = !crtPowered.value
   const video = crtVideoRef.value
@@ -880,12 +883,12 @@ onUnmounted(() => {
 
 .store-poster--left {
   left: 60px;
-  transform: rotate(-0.8deg);
+  transform: rotate(-0.8deg) scale(1.33);
 }
 
 .store-poster--right {
   right: 60px;
-  transform: rotate(0.8deg);
+  transform: rotate(0.8deg) scale(1.33);
 }
 
 .store-poster__img {
@@ -895,26 +898,6 @@ onUnmounted(() => {
   height: 100%;
   object-fit: cover;
   display: block;
-}
-
-.store-poster__kicker,
-.store-poster__line {
-  position: relative;
-  z-index: 1;
-  text-shadow: 0 1.33px 5.33px rgba(0, 0, 0, 0.9);
-}
-
-.store-poster__kicker {
-  font-size: 10px;
-  letter-spacing: 2px;
-  color: #f7e9c8;
-  font-weight: 700;
-}
-
-.store-poster__line {
-  font-size: 13.33px;
-  color: #ffe9b8;
-  letter-spacing: 2.67px;
 }
 
 /* ---------- 霓虹招牌 ---------- */
@@ -1494,7 +1477,9 @@ onUnmounted(() => {
   border-radius: 4px;
   background:
     linear-gradient(180deg, #2b211a, #1b1410 78%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 0 0 1px rgba(232, 213, 173, 0.32),
+    inset 0 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
 .store-inspect__disc-art {
@@ -1535,8 +1520,13 @@ onUnmounted(() => {
 .store-inspect__cover {
   position: absolute;
   inset: 0;
-  background: #1b1410;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02) 30%, transparent 55%),
+    linear-gradient(180deg, #26201a, #17120e 82%);
   border-radius: 4px;
+  box-shadow:
+    inset 0 0 0 1px rgba(232, 213, 173, 0.35),
+    inset 0 0 0 9px rgba(0, 0, 0, 0.22);
   transform-origin: left center;
   transition: transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
   will-change: transform;
@@ -1548,12 +1538,40 @@ onUnmounted(() => {
 
 .store-inspect__cover img {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  inset: 10px;
+  width: calc(100% - 20px);
+  height: calc(100% - 20px);
   object-fit: cover;
-  border-radius: 4px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 1px 4px rgba(0, 0, 0, 0.55);
+}
+
+/* 盒顶厚度高光 */
+.store-inspect__cover::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.04));
+  border-radius: 4px 4px 0 0;
+  pointer-events: none;
+}
+
+/* 右侧盒脊：封面边缘的厚度与受光 */
+.store-inspect__cover::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 13px;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.18), rgba(255, 255, 255, 0.1) 42%, rgba(0, 0, 0, 0.5));
+  border-left: 1px solid rgba(232, 213, 173, 0.28);
+  pointer-events: none;
 }
 
 .store-inspect__sheen {
