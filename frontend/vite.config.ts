@@ -28,23 +28,29 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:3000',
-        changeOrigin: true,
-      },
-      '/assets': {
-        target: 'http://127.0.0.1:3000',
-        changeOrigin: true,
-      },
-      '/data': {
-        target: 'http://127.0.0.1:3000',
-        changeOrigin: true,
-      },
-    },
+    // 允许通过 VITE_API_TARGET 指向远程后端做联调（默认本地 3000）
+    proxy: buildProxy(),
   },
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.ts'],
   },
 })
+
+function buildProxy() {
+  const target = process.env.VITE_API_TARGET || 'http://127.0.0.1:3000'
+  return {
+    '/api': {
+      target,
+      changeOrigin: true,
+    },
+    '/assets': {
+      target,
+      changeOrigin: true,
+    },
+    '/data': {
+      target,
+      changeOrigin: true,
+    },
+  }
+}
