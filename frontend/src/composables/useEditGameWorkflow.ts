@@ -86,12 +86,14 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
 
       const newAssets: GameAggregateNewAsset[] = []
       for (const s of options.form.value.screenshots) {
-        if (s.asset_uid && s.path) {
+        // 只提交本会话新上传（无 id）的素材；已入库素材（有 id）由顺序数组维护，
+        // 不能重复进入 new_assets，否则后端会按 staging 文件尝试移动。
+        if (!s.id && s.asset_uid && s.path) {
           newAssets.push({ asset_uid: s.asset_uid, asset_type: 'screenshot', path: s.path })
         }
       }
       for (const v of options.form.value.preview_videos) {
-        if (v.asset_uid && v.path) {
+        if (!v.id && v.asset_uid && v.path) {
           newAssets.push({
             asset_uid: v.asset_uid,
             asset_type: 'video',
@@ -101,17 +103,17 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
         }
       }
       for (const c of options.form.value.covers) {
-        if (c.asset_uid && c.path) {
+        if (!c.id && c.asset_uid && c.path) {
           newAssets.push({ asset_uid: c.asset_uid, asset_type: 'cover', path: c.path })
         }
       }
       for (const b of options.form.value.banners) {
-        if (b.asset_uid && b.path) {
+        if (!b.id && b.asset_uid && b.path) {
           newAssets.push({ asset_uid: b.asset_uid, asset_type: 'banner', path: b.path })
         }
       }
       for (const l of options.form.value.logos) {
-        if (l.asset_uid && l.path) {
+        if (!l.id && l.asset_uid && l.path) {
           newAssets.push({ asset_uid: l.asset_uid, asset_type: 'logo', path: l.path })
         }
       }

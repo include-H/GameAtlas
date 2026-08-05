@@ -158,6 +158,43 @@ describe('useEditGameWorkflow', () => {
     }))
   })
 
+  it('sends only newly uploaded assets in new_assets, keeping existing ones in order arrays', async () => {
+    const { options } = buildOptions()
+    options.form.value.screenshots = [
+      { id: 101, asset_uid: 'shot-existing', path: '/assets/game-1/shot-existing.jpg', client_key: 'k1' },
+      { asset_uid: 'shot-new', path: '/assets/game-1/shot-new.jpg', client_key: 'k2' },
+    ]
+    options.form.value.preview_videos = [
+      { id: 401, asset_uid: 'video-existing', path: '/assets/game-1/video-existing.mp4', poster_path: null },
+    ]
+    options.form.value.covers = [
+      { id: 201, asset_uid: 'cover-existing', path: '/assets/game-1/cover-existing.jpg' },
+    ]
+    options.form.value.banners = [
+      { asset_uid: 'banner-new', path: '/assets/game-1/banner-new.jpg' },
+    ]
+    options.form.value.logos = [
+      { id: 301, asset_uid: 'logo-existing', path: '/assets/game-1/logo-existing.png', position_x: null, position_y: null, width_pct: null },
+    ]
+
+    const workflow = useEditGameWorkflow(options)
+    await workflow.handleSubmit()
+
+    expect(updateGameAggregateMock).toHaveBeenCalledWith('game-1', expect.objectContaining({
+      assets: expect.objectContaining({
+        new_assets: [
+          { asset_uid: 'shot-new', asset_type: 'screenshot', path: '/assets/game-1/shot-new.jpg' },
+          { asset_uid: 'banner-new', asset_type: 'banner', path: '/assets/game-1/banner-new.jpg' },
+        ],
+        screenshot_order_asset_uids: ['shot-existing', 'shot-new'],
+        video_order_asset_uids: ['video-existing'],
+        cover_order_asset_uids: ['cover-existing'],
+        logo_order_asset_uids: ['logo-existing'],
+        banner_order_asset_uids: ['banner-new'],
+      }),
+    }))
+  })
+
   it('keeps a successful aggregate save successful without a metadata refresh step', async () => {
     const { options, addAlert, emitSuccess, closeModal } = buildOptions()
 
