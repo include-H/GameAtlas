@@ -199,40 +199,6 @@ func (s *AssetReconcileService) CleanStaging() (int, error) {
 	return s.store.CleanStaging(1 * time.Hour)
 }
 
-// BackfillThumbnails generates missing thumbnails for all persisted image
-// assets. It is best-effort: originals stay usable even when a thumbnail
-// cannot be produced (videos or undecodable images are skipped).
-func (s *AssetReconcileService) BackfillThumbnails() (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	var paths []string
-	if err := s.db.Select(&paths, `
-		SELECT path FROM (
-			SELECT cover_image AS path FROM games WHERE COALESCE(TRIM(cover_image), '') != ''
-			UNION
-			SELECT banner_image AS path FROM games WHERE COALESCE(TRIM(banner_image), '') != ''
-			UNION
-			SELECT path FROM game_assets WHERE COALESCE(TRIM(path), '') != ''
-		) refs
-	`); err != nil {
-		return 0, fmt.Errorf("load asset paths for thumbnail backfill: %w", err)
-	}
-
-	processed := 0
-	for _, path := range paths {
-		trimmed := strings.TrimSpace(path)
-		if trimmed == "" {
-			continue
-		}
-		if err := s.store.EnsureThumbnail(trimmed); err != nil {
-			continue
-		}
-		processed++
-	}
-	return processed, nil
-}
-
 // CleanOrphanedAssetFiles moves unreferenced assets to a fixed filesystem
 // quarantine for seven days. It intentionally has no restore workflow: the
 // directory is a short-lived investigation buffer for NAS file browsing.
@@ -326,12 +292,6 @@ func (s *AssetReconcileService) deleteUnreferencedFiles(referenced map[string]st
 		if !isKnownAssetFile(d.Name()) {
 			return nil
 		}
-		// Derived thumbnails live next to their original and must never be
-		// quarantined independently of it.
-		if strings.Contains(d.Name(), ".thumb.") {
-			return nil
-		}
-
 		assetPath, pathErr := fsPathToAssetPath(baseDir, path)
 		if pathErr != nil {
 			return nil

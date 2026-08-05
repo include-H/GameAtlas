@@ -61,7 +61,14 @@
             @dragover.prevent
             @drop.prevent="emit('cover-drop', cover.asset_uid || cover.path)"
           >
-            <ThumbImage :src="cover.path" />
+            <a-image
+              :src="cover.path"
+              width="100%"
+              height="100%"
+              fit="contain"
+              hide-footer
+              :preview="false"
+            />
             <div v-if="index === 0" class="media-thumb__badge">主封面</div>
             <div class="media-thumb__actions">
               <a-button
@@ -168,7 +175,14 @@
             @dragover.prevent
             @drop.prevent="emit('banner-drop', banner.asset_uid || banner.path)"
           >
-            <ThumbImage :src="banner.path" />
+            <a-image
+              :src="banner.path"
+              width="100%"
+              height="100%"
+              fit="contain"
+              hide-footer
+              :preview="false"
+            />
             <div v-if="index === 0" class="media-thumb__badge">主横幅</div>
             <div class="media-thumb__actions">
               <a-button
@@ -338,7 +352,14 @@
             @dragover.prevent
             @drop.prevent="emit('logo-drop', logo.asset_uid || logo.path)"
           >
-            <ThumbImage :src="logo.path" />
+            <a-image
+              :src="logo.path"
+              width="100%"
+              height="100%"
+              fit="contain"
+              hide-footer
+              :preview="false"
+            />
             <div v-if="index === 0" class="media-thumb__badge">主 Logo</div>
             <div class="media-thumb__actions">
               <a-button
@@ -523,7 +544,6 @@ import {
   IconVideoCamera,
 } from '@arco-design/web-vue/es/icon'
 import MediaScreenshotSection from './MediaScreenshotSection.vue'
-import ThumbImage from './ThumbImage.vue'
 
 interface EditableCover {
   asset_uid?: string

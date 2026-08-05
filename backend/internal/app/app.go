@@ -107,11 +107,6 @@ func New(cfg config.Config) (*App, error) {
 	} else if reconciled > 0 {
 		log.Printf("asset reconcile removed stale references for %d game(s)", reconciled)
 	}
-	if backfilled, err := assetReconcileService.BackfillThumbnails(); err != nil {
-		log.Printf("thumbnail backfill failed: %v", err)
-	} else if backfilled > 0 {
-		log.Printf("thumbnail backfill generated %d thumbnail(s)", backfilled)
-	}
 
 	go func() {
 		orphaned, err := assetReconcileService.CleanOrphanedAssetFiles()

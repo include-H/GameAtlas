@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"mime/multipart"
 	"time"
 
@@ -78,12 +77,6 @@ func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart
 	path, err := s.store.SaveToStaging(game.PublicID, assetType, assetName, src, contentType)
 	if err != nil {
 		return nil, normalizeAssetError(err)
-	}
-	if assetType != "video" {
-		if thumbErr := s.store.WriteThumbnail(path); thumbErr != nil {
-			// Thumbnail is best-effort: the original asset stays usable without it.
-			log.Printf("generate thumbnail for %s failed: %v", path, thumbErr)
-		}
 	}
 
 	return &UploadResult{Path: path, AssetUID: assetUID}, nil

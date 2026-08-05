@@ -32,7 +32,14 @@
             @dragover.prevent
             @drop.prevent="emit('screenshot-drop', screenshot.client_key)"
           >
-            <ThumbImage :src="screenshot.path" />
+              <a-image
+                :src="screenshot.path"
+                width="100%"
+                height="100%"
+                fit="contain"
+                hide-footer
+                :preview="false"
+              />
             <div v-if="index === 0" class="screenshot-primary-badge">主图</div>
             <div class="screenshot-overlay">
               <div class="screenshot-overlay-actions">
@@ -74,7 +81,6 @@
 import { IconDelete, IconDragArrow, IconImage } from '@arco-design/web-vue/es/icon'
 import { Modal } from '@arco-design/web-vue'
 import { ref, onBeforeUnmount } from 'vue'
-import ThumbImage from './ThumbImage.vue'
 
 interface EditableScreenshot {
   asset_uid?: string
