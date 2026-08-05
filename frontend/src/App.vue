@@ -15,17 +15,6 @@
   <a-layout v-else class="app-layout">
     <a-layout-header class="pro-header glass-header">
       <div class="header-left">
-        <a-button
-          class="app-text-action-btn start-button"
-          type="text"
-          shape="circle"
-          :aria-label="startScreenVisible ? '关闭开始屏幕' : '打开开始屏幕'"
-          @click="toggleStartScreen"
-        >
-          <template #icon>
-            <icon-apps />
-          </template>
-        </a-button>
         <div class="logo">
           <icon-trophy :size="28" />
           <span class="logo-text">{{ appName }}</span>
@@ -36,6 +25,14 @@
         <a-space :size="20">
           <span v-if="isAdmin" class="welcome-text">欢迎您，{{ adminDisplayName }}</span>
           <span v-else-if="authLoadFailed" class="welcome-text welcome-text--warning">认证状态加载失败</span>
+          <a-button
+            class="app-text-action-btn"
+            type="text"
+            :aria-label="startScreenVisible ? '关闭开始屏幕' : '打开开始屏幕'"
+            @click="toggleStartScreen"
+          >
+            开始
+          </a-button>
           <a-button class="app-text-action-btn" type="text" @click="handleAuthAction">
             {{ authActionLabel }}
           </a-button>
@@ -179,7 +176,6 @@ import {
   IconMenuFold,
   IconMenuUnfold,
   IconUp,
-  IconApps,
 } from '@arco-design/web-vue/es/icon'
 
 const router = useRouter()
@@ -405,18 +401,6 @@ onUnmounted(() => {
   border-radius: var(--radius-md);
   background: transparent;
   border: none;
-}
-
-.start-button {
-  margin-right: 6px;
-  color: var(--color-text-2);
-  background: transparent;
-  transition: color var(--transition-fast), background var(--transition-fast);
-}
-
-.start-button:hover {
-  color: var(--color-primary-6);
-  background: var(--app-header-hover);
 }
 
 .pro-header .logo :deep(.arco-icon) {
