@@ -404,8 +404,9 @@
         <div class="media-card__toolbar">
           <a-button
             v-if="previewVideos.length > 0"
-            type="primary"
-            size="mini"
+            class="app-text-action-btn media-card__action"
+            type="text"
+            size="small"
             html-type="button"
             :loading="isUploadingVideo"
             @click="openVideoFilePicker"

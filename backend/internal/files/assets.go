@@ -237,6 +237,19 @@ func (s *AssetStore) WriteThumbnail(assetPath string) error {
 	return generateThumbnail(srcPath, thumbPath)
 }
 
+// EnsureThumbnail creates the deterministic thumbnail when it is missing.
+// Existing thumbnails are left untouched, so repeated startup backfills are no-ops.
+func (s *AssetStore) EnsureThumbnail(assetPath string) error {
+	thumbPath, err := s.resolveAssetPath(ThumbURLFor(assetPath))
+	if err != nil {
+		return err
+	}
+	if _, statErr := os.Stat(thumbPath); statErr == nil {
+		return nil
+	}
+	return s.WriteThumbnail(assetPath)
+}
+
 func generateThumbnail(srcPath string, dstPath string) error {
 	src, err := os.Open(srcPath)
 	if err != nil {
@@ -250,11 +263,11 @@ func generateThumbnail(srcPath string, dstPath string) error {
 	}
 
 	bounds := img.Bounds()
-	if bounds.Dx() <= thumbnailMaxWidth {
-		return nil
+	width := bounds.Dx()
+	if width > thumbnailMaxWidth {
+		width = thumbnailMaxWidth
 	}
 
-	width := thumbnailMaxWidth
 	height := bounds.Dy() * width / bounds.Dx()
 	if height < 1 {
 		height = 1

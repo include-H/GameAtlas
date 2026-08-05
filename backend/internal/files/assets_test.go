@@ -85,7 +85,7 @@ func TestWriteThumbnailMovesWithOriginalAndDeletesWithIt(t *testing.T) {
 	}
 }
 
-func TestWriteThumbnailSkipsSmallImages(t *testing.T) {
+func TestWriteThumbnailCreatesThumbnailForSmallImages(t *testing.T) {
 	baseDir := t.TempDir()
 	store := NewAssetStore(baseDir)
 
@@ -101,7 +101,7 @@ func TestWriteThumbnailSkipsSmallImages(t *testing.T) {
 	if err := store.WriteThumbnail("/assets/game-1/" + originalName); err != nil {
 		t.Fatalf("WriteThumbnail returned error: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(stagingDir, uuid+".thumb.jpg")); !os.IsNotExist(err) {
-		t.Fatalf("small image should not get a thumbnail, got err=%v", err)
+	if _, err := os.Stat(filepath.Join(stagingDir, uuid+".thumb.jpg")); err != nil {
+		t.Fatalf("small image should still get a thumbnail, got err=%v", err)
 	}
 }
