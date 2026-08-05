@@ -37,6 +37,11 @@ const route = useRoute()
 const uiStore = useUiStore()
 const { ambientBackgroundSource, sharedBackgroundAvailability } = storeToRefs(uiStore)
 
+const props = defineProps<{
+  /** 浮层场景（如开始屏幕）需要背景时强制启用，不受路由白名单限制 */
+  forceEnabled?: boolean
+}>()
+
 const SUPPORTED_ROUTE_NAMES = new Set([
   'login',
   'dashboard',
@@ -68,7 +73,9 @@ let globalPoolRequest: Promise<void> | null = null
 
 const CUSTOM_BACKGROUND_PATH = '/data/bg.jpg'
 
-const isEnabled = computed(() => SUPPORTED_ROUTE_NAMES.has(String(route.name || '')))
+const isEnabled = computed(() =>
+  props.forceEnabled || SUPPORTED_ROUTE_NAMES.has(String(route.name || ''))
+)
 const canUseCustomBackground = computed(() => sharedBackgroundAvailability.value === 'available')
 
 const buildLayerStyle = (url: string) => {
