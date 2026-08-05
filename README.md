@@ -136,6 +136,23 @@ Dismount-VHD -Path $vhdx
 - Markdown 编辑与渲染，支持目录（TOC）与 `:::epigraph` 引用块；
 - 每个游戏保留历史版本与变更摘要，可回溯。
 
+### Wiki 批量同步
+
+本地 `Game_Wiki` 仓库（Markdown 源文件）与生产库之间可以用脚本批量同步 Wiki 正文，适合在仓库里统一维护、再推到服务器：
+
+```bash
+python3 scripts/sync_wiki_to_prod.py            # 增量同步（内容无变化自动跳过）
+python3 scripts/sync_wiki_to_prod.py --force    # 强制覆盖全部
+python3 scripts/sync_wiki_to_prod.py --dry-run  # 只打印计划，不写入
+python3 scripts/sync_wiki_to_prod.py --game "半条命"  # 只同步标题匹配的游戏
+python3 scripts/sync_wiki_to_prod.py --list     # 列出全部游戏与本地文件映射
+python3 scripts/sync_wiki_to_prod.py --unmatched  # 显示无法匹配的游戏
+```
+
+- 默认目标地址 `http://192.168.1.4:3000`，管理员密码 `0114`，可用环境变量 `GA_URL` / `GA_PASSWORD` 覆盖；
+- 通过 `GET /api/games` 分页拉取生产库全部游戏（含无发售日期的条目），按标题自动匹配 + 手工映射表（`MANUAL_MAP`）解析到本地 `Game_Wiki` 文件，重复标题按 `public_id` 消歧；
+- 写入走管理员会话 + `PUT /api/games/:publicId/wiki`，每次写入附带"同步本地重构后的 Wiki"变更摘要，可在历史版本中回溯。
+
 ### 系列库 / 发行商库
 
 按系列和发行商聚合游戏，提供分组浏览与详情页。
