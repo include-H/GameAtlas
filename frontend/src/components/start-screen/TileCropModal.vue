@@ -1,5 +1,6 @@
 <template>
   <a-modal
+    class="start-screen-modal"
     :visible="visible"
     title="裁剪磁贴图片（banner）"
     :width="640"

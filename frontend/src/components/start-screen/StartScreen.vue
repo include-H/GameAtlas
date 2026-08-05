@@ -150,6 +150,7 @@
   />
 
   <a-modal
+    class="start-screen-modal"
     :visible="launchModalVisible"
     :footer="false"
     :width="480"
@@ -486,8 +487,11 @@ onUnmounted(() => {
 }
 
 /* 开始屏幕（1500）内部会打开裁剪/添加弹窗：Arco modal 默认 1000/1001，
-   这里统一提到 1600，保证弹窗盖在开始屏幕之上、全局告警（2000）之下。 */
-.arco-modal-container {
+   这里统一提到 1600，保证弹窗盖在开始屏幕之上、全局告警（2000）之下。
+   注意只能限定 start-screen-modal（开始屏自己的弹窗），不能全局抬高：
+   Arco select 下拉 popup 由内部管理器分配 z-index（默认 1001+），
+   全局抬 .arco-modal-container 会把全站弹窗内的下拉压到弹窗底下。 */
+.start-screen-modal.arco-modal-container {
   z-index: 1600 !important;
 }
 
