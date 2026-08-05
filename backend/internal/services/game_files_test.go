@@ -98,14 +98,32 @@ func TestWindowsLaunchServiceBuildLaunchScriptUsesMappedSMBPath(t *testing.T) {
 	if !strings.Contains(script, `set "COLOR_INFO=%ESC%[96m"`) {
 		t.Fatalf("script missing color init: %s", script)
 	}
-	if !strings.Contains(script, `call :PRINT_COLOR "%COLOR_INFO%" "  1. 挂载 SMB 并挂载游戏"`) {
+	if !strings.Contains(script, `call :PRINT_COLOR "%COLOR_INFO%" "    [1] 挂载游戏并游玩（结束后自动卸载并清理凭据）"`) {
 		t.Fatalf("script missing mount menu option: %s", script)
 	}
-	if !strings.Contains(script, `call :PRINT_COLOR "%COLOR_INFO%" "  2. 删除 Windows 中刚刚添加的 SMB 凭据"`) {
+	if !strings.Contains(script, `call :PRINT_COLOR "%COLOR_INFO%" "    [2] 仅挂载（保留连接与凭据）"`) {
+		t.Fatalf("script missing mount-only menu option: %s", script)
+	}
+	if !strings.Contains(script, `call :PRINT_COLOR "%COLOR_INFO%" "    [3] 清理 SMB 凭据并断开共享"`) {
 		t.Fatalf("script missing credential removal menu option: %s", script)
 	}
-	if !strings.Contains(script, `goto REMOVE_SMB_CREDENTIAL`) {
+	if !strings.Contains(script, `choice /c 123 /n /m "  请输入选项 [1/2/3]： "`) {
+		t.Fatalf("script missing choice prompt: %s", script)
+	}
+	if !strings.Contains(script, `if errorlevel 3 goto REMOVE_SMB_CREDENTIAL`) {
 		t.Fatalf("script missing credential removal branch: %s", script)
+	}
+	if !strings.Contains(script, `set "GAME_TITLE=Launch Script Game"`) {
+		t.Fatalf("script missing game title: %s", script)
+	}
+	if !strings.Contains(script, `GameAtlas · VHD 远程启动`) {
+		t.Fatalf("script missing banner: %s", script)
+	}
+	if !strings.Contains(script, `:WAIT_PLAY`) {
+		t.Fatalf("script missing wait-for-play branch: %s", script)
+	}
+	if !strings.Contains(script, `Select-String -SimpleMatch $env:DIFF_NAME`) {
+		t.Fatalf("script missing drive letter detection: %s", script)
 	}
 	if !strings.Contains(script, `cmdkey /delete:%SMB_HOST% >nul 2>&1`) {
 		t.Fatalf("script missing credential delete command: %s", script)
@@ -115,5 +133,18 @@ func TestWindowsLaunchServiceBuildLaunchScriptUsesMappedSMBPath(t *testing.T) {
 	}
 	if !strings.Contains(script, `:PRINT_COLOR`) {
 		t.Fatalf("script missing color print helper: %s", script)
+	}
+}
+
+func TestBannerContentLineAndClampDisplayText(t *testing.T) {
+	if got := displayWidth(bannerContentLine("GameAtlas · VHD 远程启动")); got != launchBannerWidth {
+		t.Fatalf("bannerContentLine() width = %d, want %d", got, launchBannerWidth)
+	}
+	if got := clampDisplayText("使命召唤：现代战争", 20); got != "使命召唤：现代战争" {
+		t.Fatalf("clampDisplayText() short text = %q", got)
+	}
+	long := clampDisplayText("这是一个非常非常非常非常非常长的游戏标题", 20)
+	if !strings.HasSuffix(long, "…") || displayWidth(long) > 20 {
+		t.Fatalf("clampDisplayText() long text = %q", long)
 	}
 }
