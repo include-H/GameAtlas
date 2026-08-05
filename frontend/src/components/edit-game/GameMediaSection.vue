@@ -690,23 +690,23 @@ onBeforeUnmount(stopGridAutoScroll)
 }
 
 .media-card--cover {
-  grid-column: span 3;
-}
-
-.media-card--banner {
-  grid-column: span 8;
-}
-
-.media-card--screenshots {
-  grid-column: span 7;
-}
-
-.media-card--logo {
   grid-column: span 4;
 }
 
+.media-card--banner {
+  grid-column: span 4;
+}
+
+.media-card--screenshots {
+  grid-column: span 4;
+}
+
+.media-card--logo {
+  grid-column: span 7;
+}
+
 .media-card--video {
-  grid-column: span 11;
+  grid-column: span 5;
 }
 
 .media-card__header {
@@ -749,6 +749,7 @@ onBeforeUnmount(stopGridAutoScroll)
 .media-card__body {
   display: flex;
   flex-direction: column;
+  flex: 1;
   gap: 8px;
   padding: 8px 12px 12px;
   min-width: 0;
@@ -785,7 +786,7 @@ onBeforeUnmount(stopGridAutoScroll)
 }
 
 .media-card__preview--video {
-  height: clamp(220px, 28vh, 380px);
+  height: clamp(340px, 38vh, 500px);
 }
 
 .video-card__player {
@@ -870,6 +871,9 @@ onBeforeUnmount(stopGridAutoScroll)
 .media-card__thumbs {
   display: flex;
   gap: 8px;
+  flex: 1;
+  align-items: stretch;
+  min-height: 0;
   overflow-x: auto;
   padding: 4px 2px;
   scrollbar-width: thin;
