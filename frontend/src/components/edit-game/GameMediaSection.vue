@@ -1,6 +1,6 @@
 <template>
   <div class="media-page">
-    <section class="media-card">
+    <section class="media-card media-card--cover">
       <header class="media-card__header">
         <div class="media-card__heading">
           <span class="media-card__title">封面图</span>
@@ -114,7 +114,7 @@
       </div>
     </section>
 
-    <section class="media-card">
+    <section class="media-card media-card--banner">
       <header class="media-card__header">
         <div class="media-card__heading">
           <span class="media-card__title">横幅图</span>
@@ -228,7 +228,7 @@
       </div>
     </section>
 
-    <section class="media-card media-card--wide">
+    <section class="media-card media-card--screenshots">
       <header class="media-card__header">
         <div class="media-card__heading">
           <span class="media-card__title">游戏截图</span>
@@ -291,7 +291,7 @@
       </div>
     </section>
 
-    <section class="media-card media-card--wide">
+    <section class="media-card media-card--logo">
       <header class="media-card__header">
         <div class="media-card__heading">
           <span class="media-card__title">Logo</span>
@@ -416,7 +416,7 @@
       </div>
     </section>
 
-    <section class="media-card media-card--wide">
+    <section class="media-card media-card--video">
       <header class="media-card__header">
         <div class="media-card__heading">
           <span class="media-card__title">预告片</span>
@@ -714,8 +714,8 @@ onBeforeUnmount(stopGridAutoScroll)
 <style scoped>
 .media-page {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+  gap: 12px;
   padding: 2px;
 }
 
@@ -729,8 +729,24 @@ onBeforeUnmount(stopGridAutoScroll)
   overflow: hidden;
 }
 
-.media-card--wide {
-  grid-column: 1 / -1;
+.media-card--cover {
+  grid-column: span 3;
+}
+
+.media-card--banner {
+  grid-column: span 8;
+}
+
+.media-card--screenshots {
+  grid-column: span 7;
+}
+
+.media-card--logo {
+  grid-column: span 4;
+}
+
+.media-card--video {
+  grid-column: span 11;
 }
 
 .media-card__header {
@@ -738,7 +754,7 @@ onBeforeUnmount(stopGridAutoScroll)
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 12px 14px 0;
+  padding: 10px 12px 0;
 }
 
 .media-card__heading {
@@ -773,8 +789,8 @@ onBeforeUnmount(stopGridAutoScroll)
 .media-card__body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 10px 14px 14px;
+  gap: 8px;
+  padding: 8px 12px 12px;
   min-width: 0;
 }
 
@@ -793,23 +809,23 @@ onBeforeUnmount(stopGridAutoScroll)
 }
 
 .media-card__preview--cover {
-  height: clamp(260px, 30vh, 420px);
+  aspect-ratio: 2 / 3;
 }
 
 .media-card__preview--banner {
-  height: clamp(220px, 26vh, 380px);
+  aspect-ratio: 16 / 9;
 }
 
 .media-card__preview--screenshot {
-  height: clamp(260px, 30vh, 420px);
+  height: clamp(160px, 20vh, 260px);
 }
 
 .media-card__preview--logo {
-  height: clamp(180px, 22vh, 320px);
+  height: clamp(120px, 16vh, 220px);
 }
 
 .media-card__preview--video {
-  height: clamp(240px, 28vh, 400px);
+  height: clamp(160px, 20vh, 280px);
 }
 
 .video-card__player {
@@ -1117,7 +1133,11 @@ onBeforeUnmount(stopGridAutoScroll)
     grid-template-columns: 1fr;
   }
 
-  .media-card--wide {
+  .media-card--cover,
+  .media-card--banner,
+  .media-card--screenshots,
+  .media-card--logo,
+  .media-card--video {
     grid-column: auto;
   }
 
