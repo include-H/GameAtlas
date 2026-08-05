@@ -31,7 +31,7 @@
                   编辑磁贴
                 </a-button>
               </template>
-              <template v-else>
+              <template v-else-if="isEditing">
                 <a-button class="app-text-action-btn" type="text" :disabled="isSaving" @click="emit('cancelEdit')">
                   取消
                 </a-button>
