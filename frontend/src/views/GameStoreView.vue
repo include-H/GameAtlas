@@ -148,7 +148,7 @@
             ref="caseRef"
             class="store-inspect__case"
             :class="{ 'store-inspect__case--opening': isOpening }"
-            title="打开游戏盒"
+            title="开始游戏"
             @click="handleOpenCase"
           >
             <div class="store-inspect__disc">
@@ -166,13 +166,18 @@
               <span class="store-inspect__sheen" />
             </div>
           </div>
+          <p
+            class="store-inspect__hint"
+            :class="{ 'store-inspect__hint--success': launchHintSuccess }"
+          >
+            {{ launchHint }}
+          </p>
           <div class="store-inspect__meta">
             <h2>{{ pickedGame.title }}</h2>
             <p>
               {{ pickedGame.year }}
               <template v-if="pickedGame.titleAlt"> · {{ pickedGame.titleAlt }}</template>
             </p>
-            <p class="store-inspect__hint">点击游戏盒打开并查看详情</p>
           </div>
           <div class="store-inspect__actions">
             <button type="button" class="store-btn store-btn--ghost" @click="putBack()">放回去</button>
@@ -180,13 +185,38 @@
         </div>
       </div>
     </Transition>
+
+    <!-- 多版本选择：开盒后存在多个可启动版本时弹出 -->
+    <a-modal
+      :visible="launchModalVisible"
+      :footer="false"
+      :width="480"
+      :title="`开始游戏：${launchTitle}`"
+      @cancel="launchModalVisible = false"
+    >
+      <div class="store-launch-list">
+        <button
+          v-for="option in launchOptions"
+          :key="option.id"
+          type="button"
+          class="store-launch-item"
+          @click="handleLaunchVersion(option)"
+        >
+          <icon-play-arrow />
+          <span class="store-launch-item__name">{{ option.version }}</span>
+          <span class="store-launch-item__action">开始游戏</span>
+        </button>
+      </div>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import gamesService from '@/services/games.service'
+import { IconPlayArrow } from '@arco-design/web-vue/es/icon'
+import gamesService, { mapGameVersions } from '@/services/games.service'
+import type { GameVersion } from '@/services/types'
 import { useUiStore } from '@/stores/ui'
 import {
   getAmbientBackgroundPoolFromGames,
@@ -229,6 +259,14 @@ const crtVideoRef = ref<HTMLVideoElement | null>(null)
 const stageScale = ref(1)
 const storePosters = ref<string[]>([])
 const storeRootRef = ref<HTMLElement | null>(null)
+const launchModalVisible = ref(false)
+const launchTitle = ref('')
+const launchOptions = ref<Array<{ id: string; version: string; url: string }>>([])
+const launchHint = ref('点击游戏盒直接开始游戏')
+const launchHintSuccess = ref(false)
+
+/** 开盒动画（盒盖 0.6s 翻转）播完即出手，不再额外等待 */
+const OPEN_CASE_DELAY_MS = 600
 
 /**
  * 固定 1280×720 设计稿，按内容区尺寸（框架内可用区域）缩放，
@@ -352,6 +390,7 @@ let putBackTimer: number | null = null
 let pickupSettleTimer: number | null = null
 let dimTimer: number | null = null
 let pickupAnimation: Animation | null = null
+let pendingLaunchPublicId: string | null = null
 
 interface PickupOrigin {
   x: number
@@ -510,6 +549,8 @@ const pickGame = (game: StoreShelfGame, event: MouseEvent) => {
   hoveredId.value = null
   inspectSettled.value = false
   stageDim.value = false
+  launchHint.value = '点击游戏盒直接开始游戏'
+  launchHintSuccess.value = false
   pickedGame.value = game
   if (pickupSettleTimer !== null) {
     window.clearTimeout(pickupSettleTimer)
@@ -652,6 +693,7 @@ const putBack = (animate = true) => {
     window.clearTimeout(openCaseTimer)
     openCaseTimer = null
   }
+  pendingLaunchPublicId = null
   if (putBackTimer !== null) {
     window.clearTimeout(putBackTimer)
     putBackTimer = null
@@ -741,14 +783,60 @@ const putBack = (animate = true) => {
   }, 900)
 }
 
+// 开盒即开玩（与开始屏幕一致）：详情拉取与开盒动画并行，动画结束直接启动；
+// 无可启动版本或拉取失败才回退详情页，多个版本时弹窗选择。
+// 触发启动后游戏盒保持打开，等待浏览器下载启动脚本，用户可点“放回去”收起。
 const handleOpenCase = () => {
   if (isOpening.value || !pickedGame.value) return
   isOpening.value = true
   const publicId = pickedGame.value.publicId
-  openCaseTimer = window.setTimeout(() => {
-    putBack()
-    router.push(`/games/${publicId}`)
-  }, 750)
+  pendingLaunchPublicId = publicId
+  const detailPromise = gamesService.getGameDetail(publicId).catch(() => null)
+
+  openCaseTimer = window.setTimeout(async () => {
+    openCaseTimer = null
+    const detail = await detailPromise
+    if (pendingLaunchPublicId !== publicId) return
+    pendingLaunchPublicId = null
+    if (!detail) {
+      putBack()
+      router.push({ name: 'game-detail', params: { publicId } })
+      return
+    }
+    const launchable = mapGameVersions(detail).filter(
+      (version) => version.canLaunch && version.launchScriptUrl,
+    )
+    if (launchable.length === 0) {
+      putBack()
+      router.push({ name: 'game-detail', params: { publicId } })
+      return
+    }
+    if (launchable.length === 1) {
+      launchVersion(launchable[0])
+      return
+    }
+    launchTitle.value = detail.title
+    launchOptions.value = launchable.map((version) => ({
+      id: version.id,
+      version: version.version,
+      url: version.launchScriptUrl!,
+    }))
+    launchModalVisible.value = true
+  }, OPEN_CASE_DELAY_MS)
+}
+
+const launchVersion = (version: GameVersion) => {
+  if (!version.launchScriptUrl) return
+  window.location.assign(version.launchScriptUrl)
+  launchHint.value = `已生成启动脚本：${version.version}，请查看浏览器下载`
+  launchHintSuccess.value = true
+}
+
+const handleLaunchVersion = (option: { id: string; version: string; url: string }) => {
+  launchModalVisible.value = false
+  window.location.assign(option.url)
+  launchHint.value = `已生成启动脚本：${option.version}，请查看浏览器下载`
+  launchHintSuccess.value = true
 }
 
 const handleKeydown = (event: KeyboardEvent) => {
@@ -790,6 +878,7 @@ onUnmounted(() => {
     window.clearTimeout(dimTimer)
     dimTimer = null
   }
+  pendingLaunchPublicId = null
   cleanupWaifu()
 })
 </script>
@@ -1602,7 +1691,6 @@ onUnmounted(() => {
 }
 
 .store-inspect__hint {
-  margin-top: 10px !important;
   font-size: 12px !important;
   color: rgba(255, 230, 190, 0.52) !important;
   letter-spacing: 1px !important;
@@ -1612,6 +1700,10 @@ onUnmounted(() => {
   color: rgba(255, 170, 130, 0.92) !important;
 }
 
+.store-inspect__hint--success {
+  color: rgba(255, 205, 120, 0.95) !important;
+}
+
 .store-inspect__actions {
   display: flex;
   gap: 14px;
@@ -1619,6 +1711,7 @@ onUnmounted(() => {
 
 /* 盒子落定后文字与按钮再浮现，避免跟着飞行动画一起“生硬弹入” */
 .store-inspect__meta,
+.store-inspect__hint,
 .store-inspect__actions {
   opacity: 0;
   transform: translateY(14px);
@@ -1628,6 +1721,7 @@ onUnmounted(() => {
 }
 
 .store-inspect__box--settled .store-inspect__meta,
+.store-inspect__box--settled .store-inspect__hint,
 .store-inspect__box--settled .store-inspect__actions {
   opacity: 1;
   transform: translateY(0);
@@ -1667,6 +1761,44 @@ onUnmounted(() => {
 
 .store-btn--primary:hover {
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- 多版本启动选择 ---------- */
+.store-launch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.store-launch-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--app-card-border);
+  border-radius: 8px;
+  background: var(--color-fill-2);
+  color: var(--color-text-1);
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.store-launch-item:hover {
+  background: var(--color-fill-3);
+  border-color: var(--app-glass-border-hover);
+}
+
+.store-launch-item__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.store-launch-item__action {
+  font-size: 13px;
+  color: var(--color-primary-6);
 }
 
 /* ---------- 动画 ---------- */
