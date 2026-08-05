@@ -8,38 +8,60 @@
     @cancel="emit('cancel')"
   >
     <div class="tile-crop">
-      <div class="tile-crop__modes">
-        <a-radio-group v-model="mode" type="button" size="small">
-          <a-radio value="square">方形（大 / 小）</a-radio>
-          <a-radio value="wide">宽幅</a-radio>
-        </a-radio-group>
-        <span class="tile-crop__mode-tip">{{ modeTip }}</span>
-      </div>
+      <div class="tile-crop__main">
+        <div class="tile-crop__stage">
+          <div class="tile-crop__modes">
+            <a-radio-group v-model="mode" type="button" size="small">
+              <a-radio value="square">方形（大 / 小）</a-radio>
+              <a-radio value="wide">宽幅</a-radio>
+            </a-radio-group>
+            <span class="tile-crop__mode-tip">{{ modeTip }}</span>
+          </div>
 
-      <div ref="canvasRef" class="tile-crop__canvas" @mousedown="onMouseDown">
-        <img
-          ref="imgRef"
-          :src="imageSrc"
-          class="tile-crop__image"
-          draggable="false"
-          @load="onImageLoad"
-        />
-        <div class="tile-crop__overlay" />
-        <div class="tile-crop__window" :style="windowStyle" />
-      </div>
+          <div ref="canvasRef" class="tile-crop__canvas" @mousedown="onMouseDown">
+            <img
+              ref="imgRef"
+              :src="activeSrc"
+              class="tile-crop__image"
+              draggable="false"
+              @load="onImageLoad"
+            />
+            <div class="tile-crop__overlay" />
+            <div class="tile-crop__window" :style="windowStyle" />
+          </div>
 
-      <div class="tile-crop__previews">
-        <div class="tile-crop__preview">
-          <img v-if="previewLarge" :src="previewLarge" alt="大磁贴预览" class="tile-crop__preview-img tile-crop__preview-img--large" />
-          <span v-else class="tile-crop__preview-empty">大 2×2</span>
+          <div v-if="banners.length > 0" class="tile-crop__banners">
+            <div class="tile-crop__banners-list">
+              <button
+                v-for="banner in banners"
+                :key="banner"
+                type="button"
+                :class="['tile-crop__banner-thumb', { 'tile-crop__banner-thumb--active': selectedBanner === banner }]"
+                :title="banner"
+                @click="selectBanner(banner)"
+              >
+                <img :src="banner" alt="" loading="lazy" />
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="tile-crop__preview">
-          <img v-if="previewWide" :src="previewWide" alt="宽磁贴预览" class="tile-crop__preview-img tile-crop__preview-img--wide" />
-          <span v-else class="tile-crop__preview-empty">宽 2×1</span>
-        </div>
-        <div class="tile-crop__preview">
-          <img v-if="previewSmall" :src="previewSmall" alt="小磁贴预览" class="tile-crop__preview-img tile-crop__preview-img--small" />
-          <span v-else class="tile-crop__preview-empty">小 1×1</span>
+
+        <div class="tile-crop__previews">
+          <div class="tile-crop__preview">
+            <span class="tile-crop__preview-label">大磁贴</span>
+            <img v-if="previewLarge" :src="previewLarge" alt="大磁贴预览" class="tile-crop__preview-img" />
+            <span v-else class="tile-crop__preview-empty">预览生成中…</span>
+          </div>
+          <div class="tile-crop__preview">
+            <span class="tile-crop__preview-label">中磁贴</span>
+            <img v-if="previewWide" :src="previewWide" alt="宽磁贴预览" class="tile-crop__preview-img" />
+            <span v-else class="tile-crop__preview-empty">预览生成中…</span>
+          </div>
+          <div class="tile-crop__preview">
+            <span class="tile-crop__preview-label">小磁贴</span>
+            <img v-if="previewSmall" :src="previewSmall" alt="小磁贴预览" class="tile-crop__preview-img" />
+            <span v-else class="tile-crop__preview-empty">预览生成中…</span>
+          </div>
         </div>
       </div>
 
@@ -55,10 +77,13 @@
 import { computed, ref, watch } from 'vue'
 import type { StartScreenTileSize } from '@/services/types'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   visible: boolean
   imageSrc: string
-}>()
+  banners?: string[]
+}>(), {
+  banners: () => [],
+})
 
 const emit = defineEmits<{
   confirm: [blobs: Record<StartScreenTileSize, Blob>]
@@ -68,6 +93,8 @@ const emit = defineEmits<{
 type CropMode = 'square' | 'wide'
 
 const mode = ref<CropMode>('square')
+const activeSrc = ref('')
+const selectedBanner = ref<string | null>(null)
 const canvasRef = ref<HTMLElement | null>(null)
 const imgRef = ref<HTMLImageElement | null>(null)
 const imageLoaded = ref(false)
@@ -105,6 +132,8 @@ const windowStyle = computed(() => ({
 
 watch(() => props.visible, (value) => {
   if (value) {
+    activeSrc.value = props.imageSrc
+    selectedBanner.value = props.banners.includes(props.imageSrc) ? props.imageSrc : null
     imageLoaded.value = false
     squareLeft.value = 0
     wideLeft.value = 0
@@ -113,6 +142,18 @@ watch(() => props.visible, (value) => {
     previewSmall.value = ''
   }
 })
+
+const selectBanner = (banner: string) => {
+  if (banner === activeSrc.value) return
+  activeSrc.value = banner
+  selectedBanner.value = banner
+  imageLoaded.value = false
+  squareLeft.value = 0
+  wideLeft.value = 0
+  previewLarge.value = ''
+  previewWide.value = ''
+  previewSmall.value = ''
+}
 
 const onImageLoad = () => {
   const img = imgRef.value
@@ -227,6 +268,60 @@ const handleConfirm = async () => {
   gap: 14px;
 }
 
+.tile-crop__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.tile-crop__stage {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tile-crop__banners-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.tile-crop__banner-thumb {
+  flex-shrink: 0;
+  width: 96px;
+  height: 44px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--color-fill-2);
+  opacity: 0.55;
+  transition:
+    border-color var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+.tile-crop__banner-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tile-crop__banner-thumb:hover {
+  opacity: 0.85;
+}
+
+.tile-crop__banner-thumb--active,
+.tile-crop__banner-thumb--active:hover {
+  border-color: var(--color-primary-6);
+  opacity: 1;
+}
+
 .tile-crop__modes {
   display: flex;
   align-items: center;
@@ -270,40 +365,44 @@ const handleConfirm = async () => {
 
 .tile-crop__previews {
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
   gap: 10px;
+  width: 150px;
+  flex-shrink: 0;
 }
 
 .tile-crop__preview {
-  flex: 1;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 72px;
+  width: 100%;
+  height: 84px;
   border-radius: 6px;
   overflow: hidden;
   background: var(--color-fill-2);
 }
 
+.tile-crop__preview-label {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  z-index: 1;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 4px;
+  color: var(--color-text-2);
+  background: color-mix(in srgb, var(--color-bg-1) 58%, transparent);
+  pointer-events: none;
+}
+
 .tile-crop__preview-img {
-  object-fit: cover;
+  object-fit: contain;
   width: 100%;
   height: 100%;
-}
-
-.tile-crop__preview-img--large {
-  aspect-ratio: 1 / 1;
-  max-height: 96px;
-}
-
-.tile-crop__preview-img--wide {
-  aspect-ratio: 2 / 1;
-  max-height: 96px;
-}
-
-.tile-crop__preview-img--small {
-  aspect-ratio: 1 / 1;
-  max-height: 72px;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .tile-crop__preview-empty {
@@ -315,5 +414,20 @@ const handleConfirm = async () => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+@media (max-width: 576px) {
+  .tile-crop__main {
+    flex-direction: column;
+  }
+
+  .tile-crop__previews {
+    flex-direction: row;
+    width: 100%;
+  }
+
+  .tile-crop__preview {
+    flex: 1;
+  }
 }
 </style>

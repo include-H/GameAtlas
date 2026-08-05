@@ -144,6 +144,7 @@
   <tile-crop-modal
     :visible="cropVisible"
     :image-src="cropSource"
+    :banners="cropBanners"
     @confirm="handleCropConfirm"
     @cancel="cropVisible = false"
   />
@@ -219,6 +220,7 @@ const wrapperRef = ref<HTMLElement | null>(null)
 const metroAreaRef = ref<HTMLElement | null>(null)
 const cropVisible = ref(false)
 const cropGameId = ref<number | null>(null)
+const cropBanners = ref<string[]>([])
 const launchModalVisible = ref(false)
 const launchTitle = ref('')
 const launchOptions = ref<Array<{ id: string; version: string; url: string }>>([])
@@ -319,8 +321,18 @@ const handleBrowseGames = () => {
   router.push({ name: 'games' })
 }
 
-const handleCrop = (gameId: number) => {
+const handleCrop = async (gameId: number) => {
   cropGameId.value = gameId
+  cropBanners.value = []
+  const tile = props.tiles.find((item) => item.game_id === gameId)
+  if (tile?.public_id) {
+    try {
+      const detail = await gamesService.getGameDetail(tile.public_id)
+      cropBanners.value = detail.banners.map((banner) => banner.path).filter((path): path is string => Boolean(path))
+    } catch {
+      // 拉取 banner 列表失败时仍可用磁贴默认 banner / 封面裁剪。
+    }
+  }
   cropVisible.value = true
 }
 

@@ -27,7 +27,7 @@
         class="metro-tile__action metro-tile__crop"
         role="button"
         tabindex="-1"
-        title="用 banner 裁剪磁贴图片"
+        title="选择 banner 裁剪磁贴图片"
         @click.stop="emit('crop', tile.game_id)"
       >
         <icon-image />
