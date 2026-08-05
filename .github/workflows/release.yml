@@ -70,7 +70,7 @@ jobs:
           sha256sum "game-release-${VERSION}-linux-amd64.tar.gz" "game-release-${VERSION}-linux-amd64.zip" > "game-release-${VERSION}-checksums.txt"
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           files: |
