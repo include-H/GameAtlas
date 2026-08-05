@@ -1,5 +1,4 @@
 .game-detail {
-  animation: fadeIn 0.3s ease;
   max-width: 100%;
   margin: 0;
   padding: 0;
@@ -21,17 +20,6 @@
   column-gap: 10px;
   align-items: stretch;
   margin-top: 10px;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .game-detail__header {

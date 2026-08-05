@@ -282,10 +282,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.games-timeline {
-  animation: fadeInUp 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-}
-
 .games-timeline__hero {
   margin-bottom: 10px;
 }

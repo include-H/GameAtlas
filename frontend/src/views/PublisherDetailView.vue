@@ -180,10 +180,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.publisher-detail {
-  animation: fadeInOnly 0.3s ease forwards;
-}
-
 .publisher-detail__header {
   display: flex;
   flex-direction: column;
@@ -217,15 +213,6 @@ onUnmounted(() => {
 
 .publisher-detail__grid-item {
   min-width: 0;
-}
-
-@keyframes fadeInOnly {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
 
 @media (max-width: 1199px) {

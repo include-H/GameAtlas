@@ -478,7 +478,8 @@ body .arco-btn-text.arco-btn-status-warning:hover {
 
 .route-fade-enter-active,
 .route-fade-leave-active {
-  transition: opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  /* 联调结论：路由切换只用一层短交叉淡化，时长 160ms，避免与视图入场动画叠加造成“卡” */
+  transition: opacity 0.16s ease;
 }
 
 .route-fade-enter-from,
@@ -493,6 +494,14 @@ body .arco-btn-text.arco-btn-status-warning:hover {
 
 .route-fade-shell {
   min-height: 100%;
+}
+
+/* 系统要求减少动效时直接瞬切 */
+@media (prefers-reduced-motion: reduce) {
+  .route-fade-enter-active,
+  .route-fade-leave-active {
+    transition: none !important;
+  }
 }
 
 /* -----------------------------------------------------------------------

@@ -182,10 +182,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.series-detail {
-  animation: fadeInOnly 0.3s ease forwards;
-}
-
 .series-detail__header {
   display: flex;
   flex-direction: column;
@@ -222,15 +218,6 @@ onUnmounted(() => {
 
 .series-detail__grid-item {
   min-width: 0;
-}
-
-@keyframes fadeInOnly {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
 
 @media (max-width: 1199px) {

@@ -177,7 +177,6 @@ onBeforeUnmount(() => {
   --publisher-cover-overlay: linear-gradient(180deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0.14));
   --publisher-placeholder-text: var(--color-text-on-dark);
 
-  animation: fadeInUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
 .publisher-library__header {
@@ -328,17 +327,6 @@ onBeforeUnmount(() => {
   color: var(--color-text-3);
   font-size: 12px;
   line-height: 1.35;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(15px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 @media (max-width: 1199px) {
