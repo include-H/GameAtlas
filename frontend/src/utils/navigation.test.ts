@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Router } from 'vue-router'
 
 import { hasHistoryBack, navigateBackOrFallback } from './navigation'
 
@@ -22,13 +23,11 @@ describe('navigation helpers', () => {
       },
     })
 
-    navigateBackOrFallback(
-      {
-        back,
-        push,
-      } as never,
-      { name: 'games' },
-    )
+    const router = {
+      back,
+      push,
+    } as unknown as Router
+    navigateBackOrFallback(router, { name: 'games' })
 
     expect(back).toHaveBeenCalledTimes(1)
     expect(push).not.toHaveBeenCalled()
@@ -44,13 +43,11 @@ describe('navigation helpers', () => {
       },
     })
 
-    navigateBackOrFallback(
-      {
-        back,
-        push,
-      } as never,
-      { name: 'games' },
-    )
+    const router = {
+      back,
+      push,
+    } as unknown as Router
+    navigateBackOrFallback(router, { name: 'games' })
 
     expect(back).not.toHaveBeenCalled()
     expect(push).toHaveBeenCalledWith({ name: 'games' })

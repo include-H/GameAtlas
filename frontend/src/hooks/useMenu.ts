@@ -20,7 +20,7 @@ export interface MenuItem {
  * @param permission - Permission hook to check access
  * @returns Array of menu items
  */
-function generateMenuItems(
+export function generateMenuItems(
   routes: RouteRecordRaw[],
   permission: ReturnType<typeof usePermission>,
   isCompactNavigation: boolean,

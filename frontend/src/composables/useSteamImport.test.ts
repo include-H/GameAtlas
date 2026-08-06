@@ -4,11 +4,15 @@ import type { EditGameForm } from '@/utils/edit-game-form'
 import { useSteamImport } from './useSteamImport'
 
 const {
+  searchGamesMock,
+  getGameDetailsMock,
   searchSteamGridDBMock,
   getHeroesByGameIdMock,
   getLogosByGameIdMock,
   isSteamGridDBAvailableMock,
 } = vi.hoisted(() => ({
+  searchGamesMock: vi.fn(),
+  getGameDetailsMock: vi.fn(),
   searchSteamGridDBMock: vi.fn(),
   getHeroesByGameIdMock: vi.fn(),
   getLogosByGameIdMock: vi.fn(),
@@ -17,8 +21,8 @@ const {
 
 vi.mock('@/services/steam.service', () => ({
   default: {
-    searchGames: vi.fn(),
-    getGameDetails: vi.fn(),
+    searchGames: searchGamesMock,
+    getGameDetails: getGameDetailsMock,
   },
   proxySteamAssetUrl: (url: string) => url,
 }))
@@ -53,6 +57,8 @@ const buildForm = () => ref<EditGameForm>({
 
 describe('useSteamImport', () => {
   beforeEach(() => {
+    searchGamesMock.mockReset()
+    getGameDetailsMock.mockReset()
     isSteamGridDBAvailableMock.mockReset()
     isSteamGridDBAvailableMock.mockResolvedValue(true)
     searchSteamGridDBMock.mockReset()
@@ -114,7 +120,7 @@ describe('useSteamImport', () => {
       }),
     ])
 
-    await steamImport.selectScreenshotGame(steamImport.screenshotSearchResults.value[0])
+    await steamImport.selectScreenshotGame(steamImport.screenshotSearchResults.value[0]!)
 
     expect(steamImport.screenshotCandidatesData.value?.screenshots).toEqual([
       'https://cdn.example.com/hero-1.jpg',
@@ -205,5 +211,106 @@ describe('useSteamImport', () => {
       '/assets/logo-1.png',
       '/assets/logo-2.png',
     ])
+  })
+
+  it('falls back to Steam cover and banner when a game has no screenshots', async () => {
+    searchGamesMock.mockResolvedValue([{ id: '55', name: 'Steam Only' }])
+    getGameDetailsMock.mockResolvedValue({
+      name: 'Steam Only',
+      description: '',
+      releaseDate: '2024',
+      developers: [],
+      publishers: [],
+      screenshots: [],
+      coverImage: 'https://cdn.example.com/cover.jpg',
+      bannerImage: 'https://cdn.example.com/banner.jpg',
+    })
+
+    const form = buildForm()
+    const steamImport = useSteamImport({
+      form,
+      gameId: ref(42),
+      getWikiContent: () => '',
+      uploadAssetFromUrl: vi.fn(),
+      createEditableCover: vi.fn(),
+      createEditableBanner: vi.fn(),
+      createEditableLogo: vi.fn(),
+      createEditableScreenshot: vi.fn(),
+      ensureDeveloperNames: vi.fn().mockResolvedValue([]),
+      ensurePublisherNames: vi.fn().mockResolvedValue([]),
+      addAlert: vi.fn(),
+    })
+
+    steamImport.screenshotSearchQuery.value = 'Steam Only'
+    await steamImport.searchScreenshots()
+    expect(steamImport.screenshotSearchResults.value[0]).toMatchObject({
+      id: '55',
+      name: 'Steam Only',
+    })
+
+    await steamImport.selectScreenshotGame(steamImport.screenshotSearchResults.value[0]!)
+    expect(steamImport.screenshotCandidatesData.value?.screenshots).toEqual([
+      'https://cdn.example.com/banner.jpg',
+      'https://cdn.example.com/cover.jpg',
+    ])
+  })
+
+  it('clears SteamGridDB screenshot search state', async () => {
+    searchSteamGridDBMock.mockResolvedValue([{ id: 99, name: 'Grid Screenshot' }])
+    getHeroesByGameIdMock.mockResolvedValue([])
+
+    const steamImport = useSteamImport({
+      form: buildForm(),
+      gameId: ref(42),
+      getWikiContent: () => '',
+      uploadAssetFromUrl: vi.fn(),
+      createEditableCover: vi.fn(),
+      createEditableBanner: vi.fn(),
+      createEditableLogo: vi.fn(),
+      createEditableScreenshot: vi.fn(),
+      ensureDeveloperNames: vi.fn().mockResolvedValue([]),
+      ensurePublisherNames: vi.fn().mockResolvedValue([]),
+      addAlert: vi.fn(),
+    })
+    steamImport.screenshotSource.value = 'steamgriddb'
+    steamImport.screenshotSearchQuery.value = 'Grid Screenshot'
+    await steamImport.searchScreenshots()
+
+    expect(steamImport.screenshotSearchResults.value).toHaveLength(1)
+    steamImport.handleScreenshotSearchClear()
+
+    expect(steamImport.screenshotSearchQuery.value).toBe('')
+    expect(steamImport.screenshotSearchResults.value).toEqual([])
+    expect(steamImport.screenshotCandidatesData.value).toBeNull()
+  })
+
+  it('resets screenshot selector state', async () => {
+    searchSteamGridDBMock.mockResolvedValue([{ id: 100, name: 'Grid Reset' }])
+    getHeroesByGameIdMock.mockResolvedValue([])
+
+    const steamImport = useSteamImport({
+      form: buildForm(),
+      gameId: ref(42),
+      getWikiContent: () => '',
+      uploadAssetFromUrl: vi.fn(),
+      createEditableCover: vi.fn(),
+      createEditableBanner: vi.fn(),
+      createEditableLogo: vi.fn(),
+      createEditableScreenshot: vi.fn(),
+      ensureDeveloperNames: vi.fn().mockResolvedValue([]),
+      ensurePublisherNames: vi.fn().mockResolvedValue([]),
+      addAlert: vi.fn(),
+    })
+    steamImport.screenshotSource.value = 'steamgriddb'
+    steamImport.screenshotSearchQuery.value = 'Grid Reset'
+    await steamImport.searchScreenshots()
+
+    steamImport.resetSteamImportState()
+
+    expect(steamImport.showScreenshotSelector.value).toBe(false)
+    expect(steamImport.screenshotSource.value).toBe('steam')
+    expect(steamImport.screenshotSearchQuery.value).toBe('')
+    expect(steamImport.screenshotSearchResults.value).toEqual([])
+    expect(steamImport.screenshotCandidatesData.value).toBeNull()
   })
 })
