@@ -2,7 +2,6 @@ package routes
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
@@ -270,20 +269,6 @@ func registerAssetRoutes(router *gin.Engine, assetsDir string, gamesRepo assetRo
 }
 
 func registerCustomDataRoutes(router *gin.Engine, dataDir string) {
-	allowedExtensions := map[string]struct{}{
-		".jpg":   {},
-		".jpeg":  {},
-		".png":   {},
-		".webp":  {},
-		".avif":  {},
-		".gif":   {},
-		".svg":   {},
-		".ttf":   {},
-		".otf":   {},
-		".woff":  {},
-		".woff2": {},
-	}
-
 	dataHandler := func(c *gin.Context) {
 		rawPath := strings.TrimPrefix(c.Param("filepath"), "/")
 		if rawPath == "" {
@@ -297,8 +282,7 @@ func registerCustomDataRoutes(router *gin.Engine, dataDir string) {
 			return
 		}
 
-		extension := strings.ToLower(filepath.Ext(cleanPath))
-		if _, ok := allowedExtensions[extension]; !ok {
+		if cleanPath != "bg.jpg" {
 			c.Status(http.StatusNotFound)
 			return
 		}
@@ -316,9 +300,6 @@ func registerCustomDataRoutes(router *gin.Engine, dataDir string) {
 		}
 
 		c.Header("Cache-Control", "no-cache, must-revalidate")
-		if strings.HasSuffix(cleanPath, "bg.jpg") {
-			fmt.Printf("[data] serving bg.jpg from: %s (exists: %v)\n", assetPath, true)
-		}
 		c.File(assetPath)
 	}
 	router.GET("/data/*filepath", dataHandler)
