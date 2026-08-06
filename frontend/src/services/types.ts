@@ -1,5 +1,5 @@
 export interface ApiEnvelope<T> {
-  success?: boolean
+  success: boolean
   data: T
   message?: string
   error?: string
@@ -336,7 +336,7 @@ const hasResolvedGameFilePath = (file: GameFileEntry): file is AdminGameFileEntr
 
 export const isAdminGameDetail = (game: GameDetail | null | undefined): game is AdminGameDetail => {
   if (!game) return false
-  return game.files.every((file) => hasResolvedGameFilePath(file))
+  return game.files.length > 0 && game.files.every((file) => hasResolvedGameFilePath(file))
 }
 
 export interface GameVersion {

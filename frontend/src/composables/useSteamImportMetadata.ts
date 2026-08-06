@@ -1,4 +1,4 @@
-import { ref, watch, type Ref } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 import type { EditGameForm } from '@/utils/edit-game-form'
 import steamService from '@/services/steam.service'
 import { useSteamPicker } from '@/composables/useSteamPicker'
@@ -288,7 +288,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
   })
 
   const steamSummarySearchQuery = summarySteamPicker.query
-  const steamSummarySearchResults = summarySteamPicker.results
+  const steamSummarySearchResults = computed(() => [...summarySteamPicker.results.value])
   const selectedSteamSummaryGame = summarySteamPicker.selectedGame
   const isSearchingSteamSummary = summarySteamPicker.isSearching
 
@@ -354,9 +354,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
 
   const resetMetadataImportState = () => {
     showSummarySelector.value = false
-    steamSummarySearchQuery.value = ''
-    steamSummarySearchResults.value = []
-    selectedSteamSummaryGame.value = null
+    summarySteamPicker.clear()
     steamSummaryPreview.value = ''
     steamSummaryDetails.value = null
     wikiMetadataPickerVisible.value = false

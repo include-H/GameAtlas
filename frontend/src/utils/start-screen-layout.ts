@@ -3,24 +3,24 @@ import type { StartScreenTile, StartScreenTileSize } from '@/services/types'
 export const START_SCREEN_COLUMN_ROWS = 6
 export const START_SCREEN_COLUMN_COLS = 2
 
-export const START_SCREEN_TILE_SPANS: Record<StartScreenTileSize, { rows: number; cols: number }> = {
+const START_SCREEN_TILE_SPANS: Record<StartScreenTileSize, { rows: number; cols: number }> = {
   small: { rows: 1, cols: 1 },
   wide: { rows: 1, cols: 2 },
   large: { rows: 2, cols: 2 },
 }
 
-export interface PackedStartScreenSlot {
+interface PackedStartScreenSlot {
   tile: StartScreenTile
   globalIndex: number
   row: number
   col: number
 }
 
-export interface PackedStartScreenColumn {
+interface PackedStartScreenColumn {
   slots: PackedStartScreenSlot[]
 }
 
-export interface StartScreenDropTarget {
+interface StartScreenDropTarget {
   columnIndex: number
   row: number
   col: number

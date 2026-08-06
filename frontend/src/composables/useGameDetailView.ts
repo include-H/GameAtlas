@@ -1,6 +1,5 @@
 import { computed, nextTick, onActivated, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
 
-let currentAbortController: AbortController | null = null
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import downloadService from '@/services/download.service'
 import { isAdminGameDetail, type AdminGameDetail, type GameVersion } from '@/services/types'
@@ -89,6 +88,7 @@ export const useGameDetailView = ({
   uiStore,
   isAdmin,
 }: UseGameDetailViewOptions) => {
+  let currentAbortController: AbortController | null = null
   const requestedGameId = computed(() => {
     const rawValue = route.params.publicId
     return typeof rawValue === 'string' ? rawValue.trim() : Array.isArray(rawValue) ? String(rawValue[0] || '').trim() : ''

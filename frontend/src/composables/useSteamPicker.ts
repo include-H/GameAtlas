@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { readonly, ref } from 'vue'
 import steamService from '@/services/steam.service'
 import type { SteamGameSearchResult } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
@@ -59,15 +59,54 @@ export const useSteamPicker = <TSelection>(options: UseSteamPickerOptions<TSelec
     resetSelection()
   }
 
+  const setQuery = (next: string) => {
+    query.value = next
+  }
+
+  const setSelectedGame = (game: SteamGameSearchResult | null) => {
+    selectedData.value = null
+    selectedGame.value = game
+  }
+
+  const setSearching = (next: boolean) => {
+    isSearching.value = next
+  }
+
+  const clearResults = () => {
+    results.value = []
+  }
+
+  const selectExternal = async (
+    game: SteamGameSearchResult,
+    load: () => Promise<void> | void,
+  ) => {
+    resetSelection()
+    selectedGame.value = game
+    isSearching.value = true
+    try {
+      await load()
+    } catch (error) {
+      resetSelection()
+      throw error
+    } finally {
+      isSearching.value = false
+    }
+  }
+
   return {
     query,
-    results,
-    selectedGame,
-    selectedData,
-    isSearching,
+    results: readonly(results),
+    selectedGame: readonly(selectedGame),
+    selectedData: readonly(selectedData),
+    isSearching: readonly(isSearching),
     clear,
+    clearResults,
     search,
     select,
+    selectExternal,
+    setQuery,
+    setSelectedGame,
+    setSearching,
     back,
   }
 }

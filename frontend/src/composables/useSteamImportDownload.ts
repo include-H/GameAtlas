@@ -147,8 +147,8 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
       sgdbSearching.value = true
       try {
         sgdbSearchResults.value = await searchSGDB(coverSteamPicker.query.value)
-        coverSteamPicker.results.value = []
-        coverSteamPicker.selectedGame.value = null
+        coverSteamPicker.clearResults()
+        coverSteamPicker.back()
       } catch (e) {
         options.addAlert('SteamGridDB 搜索失败：' + getHttpErrorMessage(e), 'error')
       } finally {
@@ -162,19 +162,16 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
 
   const selectSteamCoverGame = async (game: SteamGameSearchResult) => {
     if (coverSource.value === 'steamgriddb') {
-      coverSteamPicker.selectedGame.value = game
-      coverSteamPicker.isSearching.value = true
       try {
-        const grids = await steamGridDBService.getGridsByGameId(Number(game.id))
-        const images = grids.map((g) => g.url)
-        steamCoverImages.value = images
-        selectedCoverImage.value = ''
-        selectedCovers.value = new Set()
+        await coverSteamPicker.selectExternal(game, async () => {
+          const grids = await steamGridDBService.getGridsByGameId(Number(game.id))
+          const images = grids.map((g) => g.url)
+          steamCoverImages.value = images
+          selectedCoverImage.value = ''
+          selectedCovers.value = new Set()
+        })
       } catch (e) {
         options.addAlert('SteamGridDB 获取封面失败：' + getHttpErrorMessage(e), 'error')
-        coverSteamPicker.selectedGame.value = null
-      } finally {
-        coverSteamPicker.isSearching.value = false
       }
     } else {
       await coverSteamPicker.select(game)
@@ -215,20 +212,20 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
   const downloadSelectedSteamCover = async () => {
     if (!selectedCoverImage.value || !options.gameId.value) return
 
-    isSearchingSteamCover.value = true
+    coverSteamPicker.setSearching(true)
     try {
       const uploaded = await options.uploadAssetFromUrl(selectedCoverImage.value, 'cover')
       options.form.value.covers.push(options.createEditableCover(uploaded))
       await options.onAssetPersisted?.()
       showCoverSelector.value = false
       backToCoverGameSearch()
-      steamCoverSearchQuery.value = ''
-      steamCoverSearchResults.value = []
+      coverSteamPicker.setQuery('')
+      coverSteamPicker.clearResults()
       options.addAlert('封面下载成功', 'success')
     } catch (error) {
       options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
     } finally {
-      isSearchingSteamCover.value = false
+      coverSteamPicker.setSearching(false)
     }
   }
 
@@ -248,8 +245,8 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
       await options.onAssetPersisted?.()
       showCoverSelector.value = false
       backToCoverGameSearch()
-      steamCoverSearchQuery.value = ''
-      steamCoverSearchResults.value = []
+      coverSteamPicker.setQuery('')
+      coverSteamPicker.clearResults()
       options.addAlert(`成功添加 ${indices.length} 张封面`, 'success')
     } catch (error) {
       options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
@@ -273,8 +270,8 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
       sgdbSearching.value = true
       try {
         sgdbSearchResults.value = await searchSGDB(bannerSteamPicker.query.value)
-        bannerSteamPicker.results.value = []
-        bannerSteamPicker.selectedGame.value = null
+        bannerSteamPicker.clearResults()
+        bannerSteamPicker.back()
       } catch (e) {
         options.addAlert('SteamGridDB 搜索失败：' + getHttpErrorMessage(e), 'error')
       } finally {
@@ -288,18 +285,15 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
 
   const selectSteamBannerGame = async (game: SteamGameSearchResult) => {
     if (bannerSource.value === 'steamgriddb') {
-      bannerSteamPicker.selectedGame.value = game
-      bannerSteamPicker.isSearching.value = true
       try {
-        const heroes = await steamGridDBService.getHeroesByGameId(Number(game.id))
-        const images = heroes.map((g) => g.url)
-        steamBannerImages.value = images
-        selectedBanners.value = new Set()
+        await bannerSteamPicker.selectExternal(game, async () => {
+          const heroes = await steamGridDBService.getHeroesByGameId(Number(game.id))
+          const images = heroes.map((g) => g.url)
+          steamBannerImages.value = images
+          selectedBanners.value = new Set()
+        })
       } catch (e) {
         options.addAlert('SteamGridDB 获取横幅失败：' + getHttpErrorMessage(e), 'error')
-        bannerSteamPicker.selectedGame.value = null
-      } finally {
-        bannerSteamPicker.isSearching.value = false
       }
     } else {
       await bannerSteamPicker.select(game)
@@ -353,8 +347,8 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
       await options.onAssetPersisted?.()
       showBannerSelector.value = false
       backToBannerGameSearch()
-      steamBannerSearchQuery.value = ''
-      steamBannerSearchResults.value = []
+      bannerSteamPicker.setQuery('')
+      bannerSteamPicker.clearResults()
       bannerSearchUrl.value = ''
       bannerPreviewUrl.value = ''
       options.addAlert(`成功添加 ${indices.length} 张横幅`, 'success')
@@ -414,7 +408,7 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
     if (!isOpen) return
     const query = options.pickSteamSearchQuery()
     if (!query) return
-    steamCoverSearchQuery.value = query
+    coverSteamPicker.setQuery(query)
     searchSteamForCover()
   })
 
@@ -422,7 +416,7 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
     if (!isOpen) return
     const query = options.pickSteamSearchQuery()
     if (!query) return
-    steamBannerSearchQuery.value = query
+    bannerSteamPicker.setQuery(query)
     searchSteamForBanner()
   })
 
@@ -450,7 +444,7 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
   const coverSearchResults = computed(() =>
     coverSource.value === 'steamgriddb'
       ? mergeSGDBThumbs(sgdbSearchResults.value)
-      : steamCoverSearchResults.value,
+      : [...steamCoverSearchResults.value],
   )
   const isSearchingCover = computed(() =>
     coverSource.value === 'steamgriddb' ? sgdbSearching.value : isSearchingSteamCover.value,
@@ -458,7 +452,7 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
   const bannerSearchResults = computed(() =>
     bannerSource.value === 'steamgriddb'
       ? mergeSGDBThumbs(sgdbSearchResults.value)
-      : steamBannerSearchResults.value,
+      : [...steamBannerSearchResults.value],
   )
   const isSearchingBanner = computed(() =>
     bannerSource.value === 'steamgriddb' ? sgdbSearching.value : isSearchingSteamBanner.value,
@@ -471,18 +465,14 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
     sgdbSearchResults.value = []
     sgdbThumbs.value = {}
 
-    steamCoverSearchQuery.value = ''
-    steamCoverSearchResults.value = []
-    selectedSteamGame.value = null
+    coverSteamPicker.clear()
     steamCoverImages.value = []
     selectedCoverImage.value = ''
     selectedCovers.value = new Set()
     coverSearchUrl.value = ''
     coverPreviewUrl.value = ''
 
-    steamBannerSearchQuery.value = ''
-    steamBannerSearchResults.value = []
-    selectedSteamBannerGame.value = null
+    bannerSteamPicker.clear()
     steamBannerImages.value = []
     selectedBanners.value = new Set()
     bannerSearchUrl.value = ''

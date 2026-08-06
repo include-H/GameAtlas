@@ -1,4 +1,4 @@
-export type EpigraphLineType = 'cn' | 'en'
+type EpigraphLineType = 'cn' | 'en'
 
 /**
  * 题记块（:::epigraph）内每一行的排版分类：

@@ -293,8 +293,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       isSearchingSgdbScreenshots.value = true
       try {
         await searchSteamGridDBForScreenshots()
-        steamScreenshotSearchResults.value = []
-        selectedScreenshotGame.value = null
+        screenshotSteamPicker.clearResults()
+        screenshotSteamPicker.back()
       } catch (error) {
         options.addAlert('SteamGridDB 搜索失败：' + getHttpErrorMessage(error), 'error')
       } finally {
@@ -310,7 +310,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
 
   const selectScreenshotGame = async (game: SteamGameSearchResult) => {
     if (screenshotSource.value === 'steamgriddb') {
-      selectedScreenshotGame.value = game
+      screenshotSteamPicker.setSelectedGame(game)
       isSearchingSgdbScreenshots.value = true
       try {
         const heroes = await steamGridDBService.getHeroesByGameId(Number(game.id))
@@ -413,7 +413,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       showScreenshotSelector.value = false
       backToScreenshotGameSearch()
       screenshotSearchQuery.value = ''
-      steamScreenshotSearchResults.value = []
+      screenshotSteamPicker.clearResults()
       options.addAlert(`成功添加 ${indices.length} 张截图`, 'success')
     } catch (error) {
       options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
@@ -564,7 +564,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const screenshotSearchResults = computed(() => (
     screenshotSource.value === 'steamgriddb'
       ? mergeSgdbScreenshotThumbs(sgdbScreenshotSearchResults.value)
-      : steamScreenshotSearchResults.value
+      : [...steamScreenshotSearchResults.value]
   ))
   const isSearchingScreenshots = computed(() => (
     screenshotSource.value === 'steamgriddb'
@@ -583,9 +583,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     resetDownloadState()
 
     screenshotSource.value = 'steam'
-    screenshotSearchQuery.value = ''
-    steamScreenshotSearchResults.value = []
-    selectedScreenshotGame.value = null
+    screenshotSteamPicker.clear()
     screenshotCandidatesData.value = null
     selectedRemoteScreenshots.value = new Set()
     sgdbScreenshotSearchResults.value = []
