@@ -11,6 +11,7 @@ import { computed } from 'vue'
 import MarkdownIt from 'markdown-it'
 import { generateHeadingId } from '@/utils/markdown-headings'
 import { classifyEpigraphLine } from '@/utils/epigraph'
+import { escapePlainTextToHtml } from '@/utils/markdown-safe-text'
 
 interface Props {
   content: string
@@ -181,7 +182,9 @@ const renderedHtml = computed(() => {
   try {
     return renderEpigraphBlocks(props.content)
   } catch {
-    return props.content
+    // 兜底绝不能把原始 Markdown（可能内嵌原生 HTML）直接交给 v-html，
+    // 否则 html: false 的转义保证被绕过（XSS）。一律转义为纯文本。
+    return escapePlainTextToHtml(props.content)
   }
 })
 </script>
