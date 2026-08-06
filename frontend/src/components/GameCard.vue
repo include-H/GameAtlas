@@ -10,8 +10,6 @@
         :src="displayImage"
         :alt="game.title"
         class="game-card__image"
-        loading="lazy"
-        decoding="async"
       />
 
       <!-- Overlay with gradient -->

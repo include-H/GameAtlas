@@ -41,7 +41,7 @@
                 :title="banner"
                 @click="selectBanner(banner)"
               >
-                <img :src="banner" alt="" loading="lazy" />
+                <img :src="banner" alt="" />
               </button>
             </div>
           </div>

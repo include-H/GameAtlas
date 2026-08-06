@@ -26,7 +26,6 @@
               :src="currentMedia.url"
               :alt="alt"
               class="screenshot-carousel__image"
-              decoding="async"
               @load="onImageLoad"
               @error="handleImageError(currentMedia.url)"
             />
@@ -58,7 +57,6 @@
                       :src="currentVideoPoster"
                       class="screenshot-carousel__loader-thumb"
                       alt=""
-                      decoding="async"
                       @error="handlePosterError(currentVideoPoster)"
                     />
                     <svg class="screenshot-carousel__loader-arc" viewBox="0 0 100 100">
@@ -82,7 +80,6 @@
                   :src="currentVideoPoster"
                   class="screenshot-carousel__loader-thumb"
                   alt=""
-                  decoding="async"
                   @error="handlePosterError(currentVideoPoster)"
                 >
                 <span class="screenshot-carousel__video-failed-text">视频加载失败</span>
@@ -122,8 +119,6 @@
             v-if="item.thumbnail"
             :src="item.thumbnail"
             :alt="item.type === 'video' ? 'Video thumbnail' : `Screenshot ${index + 1}`"
-            loading="lazy"
-            decoding="async"
             @error="item.type === 'image' ? handleImageError(item.thumbnail) : (item.poster ? handlePosterError(item.poster) : undefined)"
           />
           <div v-else class="screenshot-carousel__film-placeholder">

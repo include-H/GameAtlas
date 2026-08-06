@@ -59,8 +59,6 @@
                     :src="cover"
                     :alt="`${series.name}-${index + 1}`"
                     class="series-card__collage-image"
-                    loading="lazy"
-                    decoding="async"
                   />
                 </div>
               </div>
@@ -69,8 +67,6 @@
                 :src="series.cover_image"
                 :alt="series.name"
                 class="series-card__image"
-                loading="lazy"
-                decoding="async"
               />
               <div v-else class="series-card__placeholder">
                 {{ series.name.charAt(0) || '?' }}

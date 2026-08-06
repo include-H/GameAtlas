@@ -85,14 +85,12 @@
                 :src="game.banner_image"
                 :alt="game.title"
                 class="sidebar-header-image__img"
-                decoding="async"
               />
               <img
                 v-else-if="game.cover_image"
                 :src="game.cover_image"
                 :alt="game.title"
                 class="sidebar-header-image__img sidebar-header-image__img--contain"
-                decoding="async"
               />
               <div v-else class="sidebar-header-image__placeholder">
                 {{ game.title?.charAt(0) || '?' }}
@@ -103,7 +101,6 @@
                 :alt="game.title"
                 class="sidebar-logo-overlay"
                 :style="logoOverlayStyle"
-                decoding="async"
               />
             </div>
 

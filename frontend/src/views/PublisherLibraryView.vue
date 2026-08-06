@@ -59,8 +59,6 @@
                     :src="cover"
                     :alt="`${publisher.name}-${index + 1}`"
                     class="publisher-card__collage-image"
-                    loading="lazy"
-                    decoding="async"
                   />
                 </div>
               </div>
@@ -69,8 +67,6 @@
                 :src="publisher.cover_image"
                 :alt="publisher.name"
                 class="publisher-card__image"
-                loading="lazy"
-                decoding="async"
               />
               <div v-else class="publisher-card__placeholder">
                 {{ publisher.name.charAt(0) || '?' }}

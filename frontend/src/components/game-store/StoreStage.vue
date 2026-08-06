@@ -9,7 +9,6 @@
         class="store-poster__img"
         :src="posters[0]"
         alt="新到货"
-        decoding="async"
       >
     </div>
     <div class="store-poster store-poster--right">
@@ -18,7 +17,6 @@
         class="store-poster__img"
         :src="posters[1]"
         alt="畅销榜"
-        decoding="async"
       >
     </div>
     <div class="store-sign">

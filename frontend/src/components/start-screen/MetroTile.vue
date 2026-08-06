@@ -15,7 +15,6 @@
       :src="imageSrc"
       :alt="tile.title"
       class="metro-tile__cover"
-      loading="lazy"
       draggable="false"
     >
     <span v-else class="metro-tile__fallback">{{ initial }}</span>

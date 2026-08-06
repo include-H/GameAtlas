@@ -215,7 +215,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
@@ -455,9 +455,29 @@ const setupVirtualScroll = () => {
   virtualResizeObserver.observe(virtualScrollRoot)
 }
 
+const teardownVirtualScroll = () => {
+  virtualScrollBound = false
+  virtualScrollRoot?.removeEventListener('scroll', handleVirtualScroll)
+  virtualScrollRoot = null
+  if (virtualResizeObserver) {
+    virtualResizeObserver.disconnect()
+    virtualResizeObserver = null
+  }
+  if (virtualScrollFrame) {
+    window.cancelAnimationFrame(virtualScrollFrame)
+    virtualScrollFrame = 0
+  }
+}
+
 onActivated(() => {
   void refreshStartScreenTiles()
+  // keep-alive 恢复：重新绑定滚动监听并恢复上次位置，
+  // 避免虚拟列表位置与 .content 实际滚动错位导致白屏/跳动。
+  setupVirtualScroll()
+  virtualScrollRoot?.scrollTo({ top: virtualScrollTop.value })
 })
+
+onDeactivated(teardownVirtualScroll)
 
 onMounted(() => {
   setupVirtualScroll()
@@ -487,19 +507,7 @@ watch(virtualScrollRef, (element) => {
   }
 })
 
-onBeforeUnmount(() => {
-  virtualScrollBound = false
-  virtualScrollRoot?.removeEventListener('scroll', handleVirtualScroll)
-  virtualScrollRoot = null
-  if (virtualResizeObserver) {
-    virtualResizeObserver.disconnect()
-    virtualResizeObserver = null
-  }
-  if (virtualScrollFrame) {
-    window.cancelAnimationFrame(virtualScrollFrame)
-    virtualScrollFrame = 0
-  }
-})
+onBeforeUnmount(teardownVirtualScroll)
 </script>
 
 <style scoped src="./GamesView.css"></style>

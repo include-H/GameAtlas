@@ -16,7 +16,6 @@
       class="game-box__cover"
       :src="cell.game.coverUrl"
       :alt="cell.game.title"
-      decoding="async"
       draggable="false"
     >
     <span class="game-box__sheen" />
