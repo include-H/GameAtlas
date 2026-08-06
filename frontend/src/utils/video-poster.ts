@@ -17,7 +17,10 @@ export const extractVideoPoster = (file: File): Promise<Blob> => {
 
     video.onloadedmetadata = () => {
       const duration = Number.isFinite(video.duration) ? video.duration : 0
-      video.currentTime = duration > 1 ? Math.min(1, duration * 0.1) : 0.01
+      // 跳过片头黑帧：抓 10% 处的一帧，但限定在 1s~3s 区间。
+      // 第 1 帧（~0.03s）与"第 10 帧"（~0.33s）都大概率落在黑场淡入里，
+      // 1s 起步、3s 封顶能稳定落在预告片正文画面。
+      video.currentTime = duration > 0 ? Math.min(3, Math.max(1, duration * 0.1)) : 0.01
     }
 
     video.onseeked = () => {

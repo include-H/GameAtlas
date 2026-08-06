@@ -41,7 +41,7 @@
                 controls
                 muted
                 playsinline
-                preload="metadata"
+                preload="none"
                 @canplay="tryPlayVideo"
                 @loadedmetadata="onVideoLoaded"
                 @playing="onVideoPlaying"
@@ -60,11 +60,11 @@
                       @error="handlePosterError(currentVideoPoster)"
                     />
                     <svg class="screenshot-carousel__loader-arc" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" style="opacity: 0.1" stroke-width="3" />
+                      <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3" />
                       <circle
                         cx="50" cy="50" r="46"
                         fill="none"
-                        style="stroke: var(--color-primary-3)"
+                        stroke="rgba(170,222,255,0.9)"
                         stroke-width="3"
                         stroke-linecap="round"
                         stroke-dasharray="80 210"
@@ -78,7 +78,7 @@
                 <img
                   v-if="currentVideoPoster"
                   :src="currentVideoPoster"
-                  class="screenshot-carousel__loader-thumb"
+                  class="screenshot-carousel__video-poster"
                   alt=""
                   @error="handlePosterError(currentVideoPoster)"
                 >
@@ -355,6 +355,8 @@ const onVideoVolumeChange = () => {
   }
 }
 
+let videoAutoplayDeferred = false
+
 const tryPlayVideo = () => {
   const video = videoRef.value
   if (!video) return
@@ -365,12 +367,25 @@ const tryPlayVideo = () => {
   if (video.readyState >= 2) {
     videoReady.value = true
   }
-  const playPromise = video.play()
-  if (playPromise && typeof playPromise.catch === 'function') {
-    playPromise.catch(() => {
-      // Ignore autoplay rejections; controls remain available for manual play.
-    })
+  const startPlay = () => {
+    const playPromise = video.play()
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(() => {
+        // Ignore autoplay rejections; controls remain available for manual play.
+      })
+    }
   }
+  if (!videoAutoplayDeferred) {
+    // 首次自动播放延迟到主线程空闲后，避免视频初始化（~800ms 解封装）阻塞详情页首帧绘制。
+    videoAutoplayDeferred = true
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(startPlay, { timeout: 800 })
+    } else {
+      window.setTimeout(startPlay, 600)
+    }
+    return
+  }
+  startPlay()
 }
 
 const stopImageAutoplay = () => {
@@ -517,22 +532,9 @@ const handlePosterError = (url: string) => {
   justify-content: center;
   background: var(--app-scrim);
   z-index: 5;
-}
-
-.screenshot-carousel__video-failed {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  background: var(--color-carousel-empty-start);
-  color: var(--color-text-3);
-}
-
-.screenshot-carousel__video-failed-text {
-  font-size: 14px;
+  /* 长入场动画（1.5s）：期间视频已在 requestIdleCallback 后开始缓冲，
+     动画结束即就绪，切视频时没有"突然出现"的跳变 */
+  animation: screenshot-carousel-loader-in 1.5s ease;
 }
 
 .screenshot-carousel__loader-ring {
@@ -550,7 +552,28 @@ const handlePosterError = (url: string) => {
   height: 56px;
   border-radius: 50%;
   object-fit: cover;
-  box-shadow: var(--shadow-soft);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  animation: screenshot-carousel-thumb-in 1.5s ease;
+}
+
+@keyframes screenshot-carousel-loader-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes screenshot-carousel-thumb-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 .screenshot-carousel__loader-arc {
@@ -566,7 +589,32 @@ const handlePosterError = (url: string) => {
 }
 
 @keyframes screenshot-carousel-arc-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 视频加载失败态：整幅封面 + 错误提示（21:9 banner 兜底时 contain 不裁切） */
+.screenshot-carousel__video-poster {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.screenshot-carousel__video-failed {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--color-carousel-empty-start);
+  color: var(--color-text-3);
+}
+
+.screenshot-carousel__video-failed-text {
+  font-size: 14px;
 }
 
 .screenshot-carousel-spinner-fade-enter-active,
