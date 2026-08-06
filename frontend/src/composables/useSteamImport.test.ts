@@ -149,11 +149,11 @@ describe('useSteamImport', () => {
     ])
     getLogosByGameIdMock.mockResolvedValue([
       { url: 'https://cdn.example.com/logo-1.png', thumb: 'https://cdn.example.com/logo-1-thumb.png' },
+      { url: 'https://cdn.example.com/logo-2.png', thumb: 'https://cdn.example.com/logo-2-thumb.png' },
     ])
-    const uploadAssetFromUrl = vi.fn().mockResolvedValue({
-      path: '/assets/logo-1.png',
-      asset_uid: 'logo-1',
-    })
+    const uploadAssetFromUrl = vi.fn()
+      .mockResolvedValueOnce({ path: '/assets/logo-1.png', asset_uid: 'logo-1' })
+      .mockResolvedValueOnce({ path: '/assets/logo-2.png', asset_uid: 'logo-2' })
     const form = buildForm()
     const steamImport = useSteamImport({
       form,
@@ -195,13 +195,19 @@ describe('useSteamImport', () => {
     ])
 
     await steamImport.selectLogoGame(steamImport.logoSearchResults.value[0])
-    expect(steamImport.logoImages.value).toEqual(['https://cdn.example.com/logo-1.png'])
+    expect(steamImport.logoImages.value).toEqual([
+      'https://cdn.example.com/logo-1.png',
+      'https://cdn.example.com/logo-2.png',
+    ])
 
-    steamImport.selectedLogoImage.value = 'https://cdn.example.com/logo-1.png'
-    await steamImport.downloadSelectedLogo()
+    steamImport.selectAllLogos()
+    await steamImport.downloadSelectedLogos()
 
-    expect(uploadAssetFromUrl).toHaveBeenCalledWith('https://cdn.example.com/logo-1.png', 'logo')
-    expect(form.value.logos).toHaveLength(1)
-    expect(form.value.logos[0]?.path).toBe('/assets/logo-1.png')
+    expect(uploadAssetFromUrl).toHaveBeenNthCalledWith(1, 'https://cdn.example.com/logo-1.png', 'logo')
+    expect(uploadAssetFromUrl).toHaveBeenNthCalledWith(2, 'https://cdn.example.com/logo-2.png', 'logo')
+    expect(form.value.logos.map((item) => item.path)).toEqual([
+      '/assets/logo-1.png',
+      '/assets/logo-2.png',
+    ])
   })
 })

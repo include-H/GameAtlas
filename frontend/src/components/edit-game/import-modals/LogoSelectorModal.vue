@@ -6,9 +6,7 @@
     :footer="false"
     @update:visible="emit('update:visible', $event)"
   >
-    <a-tabs v-model:active-key="logoTabKey" type="rounded" size="small">
-      <a-tab-pane key="import" title="更换">
-        <div class="cover-selector-content">
+    <div class="cover-selector-content">
       <div class="source-selector">
         <span class="source-selector__label">数据源</span>
         <a-button
@@ -39,31 +37,36 @@
         @select="emit('select-logo-game', $event)"
       >
         <div v-if="selectedLogoGame && logoImages.length > 0" class="steam-images-section">
-          <div class="steam-search-title">
-            {{ selectedLogoGame.name }} 的 Logo
+          <div class="steam-game-info">
+            <span>{{ selectedLogoGame.name }} 的 Logo</span>
             <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('back-logo-game-search')">返回</a-button>
+            <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('select-all-logos')">全选</a-button>
+            <a-button class="app-text-action-btn" type="text" size="mini" html-type="button" @click="emit('invert-selection-logos')">反选</a-button>
           </div>
           <div class="steam-images-grid">
             <div
               v-for="(image, index) in logoImages"
               :key="index"
               class="steam-image-item"
-              :class="{ 'steam-image-selected': selectedLogoImage === image }"
-              @click="emit('update:selected-logo-image', image)"
+              :class="{ 'steam-image-selected': selectedLogos.has(index) }"
+              @click="emit('toggle-logo-selection', index)"
             >
               <img :src="image" />
+              <div v-if="selectedLogos.has(index)" class="steam-screenshot-check">
+                <icon-check />
+              </div>
             </div>
           </div>
 
           <a-button
-            v-if="selectedLogoImage"
+            v-if="selectedLogos.size > 0"
             type="primary"
             long
             :loading="isDownloadingLogos"
             html-type="button"
-            @click="emit('download-selected-steam-logo')"
+            @click="emit('download-selected-logos')"
           >
-            使用此图片
+            下载选中的 {{ selectedLogos.size }} 张 Logo
           </a-button>
         </div>
 
@@ -76,6 +79,7 @@
 
       <a-divider>本地上传</a-divider>
       <a-upload
+        multiple
         :action="logoUploadAction"
         :data="logoUploadData"
         :headers="uploadHeaders"
@@ -124,56 +128,13 @@
           确定
         </a-button>
       </div>
-        </div>
-      </a-tab-pane>
-      <a-tab-pane key="position" title="位置">
-        <div class="logo-pos-editor">
-          <div
-            ref="logoPosEditorRef"
-            class="logo-pos-editor__canvas"
-            @mousedown="handleLogoPosMouseDown"
-          >
-            <img
-              v-if="logoBannerSrc"
-              :src="logoBannerSrc"
-              class="logo-pos-editor__banner"
-              draggable="false"
-            />
-            <div v-else class="logo-pos-editor__banner-empty">
-              <icon-image />
-              <span>无横幅图</span>
-            </div>
-            <img
-              v-if="logoPath"
-              :src="logoPath"
-              class="logo-pos-editor__logo"
-              :style="logoPosLogoStyle"
-              draggable="false"
-            />
-            <div class="logo-pos-editor__hint">拖拽移动 · 滑块缩放</div>
-          </div>
-          <div class="logo-pos-editor__controls">
-            <span class="logo-pos-editor__label">大小</span>
-            <a-slider v-model="logoPosWidth" :min="10" :max="80" :step="1" :style="{ flex: 1 }" />
-            <span class="logo-pos-editor__value">{{ logoPosWidth }}%</span>
-          </div>
-          <div class="logo-pos-editor__controls">
-            <span class="logo-pos-editor__label">显示 Logo</span>
-            <a-switch v-model="logoVisible" size="small" />
-          </div>
-          <div class="cover-selector-actions">
-            <a-button class="app-text-action-btn" type="text" html-type="button" @click="emit('update:visible', false)">取消</a-button>
-            <a-button type="primary" html-type="button" @click="handleLogoPosConfirm">确定</a-button>
-          </div>
-        </div>
-      </a-tab-pane>
-    </a-tabs>
+    </div>
   </a-modal>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { IconImage, IconUpload } from '@arco-design/web-vue/es/icon'
+import { computed } from 'vue'
+import { IconCheck, IconUpload } from '@arco-design/web-vue/es/icon'
 import SteamSearchPanel from '@/components/SteamSearchPanel.vue'
 import type { ImportSource } from '@/composables/useSteamImport'
 import type { SteamGameSearchResult } from '@/services/types'
@@ -188,7 +149,7 @@ interface Props {
   logoSearchResults: SteamGameSearchResult[]
   selectedLogoGame: SteamGameSearchResult | null
   logoImages: string[]
-  selectedLogoImage: string
+  selectedLogos: Set<number>
   isDownloadingLogos: boolean
   logoUploadAction: string
   logoUploadData: Record<string, string>
@@ -196,13 +157,6 @@ interface Props {
   logoSearchUrl: string
   logoPreviewUrl: string
   isDownloadingLogo: boolean
-  logoBannerSrc: string
-  logoPath: string
-  logoPositionX: number | null
-  logoPositionY: number | null
-  logoWidthPct: number | null
-  logoVisible: boolean
-  initialTab: 'import' | 'position'
 }
 
 const props = defineProps<Props>()
@@ -215,82 +169,20 @@ const emit = defineEmits<{
   'clear-logo': []
   'select-logo-game': [game: SteamGameSearchResult]
   'back-logo-game-search': []
-  'update:selected-logo-image': [value: string]
-  'download-selected-steam-logo': []
+  'toggle-logo-selection': [index: number]
+  'select-all-logos': []
+  'invert-selection-logos': []
+  'download-selected-logos': []
   'logo-upload-success': [fileItem: FileItem]
   'logo-upload-error': []
   'update:logo-search-url': [value: string]
   'load-logo-from-url': []
   'confirm-logo-selection': []
-  'confirm-logo-position': [payload: { position_x: number; position_y: number; width_pct: number; logo_visible: boolean }]
 }>()
 
 const searchPlaceholder = computed(() =>
   props.source === 'steamgriddb' ? '搜索 SteamGridDB...' : '搜索 Steam 游戏...'
 )
-
-// Logo position editor state (local to this component)
-const logoTabKey = ref('import')
-const logoPosEditorRef = ref<HTMLElement | null>(null)
-const logoPosWidth = ref(30)
-const logoPosX = ref(50)
-const logoPosY = ref(50)
-const logoVisible = ref(true)
-
-watch(() => props.visible, (v) => {
-  if (v) {
-    logoPosX.value = props.logoPositionX ?? 50
-    logoPosY.value = props.logoPositionY ?? 50
-    logoPosWidth.value = props.logoWidthPct ?? 30
-    logoVisible.value = props.logoVisible ?? true
-    logoTabKey.value = props.initialTab
-  }
-})
-
-const logoPosLogoStyle = computed(() => ({
-  left: `${logoPosX.value}%`,
-  top: `${logoPosY.value}%`,
-  width: `${logoPosWidth.value}%`,
-  transform: 'translate(-50%, -50%)',
-}))
-
-const handleLogoPosMouseDown = (e: MouseEvent) => {
-  const target = e.target as HTMLElement
-  if (!target.classList.contains('logo-pos-editor__logo')) return
-  e.preventDefault()
-  const editor = logoPosEditorRef.value
-  if (!editor) return
-
-  const startMouseX = e.clientX
-  const startMouseY = e.clientY
-  const startPosX = logoPosX.value
-  const startPosY = logoPosY.value
-  const rect = editor.getBoundingClientRect()
-
-  const onMove = (ev: MouseEvent) => {
-    const dx = ev.clientX - startMouseX
-    const dy = ev.clientY - startMouseY
-    logoPosX.value = Math.round(Math.min(95, Math.max(5, startPosX + (dx / rect.width) * 100)) * 10) / 10
-    logoPosY.value = Math.round(Math.min(95, Math.max(5, startPosY + (dy / rect.height) * 100)) * 10) / 10
-  }
-
-  const onUp = () => {
-    document.removeEventListener('mousemove', onMove)
-    document.removeEventListener('mouseup', onUp)
-  }
-  document.addEventListener('mousemove', onMove)
-  document.addEventListener('mouseup', onUp)
-}
-
-const handleLogoPosConfirm = () => {
-  emit('confirm-logo-position', {
-    position_x: logoPosX.value,
-    position_y: logoPosY.value,
-    width_pct: logoPosWidth.value,
-    logo_visible: logoVisible.value,
-  })
-  emit('update:visible', false)
-}
 </script>
 
 <style scoped>
@@ -312,13 +204,17 @@ const handleLogoPosConfirm = () => {
   flex-shrink: 0;
 }
 
-.steam-search-title {
+.steam-game-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 14px;
   font-weight: 700;
   color: var(--color-text-1);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+}
+
+.steam-game-info .app-text-action-btn:first-of-type {
+  margin-left: auto;
 }
 
 .steam-images-section {
@@ -365,6 +261,19 @@ const handleLogoPosConfirm = () => {
 .steam-image-selected {
   border-color: rgb(var(--primary-6));
   box-shadow: 0 0 0 1px rgba(var(--primary-6), 0.45);
+}
+
+.steam-screenshot-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(var(--primary-6), 0.9);
+  color: var(--color-text-on-dark);
 }
 
 .steam-screenshots-empty {
@@ -422,93 +331,4 @@ const handleLogoPosConfirm = () => {
   margin-top: 4px;
 }
 
-/* Logo position editor */
-.logo-pos-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.logo-pos-editor__canvas {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 460 / 215;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid var(--app-card-border);
-  background: color-mix(in srgb, var(--app-card-surface) 86%, transparent);
-  user-select: none;
-}
-
-.logo-pos-editor__banner {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-.logo-pos-editor__banner-empty {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  font-size: 2rem;
-  color: var(--color-text-4);
-}
-
-.logo-pos-editor__banner-empty span {
-  font-size: 12px;
-}
-
-.logo-pos-editor__logo {
-  position: absolute;
-  max-width: 90%;
-  max-height: 90%;
-  height: auto;
-  object-fit: contain;
-  pointer-events: auto;
-  cursor: grab;
-  z-index: 2;
-}
-
-.logo-pos-editor__logo:active {
-  cursor: grabbing;
-}
-
-.logo-pos-editor__hint {
-  position: absolute;
-  bottom: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 10px;
-  color: var(--color-text-3);
-  background: var(--app-scrim-light);
-  padding: 2px 8px;
-  border-radius: 4px;
-  pointer-events: none;
-  white-space: nowrap;
-  z-index: 3;
-}
-
-.logo-pos-editor__controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.logo-pos-editor__label {
-  font-size: 13px;
-  color: var(--color-text-3);
-  white-space: nowrap;
-}
-
-.logo-pos-editor__value {
-  font-size: 13px;
-  color: var(--color-text-2);
-  min-width: 36px;
-  text-align: right;
-}
 </style>

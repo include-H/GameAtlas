@@ -130,20 +130,14 @@
           :logo-search-results="logoSearchResults"
           :selected-logo-game="selectedLogoGame"
           :logo-images="logoImages"
-          :selected-logo-image="selectedLogoImage"
+          :selected-logos="selectedLogos"
           :is-downloading-logos="isDownloadingLogos"
           :logo-upload-action="logoUploadAction"
           :logo-upload-data="logoUploadData"
           :logo-search-url="logoSearchUrl"
           :logo-preview-url="logoPreviewUrl"
           :is-downloading-logo="isDownloadingLogo"
-          :logo-banner-src="logoBannerSrc"
-          :logo-path="editingLogo?.path ?? ''"
-          :logo-position-x="editingLogo?.position_x ?? null"
-          :logo-position-y="editingLogo?.position_y ?? null"
-          :logo-width-pct="editingLogo?.width_pct ?? null"
           :logo-visible="form.logo_visible ?? true"
-          :logo-initial-tab="logoInitialTab"
           @open-cover-selector="showCoverSelector = true"
           @remove-cover="removeCover"
           @cover-drag-start="handleCoverDragStart"
@@ -240,14 +234,15 @@
           @clear-logo="handleLogoSearchClear"
           @select-logo-game="selectLogoGame"
           @back-logo-game-search="backToLogoGameSearch"
-          @update:selected-logo-image="selectedLogoImage = $event"
-          @download-selected-logo="downloadSelectedLogo"
+          @toggle-logo-selection="toggleLogoSelection"
+          @select-all-logos="selectAllLogos"
+          @invert-selection-logos="invertSelectionLogos"
+          @download-selected-logos="downloadSelectedLogos"
           @logo-upload-success="handleLogoUploadSuccess"
           @logo-upload-error="handleLogoUploadError"
           @update:logo-search-url="logoSearchUrl = $event"
           @load-logo-from-url="loadLogoFromUrl"
           @confirm-logo-selection="confirmLogoSelection"
-          @confirm-logo-position="handleLogoPositionConfirm"
         />
       </template>
     </main>
@@ -331,8 +326,8 @@ const {
   downloadSelectedSteamBanner,
   downloadSelectedSteamCover,
   downloadSelectedSteamCovers,
+  downloadSelectedLogos,
   downloadSelectedScreenshots,
-  downloadSelectedLogo,
   draggedScreenshotKey,
   dragOverScreenshotKey,
   draggedCoverKey,
@@ -343,7 +338,6 @@ const {
   dragOverLogoKey,
   draggedVideoKey,
   dragOverVideoKey,
-  editingLogo,
   form,
   handleBannerSearchClear,
   handleBannerUploadError,
@@ -369,7 +363,6 @@ const {
   handleVideoDrop,
   handleVideoDragEnd,
   handleLogoSearchClear,
-  handleLogoPositionConfirm,
   handleLogoPositionChange,
   handleLogoUploadError,
   handleLogoUploadSuccess,
@@ -385,6 +378,7 @@ const {
   handleVideoFileChange,
   invertSelectionBanners,
   invertSelectionCovers,
+  invertSelectionLogos,
   invertSelectionScreenshots,
   isDownloadingBanner,
   isDownloadingCover,
@@ -404,9 +398,7 @@ const {
   loadCoverFromUrl,
   loadLogoFromUrl,
   loadScreenshotPreview,
-  logoBannerSrc,
   logoImages,
-  logoInitialTab,
   logoPreviewUrl,
   logoSource,
   logoSearchUrl,
@@ -427,6 +419,7 @@ const {
   searchSteamForSummary,
   selectAllBanners,
   selectAllCovers,
+  selectAllLogos,
   selectAllScreenshots,
   selectSteamBannerGame,
   selectSteamCoverGame,
@@ -436,7 +429,7 @@ const {
   selectedBanners,
   selectedCoverImage,
   selectedCovers,
-  selectedLogoImage,
+  selectedLogos,
   selectedLogoGame,
   selectedSteamBannerGame,
   selectedSteamGame,
@@ -468,6 +461,7 @@ const {
   steamSummarySearchResults,
   toggleBannerSelection,
   toggleCoverSelection,
+  toggleLogoSelection,
   toggleScreenshot,
   uploadAction,
   uploadData,

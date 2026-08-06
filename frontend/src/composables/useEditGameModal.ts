@@ -109,22 +109,7 @@ export const useEditGameModal = ({
   const canCreateDeveloperOption = developerPicker.canCreate
   const canCreatePublisherOption = publisherPicker.canCreate
 
-  const logoBannerSrc = computed(() => form.value.banners[0]?.path || form.value.covers[0]?.path || '')
-  const editingLogoKey = ref<string | null>(null)
-  const logoInitialTab = ref<'import' | 'position'>('import')
-  const editingLogo = computed(() => {
-    if (!editingLogoKey.value) return null
-    return form.value.logos.find(
-      (item) => (item.asset_uid || item.path) === editingLogoKey.value,
-    ) ?? null
-  })
-  const logoPath = computed(() => editingLogo.value?.path || '')
-
   const openLogoSelector = () => {
-    editingLogoKey.value = form.value.logos[0]
-      ? (form.value.logos[0].asset_uid || form.value.logos[0].path)
-      : null
-    logoInitialTab.value = 'import'
     showLogoSelector.value = true
   }
 
@@ -579,7 +564,7 @@ export const useEditGameModal = ({
     logoPreviewUrl,
     isDownloadingLogo,
     logoImages,
-    selectedLogoImage,
+    selectedLogos,
     isDownloadingLogos,
     logoSearchQuery,
     logoSearchResults,
@@ -633,7 +618,10 @@ export const useEditGameModal = ({
     searchLogos,
     selectLogoGame,
     backToLogoGameSearch,
-    downloadSelectedLogo,
+    toggleLogoSelection,
+    selectAllLogos,
+    invertSelectionLogos,
+    downloadSelectedLogos,
     loadLogoFromUrl,
     confirmLogoSelection,
     resetSteamImportState,
@@ -672,7 +660,6 @@ export const useEditGameModal = ({
     removeBanner,
     removeScreenshot,
     removePreviewVideo,
-    handleLogoPositionConfirm,
     handleLogoPositionChange,
     resetVideoUploadState,
   } = useEditGameAssets({
@@ -681,8 +668,6 @@ export const useEditGameModal = ({
     showCoverSelector,
     showBannerSelector,
     showScreenshotSelector,
-    showLogoSelector,
-    editingLogoKey,
     isUploadingVideo,
     videoUploadProgress,
     videoUploadFileName,
@@ -754,7 +739,10 @@ export const useEditGameModal = ({
     invertSelectionBanners,
     downloadSelectedSteamCover,
     downloadSelectedSteamCovers,
-    downloadSelectedLogo,
+    downloadSelectedLogos,
+    toggleLogoSelection,
+    selectAllLogos,
+    invertSelectionLogos,
     downloadSelectedScreenshots,
     confirmLogoSelection,
     draggedScreenshotKey,
@@ -856,16 +844,11 @@ export const useEditGameModal = ({
     seriesSearchQuery: seriesPicker.query,
     logoImages,
     logoSearchQuery,
-    selectedLogoImage,
+    selectedLogos,
     selectedLogoGame,
     modalWidth,
     openFileBrowser,
-    editingLogo,
-    editingLogoKey,
-    logoInitialTab,
     openLogoSelector,
-    logoBannerSrc,
-    logoPath,
     releaseDate,
     removeBanner,
     removeCover,
@@ -873,7 +856,6 @@ export const useEditGameModal = ({
     removeFilePath,
     removePreviewVideo,
     removeScreenshot,
-    handleLogoPositionConfirm,
     handleLogoPositionChange,
     rules,
     screenshotPreviewUrl,

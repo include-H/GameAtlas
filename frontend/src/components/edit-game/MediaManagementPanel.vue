@@ -113,20 +113,13 @@
       :logo-search-results="logoSearchResults"
       :selected-logo-game="selectedLogoGame"
       :logo-images="logoImages"
-      :selected-logo-image="selectedLogoImage"
+      :selected-logos="selectedLogos"
       :is-downloading-logos="isDownloadingLogos"
       :logo-upload-action="logoUploadAction"
       :logo-upload-data="logoUploadData"
       :logo-search-url="logoSearchUrl"
       :logo-preview-url="logoPreviewUrl"
       :is-downloading-logo="isDownloadingLogo"
-      :logo-banner-src="logoBannerSrc"
-      :logo-path="logoPath"
-      :logo-position-x="logoPositionX"
-      :logo-position-y="logoPositionY"
-      :logo-width-pct="logoWidthPct"
-      :logo-visible="logoVisible"
-      :logo-initial-tab="logoInitialTab"
       @update:show-summary-selector="emit('update:show-summary-selector', $event)"
       @update:steam-summary-search-query="emit('update:steam-summary-search-query', $event)"
       @search-summary="emit('search-summary')"
@@ -192,14 +185,15 @@
       @clear-logo="emit('clear-logo')"
       @select-logo-game="emit('select-logo-game', $event)"
       @back-logo-game-search="emit('back-logo-game-search')"
-      @update:selected-logo-image="emit('update:selected-logo-image', $event)"
-      @download-selected-logo="emit('download-selected-logo')"
+      @toggle-logo-selection="emit('toggle-logo-selection', $event)"
+      @select-all-logos="emit('select-all-logos')"
+      @invert-selection-logos="emit('invert-selection-logos')"
+      @download-selected-logos="emit('download-selected-logos')"
       @logo-upload-success="emit('logo-upload-success', $event)"
       @logo-upload-error="emit('logo-upload-error')"
       @update:logo-search-url="emit('update:logo-search-url', $event)"
       @load-logo-from-url="emit('load-logo-from-url')"
       @confirm-logo-selection="emit('confirm-logo-selection')"
-      @confirm-logo-position="emit('confirm-logo-position', $event)"
     />
 
   </div>
@@ -331,20 +325,14 @@ defineProps<{
   logoSearchResults: SteamGameSearchResult[]
   selectedLogoGame: SteamGameSearchResult | null
   logoImages: string[]
-  selectedLogoImage: string
+  selectedLogos: Set<number>
   isDownloadingLogos: boolean
   logoUploadAction: string
   logoUploadData: Record<string, string>
   logoSearchUrl: string
   logoPreviewUrl: string
   isDownloadingLogo: boolean
-  logoBannerSrc: string
-  logoPath: string
-  logoPositionX: number | null
-  logoPositionY: number | null
-  logoWidthPct: number | null
   logoVisible: boolean
-  logoInitialTab: 'import' | 'position'
 
 }>()
 
@@ -446,14 +434,15 @@ const emit = defineEmits<{
   'clear-logo': []
   'select-logo-game': [game: SteamGameSearchResult]
   'back-logo-game-search': []
-  'update:selected-logo-image': [value: string]
-  'download-selected-logo': []
+  'toggle-logo-selection': [index: number]
+  'select-all-logos': []
+  'invert-selection-logos': []
+  'download-selected-logos': []
   'logo-upload-success': [fileItem: FileItem]
   'logo-upload-error': []
   'update:logo-search-url': [value: string]
   'load-logo-from-url': []
   'confirm-logo-selection': []
-  'confirm-logo-position': [payload: { position_x: number; position_y: number; width_pct: number; logo_visible: boolean }]
 }>()
 </script>
 

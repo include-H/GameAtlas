@@ -27,8 +27,6 @@ interface UseEditGameAssetsOptions {
   showCoverSelector: Ref<boolean>
   showBannerSelector: Ref<boolean>
   showScreenshotSelector: Ref<boolean>
-  showLogoSelector: Ref<boolean>
-  editingLogoKey: Ref<string | null>
   isUploadingVideo: Ref<boolean>
   videoUploadProgress: Ref<number>
   videoUploadFileName: Ref<string>
@@ -72,7 +70,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     if (response?.success && response.data) {
       options.form.value.logos.push(options.createEditableLogo(response.data))
       void options.onAssetPersisted?.()
-      options.showLogoSelector.value = false
       options.addAlert('Logo 上传成功', 'success')
       return
     }
@@ -187,12 +184,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     options.form.value.logo_visible = payload.logo_visible
   }
 
-  const handleLogoPositionConfirm = (payload: Omit<LogoPositionChange, 'key'>) => {
-    const key = options.editingLogoKey.value
-    if (!key) return
-    applyLogoPositionChange(key, payload)
-  }
-
   const handleLogoPositionChange = (change: LogoPositionChange) => {
     applyLogoPositionChange(change.key, change)
   }
@@ -236,7 +227,6 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     removeBanner,
     removeScreenshot,
     removePreviewVideo,
-    handleLogoPositionConfirm,
     handleLogoPositionChange,
     resetVideoUploadState,
   }
