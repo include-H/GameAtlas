@@ -4,7 +4,6 @@ import type {
   ApiEnvelope,
   AdminGameDetail,
   AdminGameDetailDto,
-  ApiPageEnvelope,
   GameDetail,
   GameDetailDto,
   GameAggregateUpdateRequest,
@@ -12,6 +11,8 @@ import type {
   GameFileEntry,
   GameListItem,
   GameListItemDto,
+  GameListPagination,
+  GameListPageEnvelope,
   GameListQuery,
   GameSortQuery,
   GameStats,
@@ -112,11 +113,11 @@ function buildGamesQueryParams(params?: {
   return queryParams
 }
 
-async function fetchGamesPage(params?: {
+async function fetchGamesPage<P extends GameListPagination = GameListPagination>(params?: {
   query?: GameListQuery
   sort?: GameSortQuery
-}): Promise<ApiPageEnvelope<GameListItemDto>> {
-  return get<ApiPageEnvelope<GameListItemDto>>('/games', {
+}): Promise<GameListPageEnvelope<GameListItemDto, P>> {
+  return get<GameListPageEnvelope<GameListItemDto, P>>('/games', {
     params: buildGamesQueryParams(params),
   })
 }
@@ -213,11 +214,13 @@ export function mapGameVersions(game: Pick<GameDetail, 'public_id' | 'files'>): 
 }
 
 const gamesService = {
-  async getGames(params?: {
+  // P 由调用方按请求模式选择：默认 GameListPagination（无限滚动，无 total/limit）；
+  // pending=true 的工作台传 PendingWorkbenchPagination 以获得 total。
+  async getGames<P extends GameListPagination = GameListPagination>(params?: {
     query?: GameListQuery
     sort?: GameSortQuery
-  }): Promise<ApiPageEnvelope<GameListItem>> {
-    const response = await fetchGamesPage(params)
+  }): Promise<GameListPageEnvelope<GameListItem, P>> {
+    const response = await fetchGamesPage<P>(params)
     const games = response.data.map((item) => normalizeGameListItem(item))
 
     return {

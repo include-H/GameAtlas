@@ -31,11 +31,11 @@ describe('games store favorite sync', () => {
     getGamesMock
       .mockResolvedValueOnce({
         data: [{ id: 1, public_id: 'game-1', is_favorite: false }],
-        pagination: { page: 1, limit: 24, total: 2, totalPages: 2 },
+        pagination: { page: 1, totalPages: 2 },
       })
       .mockResolvedValueOnce({
         data: [{ id: 2, public_id: 'game-2', is_favorite: false }],
-        pagination: { page: 2, limit: 24, total: 2, totalPages: 2 },
+        pagination: { page: 2, totalPages: 2 },
       })
 
     const store = useGamesStore()

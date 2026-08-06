@@ -220,7 +220,7 @@ const {
         query: { favorite: true, page, limit: 100 },
       })
       favorites.push(...result.data)
-      if (result.data.length === 0 || favorites.length >= result.pagination.total || favorites.length >= 500) {
+      if (result.data.length === 0 || page >= result.pagination.totalPages || favorites.length >= 500) {
         break
       }
       page += 1

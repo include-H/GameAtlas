@@ -16,6 +16,25 @@ export interface ApiPageEnvelope<T> {
   }
 }
 
+// /games 列表分页契约：无限滚动只依赖 page/totalPages，total/limit 已从普通列表
+// 响应移除（2026-08）。pending 模式（待处理工作台）走 PendingWorkbenchPagination，
+// 保留 total/limit 供传统分页控件使用。
+export interface GameListPagination {
+  page: number
+  totalPages: number
+  pending_issue_counts?: PendingIssueCounts | null
+}
+
+export interface PendingWorkbenchPagination extends GameListPagination {
+  limit: number
+  total: number
+}
+
+export interface GameListPageEnvelope<T, P extends GameListPagination = GameListPagination> {
+  data: T[]
+  pagination: P
+}
+
 export interface MetadataPagination {
   page: number
   limit: number

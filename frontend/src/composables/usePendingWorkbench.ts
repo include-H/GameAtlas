@@ -6,6 +6,7 @@ import type {
   GameSort,
   PendingIssueDetailState,
   PendingIssueEvaluation,
+  PendingWorkbenchPagination,
 } from '@/services/types'
 
 export const PENDING_WORKBENCH_PAGE_SIZE = 10
@@ -101,7 +102,7 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     hasLoadFailure.value = false
     try {
       const query = buildWorkbenchQuery()
-      const response = await gamesService.getGames({
+      const response = await gamesService.getGames<PendingWorkbenchPagination>({
         query: {
           page,
           limit: PENDING_WORKBENCH_PAGE_SIZE,

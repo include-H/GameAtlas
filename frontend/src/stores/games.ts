@@ -11,10 +11,10 @@ export const useGamesStore = defineStore('games', () => {
   const currentVersions = ref<GameVersion[]>([])
   const stats = ref<GameStats | null>(null)
 
+  // 2026-08-06: /games list mode no longer returns total/limit (infinite-scroll
+  // contract), so the store keeps only page/totalPages.
   const pagination = ref({
-    total: 0,
     page: 1,
-    limit: 24,
     totalPages: 0,
   })
 
@@ -135,7 +135,7 @@ export const useGamesStore = defineStore('games', () => {
     listError.value = null
 
     const page = params.query?.page ?? 1
-    const limit = params.query?.limit ?? pagination.value.limit
+    const limit = params.query?.limit ?? 24
     const append = params.append ?? false
 
     try {
@@ -155,9 +155,7 @@ export const useGamesStore = defineStore('games', () => {
       }
 
       pagination.value = {
-        total: response.pagination.total,
         page: response.pagination.page,
-        limit: response.pagination.limit,
         totalPages: response.pagination.totalPages,
       }
 

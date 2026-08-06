@@ -61,13 +61,7 @@ func (h *GamesHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    data,
-		"pagination": gin.H{
-			"page":                 result.Page,
-			"limit":                result.Limit,
-			"total":                result.Total,
-			"totalPages":           result.TotalPages,
-			"pending_issue_counts": toPendingIssueCountSummaryResponse(result.PendingIssueCounts),
-		},
+		"pagination": toGamesListPaginationResponse(result, params.PendingOnly),
 	})
 }
 

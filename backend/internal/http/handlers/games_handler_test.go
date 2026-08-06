@@ -1290,23 +1290,29 @@ func TestGamesHandlerListDefaultsAndClampsTransportListParamsBeforeService(t *te
 		Data []struct {
 			ID int64 `json:"id"`
 		} `json:"data"`
-		Pagination struct {
-			Page  int `json:"page"`
-			Limit int `json:"limit"`
-			Total int `json:"total"`
-		} `json:"pagination"`
+		Pagination map[string]json.RawMessage `json:"pagination"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if response.Pagination.Page != 1 {
-		t.Fatalf("pagination.page = %d, want 1 after transport fallback", response.Pagination.Page)
+	var page int
+	if err := json.Unmarshal(response.Pagination["page"], &page); err != nil {
+		t.Fatalf("decode pagination.page: %v", err)
 	}
-	if response.Pagination.Limit != 100 {
-		t.Fatalf("pagination.limit = %d, want 100 after transport clamp", response.Pagination.Limit)
+	if page != 1 {
+		t.Fatalf("pagination.page = %d, want 1 after transport fallback", page)
 	}
-	if response.Pagination.Total != 2 || len(response.Data) != 2 {
+	if _, ok := response.Pagination["totalPages"]; !ok {
+		t.Fatalf("pagination.totalPages missing in list mode response")
+	}
+	if _, ok := response.Pagination["limit"]; ok {
+		t.Fatalf("pagination.limit must not be present in list mode response")
+	}
+	if _, ok := response.Pagination["total"]; ok {
+		t.Fatalf("pagination.total must not be present in list mode response")
+	}
+	if len(response.Data) != 2 {
 		t.Fatalf("response = %+v, want both games in the first page", response)
 	}
 	if response.Data[0].ID != firstID || response.Data[1].ID != secondID {

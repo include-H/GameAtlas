@@ -107,6 +107,28 @@ type timelineGameItemResponse struct {
 	BannerImage *string `json:"banner_image"`
 }
 
+// gamesListPaginationResponse is the infinite-scroll pagination contract for the
+// catalog list. total/limit are intentionally absent: the games list UI pages with
+// page/totalPages only, and full-catalog walkers stop on totalPages. The pending
+// workbench keeps the traditional pagination shape
+// (pendingWorkbenchPaginationResponse) because its a-pagination renders "共 N 条"
+// from total and needs limit for page controls.
+type gamesListPaginationResponse struct {
+	Page               int                               `json:"page"`
+	TotalPages         int                               `json:"totalPages"`
+	PendingIssueCounts *pendingIssueCountSummaryResponse `json:"pending_issue_counts"`
+}
+
+// pendingWorkbenchPaginationResponse keeps total/limit for pending=true requests
+// so the pending center can drive traditional pagination from the same /games route.
+type pendingWorkbenchPaginationResponse struct {
+	Page               int                               `json:"page"`
+	Limit              int                               `json:"limit"`
+	Total              int                               `json:"total"`
+	TotalPages         int                               `json:"totalPages"`
+	PendingIssueCounts *pendingIssueCountSummaryResponse `json:"pending_issue_counts"`
+}
+
 type gamePreviewVideosResponse struct {
 	PublicID      string              `json:"public_id"`
 	PreviewVideos []gameAssetResponse `json:"preview_videos"`

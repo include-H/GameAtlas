@@ -47,6 +47,27 @@ func toTimelineGameItemResponse(game domain.TimelineGame) timelineGameItemRespon
 	}
 }
 
+// toGamesListPaginationResponse selects the /games pagination contract by list mode:
+// pending=true keeps total/limit for the workbench's traditional pagination; every
+// other mode serves the infinite-scroll shape without total/limit.
+func toGamesListPaginationResponse(result *services.GamesListResult, pendingOnly bool) any {
+	counts := toPendingIssueCountSummaryResponse(result.PendingIssueCounts)
+	if pendingOnly {
+		return pendingWorkbenchPaginationResponse{
+			Page:               result.Page,
+			Limit:              result.Limit,
+			Total:              result.Total,
+			TotalPages:         result.TotalPages,
+			PendingIssueCounts: counts,
+		}
+	}
+	return gamesListPaginationResponse{
+		Page:               result.Page,
+		TotalPages:         result.TotalPages,
+		PendingIssueCounts: counts,
+	}
+}
+
 func toGameListItemResponses(games []domain.GameListItem) []gameListItemResponse {
 	result := make([]gameListItemResponse, 0, len(games))
 	for _, game := range games {
