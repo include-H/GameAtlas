@@ -11,6 +11,8 @@ import steamGridDBService from '@/services/steamgriddb.service'
 import { useSteamPicker } from '@/composables/useSteamPicker'
 import type { SteamGameSearchResult } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
+import { getAssetFileExtension } from '@/utils/asset-file-extension'
+import { uploadAsset } from '@/services/assets'
 import { useSteamImportMetadata } from '@/composables/useSteamImportMetadata'
 import { useSteamImportDownload, type ImportSource } from '@/composables/useSteamImportDownload'
 export type { WikiMetadataCandidateSelection } from '@/composables/useSteamImportMetadata'
@@ -34,7 +36,7 @@ interface UseSteamImportOptions {
   form: Ref<Pick<EditGameForm, 'summary' | 'title' | 'title_alt' | 'release_date' | 'developer_ids' | 'publisher_ids' | 'covers' | 'logos' | 'banners' | 'screenshots'>>
   gameId: Ref<number | undefined>
   getWikiContent: () => string
-  uploadAssetFromUrl: (
+  uploadAssetFromUrl?: (
     url: string,
     assetType: 'cover' | 'banner' | 'screenshot' | 'logo',
   ) => Promise<UploadedAssetLike>
@@ -86,6 +88,31 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     if (preferred) return preferred
     return options.form.value.title?.trim() || ''
   }
+
+  const defaultUploadAssetFromUrl = async (
+    url: string,
+    assetType: 'cover' | 'banner' | 'screenshot' | 'logo',
+  ): Promise<UploadedAssetLike> => {
+    const gameId = options.gameId.value
+    if (!gameId) {
+      throw new Error('缺少游戏 ID')
+    }
+
+    const response = await fetch(proxySteamAssetUrl(url))
+    if (!response.ok) {
+      throw new Error(`下载远程图片失败: ${response.status}`)
+    }
+
+    const blob = await response.blob()
+    const ext = getAssetFileExtension(blob.type, assetType)
+    const file = new File([blob], `${assetType}-${Date.now()}.${ext}`, {
+      type: blob.type || 'image/jpeg',
+    })
+
+    return uploadAsset(assetType, gameId, file)
+  }
+
+  const uploadAssetFromUrl = options.uploadAssetFromUrl ?? defaultUploadAssetFromUrl
 
   const {
     applySelectedWikiMetadata,
@@ -169,7 +196,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     form: options.form,
     gameId: options.gameId,
     pickSteamSearchQuery,
-    uploadAssetFromUrl: options.uploadAssetFromUrl,
+    uploadAssetFromUrl,
     createEditableCover: options.createEditableCover,
     createEditableBanner: options.createEditableBanner,
     addAlert: options.addAlert,
@@ -374,7 +401,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     if (!screenshotPreviewUrl.value) return
     isDownloadingScreenshot.value = true
     try {
-      const uploaded = await options.uploadAssetFromUrl(
+      const uploaded = await uploadAssetFromUrl(
         screenshotPreviewUrl.value,
         'screenshot',
       )
@@ -405,7 +432,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
         const index = indices[i]
         const screenshotUrl = screenshotCandidatesData.value.screenshots[index]
         const currentIndex = options.form.value.screenshots.length
-        const uploaded = await options.uploadAssetFromUrl(screenshotUrl, 'screenshot')
+        const uploaded = await uploadAssetFromUrl(screenshotUrl, 'screenshot')
         options.form.value.screenshots.push(options.createEditableScreenshot(uploaded, currentIndex))
       }
 
@@ -497,7 +524,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     isDownloadingLogos.value = true
     try {
       for (const index of indices) {
-        const uploaded = await options.uploadAssetFromUrl(logoImages.value[index], 'logo')
+        const uploaded = await uploadAssetFromUrl(logoImages.value[index], 'logo')
         options.form.value.logos.push(options.createEditableLogo(uploaded))
       }
       await options.onAssetPersisted?.()
@@ -518,7 +545,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
 
     isDownloadingLogo.value = true
     try {
-      const uploaded = await options.uploadAssetFromUrl(logoSearchUrl.value, 'logo')
+      const uploaded = await uploadAssetFromUrl(logoSearchUrl.value, 'logo')
       options.form.value.logos.push(options.createEditableLogo(uploaded))
       await options.onAssetPersisted?.()
       showLogoSelector.value = false

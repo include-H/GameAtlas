@@ -1,7 +1,6 @@
 <template>
   <div class="media-management-panel">
     <game-media-section
-      :title="title"
       :covers="covers"
       :banners="banners"
       :preview-videos="previewVideos"
@@ -241,7 +240,6 @@ interface ScreenshotCandidatesData {
 }
 
 defineProps<{
-  title: string
   covers: EditableCover[]
   banners: EditableBanner[]
   logos: EditableLogo[]

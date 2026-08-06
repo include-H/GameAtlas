@@ -1,47 +1,26 @@
 import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
 import {
+  createEditableBanner,
+  createEditableCover,
+  createEditableLogo,
+  createEditableScreenshot,
+  createEditableVideo,
   createEmptyEditGameForm,
   formatEditGameReleaseDate,
   parseEditGameReleaseDate,
-  type EditGameEditableBanner,
-  type EditGameEditableCover,
-  type EditGameEditableLogo,
-  type EditGameEditableScreenshot,
-  type EditGameEditableVideo,
   type EditGameForm,
 } from '@/utils/edit-game-form'
-import { uploadAsset, type UploadedAssetResult } from '@/services/assets'
-import { buildAssetUploadUrl } from '@/services/api-url'
 import { directoryService } from '@/services/directory.service'
-import { proxySteamAssetUrl } from '@/services/steam.service'
-import { seriesService } from '@/services/series.service'
-import { developersService } from '@/services/developers.service'
-import { publishersService } from '@/services/publishers.service'
-import { getAssetFileExtension } from '@/utils/asset-file-extension'
 import { useGameFilePaths } from '@/composables/useGameFilePaths'
 import { useSteamImport } from '@/composables/useSteamImport'
 import { useEditGameWorkflow } from '@/composables/useEditGameWorkflow'
 import { useEditGameAssets } from '@/composables/useEditGameAssets'
 import { useEditGameFormBootstrap } from '@/composables/useEditGameFormBootstrap'
 import { useEditGameMediaState } from '@/composables/useEditGameMediaState'
-import {
-  normalizeMetadataPickerID,
-  normalizeMetadataPickerIDs,
-  useRemoteMetadataPicker,
-} from '@/composables/useRemoteMetadataPicker'
-import { sortCreatableOptionsByName } from '@/utils/creatable-select'
-import type {
-  AdminGameDetail,
-  BannerItem,
-  CoverItem,
-  Developer,
-  LogoItem,
-  Publisher,
-  ScreenshotItem,
-  Series,
-  VideoAssetItem,
-} from '@/services/types'
+import { useEditGameMetadataPickers } from '@/composables/useEditGameMetadataPickers'
+import { useEditGameUploadUrls } from '@/composables/useEditGameUploadUrls'
 import { useUiStore } from '@/stores/ui'
+import type { AdminGameDetail } from '@/services/types'
 
 interface UseEditGameModalOptions {
   props: {
@@ -58,10 +37,6 @@ interface UseEditGameModalOptions {
   isSubmitting: Ref<boolean>
   activeTab: Ref<string>
 }
-
-const CREATE_SERIES_OPTION_VALUE = '__create_series__'
-const CREATE_DEVELOPER_OPTION_VALUE = '__create_developer__'
-const CREATE_PUBLISHER_OPTION_VALUE = '__create_publisher__'
 
 export const useEditGameModal = ({
   props,
@@ -81,33 +56,47 @@ export const useEditGameModal = ({
   }
 
   const form = ref<EditGameForm>(createEmptyEditGameForm())
-  const seriesPicker = useRemoteMetadataPicker<Series>({
-    selectedIds: () => form.value.series_id === null ? [] : [form.value.series_id],
-    search: (query) => seriesService.searchSeries(query),
-    create: (name) => seriesService.createSeries({ name }),
+
+  const addAlert = (message: string, type: 'success' | 'warning' | 'error') => {
+    uiStore.addAlert(message, type)
+  }
+
+  const {
+    CREATE_DEVELOPER_OPTION_VALUE,
+    CREATE_PUBLISHER_OPTION_VALUE,
+    CREATE_SERIES_OPTION_VALUE,
+    seriesPicker,
+    developerPicker,
+    publisherPicker,
+    seriesOptions,
+    developerOptions,
+    publisherOptions,
+    isSearchingSeries,
+    isSearchingDevelopers,
+    isSearchingPublishers,
+    isCreatingSeries,
+    isCreatingDevelopers,
+    isCreatingPublishers,
+    canCreateSeriesOption,
+    canCreateDeveloperOption,
+    canCreatePublisherOption,
+    seriesSearchQuery,
+    developerSearchQuery,
+    publisherSearchQuery,
+    filteredSeriesOptions,
+    filteredDeveloperOptions,
+    filteredPublisherOptions,
+    handleSeriesSearch,
+    handleDeveloperSearch,
+    handlePublisherSearch,
+    handleSeriesEnter,
+    handleSeriesSelection,
+    handleDeveloperSelection,
+    handlePublisherSelection,
+  } = useEditGameMetadataPickers({
+    form,
+    addAlert,
   })
-  const developerPicker = useRemoteMetadataPicker<Developer>({
-    selectedIds: () => form.value.developer_ids,
-    search: (query) => developersService.listDevelopers({ query }),
-    create: (name) => developersService.createDeveloper({ name }),
-  })
-  const publisherPicker = useRemoteMetadataPicker<Publisher>({
-    selectedIds: () => form.value.publisher_ids,
-    search: (query) => publishersService.listPublishers({ query }),
-    create: (name) => publishersService.createPublisher({ name }),
-  })
-  const seriesOptions = seriesPicker.options
-  const developerOptions = developerPicker.options
-  const publisherOptions = publisherPicker.options
-  const isSearchingSeries = seriesPicker.isSearching
-  const isSearchingDevelopers = developerPicker.isSearching
-  const isSearchingPublishers = publisherPicker.isSearching
-  const isCreatingSeries = seriesPicker.isCreating
-  const isCreatingDevelopers = developerPicker.isCreating
-  const isCreatingPublishers = publisherPicker.isCreating
-  const canCreateSeriesOption = seriesPicker.canCreate
-  const canCreateDeveloperOption = developerPicker.canCreate
-  const canCreatePublisherOption = publisherPicker.canCreate
 
   const openLogoSelector = () => {
     showLogoSelector.value = true
@@ -121,24 +110,6 @@ export const useEditGameModal = ({
     return 800
   })
 
-  const filteredSeriesOptions = computed(() => {
-    // 2026-04-04: keep authoring pickers alphabetized for scan speed.
-    // Impact: this is UI-only option ordering; do not treat it as backend metadata sort semantics.
-    return sortCreatableOptionsByName(seriesOptions.value)
-  })
-
-  const filteredDeveloperOptions = computed(() => {
-    // 2026-04-04: keep authoring pickers alphabetized for scan speed.
-    // Impact: this is UI-only option ordering; do not treat it as backend metadata sort semantics.
-    return sortCreatableOptionsByName(developerOptions.value)
-  })
-
-  const filteredPublisherOptions = computed(() => {
-    // 2026-04-04: keep authoring pickers alphabetized for scan speed.
-    // Impact: this is UI-only option ordering; do not treat it as backend metadata sort semantics.
-    return sortCreatableOptionsByName(publisherOptions.value)
-  })
-
   const currentGame = computed(() => props.game)
   const currentGameId = computed(() => props.game?.id)
   // 2026-04-06: Wiki-derived authoring actions depend on parsable content,
@@ -150,9 +121,6 @@ export const useEditGameModal = ({
       form.value.release_date = formatEditGameReleaseDate(value)
     },
   })
-  const addAlert = (message: string, type: 'success' | 'warning' | 'error') => {
-    uiStore.addAlert(message, type)
-  }
 
   let assetSyncTimer: ReturnType<typeof setTimeout> | undefined
   const emitAssetSync = () => {
@@ -183,216 +151,19 @@ export const useEditGameModal = ({
     if (assetSyncTimer) clearTimeout(assetSyncTimer)
   })
 
-  const handleSeriesSearch = async (query: string) => {
-    try {
-      await seriesPicker.search(query)
-    } catch {
-      addAlert('系列搜索失败', 'error')
-    }
-  }
-
-  const handleDeveloperSearch = async (query: string) => {
-    try {
-      await developerPicker.search(query)
-    } catch {
-      addAlert('开发商搜索失败', 'error')
-    }
-  }
-
-  const handlePublisherSearch = async (query: string) => {
-    try {
-      await publisherPicker.search(query)
-    } catch {
-      addAlert('发行商搜索失败', 'error')
-    }
-  }
-
-  const createSeriesFromSearch = async () => {
-    try {
-      const item = await seriesPicker.createFromQuery()
-      if (!item) return
-      form.value.series_id = item.id
-      seriesPicker.clearSearch()
-    } catch {
-      addAlert('创建系列失败', 'error')
-    }
-  }
-
-  const handleSeriesEnter = async () => {
-    try {
-      const item = await seriesPicker.resolveQuery()
-      if (!item) return
-      form.value.series_id = item.id
-      seriesPicker.clearSearch()
-    } catch {
-      addAlert('选择或创建系列失败', 'error')
-    }
-  }
-
-  const createDeveloperFromSearch = async () => {
-    try {
-      const item = await developerPicker.createFromQuery()
-      if (!item) return
-      form.value.developer_ids = Array.from(new Set([...form.value.developer_ids, item.id]))
-      developerPicker.clearSearch()
-    } catch {
-      addAlert('创建开发商失败', 'error')
-    }
-  }
-
-  const createPublisherFromSearch = async () => {
-    try {
-      const item = await publisherPicker.createFromQuery()
-      if (!item) return
-      form.value.publisher_ids = Array.from(new Set([...form.value.publisher_ids, item.id]))
-      publisherPicker.clearSearch()
-    } catch {
-      addAlert('创建发行商失败', 'error')
-    }
-  }
-
-  const handleSeriesSelection = (value: unknown) => {
-    if (value === CREATE_SERIES_OPTION_VALUE) {
-      void createSeriesFromSearch()
-      return
-    }
-    form.value.series_id = normalizeMetadataPickerID(value)
-    seriesPicker.clearSearch()
-  }
-
-  const handleDeveloperSelection = (value: unknown) => {
-    const values = Array.isArray(value) ? value : []
-    form.value.developer_ids = normalizeMetadataPickerIDs(values)
-    if (values.includes(CREATE_DEVELOPER_OPTION_VALUE)) {
-      void createDeveloperFromSearch()
-    }
-  }
-
-  const handlePublisherSelection = (value: unknown) => {
-    const values = Array.isArray(value) ? value : []
-    form.value.publisher_ids = normalizeMetadataPickerIDs(values)
-    if (values.includes(CREATE_PUBLISHER_OPTION_VALUE)) {
-      void createPublisherFromSearch()
-    }
-  }
-
-
-  const uploadAction = computed(() => {
-    return buildAssetUploadUrl('cover')
+  const {
+    uploadAction,
+    uploadData,
+    bannerUploadAction,
+    bannerUploadData,
+    screenshotUploadAction,
+    screenshotUploadData,
+    logoUploadAction,
+    logoUploadData,
+    uploadHeaders,
+  } = useEditGameUploadUrls({
+    gameId: currentGameId,
   })
-
-  const uploadData = computed(() => ({
-    game_id: String(props.game?.id || ''),
-  }))
-
-  const bannerUploadAction = computed(() => {
-    return buildAssetUploadUrl('banner')
-  })
-
-  const bannerUploadData = computed(() => ({
-    game_id: String(props.game?.id || ''),
-  }))
-
-  const screenshotUploadAction = computed(() => {
-    return buildAssetUploadUrl('screenshot')
-  })
-
-  const screenshotUploadData = computed(() => ({
-    game_id: String(props.game?.id || ''),
-  }))
-
-  const logoUploadAction = computed(() => {
-    return buildAssetUploadUrl('logo')
-  })
-
-  const logoUploadData = computed(() => ({
-    game_id: String(props.game?.id || ''),
-  }))
-
-  const uploadHeaders = computed(() => ({}))
-
-  const createScreenshotKey = (
-    asset: Pick<EditGameEditableScreenshot, 'id' | 'asset_uid' | 'path'>,
-    index = 0,
-  ) => {
-    if (asset.asset_uid) return `uid:${asset.asset_uid}`
-    if (typeof asset.id === 'number') return `db:${asset.id}`
-    return `path:${asset.path}:${index}:${Date.now()}`
-  }
-
-  const createEditableScreenshot = (
-    asset: ScreenshotItem | UploadedAssetResult | string,
-    index: number,
-  ): EditGameEditableScreenshot => {
-    if (typeof asset === 'string') {
-      return {
-        path: asset,
-        client_key: createScreenshotKey({ path: asset }, index),
-      }
-    }
-
-    const screenshotId = 'id' in asset ? asset.id : undefined
-
-    return {
-      id: screenshotId,
-      asset_uid: asset.asset_uid,
-      path: asset.path,
-      client_key: createScreenshotKey({
-        id: screenshotId,
-        asset_uid: asset.asset_uid,
-        path: asset.path,
-      }, index),
-    }
-  }
-
-  const createEditableVideo = (asset: VideoAssetItem | UploadedAssetResult | string): EditGameEditableVideo => {
-    if (typeof asset === 'string') {
-      return { path: asset }
-    }
-    return {
-      id: 'id' in asset ? asset.id : undefined,
-      asset_uid: asset.asset_uid,
-      path: asset.path,
-      poster_path: 'poster_path' in asset ? (asset.poster_path ?? null) : null,
-    }
-  }
-
-  const createEditableCover = (asset: CoverItem | UploadedAssetResult | string): EditGameEditableCover => {
-    if (typeof asset === 'string') {
-      return { path: asset }
-    }
-    return {
-      id: 'id' in asset ? asset.id : undefined,
-      asset_uid: asset.asset_uid,
-      path: asset.path,
-    }
-  }
-
-  const createEditableBanner = (asset: BannerItem | UploadedAssetResult | string): EditGameEditableBanner => {
-    if (typeof asset === 'string') {
-      return { path: asset }
-    }
-    return {
-      id: 'id' in asset ? asset.id : undefined,
-      asset_uid: asset.asset_uid,
-      path: asset.path,
-    }
-  }
-
-  const createEditableLogo = (asset: LogoItem | UploadedAssetResult | string): EditGameEditableLogo => {
-    if (typeof asset === 'string') {
-      return { path: asset, position_x: null, position_y: null, width_pct: null }
-    }
-    const isLogoItem = 'sort_order' in asset
-    return {
-      id: 'id' in asset ? asset.id : undefined,
-      asset_uid: asset.asset_uid,
-      path: asset.path,
-      position_x: isLogoItem ? (asset as LogoItem).position_x ?? null : null,
-      position_y: isLogoItem ? (asset as LogoItem).position_y ?? null : null,
-      width_pct: isLogoItem ? (asset as LogoItem).width_pct ?? null : null,
-    }
-  }
 
   const {
     draggedScreenshotKey,
@@ -486,28 +257,6 @@ export const useEditGameModal = ({
       visible.value = false
     },
   })
-
-  const uploadAssetFromUrl = async (
-    url: string,
-    assetType: 'cover' | 'banner' | 'screenshot' | 'video' | 'logo',
-  ) => {
-    if (!props.game?.id) {
-      throw new Error('缺少游戏 ID')
-    }
-
-    const response = await fetch(proxySteamAssetUrl(url))
-    if (!response.ok) {
-      throw new Error(`下载远程图片失败: ${response.status}`)
-    }
-
-    const blob = await response.blob()
-    const ext = getAssetFileExtension(blob.type, assetType)
-    const file = new File([blob], `${assetType}-${Date.now()}.${ext}`, {
-      type: blob.type || 'image/jpeg',
-    })
-
-    return uploadAsset(assetType, props.game.id, file)
-  }
 
   const {
     showSummarySelector,
@@ -623,7 +372,6 @@ export const useEditGameModal = ({
     form,
     gameId: currentGameId,
     getWikiContent: () => props.game?.wiki_content || '',
-    uploadAssetFromUrl,
     createEditableCover,
     createEditableBanner,
     createEditableLogo,
@@ -833,9 +581,9 @@ export const useEditGameModal = ({
     logoSearchUrl,
     logoPreviewUrl,
     logoSearchResults,
-    developerSearchQuery: developerPicker.query,
-    publisherSearchQuery: publisherPicker.query,
-    seriesSearchQuery: seriesPicker.query,
+    developerSearchQuery,
+    publisherSearchQuery,
+    seriesSearchQuery,
     logoImages,
     logoSearchQuery,
     selectedLogos,

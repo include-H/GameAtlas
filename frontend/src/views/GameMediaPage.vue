@@ -53,7 +53,6 @@
       </a-empty>
       <template v-else-if="game">
         <media-management-panel
-          :title="form.title"
           :covers="form.covers"
           :banners="form.banners"
           :preview-videos="form.preview_videos"

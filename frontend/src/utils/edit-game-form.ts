@@ -1,4 +1,12 @@
 import type { FilePathItem } from '@/composables/useGameFilePaths'
+import type { UploadedAssetResult } from '@/services/assets'
+import type {
+  BannerItem,
+  CoverItem,
+  LogoItem,
+  ScreenshotItem,
+  VideoAssetItem,
+} from '@/services/types'
 
 export interface EditGameEditableScreenshot {
   id?: number
@@ -112,4 +120,88 @@ export const formatEditGameReleaseDate = (
   const month = String(dateObj.getMonth() + 1).padStart(2, '0')
   const day = String(dateObj.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+// 会话新素材没有后端 id，靠 client_key 支撑拖拽排序与移除；已入库素材用 asset_uid / id 定位。
+export const createScreenshotKey = (
+  asset: Pick<EditGameEditableScreenshot, 'id' | 'asset_uid' | 'path'>,
+  index = 0,
+) => {
+  if (asset.asset_uid) return `uid:${asset.asset_uid}`
+  if (typeof asset.id === 'number') return `db:${asset.id}`
+  return `path:${asset.path}:${index}:${Date.now()}`
+}
+
+export const createEditableScreenshot = (
+  asset: ScreenshotItem | UploadedAssetResult | string,
+  index: number,
+): EditGameEditableScreenshot => {
+  if (typeof asset === 'string') {
+    return {
+      path: asset,
+      client_key: createScreenshotKey({ path: asset }, index),
+    }
+  }
+
+  const screenshotId = 'id' in asset ? asset.id : undefined
+
+  return {
+    id: screenshotId,
+    asset_uid: asset.asset_uid,
+    path: asset.path,
+    client_key: createScreenshotKey({
+      id: screenshotId,
+      asset_uid: asset.asset_uid,
+      path: asset.path,
+    }, index),
+  }
+}
+
+export const createEditableVideo = (asset: VideoAssetItem | UploadedAssetResult | string): EditGameEditableVideo => {
+  if (typeof asset === 'string') {
+    return { path: asset }
+  }
+  return {
+    id: 'id' in asset ? asset.id : undefined,
+    asset_uid: asset.asset_uid,
+    path: asset.path,
+    poster_path: 'poster_path' in asset ? (asset.poster_path ?? null) : null,
+  }
+}
+
+export const createEditableCover = (asset: CoverItem | UploadedAssetResult | string): EditGameEditableCover => {
+  if (typeof asset === 'string') {
+    return { path: asset }
+  }
+  return {
+    id: 'id' in asset ? asset.id : undefined,
+    asset_uid: asset.asset_uid,
+    path: asset.path,
+  }
+}
+
+export const createEditableBanner = (asset: BannerItem | UploadedAssetResult | string): EditGameEditableBanner => {
+  if (typeof asset === 'string') {
+    return { path: asset }
+  }
+  return {
+    id: 'id' in asset ? asset.id : undefined,
+    asset_uid: asset.asset_uid,
+    path: asset.path,
+  }
+}
+
+export const createEditableLogo = (asset: LogoItem | UploadedAssetResult | string): EditGameEditableLogo => {
+  if (typeof asset === 'string') {
+    return { path: asset, position_x: null, position_y: null, width_pct: null }
+  }
+  const isLogoItem = 'sort_order' in asset
+  return {
+    id: 'id' in asset ? asset.id : undefined,
+    asset_uid: asset.asset_uid,
+    path: asset.path,
+    position_x: isLogoItem ? (asset as LogoItem).position_x ?? null : null,
+    position_y: isLogoItem ? (asset as LogoItem).position_y ?? null : null,
+    width_pct: isLogoItem ? (asset as LogoItem).width_pct ?? null : null,
+  }
 }
