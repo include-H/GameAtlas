@@ -265,6 +265,9 @@ const launchOptions = ref<Array<{ id: string; version: string; url: string }>>([
 const launchHint = ref('点击游戏盒直接开始游戏')
 const launchHintSuccess = ref(false)
 
+let isStoreDisposed = false
+let storeAbortController: AbortController | null = null
+
 /** 开盒动画（盒盖 0.6s 翻转）播完即出手，不再额外等待 */
 const OPEN_CASE_DELAY_MS = 600
 
@@ -303,7 +306,7 @@ const pickPosterImages = (pool: AmbientBackgroundPool): string[] => {
   return picks
 }
 
-const loadStorePosters = async () => {
+const loadStorePosters = async (signal?: AbortSignal) => {
   try {
     // 与全局抽卡池同一数据源：遍历游戏列表收集 banner 与截图
     const pools: AmbientBackgroundPool[] = []
@@ -312,27 +315,33 @@ const loadStorePosters = async () => {
       const result = await gamesService.getGames({
         query: { page, limit: 100 },
         sort: { field: 'created_at', order: 'desc' },
+        signal,
       })
+      if (isStoreDisposed) return
       pools.push(getAmbientBackgroundPoolFromGames(result.data))
       const totalPages = Math.max(1, result.pagination.totalPages || 1)
       if (page >= totalPages) break
       page += 1
     }
+    if (isStoreDisposed) return
     storePosters.value = pickPosterImages(mergeAmbientBackgroundPools(pools))
   } catch {
+    if (isStoreDisposed) return
     // 拉取失败时保留纯色海报兜底
     uiStore.addAlert('游戏店海报加载失败，已显示兜底样式', 'warning')
   }
 }
 
-const loadStoreSession = async () => {
+const loadStoreSession = async (signal?: AbortSignal) => {
   try {
     // 每次进入生成一个随机种子，后端直接按 random 排序返回 20 个游戏
     const seed = Math.floor(Math.random() * 2_147_483_647) + 1
     const result = await gamesService.getGames({
       query: { page: 1, limit: 20 },
       sort: { field: 'random', order: 'desc', seed },
+      signal,
     })
+    if (isStoreDisposed) return
     // 货架固定 4 行 × 5 盒
     const picked = result.data.filter((game) => game.cover_image)
     gameStoreSessionGames.value = picked.map((game) => ({
@@ -344,11 +353,16 @@ const loadStoreSession = async () => {
     }))
 
     // CRT 播放真实预告：把本次 Session 所有预告片拍平成轮播列表，播完自动换下一个
-    const videoBundles = await gamesService.getPreviewVideos(picked.map((game) => game.public_id))
+    const videoBundles = await gamesService.getPreviewVideos(
+      picked.map((game) => game.public_id),
+      signal,
+    )
+    if (isStoreDisposed) return
     crtPlaylist.value = videoBundles.flatMap((bundle) => bundle.preview_videos.map((video) => video.path))
     crtPlaylistIndex = 0
     crtVideoUrl.value = crtPlaylist.value[0] ?? ''
   } catch {
+    if (isStoreDisposed) return
     // 拉取失败时保留空货架，避免展示 mock 数据
     uiStore.addAlert('游戏店数据加载失败，货架暂时为空', 'warning')
   }
@@ -426,11 +440,17 @@ const loadWaifuResource = (url: string, type: 'css' | 'js'): Promise<void> => {
 }
 
 const waitForElement = (selector: string, timeoutMs = 8000): Promise<HTMLElement | null> => {
+  if (isStoreDisposed) return Promise.resolve(null)
   const existing = document.querySelector<HTMLElement>(selector)
   if (existing) return Promise.resolve(existing)
   return new Promise((resolve) => {
     const startedAt = Date.now()
     const timer = window.setInterval(() => {
+      if (isStoreDisposed) {
+        window.clearInterval(timer)
+        resolve(null)
+        return
+      }
       const element = document.querySelector<HTMLElement>(selector)
       if (element) {
         window.clearInterval(timer)
@@ -446,18 +466,22 @@ const waitForElement = (selector: string, timeoutMs = 8000): Promise<HTMLElement
 }
 
 const initWaifu = async () => {
+  if (isStoreDisposed) return
   // 热更新或重复挂载时先清掉旧的看板娘节点
   document.getElementById('waifu')?.remove()
   document.getElementById('waifu-toggle')?.remove()
 
   await loadWaifuResource('/live2d-widget/waifu.css', 'css')
+  if (isStoreDisposed) return
   if (!window.initWidget) {
     await loadWaifuResource('/live2d-widget/waifu-tips.js', 'js')
+    if (isStoreDisposed) return
   }
 
   // 清掉旧 manager，避免上一次会话的缩放状态被误判为“已生效”
   window.__waifuManager = undefined
 
+  if (isStoreDisposed) return
   window.initWidget?.({
     waifuPath: '/live2d-config/waifu-tips.json',
     cdnPath: '/live2d-models/',
@@ -473,6 +497,7 @@ const initWaifu = async () => {
   // 把看板娘挂到场景内部，跟随 1280×720 设计稿一起缩放定位
   const stageElement = document.querySelector<HTMLElement>('.store-stage')
   const waifuElement = await waitForElement('#waifu')
+  if (isStoreDisposed) return
   if (stageElement && waifuElement) {
     stageElement.appendChild(waifuElement)
   }
@@ -488,6 +513,7 @@ const initWaifu = async () => {
     }
     return true
   }
+  if (isStoreDisposed) return
   if (!applyTargetZoom()) {
     const startedAt = Date.now()
     waifuZoomTimer = window.setInterval(() => {
@@ -844,6 +870,9 @@ const handleKeydown = (event: KeyboardEvent) => {
 }
 
 onMounted(() => {
+  isStoreDisposed = false
+  storeAbortController = new AbortController()
+  const storeSignal = storeAbortController.signal
   window.addEventListener('keydown', handleKeydown)
   updateStageScale()
   // 侧边栏收起/展开不会触发 window.resize，监听容器尺寸变化才能让场景跟随内容区缩放。
@@ -851,12 +880,19 @@ onMounted(() => {
     storeResizeObserver = new ResizeObserver(() => updateStageScale())
     storeResizeObserver.observe(storeRootRef.value)
   }
-  void initWaifu()
-  void loadStorePosters()
-  void loadStoreSession()
-
+  void initWaifu().catch(() => {
+    cleanupWaifu()
+    if (!isStoreDisposed) {
+      uiStore.addAlert('看板娘加载失败，已停用', 'warning')
+    }
+  })
+  void loadStorePosters(storeSignal)
+  void loadStoreSession(storeSignal)
 })
 onUnmounted(() => {
+  isStoreDisposed = true
+  storeAbortController?.abort()
+  storeAbortController = null
   pickupAnimation?.cancel()
   pickupAnimation = null
   window.removeEventListener('keydown', handleKeydown)

@@ -152,6 +152,34 @@ describe('games service', () => {
     expect(params.get('favorite')).toBe('false')
   })
 
+  it('passes abort signals through list and preview video requests', async () => {
+    getMock.mockResolvedValue({
+      data: [],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0,
+      },
+    })
+
+    const controller = new AbortController()
+    await gamesService.getGames({ signal: controller.signal })
+
+    expect(getMock).toHaveBeenCalledWith(
+      '/games',
+      expect.objectContaining({ signal: controller.signal }),
+    )
+
+    getMock.mockResolvedValue({ data: [] })
+    await gamesService.getPreviewVideos(['game-1'], controller.signal)
+
+    expect(getMock).toHaveBeenCalledWith(
+      '/games/preview-videos',
+      expect.objectContaining({ signal: controller.signal }),
+    )
+  })
+
   it('passes through invalid favorite transport values from route-owned callers', async () => {
     getMock.mockResolvedValue({
       data: [{ ...baseGame, id: 2, public_id: 'game-2', is_favorite: true }],

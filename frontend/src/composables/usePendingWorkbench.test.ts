@@ -198,4 +198,58 @@ describe('usePendingWorkbench', () => {
     expect(workbench.hasLoadFailure.value).toBe(true)
     expect(addAlert).toHaveBeenCalledWith('加载待处理工作台失败', 'error')
   })
+
+  it('discards stale responses when workbench loads overlap', async () => {
+    const stalePage = {
+      data: [{ public_id: 'game-old', title: 'Old', pending_issues: baseEvaluation }],
+      pagination: {
+        total: 1,
+        totalPages: 1,
+        page: 1,
+        limit: PENDING_WORKBENCH_PAGE_SIZE,
+        pending_issue_counts: {
+          groups: {
+            'missing-assets': 1,
+          },
+          ignored_total: 0,
+        },
+      },
+    }
+    const freshPage = {
+      data: [{ public_id: 'game-new', title: 'New', pending_issues: baseEvaluation }],
+      pagination: {
+        total: 8,
+        totalPages: 3,
+        page: 2,
+        limit: PENDING_WORKBENCH_PAGE_SIZE,
+        pending_issue_counts: {
+          groups: {
+            'missing-assets': 2,
+          },
+          ignored_total: 3,
+        },
+      },
+    }
+    let resolveFirst!: (value: unknown) => void
+    getGamesMock
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveFirst = resolve
+      }))
+      .mockResolvedValueOnce(freshPage)
+
+    const workbench = usePendingWorkbench({ addAlert: vi.fn() })
+    const firstLoad = workbench.loadWorkbenchGames()
+    const secondLoad = workbench.loadWorkbenchGames()
+    resolveFirst(stalePage)
+
+    await Promise.all([firstLoad, secondLoad])
+
+    expect(getGamesMock).toHaveBeenCalledTimes(2)
+    expect(workbench.pendingGames.value).toEqual(freshPage.data)
+    expect(workbench.pendingIssueCounts.value).toEqual({ 'missing-assets': 2 })
+    expect(workbench.pendingIssueIgnoredTotal.value).toBe(3)
+    expect(workbench.currentPage.value).toBe(2)
+    expect(workbench.totalPages.value).toBe(3)
+    expect(workbench.isLoading.value).toBe(false)
+  })
 })

@@ -116,9 +116,11 @@ function buildGamesQueryParams(params?: {
 async function fetchGamesPage<P extends GameListPagination = GameListPagination>(params?: {
   query?: GameListQuery
   sort?: GameSortQuery
+  signal?: AbortSignal
 }): Promise<GameListPageEnvelope<GameListItemDto, P>> {
   return get<GameListPageEnvelope<GameListItemDto, P>>('/games', {
     params: buildGamesQueryParams(params),
+    signal: params?.signal,
   })
 }
 
@@ -219,6 +221,7 @@ const gamesService = {
   async getGames<P extends GameListPagination = GameListPagination>(params?: {
     query?: GameListQuery
     sort?: GameSortQuery
+    signal?: AbortSignal
   }): Promise<GameListPageEnvelope<GameListItem, P>> {
     const response = await fetchGamesPage<P>(params)
     const games = response.data.map((item) => normalizeGameListItem(item))
@@ -249,12 +252,13 @@ const gamesService = {
 
   // 游戏店会话批量拉取预告片：一次请求返回多个游戏的 preview_videos，
   // 避免对每个游戏再发一次详情请求。
-  async getPreviewVideos(publicIds: string[]): Promise<GamePreviewVideosApiItem[]> {
+  async getPreviewVideos(publicIds: string[], signal?: AbortSignal): Promise<GamePreviewVideosApiItem[]> {
     const ids = Array.from(new Set(publicIds.map((id) => id.trim()).filter(Boolean)))
     if (ids.length === 0) return []
     const queryParams = new URLSearchParams({ public_ids: ids.join(',') })
     const response = await get<ApiEnvelope<GamePreviewVideosApiItem[]>>('/games/preview-videos', {
       params: queryParams,
+      signal,
     })
     return response.data ?? []
   },

@@ -40,6 +40,8 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   const pendingIssueIgnoredTotal = ref(0)
   const pendingIssueCounts = ref<Record<string, number>>({})
 
+  let workbenchRequestId = 0
+
   const pageGameCount = computed(() => pendingGames.value.length)
 
   const getIssueEvaluation = (game: GameListItem): PendingIssueEvaluation => {
@@ -98,6 +100,7 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   })
 
   const loadWorkbenchGames = async (page = currentPage.value) => {
+    const requestId = ++workbenchRequestId
     isLoading.value = true
     hasLoadFailure.value = false
     try {
@@ -125,6 +128,9 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
       if (response.data.some((game) => !game.pending_issues)) {
         throw new Error('pending workbench response missing pending_issues')
       }
+      if (requestId !== workbenchRequestId) {
+        return
+      }
       pendingGames.value = response.data
       pendingIssueIgnoredTotal.value = countsSummary.ignored_total
       pendingIssueCounts.value = countsSummary.groups
@@ -134,12 +140,18 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
 
       if (response.pagination.page > response.pagination.totalPages && response.pagination.totalPages > 0) {
         await loadWorkbenchGames(response.pagination.totalPages)
+        return
       }
     } catch {
+      if (requestId !== workbenchRequestId) {
+        return
+      }
       hasLoadFailure.value = true
       options.addAlert('加载待处理工作台失败', 'error')
     } finally {
-      isLoading.value = false
+      if (requestId === workbenchRequestId) {
+        isLoading.value = false
+      }
     }
   }
 
