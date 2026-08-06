@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -180,6 +181,19 @@ func registerAssetRoutes(
 		return
 	}
 
+	assetStore := files.NewAssetStore(assetsDir)
+	requestedVariantWidth := func(c *gin.Context) int {
+		raw := strings.TrimSpace(c.Query("w"))
+		if raw == "" {
+			return 0
+		}
+		width, err := strconv.Atoi(raw)
+		if err != nil || !files.IsAllowedVariantWidth(width) {
+			return 0
+		}
+		return width
+	}
+
 	serveAssetFile := func(c *gin.Context, rawPath string) {
 		targetPath := filepath.Join(assetsDir, filepath.FromSlash(rawPath))
 		relative, err := filepath.Rel(assetsDir, targetPath)
@@ -188,11 +202,13 @@ func registerAssetRoutes(
 			return
 		}
 
+		permanentFile := true
 		if _, err := os.Stat(targetPath); err != nil {
 			// Fallback: check staging directory for files not yet moved to permanent.
 			stagingPath := filepath.Join(assetsDir, "_staging", filepath.Base(rawPath))
 			if _, statErr := os.Stat(stagingPath); statErr == nil {
 				targetPath = stagingPath
+				permanentFile = false
 			} else {
 				c.Status(http.StatusNotFound)
 				return
@@ -200,6 +216,14 @@ func registerAssetRoutes(
 		}
 
 		c.Header("Cache-Control", "public, max-age=86400")
+
+		if permanentFile {
+			if variant, variantErr := assetStore.EnsureVariant("/assets/"+rawPath, requestedVariantWidth(c)); variantErr == nil && variant != targetPath {
+				targetPath = variant
+				c.Header("Cache-Control", "public, max-age=31536000, immutable")
+			}
+		}
+
 		c.File(targetPath)
 	}
 

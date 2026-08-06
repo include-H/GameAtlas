@@ -109,6 +109,7 @@ import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { GameListItem, TimelineGame } from '@/services/types'
 import { useAuthStore } from '@/stores/auth'
+import { withAssetWidth } from '@/utils/asset-url'
 import {
   IconHeartFill,
   IconHeart,
@@ -186,12 +187,12 @@ const bannerImage = computed(() => {
 })
 
 const displayImage = computed(() => {
-  if (props.isList) {
+  const base = props.isList
     // List mode prefers horizontal banner
-    return bannerImage.value || props.game.cover_image || placeholderImage
-  }
-  // Grid mode prefers vertical cover
-  return props.game.cover_image || bannerImage.value || placeholderImage
+    ? (bannerImage.value || props.game.cover_image || placeholderImage)
+    // Grid mode prefers vertical cover
+    : (props.game.cover_image || bannerImage.value || placeholderImage)
+  return withAssetWidth(base, 480)
 })
 </script>
 

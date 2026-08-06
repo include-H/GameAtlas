@@ -26,6 +26,7 @@
               :src="currentMedia.url"
               :alt="alt"
               class="screenshot-carousel__image"
+              decoding="async"
               @load="onImageLoad"
               @error="handleImageError(currentMedia.url)"
             />
@@ -57,6 +58,7 @@
                       :src="currentVideoPoster"
                       class="screenshot-carousel__loader-thumb"
                       alt=""
+                      decoding="async"
                       @error="handlePosterError(currentVideoPoster)"
                     />
                     <svg class="screenshot-carousel__loader-arc" viewBox="0 0 100 100">
@@ -80,6 +82,7 @@
                   :src="currentVideoPoster"
                   class="screenshot-carousel__loader-thumb"
                   alt=""
+                  decoding="async"
                   @error="handlePosterError(currentVideoPoster)"
                 >
                 <span class="screenshot-carousel__video-failed-text">视频加载失败</span>
@@ -119,6 +122,8 @@
             v-if="item.thumbnail"
             :src="item.thumbnail"
             :alt="item.type === 'video' ? 'Video thumbnail' : `Screenshot ${index + 1}`"
+            loading="lazy"
+            decoding="async"
             @error="item.type === 'image' ? handleImageError(item.thumbnail) : (item.poster ? handlePosterError(item.poster) : undefined)"
           />
           <div v-else class="screenshot-carousel__film-placeholder">
@@ -145,7 +150,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { IconLeft, IconRight } from '@arco-design/web-vue/es/icon'
-import { resolveAssetUrl } from '@/utils/asset-url'
+import { resolveAssetUrl, withAssetWidth } from '@/utils/asset-url'
 import { shouldResetVideoPlaybackState } from '@/utils/video-playback'
 
 interface Props {
@@ -188,7 +193,12 @@ let imageAutoplayTimer: number | null = null
 
 const visibleScreenshots = computed(() => {
   const brokenSet = new Set(brokenImages.value)
-  return props.screenshots.filter((shot) => !!shot && !brokenSet.has(shot))
+  return props.screenshots.filter((shot) => {
+    if (!shot) return false
+    return !brokenSet.has(shot)
+      && !brokenSet.has(withAssetWidth(shot, 1280))
+      && !brokenSet.has(withAssetWidth(shot, 480))
+  })
 })
 
 const mediaItems = computed<MediaItem[]>(() => {
@@ -216,9 +226,9 @@ const mediaItems = computed<MediaItem[]>(() => {
     items.push({
       key: `image:${index}:${shot}`,
       type: 'image',
-      url: shot,
+      url: withAssetWidth(shot, 1280),
       poster: null,
-      thumbnail: shot,
+      thumbnail: withAssetWidth(shot, 480),
     })
   })
   return items

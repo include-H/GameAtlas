@@ -3,14 +3,33 @@ package files
 import (
 	"errors"
 	"fmt"
+	"image"
 	"io"
+	"math"
 	"mime"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/chai2010/webp"
+	"golang.org/x/image/draw"
+	_ "golang.org/x/image/webp" // register webp decoder for image.Decode
+
+	_ "image/gif"  // register gif decoder for image.Decode
+	_ "image/jpeg" // register jpeg decoder for image.Decode
+	_ "image/png"  // register png decoder for image.Decode
 )
+
+// AllowedVariantWidths 是允许生成的缩放变体宽度白名单，
+// 防止任意 ?w= 参数触发无限生成撑爆磁盘。
+var AllowedVariantWidths = map[int]bool{320: true, 480: true, 640: true, 960: true, 1280: true, 1920: true}
+
+// IsAllowedVariantWidth reports whether the requested variant width is allowed.
+func IsAllowedVariantWidth(width int) bool {
+	return AllowedVariantWidths[width]
+}
 
 var allowedImageContentTypes = map[string]string{
 	"image/jpeg": ".jpg",
@@ -186,6 +205,82 @@ func (s *AssetStore) AssetExists(assetPath string) bool {
 		return true
 	}
 	return false
+}
+
+// EnsureVariant returns the disk path to serve for assetPath at the given width.
+// It lazily generates and permanently stores a WebP variant named
+// <original-name>.w<width>.webp next to the original, and serves the original
+// unchanged when the width is not allowed, the source is an animated GIF,
+// decoding/resizing fails, or the original is already narrower than the target.
+func (s *AssetStore) EnsureVariant(assetPath string, width int) (string, error) {
+	originalPath, err := s.resolveAssetPath(assetPath)
+	if err != nil {
+		return "", err
+	}
+	if width <= 0 || !IsAllowedVariantWidth(width) || strings.EqualFold(filepath.Ext(originalPath), ".gif") {
+		return originalPath, nil
+	}
+
+	variantPath := variantFilePath(originalPath, width)
+	if _, err := os.Stat(variantPath); err == nil {
+		return variantPath, nil
+	}
+
+	source, err := openImage(originalPath)
+	if err != nil {
+		return originalPath, nil
+	}
+	defer source.Close()
+
+	img, _, err := image.Decode(source)
+	if err != nil {
+		return originalPath, nil
+	}
+	bounds := img.Bounds()
+	if bounds.Dx() <= width {
+		return originalPath, nil
+	}
+
+	resized := resizeToWidth(img, width)
+	if err := writeWebPFile(variantPath, resized); err != nil {
+		return originalPath, nil
+	}
+	return variantPath, nil
+}
+
+func variantFilePath(originalPath string, width int) string {
+	ext := filepath.Ext(originalPath)
+	base := strings.TrimSuffix(originalPath, ext)
+	return fmt.Sprintf("%s.w%d.webp", base, width)
+}
+
+func openImage(path string) (*os.File, error) {
+	return os.Open(path)
+}
+
+func resizeToWidth(src image.Image, width int) image.Image {
+	srcBounds := src.Bounds()
+	height := int(math.Round(float64(srcBounds.Dy()) * float64(width) / float64(srcBounds.Dx())))
+	dst := image.NewRGBA(image.Rect(0, 0, width, height))
+	draw.CatmullRom.Scale(dst, dst.Bounds(), src, srcBounds, draw.Over, nil)
+	return dst
+}
+
+func writeWebPFile(path string, img image.Image) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".variant-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+
+	if err := webp.Encode(tmp, img, &webp.Options{Quality: 80}); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), path)
 }
 
 func (s *AssetStore) resolveAssetPath(assetPath string) (string, error) {

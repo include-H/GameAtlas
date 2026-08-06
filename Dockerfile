@@ -7,7 +7,7 @@ COPY frontend/ .
 RUN npm run build
 
 # ---- 后端构建 ----
-FROM golang:1.22-alpine AS backend-builder
+FROM golang:1.25-alpine AS backend-builder
 RUN apk add --no-cache gcc musl-dev
 WORKDIR /app/backend
 COPY backend/go.mod backend/go.sum ./

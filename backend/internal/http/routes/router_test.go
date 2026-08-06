@@ -2,6 +2,9 @@ package routes
 
 import (
 	"errors"
+	"image"
+	"image/color"
+	"image/jpeg"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -22,6 +25,12 @@ type assetRouteGameRepositoryStub struct {
 
 func (s assetRouteGameRepositoryStub) GetByPublicID(publicID string) (*domain.Game, error) {
 	return nil, s.err
+}
+
+type assetRouteGameRepositoryPublicStub struct{}
+
+func (s assetRouteGameRepositoryPublicStub) GetByPublicID(publicID string) (*domain.Game, error) {
+	return &domain.Game{PublicID: publicID, Visibility: domain.GameVisibilityPublic}, nil
 }
 
 type assetRouteStartScreenRepositoryStub struct {
@@ -365,5 +374,64 @@ func TestResolveEmbeddedDistFSFromReturnsFSWhenIndexExists(t *testing.T) {
 	}
 	if string(content) != "<html>spa</html>" {
 		t.Fatalf("index.html = %q, want %q", string(content), "<html>spa</html>")
+	}
+}
+
+func TestRegisterAssetRoutesServesWebPVariantForWidthQuery(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	assetsDir := t.TempDir()
+	gameDir := filepath.Join(assetsDir, "variant-game")
+	if err := os.MkdirAll(gameDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+
+	srcImage := image.NewRGBA(image.Rect(0, 0, 1600, 900))
+	for y := 0; y < 900; y++ {
+		for x := 0; x < 1600; x++ {
+			srcImage.Set(x, y, color.RGBA{R: uint8(x % 255), G: uint8(y % 255), B: 128, A: 255})
+		}
+	}
+	srcPath := filepath.Join(gameDir, "shot.jpg")
+	file, err := os.Create(srcPath)
+	if err != nil {
+		t.Fatalf("create source image: %v", err)
+	}
+	if err := jpeg.Encode(file, srcImage, nil); err != nil {
+		_ = file.Close()
+		t.Fatalf("encode source image: %v", err)
+	}
+	_ = file.Close()
+
+	router := gin.New()
+	registerAssetRoutes(
+		router,
+		assetsDir,
+		assetRouteGameRepositoryPublicStub{},
+		assetRouteStartScreenRepositoryStub{},
+	)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/assets/variant-game/shot.jpg?w=480", nil)
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	if contentType := recorder.Header().Get("Content-Type"); !strings.Contains(contentType, "image/webp") {
+		t.Fatalf("content-type = %q, want image/webp", contentType)
+	}
+	if _, err := os.Stat(filepath.Join(gameDir, "shot.w480.webp")); err != nil {
+		t.Fatalf("variant file not persisted: %v", err)
+	}
+
+	recorderSecond := httptest.NewRecorder()
+	requestSecond := httptest.NewRequest(http.MethodGet, "/assets/variant-game/shot.jpg?w=480", nil)
+	router.ServeHTTP(recorderSecond, requestSecond)
+	if recorderSecond.Code != http.StatusOK {
+		t.Fatalf("second status = %d, want %d", recorderSecond.Code, http.StatusOK)
+	}
+	if cacheControl := recorderSecond.Header().Get("Cache-Control"); !strings.Contains(cacheControl, "immutable") {
+		t.Fatalf("cache-control = %q, want immutable for cached variant", cacheControl)
 	}
 }
