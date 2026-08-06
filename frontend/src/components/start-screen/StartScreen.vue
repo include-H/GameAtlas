@@ -15,9 +15,6 @@
           <header class="start-screen__header">
             <div>
               <h1 class="start-screen__heading">开始</h1>
-              <p class="start-screen__subtitle">
-                {{ tiles.length > 0 ? `${tiles.length} 个磁贴` : '你的专属游戏磁贴' }}
-              </p>
             </div>
 
             <div class="start-screen__header-actions">
@@ -42,9 +39,6 @@
             </div>
           </header>
 
-          <p v-if="isEditing" class="start-screen__edit-hint">
-            拖动排序 · 尺寸切换 · banner 裁剪 · × 移除
-          </p>
           <p v-if="isEditing && saveError" class="start-screen__save-error">{{ saveError }}</p>
 
           <div v-if="isLoading && tiles.length === 0" class="start-screen__state">
@@ -645,22 +639,10 @@ onUnmounted(() => {
   letter-spacing: 0.1em;
 }
 
-.start-screen__subtitle {
-  margin: 8px 0 0;
-  font-size: 14px;
-  opacity: 0.65;
-}
-
 .start-screen__header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.start-screen__edit-hint {
-  margin: 0 0 12px;
-  font-size: 13px;
-  opacity: 0.7;
 }
 
 .start-screen__save-error {
