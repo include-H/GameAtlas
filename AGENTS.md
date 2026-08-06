@@ -155,6 +155,18 @@ Outputs to `release/game-release-<version>/`. The script:
 - **Backend**: Go std testing. Run: `go test ./...` (or `bash check.sh` for tests + vet)
 - Migration changes require tests covering "new DB success + idempotent re-run"
 
+## 排错方法论（Debugging Heuristics）
+
+来自 2026.8.6 虚拟滚动恢复 saga（`docs/2026.8.6_游戏库虚拟滚动恢复陷阱.md`）与历史调试的沉淀。遇到顽固 Bug 时按此顺序思考：
+
+1. **症状会漂移，先归类"症状族"**：白屏 / 闪毁 / 回顶 / 偶发成功——四个互斥症状可能是同一根因的不同时序表现。看到"时好时坏""不同构建表现不同"，第一假设是**竞态**而非多个独立 Bug；找出那个时序变量（网络快慢、过渡时长、异步完成先后），它能统一解释全部症状。
+2. **猜不如测：取证优先**。每个"合理假设"在动手修之前，先设计一个能证伪它的观察：生命周期日志带现场值（`virtualScrollTop`、`refReady`、实际 scrollTop）一次排除 keep-alive 嫌疑；拦截 `Element.prototype.scrollTo` 带调用栈，知道"谁在滚动、滚到哪"；帧采样 + MutationObserver 抓直接赋值与 DOM 出现/消失。控制台取证成本低、证据硬，胜过任何推理。
+3. **分层归因：症状层 vs 根源层**。"scrollTo 被夹取"是症状，"数据被替换"是根源。修症状的补丁只让症状变体（白屏消失但位置仍丢）；验收标准是**补丁消灭所有已知症状变体**——剩一个都说明没修到根。
+4. **不变量审查**：僵局时列出代码依赖的"未经验证的不变量"逐一证伪（API 返回的子对象 ID 可信？route.query 引用稳定？keep-alive 必然命中？）。真正的根因几乎总藏在某个被默认为真的假设里。
+5. **玄学 = 时序 + 确定性机制**：任何"第一次成功、后续失败"都有确定机制，只是被时序掩盖。找到机制、能统一解释所有互斥现象，才是根因修复的完成判据。
+6. **一次只改一个变量**：每个修复单独验证，记录有效/无效——无效的也是信息（排除法）。
+7. **错误路径也是资产**：修复后写调试文档（现象 → 被推翻的假设 → 真根因 → 方案 → 测试矩阵），被推翻的假设明确标注。风格参考 `docs/2026.8.6_游戏库虚拟滚动恢复陷阱.md`。
+
 ## Important Gotchas
 
 1. **`backend/web/dist/` is embedded into the Go binary** — the release build copies frontend dist here before building. CI creates a `.gitkeep` placeholder. Never commit built artifacts.
