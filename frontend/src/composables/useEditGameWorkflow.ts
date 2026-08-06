@@ -45,13 +45,13 @@ const createUpdatePayload = (params: {
 }
 
 export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
-  const handleSubmit = async () => {
+  const handleSubmit = async (): Promise<boolean> => {
     const game = options.game.value
-    if (!game) return
-    if (options.isSubmitting.value) return
+    if (!game) return false
+    if (options.isSubmitting.value) return false
 
     const isValid = await options.validateForm()
-    if (!isValid) return
+    if (!isValid) return false
 
     options.isSubmitting.value = true
 
@@ -152,8 +152,10 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       options.addAlert('保存成功', 'success')
       options.emitSuccess()
       options.closeModal()
+      return true
     } catch (error) {
       options.addAlert(getHttpErrorMessage(error, '保存失败'), 'error')
+      return false
     } finally {
       options.isSubmitting.value = false
     }

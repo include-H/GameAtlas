@@ -194,10 +194,11 @@
             class="app-text-action-btn"
             type="text"
             html-type="button"
+            :loading="isSubmitting"
             @click="openStandaloneMediaPage"
           >
             <template #icon><icon-launch /></template>
-            素材管理
+            保存并跳转素材管理
           </a-button>
           <a-button class="app-text-action-btn" type="text" html-type="button" @click="handleCancel">
             取消
@@ -342,10 +343,12 @@ const {
   activeTab,
 })
 
-const openStandaloneMediaPage = () => {
-  if (!props.game?.public_id) return
-  visible.value = false
-  void router.push({ name: 'game-media', params: { publicId: props.game.public_id } })
+const openStandaloneMediaPage = async () => {
+  const publicId = props.game?.public_id
+  if (!publicId) return
+  const saved = await handleSubmit()
+  if (!saved) return
+  void router.push({ name: 'game-media', params: { publicId } })
 }
 </script>
 
