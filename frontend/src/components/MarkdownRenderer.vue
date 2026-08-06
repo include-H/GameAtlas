@@ -10,6 +10,7 @@
 import { computed } from 'vue'
 import MarkdownIt from 'markdown-it'
 import { generateHeadingId } from '@/utils/markdown-headings'
+import { classifyEpigraphLine } from '@/utils/epigraph'
 
 interface Props {
   content: string
@@ -47,17 +48,6 @@ md.renderer.rules.heading_open = (tokens, idx, options, env, self) => {
 
 const epigraphBlockPattern = /(^|\n):::epigraph[ \t]*\n([\s\S]*?)\n:::(?=\n|$)/g
 const epigraphTokenPrefix = '@@EPIGRAPH_BLOCK_'
-
-function classifyEpigraphLine(line: string): 'cn' | 'en' {
-  const asciiLetters = (line.match(/[A-Za-z]/g) || []).length
-  const cjkChars = (line.match(/[\u3400-\u9fff]/g) || []).length
-
-  if (asciiLetters > cjkChars) {
-    return 'en'
-  }
-
-  return 'cn'
-}
 
 function splitCnEpigraphSegments(line: string): string[] {
   const normalized = line.replace(/\s+/g, '')
