@@ -1,0 +1,47 @@
+/* 看板娘：live2d-widget 创建的是 body 级节点，需用全局样式把它定位进店内场景 */
+
+#waifu {
+  position: absolute !important;
+  left: 0px !important;
+  bottom: 6.67px !important;
+  width: 533.33px !important;
+  height: 533.33px !important;
+  transform: none !important;
+  z-index: 3 !important;
+  pointer-events: none !important;
+  transition: bottom 1s ease-in-out;
+}
+
+#waifu.waifu-active {
+  bottom: 6.67px !important;
+}
+
+#waifu:hover {
+  transform: none !important;
+}
+
+#waifu-toggle {
+  display: none !important;
+}
+
+#live2d {
+  width: 533.33px !important;
+  height: 533.33px !important;
+  pointer-events: none !important;
+}
+
+#waifu-tips {
+  left: 340px !important;
+  top: 20px !important;
+  margin: 0 !important;
+  width: 146.67px !important;
+  min-height: 36px;
+  font-size: 8.67px;
+  line-height: 14px;
+}
+
+@media (max-width: 768px) {
+  #waifu {
+    display: none;
+  }
+}
