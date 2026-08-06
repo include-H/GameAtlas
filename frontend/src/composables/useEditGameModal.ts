@@ -573,7 +573,6 @@ export const useEditGameModal = ({
     coverSource,
     bannerSource,
     screenshotSource,
-    logoSource,
     sgdbAvailable,
     handleSummarySearchClear,
     searchSteamForSummary,
@@ -918,7 +917,6 @@ export const useEditGameModal = ({
     coverSource,
     bannerSource,
     screenshotSource,
-    logoSource,
     sgdbAvailable,
   }
 }

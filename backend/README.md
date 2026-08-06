@@ -223,7 +223,7 @@ backend/
 ### Steam / SteamGridDB
 
 - Steam：`/api/steam/search`、`/api/steam/:appId/assets`（元数据 + 素材候选），图片经 `/api/steam/proxy` 代理下载，避免浏览器直连外部；
-- SteamGridDB：按 appId / gameId 获取 grids / heroes / logos / icons，需要 API Key；
+- SteamGridDB：按 SGDB 游戏 id 获取 grids / heroes / logos（SGDB 搜索选中后），需要 API Key；
 - Steam 与 SteamGridDB 出站请求统一走 `PROXY` 配置（空则直连）；
 - 图片代理仅做 host 后缀白名单（`steamcdn-a.akamaihd.net`、`*.steamstatic.com`、`*.steampowered.com`、`*.steamgriddb.com`），不承诺内网 IP 拦截与 DNS 重绑定防护。
 
@@ -287,7 +287,6 @@ backend/
 **Steam / SteamGridDB**
 - `GET /api/steam/search` · `GET /api/steam/:appId/assets` · `GET /api/steam/proxy`
 - `GET /api/steamgriddb/available` · `GET /api/steamgriddb/search`
-- `GET /api/steamgriddb/:appId/grids` · `heroes` · `logos` · `icons`
 - `GET /api/steamgriddb/game/:gameId/grids` · `heroes` · `logos`
 
 </details>

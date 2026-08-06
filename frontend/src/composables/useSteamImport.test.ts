@@ -29,7 +29,6 @@ vi.mock('@/services/steamgriddb.service', () => ({
     search: searchSteamGridDBMock,
     getGridsByGameId: vi.fn(),
     getHeroesByGameId: getHeroesByGameIdMock,
-    getLogosBySteamAppId: vi.fn(),
     getLogosByGameId: getLogosByGameIdMock,
   },
 }))
@@ -185,7 +184,6 @@ describe('useSteamImport', () => {
       addAlert: vi.fn(),
     })
 
-    steamImport.logoSource.value = 'steamgriddb'
     steamImport.logoSearchQuery.value = 'Grid Only Logo Game'
     await steamImport.searchLogos()
 

@@ -78,7 +78,6 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const logoImages = ref<string[]>([])
   const selectedLogos = ref<Set<number>>(new Set())
   const isDownloadingLogos = ref(false)
-  const logoSource = ref<ImportSource>('steam')
   const sgdbLogoSearchResults = ref<SteamGameSearchResult[]>([])
   const sgdbLogoThumbs = ref<Record<string, string>>({})
   const isSearchingSgdbLogos = ref(false)
@@ -206,28 +205,13 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     },
   })
 
-  const logoSteamPicker = useSteamPicker<string[]>({
-    onSelect: async (game) => {
-      const logos = await steamGridDBService.getLogosBySteamAppId(Number(game.id))
-      const images = logos.map((g: { url: string }) => g.url)
-      logoImages.value = images
-      selectedLogos.value = new Set()
-      return images
-    },
-    onError: (message) => {
-      options.addAlert('Logo 处理失败：' + message, 'error')
-    },
-  })
-
   const screenshotSearchQuery = screenshotSteamPicker.query
   const steamScreenshotSearchResults = screenshotSteamPicker.results
   const selectedScreenshotGame = screenshotSteamPicker.selectedGame
   const isSearchingSteamScreenshots = screenshotSteamPicker.isSearching
 
-  const logoSearchQuery = logoSteamPicker.query
-  const steamLogoSearchResults = logoSteamPicker.results
-  const selectedLogoGame = logoSteamPicker.selectedGame
-  const isSearchingSteamLogos = logoSteamPicker.isSearching
+  const logoSearchQuery = ref('')
+  const selectedLogoGame = ref<SteamGameSearchResult | null>(null)
 
   const mergeSgdbScreenshotThumbs = (results: SteamGameSearchResult[]) => {
     const thumbs = sgdbScreenshotThumbs.value
@@ -441,9 +425,10 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   }
 
   const handleLogoSearchClear = () => {
-    logoSteamPicker.clear()
+    logoSearchQuery.value = ''
     logoImages.value = []
     selectedLogos.value = new Set()
+    selectedLogoGame.value = null
     sgdbLogoSearchResults.value = []
     sgdbLogoThumbs.value = {}
   }
@@ -451,47 +436,34 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const searchLogos = async () => {
     logoImages.value = []
     selectedLogos.value = new Set()
-    if (logoSource.value === 'steamgriddb') {
-      isSearchingSgdbLogos.value = true
-      try {
-        await searchSteamGridDBForLogos()
-        steamLogoSearchResults.value = []
-        selectedLogoGame.value = null
-      } catch (error) {
-        options.addAlert('SteamGridDB 搜索失败：' + getHttpErrorMessage(error), 'error')
-      } finally {
-        isSearchingSgdbLogos.value = false
-      }
-      return
+    isSearchingSgdbLogos.value = true
+    try {
+      await searchSteamGridDBForLogos()
+      selectedLogoGame.value = null
+    } catch (error) {
+      options.addAlert('SteamGridDB 搜索失败：' + getHttpErrorMessage(error), 'error')
+    } finally {
+      isSearchingSgdbLogos.value = false
     }
-
-    sgdbLogoSearchResults.value = []
-    sgdbLogoThumbs.value = {}
-    await logoSteamPicker.search()
   }
 
   const selectLogoGame = async (game: SteamGameSearchResult) => {
-    if (logoSource.value === 'steamgriddb') {
-      selectedLogoGame.value = game
-      isSearchingSgdbLogos.value = true
-      try {
-        const logos = await steamGridDBService.getLogosByGameId(Number(game.id))
-        logoImages.value = logos.map((logo) => logo.url)
-        selectedLogos.value = new Set()
-      } catch (error) {
-        options.addAlert('SteamGridDB 获取 Logo 失败：' + getHttpErrorMessage(error), 'error')
-        selectedLogoGame.value = null
-      } finally {
-        isSearchingSgdbLogos.value = false
-      }
-      return
+    selectedLogoGame.value = game
+    isSearchingSgdbLogos.value = true
+    try {
+      const logos = await steamGridDBService.getLogosByGameId(Number(game.id))
+      logoImages.value = logos.map((logo) => logo.url)
+      selectedLogos.value = new Set()
+    } catch (error) {
+      options.addAlert('SteamGridDB 获取 Logo 失败：' + getHttpErrorMessage(error), 'error')
+      selectedLogoGame.value = null
+    } finally {
+      isSearchingSgdbLogos.value = false
     }
-
-    await logoSteamPicker.select(game)
   }
 
   const backToLogoGameSearch = () => {
-    logoSteamPicker.back()
+    selectedLogoGame.value = null
     logoImages.value = []
     selectedLogos.value = new Set()
   }
@@ -534,7 +506,6 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       showLogoSelector.value = false
       backToLogoGameSearch()
       logoSearchQuery.value = ''
-      steamLogoSearchResults.value = []
       sgdbLogoSearchResults.value = []
       options.addAlert(`成功添加 ${indices.length} 张 Logo`, 'success')
     } catch (error) {
@@ -592,12 +563,6 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     void searchLogos()
   })
 
-  watch(logoSource, () => {
-    if (!showLogoSelector.value) return
-    if (!logoSearchQuery.value.trim()) return
-    void searchLogos()
-  })
-
   const screenshotSearchResults = computed(() => (
     screenshotSource.value === 'steamgriddb'
       ? mergeSgdbScreenshotThumbs(sgdbScreenshotSearchResults.value)
@@ -608,16 +573,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       ? isSearchingSgdbScreenshots.value
       : isSearchingSteamScreenshots.value
   ))
-  const logoSearchResults = computed(() => (
-    logoSource.value === 'steamgriddb'
-      ? mergeSgdbLogoThumbs(sgdbLogoSearchResults.value)
-      : steamLogoSearchResults.value
-  ))
-  const isSearchingLogo = computed(() => (
-    logoSource.value === 'steamgriddb'
-      ? isSearchingSgdbLogos.value
-      : isSearchingSteamLogos.value
-  ))
+  const logoSearchResults = computed(() => mergeSgdbLogoThumbs(sgdbLogoSearchResults.value))
+  const isSearchingLogo = computed(() => isSearchingSgdbLogos.value)
 
   const resetSteamImportState = () => {
     showSummarySelector.value = false
@@ -638,9 +595,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     screenshotSearchUrl.value = ''
     screenshotPreviewUrl.value = ''
 
-    logoSource.value = 'steam'
     logoSearchQuery.value = ''
-    steamLogoSearchResults.value = []
     selectedLogoGame.value = null
     logoImages.value = []
     selectedLogos.value = new Set()
@@ -709,7 +664,6 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     coverSource,
     bannerSource,
     screenshotSource,
-    logoSource,
     sgdbAvailable,
     handleSummarySearchClear,
     searchSteamForSummary,

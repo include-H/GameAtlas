@@ -124,7 +124,6 @@
           :screenshot-preview-url="screenshotPreviewUrl"
           :is-downloading-screenshot="isDownloadingScreenshot"
           :show-logo-selector="showLogoSelector"
-          :logo-source="logoSource"
           :logo-search-query="logoSearchQuery"
           :is-searching-logo="isSearchingLogo"
           :logo-search-results="logoSearchResults"
@@ -228,7 +227,6 @@
           @load-screenshot-preview="loadScreenshotPreview"
           @confirm-screenshot-selection="confirmScreenshotSelection"
           @update:show-logo-selector="showLogoSelector = $event"
-          @source-change-logo="logoSource = $event"
           @update:logo-search-query="logoSearchQuery = $event"
           @search-logo="searchLogos"
           @clear-logo="handleLogoSearchClear"
@@ -400,7 +398,6 @@ const {
   loadScreenshotPreview,
   logoImages,
   logoPreviewUrl,
-  logoSource,
   logoSearchUrl,
   logoSearchResults,
   logoSearchQuery,

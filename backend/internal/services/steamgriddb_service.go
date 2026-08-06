@@ -128,20 +128,8 @@ func (s *SteamGridDBService) Search(query string) ([]SteamGridDBGame, error) {
 	return result.Data, nil
 }
 
-func (s *SteamGridDBService) GetGridsBySteamAppID(steamAppID int64) ([]SteamGridDBImage, error) {
-	return s.fetchImages(fmt.Sprintf("grids/steam/%d", steamAppID), url.Values{"dimensions": {"600x900"}})
-}
-
-func (s *SteamGridDBService) GetHeroesBySteamAppID(steamAppID int64) ([]SteamGridDBImage, error) {
-	return s.fetchImages(fmt.Sprintf("heroes/steam/%d", steamAppID), nil)
-}
-
 func (s *SteamGridDBService) GetLogosBySteamAppID(steamAppID int64) ([]SteamGridDBImage, error) {
 	return s.fetchImages(fmt.Sprintf("logos/steam/%d", steamAppID), nil)
-}
-
-func (s *SteamGridDBService) GetIconsBySteamAppID(steamAppID int64) ([]SteamGridDBImage, error) {
-	return s.fetchImages(fmt.Sprintf("icons/steam/%d", steamAppID), nil)
 }
 
 func (s *SteamGridDBService) GetGridsByGameID(gameID int) ([]SteamGridDBImage, error) {

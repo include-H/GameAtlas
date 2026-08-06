@@ -16,34 +16,6 @@ func NewSteamGridDBHandler(service *services.SteamGridDBService) *SteamGridDBHan
 	return &SteamGridDBHandler{service: service}
 }
 
-func (h *SteamGridDBHandler) GetGrids(c *gin.Context) {
-	if !requireAdmin(c) {
-		return
-	}
-	h.handleImages(c, h.service.GetGridsBySteamAppID)
-}
-
-func (h *SteamGridDBHandler) GetHeroes(c *gin.Context) {
-	if !requireAdmin(c) {
-		return
-	}
-	h.handleImages(c, h.service.GetHeroesBySteamAppID)
-}
-
-func (h *SteamGridDBHandler) GetLogos(c *gin.Context) {
-	if !requireAdmin(c) {
-		return
-	}
-	h.handleImages(c, h.service.GetLogosBySteamAppID)
-}
-
-func (h *SteamGridDBHandler) GetIcons(c *gin.Context) {
-	if !requireAdmin(c) {
-		return
-	}
-	h.handleImages(c, h.service.GetIconsBySteamAppID)
-}
-
 func (h *SteamGridDBHandler) Available(c *gin.Context) {
 	writeJSONSuccess(c, http.StatusOK, h.service.Available())
 }
@@ -98,25 +70,5 @@ func (h *SteamGridDBHandler) handleImagesByGameID(c *gin.Context, fetch func(int
 		writeServiceError(c, err, "SteamGridDB 请求失败")
 		return
 	}
-	writeJSONSuccess(c, http.StatusOK, toSteamGridDBImageResponses(images))
-}
-
-func (h *SteamGridDBHandler) handleImages(c *gin.Context, fetch func(int64) ([]services.SteamGridDBImage, error)) {
-	if !h.service.Available() {
-		writeJSONError(c, http.StatusServiceUnavailable, "SteamGridDB API 未配置")
-		return
-	}
-
-	appID, ok := parseIDParam(c, "appId")
-	if !ok {
-		return
-	}
-
-	images, err := fetch(appID)
-	if err != nil {
-		writeServiceError(c, err, "SteamGridDB 请求失败")
-		return
-	}
-
 	writeJSONSuccess(c, http.StatusOK, toSteamGridDBImageResponses(images))
 }

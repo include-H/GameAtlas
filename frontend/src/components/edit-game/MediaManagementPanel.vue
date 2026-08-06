@@ -107,7 +107,6 @@
       :screenshot-preview-url="screenshotPreviewUrl"
       :is-downloading-screenshot="isDownloadingScreenshot"
       :show-logo-selector="showLogoSelector"
-      :logo-source="logoSource"
       :logo-search-query="logoSearchQuery"
       :is-searching-logo="isSearchingLogo"
       :logo-search-results="logoSearchResults"
@@ -179,7 +178,6 @@
       @load-screenshot-preview="emit('load-screenshot-preview')"
       @confirm-screenshot-selection="emit('confirm-screenshot-selection')"
       @update:show-logo-selector="emit('update:show-logo-selector', $event)"
-      @source-change-logo="emit('source-change-logo', $event)"
       @update:logo-search-query="emit('update:logo-search-query', $event)"
       @search-logo="emit('search-logo')"
       @clear-logo="emit('clear-logo')"
@@ -319,7 +317,6 @@ defineProps<{
   isDownloadingScreenshot: boolean
 
   showLogoSelector: boolean
-  logoSource: ImportSource
   logoSearchQuery: string
   isSearchingLogo: boolean
   logoSearchResults: SteamGameSearchResult[]
@@ -428,7 +425,6 @@ const emit = defineEmits<{
   'load-screenshot-preview': []
   'confirm-screenshot-selection': []
   'update:show-logo-selector': [value: boolean]
-  'source-change-logo': [source: ImportSource]
   'update:logo-search-query': [value: string]
   'search-logo': []
   'clear-logo': []

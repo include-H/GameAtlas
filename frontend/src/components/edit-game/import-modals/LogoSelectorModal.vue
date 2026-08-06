@@ -7,27 +7,9 @@
     @update:visible="emit('update:visible', $event)"
   >
     <div class="cover-selector-content">
-      <div class="source-selector">
-        <span class="source-selector__label">数据源</span>
-        <a-button
-          class="app-text-action-btn"
-          :type="source === 'steam' ? 'outline' : 'text'"
-          size="small"
-          html-type="button"
-          @click="emit('source-change', 'steam')"
-        >Steam</a-button>
-        <a-button
-          class="app-text-action-btn"
-          :type="source === 'steamgriddb' ? 'outline' : 'text'"
-          size="small"
-          html-type="button"
-          :disabled="!sgdbAvailable"
-          @click="emit('source-change', 'steamgriddb')"
-        >SteamGridDB</a-button>
-      </div>
       <steam-search-panel
         :query="logoSearchQuery"
-        :placeholder="searchPlaceholder"
+        placeholder="搜索 SteamGridDB..."
         :loading="isSearchingLogo"
         :results="logoSearchResults"
         :selected-game="selectedLogoGame"
@@ -133,17 +115,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import { IconCheck, IconUpload } from '@arco-design/web-vue/es/icon'
 import SteamSearchPanel from '@/components/SteamSearchPanel.vue'
-import type { ImportSource } from '@/composables/useSteamImport'
 import type { SteamGameSearchResult } from '@/services/types'
 import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
 
 interface Props {
   visible: boolean
-  source: ImportSource
-  sgdbAvailable: boolean
   logoSearchQuery: string
   isSearchingLogo: boolean
   logoSearchResults: SteamGameSearchResult[]
@@ -159,11 +137,10 @@ interface Props {
   isDownloadingLogo: boolean
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 
 const emit = defineEmits<{
   'update:visible': [value: boolean]
-  'source-change': [source: ImportSource]
   'update:logo-search-query': [value: string]
   'search-logo': []
   'clear-logo': []
@@ -179,10 +156,6 @@ const emit = defineEmits<{
   'load-logo-from-url': []
   'confirm-logo-selection': []
 }>()
-
-const searchPlaceholder = computed(() =>
-  props.source === 'steamgriddb' ? '搜索 SteamGridDB...' : '搜索 Steam 游戏...'
-)
 </script>
 
 <style scoped>
@@ -190,18 +163,6 @@ const searchPlaceholder = computed(() =>
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.source-selector {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.source-selector__label {
-  font-size: 14px;
-  color: var(--color-text-2);
-  flex-shrink: 0;
 }
 
 .steam-game-info {
