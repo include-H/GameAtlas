@@ -216,6 +216,22 @@
       @select="handleFileSelect"
     />
 
+    <summary-import-modal
+      :visible="showSummarySelector"
+      :steam-summary-search-query="steamSummarySearchQuery"
+      :is-searching-steam-summary="isSearchingSteamSummary"
+      :steam-summary-search-results="steamSummarySearchResults"
+      :selected-steam-summary-game="selectedSteamSummaryGame"
+      :steam-summary-preview="steamSummaryPreview"
+      @update:visible="showSummarySelector = $event"
+      @update:steam-summary-search-query="steamSummarySearchQuery = $event"
+      @search-summary="searchSteamForSummary"
+      @clear-summary="handleSummarySearchClear"
+      @select-summary="selectSteamSummaryGame"
+      @back-summary="backToSummarySearch"
+      @confirm-summary-import="confirmSummaryImport"
+    />
+
     <edit-game-wiki-metadata-picker-modal
       :visible="wikiMetadataPickerVisible"
       :candidates="wikiMetadataCandidates"
@@ -236,6 +252,7 @@ import type { AdminGameDetail } from '@/services/types'
 import FileBrowserModal from '@/components/FileBrowserModal.vue'
 import GameFilePathsSection from '@/components/edit-game/GameFilePathsSection.vue'
 import EditGameWikiMetadataPickerModal from '@/components/edit-game/EditGameWikiMetadataPickerModal.vue'
+import SummaryImportModal from '@/components/edit-game/import-modals/SummaryImportModal.vue'
 import { useEditGameModal } from '@/composables/useEditGameModal'
 
 interface Props {
@@ -263,9 +280,11 @@ const {
   CREATE_SERIES_OPTION_VALUE,
   addFilePath,
   applySelectedWikiMetadata,
+  backToSummarySearch,
   canCreateDeveloperOption,
   canCreatePublisherOption,
   canCreateSeriesOption,
+  confirmSummaryImport,
   developerSearchQuery,
   filteredDeveloperOptions,
   filteredPublisherOptions,
@@ -282,6 +301,7 @@ const {
   handleSeriesSearch,
   handleSeriesSelection,
   handleSubmit,
+  handleSummarySearchClear,
   handleWikiMetadataCandidateSelectionChange,
   hasParsableWikiContent,
   importMetadataFromWiki,
@@ -293,6 +313,7 @@ const {
   isPreparingWikiMetadataCandidates,
   isSearchingDevelopers,
   isSearchingPublishers,
+  isSearchingSteamSummary,
   isSearchingSeries,
   modalWidth,
   openFileBrowser,
@@ -300,9 +321,15 @@ const {
   releaseDate,
   removeFilePath,
   rules,
+  searchSteamForSummary,
+  selectSteamSummaryGame,
+  selectedSteamSummaryGame,
   seriesSearchQuery,
   showFileBrowser,
   showSummarySelector,
+  steamSummaryPreview,
+  steamSummarySearchQuery,
+  steamSummarySearchResults,
   visible,
   wikiMetadataCandidates,
   wikiMetadataPickerVisible,
