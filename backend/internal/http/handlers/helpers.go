@@ -23,6 +23,14 @@ func writeJSONSuccess[T any](c *gin.Context, status int, data T) {
 	})
 }
 
+func writeJSONPage[T any, P any](c *gin.Context, status int, data T, pagination P) {
+	c.JSON(status, pageEnvelope[T, P]{
+		Success:    true,
+		Data:       data,
+		Pagination: pagination,
+	})
+}
+
 func writeJSONError(c *gin.Context, status int, message string) {
 	c.JSON(status, errorEnvelope{
 		Success: false,

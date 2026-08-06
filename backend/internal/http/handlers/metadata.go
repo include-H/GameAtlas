@@ -36,16 +36,12 @@ func (h *MetadataHandler) List(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    toMetadataResponses(result.Items),
-		"pagination": gin.H{
-			"page":       result.Page,
-			"limit":      result.Limit,
-			"total":      result.Total,
-			"totalPages": result.TotalPages,
-		},
-	})
+	writeJSONPage(c, http.StatusOK, toMetadataResponses(result.Items), metadataPaginationResponse(
+		result.Page,
+		result.Limit,
+		result.Total,
+		result.TotalPages,
+	))
 }
 
 func decodeMetadataListOptions(c *gin.Context) (services.MetadataListOptions, bool) {
@@ -180,12 +176,19 @@ func parseMetadataDetailPagination(c *gin.Context) (int, int, bool) {
 	return page, limit, true
 }
 
-func metadataPaginationResponse(page int, limit int, total int, totalPages int) gin.H {
-	return gin.H{
-		"page":       page,
-		"limit":      limit,
-		"total":      total,
-		"totalPages": totalPages,
+type metadataPageResponse struct {
+	Page       int `json:"page"`
+	Limit      int `json:"limit"`
+	Total      int `json:"total"`
+	TotalPages int `json:"totalPages"`
+}
+
+func metadataPaginationResponse(page int, limit int, total int, totalPages int) metadataPageResponse {
+	return metadataPageResponse{
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPages: totalPages,
 	}
 }
 

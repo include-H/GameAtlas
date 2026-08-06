@@ -7,6 +7,12 @@ type successEnvelope[T any] struct {
 	Data    T    `json:"data"`
 }
 
+type pageEnvelope[T any, P any] struct {
+	Success    bool `json:"success"`
+	Data       T    `json:"data"`
+	Pagination P    `json:"pagination"`
+}
+
 type errorEnvelope struct {
 	Success bool   `json:"success"`
 	Error   string `json:"error"`
@@ -105,6 +111,12 @@ type timelineGameItemResponse struct {
 	ReleaseDate *string `json:"release_date"`
 	CoverImage  *string `json:"cover_image"`
 	BannerImage *string `json:"banner_image"`
+}
+
+type timelinePaginationResponse struct {
+	Limit      int    `json:"limit"`
+	HasMore    bool   `json:"hasMore"`
+	NextCursor string `json:"nextCursor"`
 }
 
 // gamesListPaginationResponse is the infinite-scroll pagination contract for the

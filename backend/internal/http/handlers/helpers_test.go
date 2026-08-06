@@ -116,6 +116,36 @@ func TestWriteServiceError(t *testing.T) {
 	}
 }
 
+func TestWriteJSONPage(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+
+	writeJSONPage(context, http.StatusOK, []string{"one", "two"}, map[string]int{"page": 2})
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	var response struct {
+		Success    bool           `json:"success"`
+		Data       []string       `json:"data"`
+		Pagination map[string]int `json:"pagination"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !response.Success {
+		t.Fatalf("expected success=true")
+	}
+	if len(response.Data) != 2 || response.Data[0] != "one" || response.Data[1] != "two" {
+		t.Fatalf("data = %#v, want [one two]", response.Data)
+	}
+	if response.Pagination["page"] != 2 {
+		t.Fatalf("pagination = %#v, want page=2", response.Pagination)
+	}
+}
+
 func TestRequireAdmin(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 

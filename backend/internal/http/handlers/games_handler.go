@@ -58,11 +58,7 @@ func (h *GamesHandler) List(c *gin.Context) {
 		data = append(data, toGameListItemResponse(game))
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    data,
-		"pagination": toGamesListPaginationResponse(result, params.PendingOnly),
-	})
+	writeJSONPage(c, http.StatusOK, data, toGamesListPaginationResponse(result, params.PendingOnly))
 }
 
 // ListTimeline returns games ordered by release date descending with cursor-based pagination.
@@ -94,14 +90,10 @@ func (h *GamesHandler) ListTimeline(c *gin.Context) {
 		data = append(data, toTimelineGameItemResponse(game))
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    data,
-		"pagination": gin.H{
-			"limit":      result.Limit,
-			"hasMore":    result.HasMore,
-			"nextCursor": result.NextCursor,
-		},
+	writeJSONPage(c, http.StatusOK, data, timelinePaginationResponse{
+		Limit:      result.Limit,
+		HasMore:    result.HasMore,
+		NextCursor: result.NextCursor,
 	})
 }
 
