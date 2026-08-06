@@ -319,7 +319,7 @@ const gamesService = {
       favorite_games: response.data.favorite_games.map((item) => normalizeGameListItem(item)),
       favorite_count: response.data.favorite_count,
       pending_reviews: response.data.pending_reviews,
-      pending_issue_counts: response.data.pending_issue_counts ?? null,
+      pending_issue_counts: response.data.pending_issue_counts,
     }
   },
 

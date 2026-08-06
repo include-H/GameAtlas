@@ -12,6 +12,7 @@ export interface ApiPageEnvelope<T> {
     limit: number
     total: number
     totalPages: number
+    // metadata 接口（/series、/publishers）分页不含该键，保持可选
     pending_issue_counts?: PendingIssueCounts | null
   }
 }
@@ -22,7 +23,8 @@ export interface ApiPageEnvelope<T> {
 export interface GameListPagination {
   page: number
   totalPages: number
-  pending_issue_counts?: PendingIssueCounts | null
+  // 后端始终输出该键（值为 null 时表示无待处理聚合）
+  pending_issue_counts: PendingIssueCounts | null
 }
 
 export interface PendingWorkbenchPagination extends GameListPagination {
@@ -159,7 +161,8 @@ export interface VideoAssetItem {
   id: number
   asset_uid: string
   path: string
-  poster_path: string | null
+  // 后端对无封面预告片省略该键（omitempty），运行时可能为 undefined
+  poster_path?: string | null
   sort_order: number
 }
 
