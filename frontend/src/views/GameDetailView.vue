@@ -69,7 +69,7 @@
         <div class="game-detail__content">
           <div class="game-detail__main">
             <screenshot-carousel
-              :preview-videos="game.preview_videos?.map((item) => item.path) || []"
+              :preview-videos="game.preview_videos || []"
               :video-poster="game.banner_image || game.cover_image || null"
               :screenshots="game.screenshots.map((item) => item.path)"
               :alt="game.title"

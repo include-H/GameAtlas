@@ -36,7 +36,7 @@
                 :src="currentMedia.url"
                 class="screenshot-carousel__video"
                 :class="{ 'screenshot-carousel__video--ready': videoReady }"
-                :poster="videoPoster || undefined"
+                :poster="currentVideoPoster || undefined"
                 autoplay
                 controls
                 muted
@@ -53,8 +53,8 @@
                 <div v-if="!videoReady && !videoFailed" class="screenshot-carousel__video-loader">
                   <div class="screenshot-carousel__loader-ring">
                     <img
-                      v-if="videoPoster"
-                      :src="resolveAssetUrl(videoPoster)"
+                      v-if="currentVideoPoster"
+                      :src="currentVideoPoster"
                       class="screenshot-carousel__loader-thumb"
                       alt=""
                     />
@@ -75,8 +75,8 @@
               </transition>
               <div v-if="videoFailed" class="screenshot-carousel__video-failed">
                 <img
-                  v-if="videoPoster"
-                  :src="resolveAssetUrl(videoPoster)"
+                  v-if="currentVideoPoster"
+                  :src="currentVideoPoster"
                   class="screenshot-carousel__loader-thumb"
                   alt=""
                 >
@@ -148,7 +148,7 @@ import { shouldResetVideoPlaybackState } from '@/utils/video-playback'
 
 interface Props {
   screenshots?: string[]
-  previewVideos?: string[]
+  previewVideos?: Array<{ path: string; poster_path?: string | null }>
   videoPoster?: string | null
   alt?: string
 }
@@ -164,6 +164,7 @@ interface MediaItem {
   key: string
   type: 'image' | 'video'
   url: string
+  poster: string | null
   thumbnail: string | null
 }
 
@@ -189,23 +190,27 @@ const visibleScreenshots = computed(() => {
 
 const mediaItems = computed<MediaItem[]>(() => {
   const items: MediaItem[] = []
-  const resolvedVideoList = props.previewVideos
-    .filter(Boolean)
-    .map((video) => resolveAssetUrl(video))
-  resolvedVideoList.forEach((videoUrl, index) => {
-    if (!videoUrl) return
-    items.push({
-      key: `video:${index}:${videoUrl}`,
-      type: 'video',
-      url: videoUrl,
-      thumbnail: props.videoPoster ? resolveAssetUrl(props.videoPoster) : placeholderImage,
+  const fallbackPoster = props.videoPoster ? resolveAssetUrl(props.videoPoster) : null
+  props.previewVideos
+    .filter((video) => Boolean(video.path))
+    .forEach((video, index) => {
+      const videoUrl = resolveAssetUrl(video.path)
+      if (!videoUrl) return
+      const poster = video.poster_path ? resolveAssetUrl(video.poster_path) : fallbackPoster
+      items.push({
+        key: `video:${index}:${videoUrl}`,
+        type: 'video',
+        url: videoUrl,
+        poster,
+        thumbnail: poster || placeholderImage,
+      })
     })
-  })
   visibleScreenshots.value.forEach((shot, index) => {
     items.push({
       key: `image:${index}:${shot}`,
       type: 'image',
       url: shot,
+      poster: null,
       thumbnail: shot,
     })
   })
@@ -214,6 +219,11 @@ const mediaItems = computed<MediaItem[]>(() => {
 
 const currentMedia = computed(() => {
   return mediaItems.value[currentIndex.value] || null
+})
+
+const currentVideoPoster = computed(() => {
+  const media = currentMedia.value
+  return media?.type === 'video' ? (media.poster || null) : null
 })
 
 const placeholderImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450"%3E%3Crect fill="%231a1a1a" width="800" height="450"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23666" font-size="24"%3E暂无截图%3C/text%3E%3C/svg%3E'
