@@ -157,7 +157,8 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.GET("/steamgriddb/game/:gameId/logos", steamGridDBHandler.GetLogosByGameID)
 
 	registerAssetRoutes(router, cfg.AssetsDir, gamesRepo, startScreenTilesRepo)
-	registerCustomDataRoutes(router, filepath.Dir(cfg.AssetsDir))
+	// /data/bg.jpg 挂载到 /api 前缀：浏览器直连 URL 统一走 api-url.ts 的 buildApiUrl。
+	registerCustomDataRoutes(api, filepath.Dir(cfg.AssetsDir))
 	registerStaticRoutes(router, cfg.StaticDir)
 
 	return router
@@ -262,7 +263,7 @@ func registerAssetRoutes(
 	})
 }
 
-func registerCustomDataRoutes(router *gin.Engine, dataDir string) {
+func registerCustomDataRoutes(api *gin.RouterGroup, dataDir string) {
 	dataHandler := func(c *gin.Context) {
 		rawPath := strings.TrimPrefix(c.Param("filepath"), "/")
 		if rawPath == "" {
@@ -296,8 +297,8 @@ func registerCustomDataRoutes(router *gin.Engine, dataDir string) {
 		c.Header("Cache-Control", "no-cache, must-revalidate")
 		c.File(assetPath)
 	}
-	router.GET("/data/*filepath", dataHandler)
-	router.HEAD("/data/*filepath", dataHandler)
+	api.GET("/data/*filepath", dataHandler)
+	api.HEAD("/data/*filepath", dataHandler)
 }
 
 func registerStaticRoutes(router *gin.Engine, staticDir string) {

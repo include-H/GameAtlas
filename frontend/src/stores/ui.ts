@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { safeLocalStorageGetItem, safeLocalStorageSetItem } from '@/utils/safe-local-storage'
+import { buildApiUrl } from '@/services/api-url'
 import type { AmbientBackgroundPool } from '@/utils/ambient-background'
 
 type ViewMode = 'grid' | 'list'
@@ -12,7 +13,7 @@ type AmbientBackgroundSource = {
 
 type SharedBackgroundAvailability = 'unknown' | 'available' | 'missing'
 
-const CUSTOM_BACKGROUND_PATH = '/data/bg.jpg'
+const CUSTOM_BACKGROUND_PATH = buildApiUrl('/data/bg.jpg')
 
 export const useUiStore = defineStore('ui', () => {
   // View modes

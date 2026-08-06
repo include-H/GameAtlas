@@ -25,6 +25,7 @@ import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import gamesService from '@/services/games.service'
+import { buildApiUrl } from '@/services/api-url'
 import {
   createAmbientBackgroundPool,
   getAmbientBackgroundPoolFromGames,
@@ -71,7 +72,7 @@ const globalPool = ref<AmbientBackgroundPool>(createAmbientBackgroundPool())
 const globalPoolLoaded = ref(false)
 let globalPoolRequest: Promise<void> | null = null
 
-const CUSTOM_BACKGROUND_PATH = '/data/bg.jpg'
+const CUSTOM_BACKGROUND_PATH = buildApiUrl('/data/bg.jpg')
 
 const isEnabled = computed(() =>
   props.forceEnabled || SUPPORTED_ROUTE_NAMES.has(String(route.name || ''))

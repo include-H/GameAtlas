@@ -48,9 +48,5 @@ function buildProxy() {
       target,
       changeOrigin: true,
     },
-    '/data': {
-      target,
-      changeOrigin: true,
-    },
   }
 }

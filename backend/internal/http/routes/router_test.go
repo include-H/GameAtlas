@@ -230,10 +230,10 @@ func TestRegisterCustomDataRoutesServesBackground(t *testing.T) {
 	}
 
 	router := gin.New()
-	registerCustomDataRoutes(router, dataDir)
+	registerCustomDataRoutes(router.Group("/api"), dataDir)
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/data/bg.jpg", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/data/bg.jpg", nil)
 
 	router.ServeHTTP(recorder, request)
 
@@ -266,14 +266,14 @@ func TestRegisterCustomDataRoutesRejectsUnlistedDataPaths(t *testing.T) {
 	}
 
 	router := gin.New()
-	registerCustomDataRoutes(router, dataDir)
+	registerCustomDataRoutes(router.Group("/api"), dataDir)
 
 	for _, path := range []string{
-		"/data/ui/FONT.WOFF2",
-		"/data/fonts/CUSTOM.woff2",
-		"/data/CUSTOM.woff2",
-		"/data/gamelist/private-game/cover.png",
-		"/data/custom/cover.png",
+		"/api/data/ui/FONT.WOFF2",
+		"/api/data/fonts/CUSTOM.woff2",
+		"/api/data/CUSTOM.woff2",
+		"/api/data/gamelist/private-game/cover.png",
+		"/api/data/custom/cover.png",
 	} {
 		recorder := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodGet, path, nil)

@@ -89,7 +89,7 @@ describe('useUiStore', () => {
     const store = useUiStore()
     await store.initializeSharedBackgroundAvailability()
 
-    expect(fetchMock).toHaveBeenCalledWith('/data/bg.jpg', {
+    expect(fetchMock).toHaveBeenCalledWith('/api/data/bg.jpg', {
       method: 'HEAD',
       cache: 'no-store',
     })

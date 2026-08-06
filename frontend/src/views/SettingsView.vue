@@ -223,6 +223,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { settingsService, type EnvEntry } from '@/services/settings.service'
 import gamesService from '@/services/games.service'
+import { buildApiUrl } from '@/services/api-url'
 import { useUiStore } from '@/stores/ui'
 import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
 import {
@@ -264,7 +265,7 @@ const bgExists = ref(false)
 const bgUploading = ref(false)
 const bgRemoving = ref(false)
 
-const CUSTOM_BG_PATH = '/data/bg.jpg'
+const CUSTOM_BG_PATH = buildApiUrl('/data/bg.jpg')
 
 const resetBgPreview = () => {
   bgPreviewUrl.value = `${CUSTOM_BG_PATH}?t=${Date.now()}`
