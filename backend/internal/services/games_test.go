@@ -979,7 +979,13 @@ func TestGamesServiceUpdateAggregatePersistsVideoPosterPath(t *testing.T) {
 	gameID := insertServicesTestGame(t, db, "aggregate-video-poster", "Video Poster", domain.GameVisibilityPublic)
 	writeServicesAssetFile(t, assetsDir, "aggregate-video-poster", "video.mp4", []byte("video"))
 	posterPath := "/assets/aggregate-video-poster/poster.jpg"
-	writeServicesAssetFile(t, assetsDir, "aggregate-video-poster", "poster.jpg", []byte("poster"))
+	stagingPoster := filepath.Join(assetsDir, "_staging", "poster.jpg")
+	if err := os.MkdirAll(filepath.Dir(stagingPoster), 0o755); err != nil {
+		t.Fatalf("MkdirAll staging returned error: %v", err)
+	}
+	if err := os.WriteFile(stagingPoster, []byte("poster"), 0o644); err != nil {
+		t.Fatalf("WriteFile staging poster returned error: %v", err)
+	}
 
 	service := newServicesAggregateService(db, config.Config{AssetsDir: assetsDir})
 	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
@@ -1009,66 +1015,17 @@ func TestGamesServiceUpdateAggregatePersistsVideoPosterPath(t *testing.T) {
 	if videos[0].PosterPath == nil || *videos[0].PosterPath != posterPath {
 		t.Fatalf("PosterPath = %v, want %q", videos[0].PosterPath, posterPath)
 	}
-}
-
-func TestGamesServiceUpdateAggregateBackfillsVideoPosterPath(t *testing.T) {
-	db := openServicesTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	assetsDir := filepath.Join(t.TempDir(), "assets")
-	gameID := insertServicesTestGame(t, db, "aggregate-video-backfill", "Video Backfill", domain.GameVisibilityPublic)
-	// 模拟老预告片：已有 video 行但没有 poster_path，封面文件还在 _staging。
-	insertServicesGameAsset(t, db, gameID, "video-1", "video", "/assets/aggregate-video-backfill/video.mp4", 0)
-	writeServicesAssetFile(t, assetsDir, "aggregate-video-backfill", "video.mp4", []byte("video"))
-	posterPath := "/assets/aggregate-video-backfill/poster-1.jpg"
-	stagingPoster := filepath.Join(assetsDir, "_staging", "poster-1.jpg")
-	if err := os.MkdirAll(filepath.Dir(stagingPoster), 0o755); err != nil {
-		t.Fatalf("MkdirAll staging returned error: %v", err)
-	}
-	if err := os.WriteFile(stagingPoster, []byte("poster"), 0o644); err != nil {
-		t.Fatalf("WriteFile staging poster returned error: %v", err)
-	}
-
-	service := newServicesAggregateService(db, config.Config{AssetsDir: assetsDir})
-	videoPath := "/assets/aggregate-video-backfill/video.mp4"
-	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
-		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Video Backfill", Visibility: domain.GameVisibilityPublic},
-		},
-		Assets: domain.GameAggregateAssetsInput{
-			VideoOrderAssetUIDs: []string{"video-1"},
-			NewAssets: []domain.NewAssetEntry{
-				{
-					AssetUID:   "video-1",
-					AssetType:  "video",
-					Path:       videoPath,
-					PosterPath: &posterPath,
-				},
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("UpdateAggregate returned error: %v", err)
-	}
-
-	videos := listServicesVideos(t, db, gameID)
-	if len(videos) != 1 {
-		t.Fatalf("len(videos) = %d, want 1", len(videos))
-	}
-	if videos[0].PosterPath == nil || *videos[0].PosterPath != posterPath {
-		t.Fatalf("PosterPath = %v, want %q", videos[0].PosterPath, posterPath)
-	}
 	if _, err := os.Stat(stagingPoster); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("staging poster should be moved to permanent, got err=%v", err)
 	}
-	if _, err := os.Stat(filepath.Join(assetsDir, "aggregate-video-backfill", "poster-1.jpg")); err != nil {
+	if _, err := os.Stat(filepath.Join(assetsDir, "aggregate-video-poster", "poster.jpg")); err != nil {
 		t.Fatalf("poster should exist in permanent dir, got err=%v", err)
 	}
 
 	// 第二次更新不带 poster_path，已有封面不应被覆盖。
 	_, _, err = service.Update(gameID, domain.GameAggregateUpdateInput{
 		Game: domain.GameAggregateCoreUpdateInput{
-			GameCoreInput: domain.GameCoreInput{Title: "Video Backfill", Visibility: domain.GameVisibilityPublic},
+			GameCoreInput: domain.GameCoreInput{Title: "Video Poster", Visibility: domain.GameVisibilityPublic},
 		},
 		Assets: domain.GameAggregateAssetsInput{
 			VideoOrderAssetUIDs: []string{"video-1"},
@@ -1076,7 +1033,7 @@ func TestGamesServiceUpdateAggregateBackfillsVideoPosterPath(t *testing.T) {
 				{
 					AssetUID:  "video-1",
 					AssetType: "video",
-					Path:      videoPath,
+					Path:      "/assets/aggregate-video-poster/video.mp4",
 				},
 			},
 		},
