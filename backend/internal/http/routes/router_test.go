@@ -24,7 +24,16 @@ func (s assetRouteGameRepositoryStub) GetByPublicID(publicID string) (*domain.Ga
 	return nil, s.err
 }
 
-func TestRegisterAssetRoutesServesStartScreenImagesWithoutGameLookup(t *testing.T) {
+type assetRouteStartScreenRepositoryStub struct {
+	visibility string
+	err        error
+}
+
+func (s assetRouteStartScreenRepositoryStub) GetGameVisibilityByImagePath(imagePath string) (string, error) {
+	return s.visibility, s.err
+}
+
+func TestRegisterAssetRoutesServesPublicStartScreenTileImages(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 
 	assetsDir := t.TempDir()
@@ -38,7 +47,12 @@ func TestRegisterAssetRoutesServesStartScreenImagesWithoutGameLookup(t *testing.
 	}
 
 	router := gin.New()
-	registerAssetRoutes(router, assetsDir, assetRouteGameRepositoryStub{err: errors.New("game lookup must be skipped")})
+	registerAssetRoutes(
+		router,
+		assetsDir,
+		assetRouteGameRepositoryStub{err: errors.New("game lookup must be skipped")},
+		assetRouteStartScreenRepositoryStub{visibility: domain.GameVisibilityPublic},
+	)
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/assets/start-screen/66dbcee2-3512-4139-ad10-65898b8f0cfb.png", nil)
@@ -52,12 +66,151 @@ func TestRegisterAssetRoutesServesStartScreenImagesWithoutGameLookup(t *testing.
 	}
 }
 
+func TestRegisterAssetRoutesHidesPrivateStartScreenTileImagesFromPublicCallers(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	assetsDir := t.TempDir()
+	imageDir := filepath.Join(assetsDir, "start-screen")
+	if err := os.MkdirAll(imageDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	imagePath := filepath.Join(imageDir, "66dbcee2-3512-4139-ad10-65898b8f0cfb.png")
+	if err := os.WriteFile(imagePath, []byte("tile-image"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	router := gin.New()
+	registerAssetRoutes(
+		router,
+		assetsDir,
+		assetRouteGameRepositoryStub{err: errors.New("game lookup must be skipped")},
+		assetRouteStartScreenRepositoryStub{visibility: domain.GameVisibilityPrivate},
+	)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/assets/start-screen/66dbcee2-3512-4139-ad10-65898b8f0cfb.png", nil)
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNotFound)
+	}
+}
+
+func TestRegisterAssetRoutesAllowsAdminToReadPrivateStartScreenTileImages(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	assetsDir := t.TempDir()
+	imageDir := filepath.Join(assetsDir, "start-screen")
+	if err := os.MkdirAll(imageDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	imagePath := filepath.Join(imageDir, "66dbcee2-3512-4139-ad10-65898b8f0cfb.png")
+	if err := os.WriteFile(imagePath, []byte("tile-image"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("is_admin", true)
+		c.Next()
+	})
+	registerAssetRoutes(
+		router,
+		assetsDir,
+		assetRouteGameRepositoryStub{err: errors.New("game lookup must be skipped")},
+		assetRouteStartScreenRepositoryStub{visibility: domain.GameVisibilityPrivate},
+	)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/assets/start-screen/66dbcee2-3512-4139-ad10-65898b8f0cfb.png", nil)
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	if recorder.Body.String() != "tile-image" {
+		t.Fatalf("body = %q, want %q", recorder.Body.String(), "tile-image")
+	}
+}
+
+func TestRegisterAssetRoutesHidesUnknownStartScreenImagesFromPublicCallers(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	assetsDir := t.TempDir()
+	stagingDir := filepath.Join(assetsDir, "_staging")
+	if err := os.MkdirAll(stagingDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	stagingPath := filepath.Join(stagingDir, "66dbcee2-3512-4139-ad10-65898b8f0cfb.png")
+	if err := os.WriteFile(stagingPath, []byte("tile-image"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	router := gin.New()
+	registerAssetRoutes(
+		router,
+		assetsDir,
+		assetRouteGameRepositoryStub{err: errors.New("game lookup must be skipped")},
+		assetRouteStartScreenRepositoryStub{err: errors.New("tile not saved")},
+	)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/assets/start-screen/66dbcee2-3512-4139-ad10-65898b8f0cfb.png", nil)
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNotFound)
+	}
+}
+
+func TestRegisterAssetRoutesAllowsAdminToPreviewUnregisteredStartScreenImages(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	assetsDir := t.TempDir()
+	stagingDir := filepath.Join(assetsDir, "_staging")
+	if err := os.MkdirAll(stagingDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	stagingPath := filepath.Join(stagingDir, "66dbcee2-3512-4139-ad10-65898b8f0cfb.png")
+	if err := os.WriteFile(stagingPath, []byte("tile-image"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("is_admin", true)
+		c.Next()
+	})
+	registerAssetRoutes(
+		router,
+		assetsDir,
+		assetRouteGameRepositoryStub{err: errors.New("game lookup must be skipped")},
+		assetRouteStartScreenRepositoryStub{err: errors.New("tile not saved")},
+	)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/assets/start-screen/66dbcee2-3512-4139-ad10-65898b8f0cfb.png", nil)
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	if recorder.Body.String() != "tile-image" {
+		t.Fatalf("body = %q, want %q", recorder.Body.String(), "tile-image")
+	}
+}
+
 func TestRegisterAssetRoutesStillHidesUnknownGameAssets(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 
 	assetsDir := t.TempDir()
 	router := gin.New()
-	registerAssetRoutes(router, assetsDir, assetRouteGameRepositoryStub{err: errors.New("no such game")})
+	registerAssetRoutes(
+		router,
+		assetsDir,
+		assetRouteGameRepositoryStub{err: errors.New("no such game")},
+		assetRouteStartScreenRepositoryStub{},
+	)
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/assets/unknown-game/cover.png", nil)

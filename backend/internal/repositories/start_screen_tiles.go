@@ -43,6 +43,24 @@ func (r *StartScreenTilesRepository) List(includeAll bool) ([]domain.StartScreen
 	return tiles, nil
 }
 
+// GetGameVisibilityByImagePath 通过磁贴裁剪图反查所属游戏的可见性，供 /assets 路由复用同一规则。
+func (r *StartScreenTilesRepository) GetGameVisibilityByImagePath(imagePath string) (string, error) {
+	var visibility string
+	err := r.db.Get(&visibility, `
+		SELECT g.visibility
+		FROM start_screen_tiles t
+		INNER JOIN games g ON g.id = t.game_id
+		WHERE t.image_small_path = ?
+		   OR t.image_wide_path = ?
+		   OR t.image_large_path = ?
+		LIMIT 1
+	`, imagePath, imagePath, imagePath)
+	if err != nil {
+		return "", err
+	}
+	return visibility, nil
+}
+
 // Replace 是全量替换：sort_order 按传入顺序写入。单用户场景下无并发编辑，直接清空重建。
 func (r *StartScreenTilesRepository) Replace(tiles []domain.StartScreenTileWrite) error {
 	tx, err := r.db.Beginx()

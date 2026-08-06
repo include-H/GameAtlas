@@ -78,8 +78,9 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	hitokotoHandler := handlers.NewHitokotoHandler(hitokotoService)
 	settingsService := services.NewSettingsService(cfg, repositories.NewAppSettingsRepository(db))
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
+	startScreenTilesRepo := repositories.NewStartScreenTilesRepository(db)
 	startScreenTilesService := services.NewStartScreenTilesService(
-		repositories.NewStartScreenTilesRepository(db),
+		startScreenTilesRepo,
 		repositories.NewStartScreenColumnsRepository(db),
 		gamesRepo,
 		files.NewAssetStore(cfg.AssetsDir),
@@ -161,7 +162,7 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.GET("/steamgriddb/game/:gameId/heroes", steamGridDBHandler.GetHeroesByGameID)
 	api.GET("/steamgriddb/game/:gameId/logos", steamGridDBHandler.GetLogosByGameID)
 
-	registerAssetRoutes(router, cfg.AssetsDir, gamesRepo)
+	registerAssetRoutes(router, cfg.AssetsDir, gamesRepo, startScreenTilesRepo)
 	registerCustomDataRoutes(router, filepath.Dir(cfg.AssetsDir))
 	registerStaticRoutes(router, cfg.StaticDir)
 
@@ -172,13 +173,22 @@ type assetRouteGameRepository interface {
 	GetByPublicID(publicID string) (*domain.Game, error)
 }
 
+type assetRouteStartScreenRepository interface {
+	GetGameVisibilityByImagePath(imagePath string) (string, error)
+}
+
 type assetRouteCacheEntry struct {
 	exists     bool
 	visibility string
 	loadedAt   time.Time
 }
 
-func registerAssetRoutes(router *gin.Engine, assetsDir string, gamesRepo assetRouteGameRepository) {
+func registerAssetRoutes(
+	router *gin.Engine,
+	assetsDir string,
+	gamesRepo assetRouteGameRepository,
+	startScreenTilesRepo assetRouteStartScreenRepository,
+) {
 	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
 		return
 	}
@@ -227,9 +237,25 @@ func registerAssetRoutes(router *gin.Engine, assetsDir string, gamesRepo assetRo
 			return
 		}
 
-		// 开始屏幕磁贴裁剪图存放在 assets/start-screen/ 下，不属于某个游戏，
-		// 跳过游戏可见性校验，直接按文件服务。
+		isAdmin, _ := c.Get("is_admin")
+		admin, _ := isAdmin.(bool)
+
+		// 开始屏幕磁贴裁剪图先反查所属游戏，复用同一可见性规则；
+		// 未登记的暂存图只允许管理员访问，保证保存前裁剪预览仍可用。
 		if gamePublicID == "start-screen" {
+			visibility, err := startScreenTilesRepo.GetGameVisibilityByImagePath("/assets/" + rawPath)
+			if err != nil {
+				if !admin {
+					c.Status(http.StatusNotFound)
+					return
+				}
+				serveAssetFile(c, rawPath)
+				return
+			}
+			if !admin && visibility == domain.GameVisibilityPrivate {
+				c.Status(http.StatusNotFound)
+				return
+			}
 			serveAssetFile(c, rawPath)
 			return
 		}
@@ -257,8 +283,6 @@ func registerAssetRoutes(router *gin.Engine, assetsDir string, gamesRepo assetRo
 			assetCache.Store(gamePublicID, assetRouteCacheEntry{exists: true, visibility: game.Visibility, loadedAt: time.Now()})
 		}
 
-		isAdmin, _ := c.Get("is_admin")
-		admin, _ := isAdmin.(bool)
 		if !admin && gameVisibility == domain.GameVisibilityPrivate {
 			c.Status(http.StatusNotFound)
 			return
