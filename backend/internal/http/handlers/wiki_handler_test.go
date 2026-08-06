@@ -105,6 +105,40 @@ func TestWikiHandlerGetReturnsNotFoundForUnknownGame(t *testing.T) {
 	}
 }
 
+func TestWikiHandlerUpdateRejectsAnonymousBeforeResolvingGame(t *testing.T) {
+	t.Setenv("GIN_MODE", gin.TestMode)
+
+	db := openGamesHandlerTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	insertGamesHandlerTestGame(t, db, "wiki-anon", "Wiki Anon", domain.GameVisibilityPrivate, "")
+
+	service := services.NewWikiService(
+		repositories.NewGamesRepository(db),
+		repositories.NewWikiRepository(db),
+		10,
+	)
+	handler := NewWikiHandler(service)
+
+	// 匿名请求：无论游戏存在与否、可见性如何，一律 401，不做资源解析。
+	for _, publicID := range []string{"wiki-anon", "does-not-exist"} {
+		recorder := httptest.NewRecorder()
+		context, _ := gin.CreateTestContext(recorder)
+		context.Request = httptest.NewRequest(http.MethodPut, "/api/games/"+publicID+"/wiki", strings.NewReader(`{"content":"# Demo"}`))
+		context.Request.Header.Set("Content-Type", "application/json")
+		context.Params = gin.Params{{Key: "publicId", Value: publicID}}
+
+		handler.Update(context)
+
+		if recorder.Code != http.StatusUnauthorized {
+			t.Fatalf("anonymous Update(%s) status = %d, want %d", publicID, recorder.Code, http.StatusUnauthorized)
+		}
+		if !strings.Contains(recorder.Body.String(), `"error":"需要管理员登录"`) {
+			t.Fatalf("body = %s, want 需要管理员登录", recorder.Body.String())
+		}
+	}
+}
+
 func TestWikiHandlerUpdateRejectsInvalidJSONAfterResolvingGame(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 

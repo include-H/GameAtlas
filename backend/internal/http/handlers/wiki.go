@@ -39,11 +39,11 @@ func (h *WikiHandler) Get(c *gin.Context) {
 }
 
 func (h *WikiHandler) Update(c *gin.Context) {
-	gameID, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
-	if !ok {
+	if !requireAdmin(c) {
 		return
 	}
-	if !requireAdmin(c) {
+	gameID, ok := parseGamePublicIDParam(c, "publicId", h.service.ResolveGameID)
+	if !ok {
 		return
 	}
 
