@@ -211,7 +211,7 @@ func TestGamesServiceDeleteRemovesTrackedAssetFiles(t *testing.T) {
 	assertNoAssetCleanupTasks(t, db)
 }
 
-func TestGamesServiceDeletePrunesSeriesAndInvalidatesMetadataListCache(t *testing.T) {
+func TestGamesServiceDeletePrunesSeriesFromMetadataList(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()
 
@@ -244,24 +244,24 @@ func TestGamesServiceDeletePrunesSeriesAndInvalidatesMetadataListCache(t *testin
 		repositories.NewAssetCleanupTasksRepository(db),
 	)
 
-	cached, err := metadataService.List(MetadataResource{Type: domain.MetadataSeries}, true, MetadataListOptions{Sort: "name"})
+	before, err := metadataService.ListPage(MetadataResource{Type: domain.MetadataSeries}, true, MetadataListOptions{Page: 1, Limit: 100, Sort: "name"})
 	if err != nil {
-		t.Fatalf("List returned error: %v", err)
+		t.Fatalf("ListPage before delete returned error: %v", err)
 	}
-	if len(cached) != 2 {
-		t.Fatalf("cached series = %+v, want linked and loose rows before delete", cached)
+	if len(before.Items) != 2 {
+		t.Fatalf("series before delete = %+v, want linked and loose rows", before.Items)
 	}
 
 	if _, err := service.Delete(gameID); err != nil {
 		t.Fatalf("Delete returned error: %v", err)
 	}
 
-	refreshed, err := metadataService.List(MetadataResource{Type: domain.MetadataSeries}, true, MetadataListOptions{Sort: "name"})
+	refreshed, err := metadataService.ListPage(MetadataResource{Type: domain.MetadataSeries}, true, MetadataListOptions{Page: 1, Limit: 100, Sort: "name"})
 	if err != nil {
-		t.Fatalf("List after delete returned error: %v", err)
+		t.Fatalf("ListPage after delete returned error: %v", err)
 	}
-	if len(refreshed) != 0 {
-		t.Fatalf("refreshed series = %+v, want no orphan series after game delete", refreshed)
+	if len(refreshed.Items) != 0 {
+		t.Fatalf("refreshed series = %+v, want no orphan series after game delete", refreshed.Items)
 	}
 }
 
@@ -1104,4 +1104,3 @@ func TestGamesServiceUpdateAggregateBackfillsVideoPosterPath(t *testing.T) {
 		t.Fatalf("PosterPath after second update = %v, want %q unchanged", videos[0].PosterPath, posterPath)
 	}
 }
-

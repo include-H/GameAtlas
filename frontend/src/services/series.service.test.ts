@@ -37,14 +37,26 @@ describe('series service', () => {
   it('omits blank search text instead of sending a fake search filter', async () => {
     getMock.mockResolvedValue({
       data: [{ id: 2, name: 'Final Fantasy' }],
+      pagination: {
+        page: 1,
+        limit: 24,
+        total: 1,
+        totalPages: 1,
+      },
     })
 
-    await expect(seriesService.getAllSeries({ search: '   ', sort: 'name' })).resolves.toEqual([
-      { id: 2, name: 'Final Fantasy' },
-    ])
+    await expect(seriesService.getSeriesPage({ page: 1, limit: 24, search: '   ', sort: 'name' })).resolves.toEqual({
+      data: [{ id: 2, name: 'Final Fantasy' }],
+      pagination: {
+        page: 1,
+        limit: 24,
+        total: 1,
+        totalPages: 1,
+      },
+    })
 
     const [, config] = getMock.mock.calls[0]
-    expect((config.params as URLSearchParams).toString()).toBe('sort=name')
+    expect((config.params as URLSearchParams).toString()).toBe('page=1&limit=24&sort=name')
   })
 
   it('normalizes series games without retaining the API favorite field', async () => {
@@ -57,10 +69,16 @@ describe('series service', () => {
           title: 'Persona 5',
           is_favorite: true,
         }],
+        pagination: {
+          page: 1,
+          limit: 24,
+          total: 1,
+          totalPages: 1,
+        },
       },
     })
 
-    const detail = await seriesService.getSeriesDetail(7)
+    const detail = await seriesService.getSeriesDetail(7, { page: 1, limit: 24 })
 
     expect(detail.games[0]).toMatchObject({
       id: 42,
@@ -68,5 +86,11 @@ describe('series service', () => {
       isFavorite: true,
     })
     expect(detail.games[0]).not.toHaveProperty('is_favorite')
+    expect(detail.pagination).toEqual({
+      page: 1,
+      limit: 24,
+      total: 1,
+      totalPages: 1,
+    })
   })
 })

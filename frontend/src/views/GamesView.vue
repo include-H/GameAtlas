@@ -59,14 +59,6 @@
           </a-select>
         </a-col>
 
-        <!-- Items Per Page -->
-        <a-col :xs="24" :sm="8" :md="3" :lg="3" :xl="3" :xxl="3" class="games-filters-col games-filters-col--page-size">
-          <a-select
-            v-model="itemsPerPage"
-            :options="itemsPerPageOptions"
-          />
-        </a-col>
-
         <!-- Favorites Toggle -->
         <a-col :xs="24" :sm="8" :md="1" :lg="1" :xl="1" :xxl="1" class="games-filters-col games-filters-col--favorite">
           <a-tag
@@ -136,77 +128,47 @@
       </a-row>
     </a-card>
 
-    <!-- Results Count -->
-    <div v-if="!hasLoadFailure" class="results-info">
-      <span class="results-count">
-        显示 {{ games?.length || 0 }} / {{ pagination?.total || 0 }} 个游戏
-      </span>
-    </div>
-
     <!-- Loading State -->
     <div v-if="isLoading" class="loading-container">
       <a-spin :size="24" />
       <p class="loading-text">加载中...</p>
     </div>
 
-    <!-- Games Grid/List -->
+    <!-- Virtualized Games Grid/List -->
     <div v-else-if="games && games.length > 0">
-      <!-- Grid View -->
-      <div v-if="viewMode === 'grid'" class="games-grid">
+      <div ref="virtualScrollRef" class="games-virtual-scroll">
         <div
-          v-for="game in games"
-          :key="game.id"
-          class="games-grid__item"
+          class="games-virtual-scroll__canvas"
+          :style="{ height: `${virtualTotalHeight}px` }"
         >
-          <game-card
-            :game="game"
-            can-add-to-start-screen
-            can-delete
-            :is-on-start-screen="startScreenGameIds.has(game.id)"
-            @view="viewGame"
-            @view-series="viewSeries"
-            @toggle-favorite="toggleFavorite"
-            @delete="handleDelete($event, game.title)"
-            @add-to-start-screen="handleAddToStartScreen"
-            @remove-from-start-screen="handleRemoveFromStartScreen"
-          />
+          <div
+            v-for="virtualItem in virtualItems"
+            :key="virtualItem.key"
+            class="games-virtual-scroll__item"
+            :style="virtualItem.style"
+          >
+            <game-card
+              :game="virtualItem.game"
+              :is-list="viewMode === 'list'"
+              can-add-to-start-screen
+              can-delete
+              :is-on-start-screen="startScreenGameIds.has(virtualItem.game.id)"
+              @view="viewGame"
+              @view-series="viewSeries"
+              @toggle-favorite="toggleFavorite"
+              @delete="handleDelete($event, virtualItem.game.title)"
+              @add-to-start-screen="handleAddToStartScreen"
+              @remove-from-start-screen="handleRemoveFromStartScreen"
+            />
+          </div>
         </div>
-      </div>
 
-      <!-- List View -->
-      <a-row v-else :gutter="16">
-        <a-col
-          v-for="game in games"
-          :key="game.id"
-          :span="24"
+        <div
+          ref="loadMoreSentinel"
+          class="games-infinite-scroll"
         >
-          <game-card
-            :game="game"
-            is-list
-            can-add-to-start-screen
-            can-delete
-            :is-on-start-screen="startScreenGameIds.has(game.id)"
-            @view="viewGame"
-            @view-series="viewSeries"
-            @toggle-favorite="toggleFavorite"
-            @delete="handleDelete($event, game.title)"
-            @add-to-start-screen="handleAddToStartScreen"
-            @remove-from-start-screen="handleRemoveFromStartScreen"
-          />
-        </a-col>
-      </a-row>
-
-      <!-- Pagination -->
-      <div v-if="totalPages > 1" class="pagination-container">
-        <a-pagination
-          v-model:current="currentPage"
-          v-model:page-size="itemsPerPage"
-          :total="pagination?.total || 0"
-          :page-size-options="itemsPerPageOptions.map((item) => item.value)"
-          show-total
-          show-jumper
-          show-page-size
-        />
+          <a-spin v-if="isLoadingMore" :size="20" />
+        </div>
       </div>
     </div>
 
@@ -253,7 +215,7 @@
 </template>
 
 <script setup lang="ts">
-import { onActivated, ref } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useGamesStore } from '@/stores/games'
@@ -263,7 +225,7 @@ import GameCard from '@/components/GameCard.vue'
 import AddGameModal from '@/components/AddGameModal.vue'
 import { useGamesView } from '@/composables/useGamesView'
 import startScreenService from '@/services/start-screen.service'
-import type { StartScreenLayout } from '@/services/types'
+import type { GameListItem, StartScreenLayout } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import { IconApps, IconHeart, IconHeartFill, IconList, IconLock, IconPlus, IconSearch, IconSort, IconTrophy } from '@arco-design/web-vue/es/icon'
 
@@ -279,6 +241,151 @@ const uiStore = useUiStore()
 const { isAdmin } = storeToRefs(authStore)
 
 const startScreenGameIds = ref<Set<number>>(new Set())
+const loadMoreSentinel = ref<HTMLElement | null>(null)
+const virtualScrollRef = ref<HTMLElement | null>(null)
+const virtualViewportWidth = ref(0)
+const virtualViewportHeight = ref(0)
+const virtualScrollTop = ref(0)
+let virtualResizeObserver: ResizeObserver | null = null
+let virtualScrollFrame = 0
+let virtualScrollBound = false
+let virtualScrollRoot: HTMLElement | null = null
+
+const {
+  clearFilters,
+  addGameSubmitting,
+  filterFavorites,
+  filterPrivate,
+  games,
+  handleAddGame,
+  handleAddGameSubmit,
+  handleDelete,
+  handleSearch,
+  hasActiveFilters,
+  hasLoadFailure,
+  isLoading,
+  isLoadingMore,
+  pageTitle,
+  searchQuery,
+  showAddModal,
+  sortBy,
+  sortOptions,
+  toggleFavorite,
+  updateRoute,
+  viewGame,
+  viewSeries,
+  viewMode,
+} = useGamesView({
+  route,
+  router,
+  gamesStore,
+  uiStore,
+  isAdmin,
+  loadMoreSentinel,
+})
+
+const VIRTUAL_GAP = 16
+const VIRTUAL_BUFFER_ROWS = 2
+
+interface VirtualGameItem {
+  key: string
+  game: GameListItem
+  style: Record<string, string>
+}
+
+const virtualColumns = computed(() => {
+  const width = virtualViewportWidth.value || 1200
+  if (width < 768) return 2
+  if (width < 992) return 3
+  if (width < 1200) return 4
+  if (width < 1600) return 6
+  if (width < 2200) return 8
+  return 12
+})
+
+const virtualCardWidth = computed(() => {
+  if (viewMode.value === 'list') {
+    return virtualViewportWidth.value
+  }
+  const columns = virtualColumns.value
+  const width = virtualViewportWidth.value || 1200
+  return Math.max(0, (width - VIRTUAL_GAP * (columns - 1)) / columns)
+})
+
+const virtualRowHeight = computed(() => {
+  if (viewMode.value === 'list') {
+    return virtualViewportWidth.value > 0 && virtualViewportWidth.value <= 768 ? 300 : 110
+  }
+  return virtualCardWidth.value * (4 / 3) + 76
+})
+
+const virtualRowCount = computed(() => {
+  if (viewMode.value === 'list') {
+    return games.value.length
+  }
+  return Math.ceil(games.value.length / virtualColumns.value)
+})
+
+const virtualTotalHeight = computed(() => {
+  if (virtualRowCount.value === 0) {
+    return 0
+  }
+  return virtualRowCount.value * (virtualRowHeight.value + VIRTUAL_GAP) + VIRTUAL_GAP
+})
+
+const virtualStartRow = computed(() => {
+  const stride = virtualRowHeight.value + VIRTUAL_GAP
+  return Math.max(0, Math.floor(virtualScrollTop.value / stride) - VIRTUAL_BUFFER_ROWS)
+})
+
+const virtualEndRow = computed(() => {
+  const stride = virtualRowHeight.value + VIRTUAL_GAP
+  const viewportHeight = virtualViewportHeight.value || 800
+  const visibleEnd = Math.ceil((virtualScrollTop.value + viewportHeight) / stride) + VIRTUAL_BUFFER_ROWS
+  return Math.min(virtualRowCount.value, visibleEnd)
+})
+
+const virtualItems = computed<VirtualGameItem[]>(() => {
+  const stride = virtualRowHeight.value + VIRTUAL_GAP
+  const items: VirtualGameItem[] = []
+
+  if (viewMode.value === 'list') {
+    for (let index = virtualStartRow.value; index < virtualEndRow.value; index += 1) {
+      const game = games.value[index]
+      if (!game) continue
+      items.push({
+        key: `list-${game.id}`,
+        game,
+        style: {
+          width: `${virtualCardWidth.value}px`,
+          height: `${virtualRowHeight.value}px`,
+          transform: `translate3d(0, ${index * stride}px, 0)`,
+        },
+      })
+    }
+    return items
+  }
+
+  const columns = virtualColumns.value
+  for (let row = virtualStartRow.value; row < virtualEndRow.value; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const gameIndex = row * columns + column
+      const game = games.value[gameIndex]
+      if (!game) break
+      items.push({
+        key: `grid-${game.id}`,
+        game,
+        style: {
+          width: `${virtualCardWidth.value}px`,
+          height: `${virtualRowHeight.value}px`,
+          transform: `translate3d(${column * (virtualCardWidth.value + VIRTUAL_GAP)}px, ${row * stride}px, 0)`,
+        },
+      })
+    }
+  }
+
+  return items
+})
 
 const syncStartScreenLayout = (layout: StartScreenLayout) => {
   startScreenGameIds.value = new Set(layout.tiles.map((tile) => tile.game_id))
@@ -311,44 +418,87 @@ const handleRemoveFromStartScreen = async (gameId: number) => {
   }
 }
 
+const updateVirtualMetrics = () => {
+  const root = virtualScrollRoot || virtualScrollRef.value
+  if (!root) return
+  virtualViewportWidth.value = virtualScrollRef.value?.clientWidth || root.clientWidth
+  virtualViewportHeight.value = root.clientHeight
+}
+
+const handleVirtualScroll = () => {
+  if (virtualScrollFrame) return
+  virtualScrollFrame = window.requestAnimationFrame(() => {
+    virtualScrollFrame = 0
+    virtualScrollTop.value = virtualScrollRoot?.scrollTop || 0
+  })
+}
+
+const setupVirtualScroll = () => {
+  const element = virtualScrollRef.value
+  if (!element) {
+    return
+  }
+  if (virtualScrollBound) {
+    updateVirtualMetrics()
+    return
+  }
+  virtualScrollRoot = element.closest<HTMLElement>('.content') || element
+  virtualScrollRoot.addEventListener('scroll', handleVirtualScroll, { passive: true })
+  virtualScrollBound = true
+  updateVirtualMetrics()
+  if (typeof ResizeObserver === 'undefined') {
+    return
+  }
+  virtualResizeObserver = new ResizeObserver(() => {
+    updateVirtualMetrics()
+  })
+  virtualResizeObserver.observe(virtualScrollRoot)
+}
+
 onActivated(() => {
   void refreshStartScreenTiles()
 })
 
-const {
-  clearFilters,
-  currentPage,
-  addGameSubmitting,
-  filterFavorites,
-  filterPrivate,
-  games,
-  handleAddGame,
-  handleAddGameSubmit,
-  handleDelete,
-  handleSearch,
-  hasActiveFilters,
-  hasLoadFailure,
-  isLoading,
-  itemsPerPage,
-  itemsPerPageOptions,
-  pageTitle,
-  pagination,
-  searchQuery,
-  showAddModal,
-  sortBy,
-  sortOptions,
-  toggleFavorite,
-  totalPages,
-  updateRoute,
-  viewGame,
-  viewSeries,
-  viewMode,
-} = useGamesView({
-  route,
-  router,
-  gamesStore,
-  uiStore,
-  isAdmin,
+onMounted(() => {
+  setupVirtualScroll()
+})
+
+watch(() => route.query, () => {
+  virtualScrollTop.value = 0
+  virtualScrollRoot?.scrollTo({ top: 0 })
+  updateVirtualMetrics()
+})
+
+watch(viewMode, () => {
+  virtualScrollTop.value = 0
+  updateVirtualMetrics()
+  virtualScrollRoot?.scrollTo({ top: 0 })
+})
+
+watch(virtualScrollRef, (element) => {
+  virtualScrollBound = false
+  virtualScrollRoot = null
+  if (virtualResizeObserver) {
+    virtualResizeObserver.disconnect()
+    virtualResizeObserver = null
+  }
+  if (element) {
+    setupVirtualScroll()
+  }
+})
+
+onBeforeUnmount(() => {
+  virtualScrollBound = false
+  virtualScrollRoot?.removeEventListener('scroll', handleVirtualScroll)
+  virtualScrollRoot = null
+  if (virtualResizeObserver) {
+    virtualResizeObserver.disconnect()
+    virtualResizeObserver = null
+  }
+  if (virtualScrollFrame) {
+    window.cancelAnimationFrame(virtualScrollFrame)
+    virtualScrollFrame = 0
+  }
 })
 </script>
 

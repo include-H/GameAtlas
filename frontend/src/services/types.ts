@@ -16,6 +16,13 @@ export interface ApiPageEnvelope<T> {
   }
 }
 
+export interface MetadataPagination {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
 export interface PendingIssueCounts {
   groups: Record<string, number>
   ignored_total: number
@@ -67,6 +74,7 @@ export interface Series {
 export interface SeriesDetail {
   series: Series
   games: GameListItemView[]
+  pagination: MetadataPagination
 }
 
 export interface Developer {
@@ -98,6 +106,7 @@ export interface Publisher {
 export interface PublisherDetail {
   publisher: Publisher
   games: GameListItemView[]
+  pagination: MetadataPagination
 }
 
 

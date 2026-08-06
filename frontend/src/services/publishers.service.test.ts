@@ -34,6 +34,38 @@ describe('publishers service', () => {
     expect((config.params as URLSearchParams).toString()).toBe('search=sega&limit=1&sort=popular')
   })
 
+  it('loads a publisher page with page and limit', async () => {
+    getMock.mockResolvedValue({
+      data: [{ id: 1, name: 'SEGA' }],
+      pagination: {
+        page: 2,
+        limit: 24,
+        total: 25,
+        totalPages: 2,
+      },
+    })
+
+    await expect(
+      publishersService.getPublishersPage({
+        page: 2,
+        limit: 24,
+        search: ' sega ',
+        sort: 'name',
+      }),
+    ).resolves.toEqual({
+      data: [{ id: 1, name: 'SEGA' }],
+      pagination: {
+        page: 2,
+        limit: 24,
+        total: 25,
+        totalPages: 2,
+      },
+    })
+
+    const [, config] = getMock.mock.calls[0]
+    expect((config.params as URLSearchParams).toString()).toBe('page=2&limit=24&search=sega&sort=name')
+  })
+
   it('creates a publisher via post', async () => {
     postMock.mockResolvedValue({
       data: { id: 7, name: 'Atlus' },
@@ -58,10 +90,16 @@ describe('publishers service', () => {
           title: 'Persona 5',
           is_favorite: true,
         }],
+        pagination: {
+          page: 1,
+          limit: 24,
+          total: 1,
+          totalPages: 1,
+        },
       },
     })
 
-    const detail = await publishersService.getPublisherDetail(7)
+    const detail = await publishersService.getPublisherDetail(7, { page: 1, limit: 24 })
 
     expect(detail.games[0]).toMatchObject({
       id: 42,
@@ -69,5 +107,11 @@ describe('publishers service', () => {
       isFavorite: true,
     })
     expect(detail.games[0]).not.toHaveProperty('is_favorite')
+    expect(detail.pagination).toEqual({
+      page: 1,
+      limit: 24,
+      total: 1,
+      totalPages: 1,
+    })
   })
 })

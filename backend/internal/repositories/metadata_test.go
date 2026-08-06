@@ -6,7 +6,7 @@ import (
 	"github.com/hao/game/internal/domain"
 )
 
-func TestMetadataRepositoryListSeriesGamesBySeriesIDsInitializesEmptyAndFiltersVisibility(t *testing.T) {
+func TestMetadataRepositoryListMetadataGamesBySeriesIDsInitializesEmptyAndFiltersVisibility(t *testing.T) {
 	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
@@ -38,9 +38,9 @@ func TestMetadataRepositoryListSeriesGamesBySeriesIDsInitializesEmptyAndFiltersV
 
 	repo := NewMetadataRepository(db)
 
-	publicOnly, err := repo.ListSeriesGamesBySeriesIDs([]int64{seriesAID, seriesBID}, false)
+	publicOnly, err := repo.ListMetadataGamesByIDs(domain.MetadataSeries, []int64{seriesAID, seriesBID}, false)
 	if err != nil {
-		t.Fatalf("ListSeriesGamesBySeriesIDs(false) returned error: %v", err)
+		t.Fatalf("ListMetadataGamesByIDs(false) returned error: %v", err)
 	}
 	if len(publicOnly[seriesAID]) != 1 || publicOnly[seriesAID][0].ID != publicID {
 		t.Fatalf("publicOnly[seriesA] = %+v, want only public game", publicOnly[seriesAID])
@@ -52,9 +52,9 @@ func TestMetadataRepositoryListSeriesGamesBySeriesIDsInitializesEmptyAndFiltersV
 		t.Fatalf("publicOnly[seriesB] = %+v, want initialized empty slice", games)
 	}
 
-	includeAll, err := repo.ListSeriesGamesBySeriesIDs([]int64{seriesAID, seriesBID}, true)
+	includeAll, err := repo.ListMetadataGamesByIDs(domain.MetadataSeries, []int64{seriesAID, seriesBID}, true)
 	if err != nil {
-		t.Fatalf("ListSeriesGamesBySeriesIDs(true) returned error: %v", err)
+		t.Fatalf("ListMetadataGamesByIDs(true) returned error: %v", err)
 	}
 	if len(includeAll[seriesAID]) != 2 || includeAll[seriesAID][0].ID != privateID || includeAll[seriesAID][1].ID != publicID {
 		t.Fatalf("includeAll[seriesA] = %+v, want private then public by updated_at desc", includeAll[seriesAID])
@@ -182,5 +182,115 @@ func TestMetadataRepositoryDeleteUnusedRemovesOrphansOnly(t *testing.T) {
 	}
 	if developerCount != 1 {
 		t.Fatalf("developer count = %d, want 1 after removing orphan", developerCount)
+	}
+}
+
+func TestMetadataRepositoryListPageCountsAndPaginatesSeries(t *testing.T) {
+	db := openRepositoryTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	seriesAID := insertRepositorySeries(t, db, "Alpha", "alpha")
+	seriesBID := insertRepositorySeries(t, db, "Beta", "beta")
+	insertRepositorySeries(t, db, "Gamma", "gamma")
+	insertRepositorySeries(t, db, "Delta", "delta")
+
+	publicAlpha := insertRepositoryGame(t, db, "series-alpha-public", "Series Alpha Public", "public")
+	privateAlpha := insertRepositoryGame(t, db, "series-alpha-private", "Series Alpha Private", "private")
+	publicBeta := insertRepositoryGame(t, db, "series-beta-public", "Series Beta Public", "public")
+	for _, gameID := range []int64{publicAlpha, privateAlpha} {
+		if _, err := db.Exec(`UPDATE games SET series_id = ? WHERE id = ?`, seriesAID, gameID); err != nil {
+			t.Fatalf("attach game to Alpha: %v", err)
+		}
+	}
+	if _, err := db.Exec(`UPDATE games SET series_id = ? WHERE id = ?`, seriesBID, publicBeta); err != nil {
+		t.Fatalf("attach game to Beta: %v", err)
+	}
+
+	repo := NewMetadataRepository(db)
+	total, err := repo.CountMetadata(domain.MetadataSeries, "", false)
+	if err != nil {
+		t.Fatalf("CountMetadata public returned error: %v", err)
+	}
+	if total != 2 {
+		t.Fatalf("CountMetadata public total = %d, want 2", total)
+	}
+
+	items, err := repo.ListMetadataPage(domain.MetadataSeries, "", "name", 2, 0, false)
+	if err != nil {
+		t.Fatalf("ListMetadataPage public returned error: %v", err)
+	}
+	if len(items) != 2 || items[0].Name != "Alpha" || items[1].Name != "Beta" {
+		t.Fatalf("ListMetadataPage public items = %+v, want Alpha then Beta", items)
+	}
+	if items[0].GameCount != 1 || items[1].GameCount != 1 {
+		t.Fatalf("ListMetadataPage public game counts = %d, %d, want 1, 1", items[0].GameCount, items[1].GameCount)
+	}
+
+	total, err = repo.CountMetadata(domain.MetadataSeries, "alpha", false)
+	if err != nil {
+		t.Fatalf("CountMetadata search returned error: %v", err)
+	}
+	if total != 1 {
+		t.Fatalf("CountMetadata search total = %d, want 1", total)
+	}
+
+	total, err = repo.CountMetadata(domain.MetadataSeries, "", true)
+	if err != nil {
+		t.Fatalf("CountMetadata all returned error: %v", err)
+	}
+	if total != 4 {
+		t.Fatalf("CountMetadata all total = %d, want 4", total)
+	}
+
+	secondPage, err := repo.ListMetadataPage(domain.MetadataSeries, "", "name", 2, 2, true)
+	if err != nil {
+		t.Fatalf("ListMetadataPage all second page returned error: %v", err)
+	}
+	if len(secondPage) != 2 || secondPage[0].Name != "Delta" || secondPage[1].Name != "Gamma" {
+		t.Fatalf("ListMetadataPage all second page = %+v, want Delta then Gamma", secondPage)
+	}
+}
+
+func TestMetadataRepositoryListMetadataGamesPageCountsAndLimits(t *testing.T) {
+	db := openRepositoryTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	publisherID := insertRepositoryPublisher(t, db, "Publisher", "publisher")
+	publicA := insertRepositoryGame(t, db, "publisher-a", "Publisher A", "public")
+	publicB := insertRepositoryGame(t, db, "publisher-b", "Publisher B", "public")
+	privateC := insertRepositoryGame(t, db, "publisher-c", "Publisher C", "private")
+	linkRepositoryGamePublisher(t, db, publicA, publisherID, 0)
+	linkRepositoryGamePublisher(t, db, publicB, publisherID, 1)
+	linkRepositoryGamePublisher(t, db, privateC, publisherID, 2)
+	if _, err := db.Exec(`UPDATE games SET updated_at = '2024-01-02 00:00:00' WHERE id = ?`, publicB); err != nil {
+		t.Fatalf("set public B updated_at: %v", err)
+	}
+	if _, err := db.Exec(`UPDATE games SET updated_at = '2024-01-03 00:00:00' WHERE id = ?`, privateC); err != nil {
+		t.Fatalf("set private C updated_at: %v", err)
+	}
+
+	repo := NewMetadataRepository(db)
+	total, err := repo.CountMetadataGames(domain.MetadataPublishers, publisherID, false)
+	if err != nil {
+		t.Fatalf("CountMetadataGames public returned error: %v", err)
+	}
+	if total != 2 {
+		t.Fatalf("CountMetadataGames public total = %d, want 2", total)
+	}
+
+	games, err := repo.ListMetadataGamesPage(domain.MetadataPublishers, publisherID, false, 1, 1)
+	if err != nil {
+		t.Fatalf("ListMetadataGamesPage returned error: %v", err)
+	}
+	if len(games) != 1 || games[0].PublicID != "publisher-b" {
+		t.Fatalf("ListMetadataGamesPage = %+v, want second public game", games)
+	}
+
+	total, err = repo.CountMetadataGames(domain.MetadataPublishers, publisherID, true)
+	if err != nil {
+		t.Fatalf("CountMetadataGames all returned error: %v", err)
+	}
+	if total != 3 {
+		t.Fatalf("CountMetadataGames all total = %d, want 3", total)
 	}
 }

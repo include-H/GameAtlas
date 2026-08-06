@@ -66,16 +66,12 @@
         </a-timeline-item>
       </a-timeline>
 
-      <div v-if="hasMore" class="timeline-shell__loading-more">
-        <template v-if="isLoadingMore">
-          <a-spin :size="18" />
-          <span>正在加载更多月份...</span>
-        </template>
-        <template v-else>
-          <a-button class="app-text-action-btn" type="text" size="small" @click="handleManualLoadMore">
-            加载更多
-          </a-button>
-        </template>
+      <div
+        v-if="hasMore"
+        ref="loadMoreSentinel"
+        class="timeline-shell__loading-more"
+      >
+        <a-spin v-if="isLoadingMore" :size="18" />
       </div>
       <div v-else class="timeline-shell__end">
         时间线已经到底了
@@ -85,7 +81,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import GameCard from '@/components/GameCard.vue'
 import gamesService from '@/services/games.service'
@@ -124,8 +120,9 @@ const hasLoadFailure = ref(false)
 const allGames = ref<TimelineGame[]>([])
 const hasMore = ref(false)
 const nextCursor = ref<string | null>(null)
-const scrollRootRef = ref<HTMLElement | null>(null)
+const loadMoreSentinel = ref<HTMLElement | null>(null)
 const hasLoadedTimeline = ref(false)
+let loadMoreObserver: IntersectionObserver | null = null
 
 const parseDateParts = (value?: string | null) => {
   const raw = (value || '').trim()
@@ -231,10 +228,6 @@ const loadMoreTimeline = async () => {
   }
 }
 
-const handleManualLoadMore = () => {
-  void loadMoreTimeline()
-}
-
 const loadTimeline = async () => {
   if (isLoading.value || hasLoadedTimeline.value) return
   isLoading.value = true
@@ -261,6 +254,29 @@ const loadTimeline = async () => {
   }
 }
 
+const setupLoadMoreObserver = () => {
+  if (loadMoreObserver) {
+    loadMoreObserver.disconnect()
+    loadMoreObserver = null
+  }
+  if (!loadMoreSentinel.value || typeof IntersectionObserver === 'undefined') {
+    return
+  }
+
+  loadMoreObserver = new IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) {
+      void loadMoreTimeline()
+    }
+  }, {
+    rootMargin: '320px 0px',
+  })
+  loadMoreObserver.observe(loadMoreSentinel.value)
+}
+
+watch(loadMoreSentinel, () => {
+  setupLoadMoreObserver()
+})
+
 const openGame = (publicId: string) => {
   if (!publicId) return
   router.push({
@@ -270,14 +286,14 @@ const openGame = (publicId: string) => {
 }
 
 onMounted(() => {
-  // Intentionally keep timeline pagination manual-only:
-  // each "load more" request spans another two-year backend window, and automatic scroll loading
-  // can quickly chain multiple requests together when the page height is still shorter than the viewport.
   loadTimeline()
 })
 
 onBeforeUnmount(() => {
-  scrollRootRef.value = null
+  if (loadMoreObserver) {
+    loadMoreObserver.disconnect()
+    loadMoreObserver = null
+  }
 })
 </script>
 

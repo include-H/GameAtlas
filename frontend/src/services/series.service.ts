@@ -1,5 +1,5 @@
 import { get, post } from './api'
-import type { ApiEnvelope, GameListItem, GameListItemDto, Series, SeriesDetail } from './types'
+import type { ApiEnvelope, ApiPageEnvelope, GameListItem, GameListItemDto, MetadataPagination, Series, SeriesDetail } from './types'
 
 async function listSeriesWithParams(params?: {
   search?: string
@@ -12,21 +12,33 @@ async function listSeriesWithParams(params?: {
   if (params?.search?.trim()) queryParams.append('search', params.search.trim())
   if (params?.limit) queryParams.append('limit', String(params.limit))
   if (params?.sort) queryParams.append('sort', params.sort)
-  const response = await get<ApiEnvelope<Series[]>>('/series', { params: queryParams })
+  const response = await get<ApiPageEnvelope<Series>>('/series', { params: queryParams })
   return response.data
 }
 
 export const seriesService = {
-  async getAllSeries(params?: {
+  async getSeriesPage(params: {
+    page: number
+    limit: number
     search?: string
-    limit?: number
     sort?: 'name' | 'popular'
-  }): Promise<Series[]> {
-    return listSeriesWithParams(params)
+  }): Promise<ApiPageEnvelope<Series>> {
+    const queryParams = new URLSearchParams({
+      page: String(params.page),
+      limit: String(params.limit),
+    })
+    if (params.search?.trim()) queryParams.append('search', params.search.trim())
+    if (params.sort) queryParams.append('sort', params.sort)
+    return get<ApiPageEnvelope<Series>>('/series', { params: queryParams })
   },
 
-  async getSeriesDetail(id: number | string): Promise<SeriesDetail> {
-    const response = await get<ApiEnvelope<{ series: Series; games: GameListItemDto[] }>>(`/series/${id}`)
+  async getSeriesDetail(id: number | string, options?: { page?: number; limit?: number }): Promise<SeriesDetail> {
+    const queryParams = new URLSearchParams()
+    if (options?.page) queryParams.append('page', String(options.page))
+    if (options?.limit) queryParams.append('limit', String(options.limit))
+    const response = await get<ApiEnvelope<{ series: Series; games: GameListItemDto[]; pagination: MetadataPagination }>>(`/series/${id}`, {
+      params: queryParams,
+    })
     return {
       series: response.data.series,
       games: response.data.games.map((item): GameListItem => {
@@ -36,15 +48,16 @@ export const seriesService = {
           isFavorite: is_favorite,
         }
       }),
+      pagination: response.data.pagination,
     }
   },
 
-  async getPopularSeries(limit?: number): Promise<(Series & { game_count: number })[]> {
+  async getPopularSeries(limit = 100): Promise<(Series & { game_count: number })[]> {
     const all = await listSeriesWithParams({ limit, sort: 'popular' })
     return all.map((item) => ({ ...item, game_count: item.game_count || 0 }))
   },
 
-  async searchSeries(query: string, limit?: number): Promise<Series[]> {
+  async searchSeries(query: string, limit = 100): Promise<Series[]> {
     return listSeriesWithParams({ search: query, limit, sort: 'popular' })
   },
 

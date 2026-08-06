@@ -33,19 +33,18 @@ interface UseGamesViewOptions {
   gamesStore: ReturnType<typeof useGamesStore>
   uiStore: ReturnType<typeof useUiStore>
   isAdmin: Ref<boolean>
+  loadMoreSentinel: Ref<HTMLElement | null>
 }
 
 interface BuildGamesListRequestOptions {
   routeQuery: LocationQuery
-  itemsPerPage: number
 }
 
 // 2026-04-04: keep this UI-only default aligned with the backend list default sort/order.
 // Impact: the select shows "最近更新" when route.query omits both fields, but requests still rely
 // on the backend native default instead of forcing route-owned sort/order values.
 const DEFAULT_SORT = { field: 'updated_at', order: 'desc' } as const satisfies Pick<GameSort, 'field' | 'order'>
-const DEFAULT_ITEMS_PER_PAGE = 24
-const ITEMS_PER_PAGE_VALUES = new Set([12, 24, 48, 96])
+const GAMES_PAGE_SIZE = 24
 
 const SORT_VALUES = new Set<GamesSortOptionValue>([
   'updated_at:desc',
@@ -77,24 +76,11 @@ const normalizeCommittedSearchValue = (value: string | undefined): string | unde
   return normalized ? normalized : undefined
 }
 
-const parsePositiveQueryNumber = (value: string | undefined, fallback: number): number => {
-  if (!value) return fallback
-  const parsed = Number.parseInt(value, 10)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
-}
-
 const parsePositiveRouteNumber = (
   value: LocationQueryValue | LocationQueryValue[] | undefined,
 ): number | undefined => {
   const parsed = Number(readSingleQueryValue(value))
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
-}
-
-const parseGamesItemsPerPage = (
-  value: LocationQueryValue | LocationQueryValue[] | undefined,
-): number | undefined => {
-  const parsed = parsePositiveRouteNumber(value)
-  return parsed !== undefined && ITEMS_PER_PAGE_VALUES.has(parsed) ? parsed : undefined
 }
 
 const parseRouteBoolean = (
@@ -134,22 +120,16 @@ export const buildGamesRouteQuery = (
     }
   })
 
-  if (
-    newParams.search !== undefined
-    || newParams.favorite !== undefined
-    || newParams.visibility !== undefined
-  ) {
-    query.page = '1'
-  }
+  // Infinite scroll owns page/limit in the store; route URLs only carry filters and sort state.
+  delete query.page
+  delete query.limit
 
   return query
 }
 
 export const buildGamesListRequest = ({
   routeQuery,
-  itemsPerPage,
 }: BuildGamesListRequestOptions): { query: GameListQuery; sort?: GameSortQuery } => {
-  const page = parsePositiveQueryNumber(readSingleQueryValue(routeQuery.page), 1)
   const rawSort = readSingleQueryValue(routeQuery.sort)
   const rawOrder = readSingleQueryValue(routeQuery.order)
   const sortField = parseGamesSortField(rawSort)
@@ -160,8 +140,8 @@ export const buildGamesListRequest = ({
 
   const request: { query: GameListQuery; sort?: GameSortQuery } = {
     query: {
-      page,
-      limit: itemsPerPage,
+      page: 1,
+      limit: GAMES_PAGE_SIZE,
       search: normalizeCommittedSearchValue(readSingleQueryValue(routeQuery.search)),
       visibility,
       favorite,
@@ -254,42 +234,12 @@ export const normalizeGamesPaginationRouteQuery = (routeQuery: LocationQuery): L
     return null
   }
 
-  const normalizedPage = parsePositiveRouteNumber(routeQuery.page)
-  const normalizedLimit = parseGamesItemsPerPage(routeQuery.limit)
-
-  if ((rawPage === undefined || normalizedPage !== undefined) && (rawLimit === undefined || normalizedLimit !== undefined)) {
-    return null
-  }
-
-  // 2026-04-06: games route paging stays inside the UI-supported page sizes and valid positive pages.
-  // Impact: shared URLs no longer depend on backend coercion to recover malformed limit/page inputs.
+  // 2026-08-06: games list uses infinite scroll with a fixed page size, so page/limit
+  // are owned by the client instead of the URL. Impact: shared links always start from
+  // the first 24 games and no longer depend on stale pagination params.
   return buildGamesRouteQuery(routeQuery, {
-    page: normalizedPage !== undefined ? String(normalizedPage) : undefined,
-    limit: normalizedLimit !== undefined ? String(normalizedLimit) : undefined,
-  })
-}
-
-export const normalizeGamesPaginationResponseQuery = (
-  routeQuery: LocationQuery,
-  pagination: Pick<GameListQuery, 'page' | 'limit'> & { totalPages: number },
-): LocationQueryRaw | null => {
-  const requestedPage = parsePositiveQueryNumber(readSingleQueryValue(routeQuery.page), 1)
-
-  if (pagination.totalPages === 0) {
-    if (requestedPage === 1) {
-      return null
-    }
-    return buildGamesRouteQuery(routeQuery, {
-      page: undefined,
-    })
-  }
-
-  if (requestedPage <= pagination.totalPages) {
-    return null
-  }
-
-  return buildGamesRouteQuery(routeQuery, {
-    page: String(pagination.totalPages),
+    page: undefined,
+    limit: undefined,
   })
 }
 
@@ -340,20 +290,17 @@ export const useGamesView = ({
   gamesStore,
   uiStore,
   isAdmin,
+  loadMoreSentinel,
 }: UseGamesViewOptions) => {
   const isLoading = ref(false)
+  const isLoadingMore = ref(false)
   const searchQuery = ref('')
   const viewMode = ref<GamesViewMode>('grid')
   const showAddModal = ref(false)
   const addGameSubmitting = ref(false)
   const isTogglingFavorite = ref(false)
-
-  const itemsPerPageOptions = [
-    { label: '12', value: 12 },
-    { label: '24', value: 24 },
-    { label: '48', value: 48 },
-    { label: '96', value: 96 },
-  ]
+  let listRequestId = 0
+  let loadMoreObserver: IntersectionObserver | null = null
 
   const sortOptions = [
     { label: '最近更新', value: 'updated_at:desc' },
@@ -370,20 +317,10 @@ export const useGamesView = ({
 
   const games = computed(() => gamesStore.games)
   const pagination = computed(() => gamesStore.pagination)
-  const totalPages = computed(() => pagination.value.totalPages || 0)
   const hasLoadFailure = computed(() => {
     // 2026-04-07: a failed catalog read must not fall through to the empty-state copy.
     // Impact: "暂无游戏" now only means the backend successfully returned an empty page.
     return Boolean(gamesStore.listError) && games.value.length === 0
-  })
-
-  const currentPage = computed({
-    get: () => parsePositiveQueryNumber(readSingleQueryValue(route.query.page), 1),
-    set: (page: number) => {
-      if (page !== parsePositiveQueryNumber(readSingleQueryValue(route.query.page), 1)) {
-        updateRoute({ page: String(page) })
-      }
-    },
   })
 
   const sortBy = computed({
@@ -406,15 +343,8 @@ export const useGamesView = ({
         seed: nextField === 'random'
           ? (readSingleQueryValue(route.query.seed) || String(Date.now()))
           : undefined,
-        page: '1',
+        page: undefined,
       })
-    },
-  })
-
-  const itemsPerPage = computed({
-    get: () => parseGamesItemsPerPage(route.query.limit) ?? DEFAULT_ITEMS_PER_PAGE,
-    set: (limit: number) => {
-      updateRoute({ limit: String(limit), page: '1' })
     },
   })
 
@@ -456,31 +386,75 @@ export const useGamesView = ({
   }
 
   const loadGames = async () => {
+    const requestId = ++listRequestId
     isLoading.value = true
 
     const request = buildGamesListRequest({
       routeQuery: route.query,
-      itemsPerPage: itemsPerPage.value,
     })
 
     try {
-      const response = await gamesStore.fetchGames(request)
-      const normalizedPaginationQuery = normalizeGamesPaginationResponseQuery(route.query, response.pagination)
-      if (normalizedPaginationQuery && !isSameRouteQuery(route.query, normalizedPaginationQuery)) {
-        // 2026-04-06: when filters or deletes invalidate the current page, route state must follow
-        // the backend pagination contract instead of rendering an out-of-range empty page as "no data".
-        router.replace({
-          name: 'games',
-          query: normalizedPaginationQuery,
-        })
-        return
-      }
+      await gamesStore.fetchGames(request)
     } catch {
       uiStore.addAlert('加载游戏失败', 'error')
     } finally {
-      isLoading.value = false
+      if (requestId === listRequestId) {
+        isLoading.value = false
+      }
     }
   }
+
+  const loadMoreGames = async () => {
+    if (isLoading.value || isLoadingMore.value || !gamesStore.hasMorePages) {
+      return
+    }
+
+    const requestId = listRequestId
+    isLoadingMore.value = true
+    try {
+      const request = buildGamesListRequest({
+        routeQuery: route.query,
+      })
+      await gamesStore.fetchGames({
+        query: {
+          ...request.query,
+          page: gamesStore.pagination.page + 1,
+        },
+        sort: request.sort,
+        append: true,
+      })
+      if (requestId !== listRequestId) {
+        await loadGames()
+      }
+    } catch {
+      uiStore.addAlert('加载更多游戏失败', 'error')
+    } finally {
+      isLoadingMore.value = false
+    }
+  }
+
+  const setupLoadMoreObserver = () => {
+    if (loadMoreObserver) {
+      loadMoreObserver.disconnect()
+      loadMoreObserver = null
+    }
+    if (!loadMoreSentinel.value || typeof IntersectionObserver === 'undefined') {
+      return
+    }
+
+    loadMoreObserver = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        void loadMoreGames()
+      }
+    }, {
+      rootMargin: '320px 0px',
+    })
+    loadMoreObserver.observe(loadMoreSentinel.value)
+  }
+
+  watch(loadMoreSentinel, () => {
+    setupLoadMoreObserver()
+  })
 
   // 2026-04-04: keep route.query as the only active-filter source of truth.
   // Impact: the debounced search input remains a local draft, while badges/empty states/pagination
@@ -616,6 +590,7 @@ export const useGamesView = ({
 
     searchQuery.value = readSingleQueryValue(route.query.search) || ''
     await loadGames()
+    setupLoadMoreObserver()
   })
 
   let searchDebounceTimer: number | undefined
@@ -643,6 +618,10 @@ export const useGamesView = ({
   })
 
   onBeforeUnmount(() => {
+    if (loadMoreObserver) {
+      loadMoreObserver.disconnect()
+      loadMoreObserver = null
+    }
     if (searchDebounceTimer) {
       clearTimeout(searchDebounceTimer)
     }
@@ -650,7 +629,6 @@ export const useGamesView = ({
 
   return {
     clearFilters,
-    currentPage,
     addGameSubmitting,
     filterFavorites,
     filterPrivate,
@@ -662,9 +640,8 @@ export const useGamesView = ({
     hasActiveFilters,
     hasLoadFailure,
     isLoading,
+    isLoadingMore,
     isTogglingFavorite,
-    itemsPerPage,
-    itemsPerPageOptions,
     loadGames,
     pageTitle,
     pagination,
@@ -673,7 +650,6 @@ export const useGamesView = ({
     sortBy,
     sortOptions,
     toggleFavorite,
-    totalPages,
     updateRoute,
     viewGame,
     viewSeries,

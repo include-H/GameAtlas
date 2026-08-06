@@ -29,17 +29,30 @@ func (h *MetadataHandler) List(c *gin.Context) {
 		return
 	}
 
-	items, err := h.service.List(h.resource, isAdminRequest(c), options)
+	result, err := h.service.ListPage(h.resource, isAdminRequest(c), options)
 	if err != nil {
 		// 2026-05-09: 统一为中文错误信息
 		writeServiceError(c, err, "无效的元数据请求")
 		return
 	}
 
-	writeJSONSuccess(c, http.StatusOK, toMetadataResponses(items))
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    toMetadataResponses(result.Items),
+		"pagination": gin.H{
+			"page":       result.Page,
+			"limit":      result.Limit,
+			"total":      result.Total,
+			"totalPages": result.TotalPages,
+		},
+	})
 }
 
 func decodeMetadataListOptions(c *gin.Context) (services.MetadataListOptions, bool) {
+	page, ok := parseMetadataListPage(c)
+	if !ok {
+		return services.MetadataListOptions{}, false
+	}
 	limit, ok := parseMetadataListLimit(c)
 	if !ok {
 		return services.MetadataListOptions{}, false
@@ -53,19 +66,42 @@ func decodeMetadataListOptions(c *gin.Context) (services.MetadataListOptions, bo
 		Search: c.Query("search"),
 		Limit:  limit,
 		Sort:   sort,
+		Page:   page,
 	}
 	return options, true
+}
+
+func parseMetadataListPage(c *gin.Context) (int, bool) {
+	raw := c.Query("page")
+	if raw == "" {
+		return 1, true
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		writeJSONError(c, http.StatusBadRequest, "无效的元数据查询参数: page")
+		return 0, false
+	}
+	if value <= 0 {
+		value = 1
+	}
+	return value, true
 }
 
 func parseMetadataListLimit(c *gin.Context) (int, bool) {
 	raw := c.Query("limit")
 	if raw == "" {
-		return 0, true
+		return 24, true
 	}
 	value, err := strconv.Atoi(raw)
 	if err != nil {
 		writeJSONError(c, http.StatusBadRequest, "无效的元数据查询参数: limit")
 		return 0, false
+	}
+	if value <= 0 {
+		value = 24
+	}
+	if value > 100 {
+		value = 100
 	}
 	return value, true
 }
@@ -95,28 +131,62 @@ func (h *MetadataHandler) Get(c *gin.Context) {
 		return
 	}
 
+	page, limit, ok := parseMetadataDetailPagination(c)
+	if !ok {
+		return
+	}
+
 	includeAll := isAdminRequest(c)
 	response := gin.H{"games": []gameListItemResponse{}}
 	switch h.resource.Type {
 	case domain.MetadataSeries:
-		detail, err := h.service.GetSeriesDetail(id, includeAll)
+		detail, err := h.service.GetSeriesDetail(id, includeAll, services.MetadataDetailOptions{
+			Page:  page,
+			Limit: limit,
+		})
 		if err != nil {
 			writeServiceError(c, err, "无效的元数据请求")
 			return
 		}
 		response["series"] = toMetadataResponse(*detail.Series)
 		response["games"] = toMetadataGameSummaryResponses(detail.Games)
+		response["pagination"] = metadataPaginationResponse(detail.Page, detail.Limit, detail.Total, detail.TotalPages)
 	case domain.MetadataPublishers:
-		detail, err := h.service.GetPublisherDetail(id, includeAll)
+		detail, err := h.service.GetPublisherDetail(id, includeAll, services.MetadataDetailOptions{
+			Page:  page,
+			Limit: limit,
+		})
 		if err != nil {
 			writeServiceError(c, err, "无效的元数据请求")
 			return
 		}
 		response["publisher"] = toMetadataResponse(*detail.Publisher)
 		response["games"] = toMetadataGameSummaryResponses(detail.Games)
+		response["pagination"] = metadataPaginationResponse(detail.Page, detail.Limit, detail.Total, detail.TotalPages)
 	}
 
 	writeJSONSuccess(c, http.StatusOK, response)
+}
+
+func parseMetadataDetailPagination(c *gin.Context) (int, int, bool) {
+	page, ok := parseMetadataListPage(c)
+	if !ok {
+		return 0, 0, false
+	}
+	limit, ok := parseMetadataListLimit(c)
+	if !ok {
+		return 0, 0, false
+	}
+	return page, limit, true
+}
+
+func metadataPaginationResponse(page int, limit int, total int, totalPages int) gin.H {
+	return gin.H{
+		"page":       page,
+		"limit":      limit,
+		"total":      total,
+		"totalPages": totalPages,
+	}
 }
 
 func (h *MetadataHandler) Create(c *gin.Context) {

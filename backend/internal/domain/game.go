@@ -113,7 +113,7 @@ type MetadataItem struct {
 	Slug                 string `db:"slug"`
 	SortOrder            int    `db:"sort_order"`
 	CreatedAt            string `db:"created_at"`
-	GameCount            int
+	GameCount            int    `db:"game_count"`
 	CoverImage           *string
 	CoverCandidates      []string
 	BackgroundCandidates []string

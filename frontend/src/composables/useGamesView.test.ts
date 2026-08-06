@@ -6,7 +6,6 @@ import {
   buildGamesRouteQuery,
   hasGamesActiveFilters,
   normalizeGamesFavoriteRouteQuery,
-  normalizeGamesPaginationResponseQuery,
   normalizeGamesPaginationRouteQuery,
   normalizeGamesSortRouteQuery,
   parseGamesSortField,
@@ -39,12 +38,11 @@ describe('useGamesView helpers', () => {
         page: '2',
         search: 'halo',
       },
-      itemsPerPage: 24,
     })
 
     expect(result).toEqual({
       query: {
-        page: 2,
+        page: 1,
         limit: 24,
         search: 'halo',
         favorite: undefined,
@@ -60,12 +58,11 @@ describe('useGamesView helpers', () => {
         sort: 'legacy_default',
         order: 'desc',
       },
-      itemsPerPage: 24,
     })
 
     expect(result).toEqual({
       query: {
-        page: 2,
+        page: 1,
         limit: 24,
         search: 'halo',
         favorite: undefined,
@@ -102,7 +99,6 @@ describe('useGamesView helpers', () => {
     })
 
     expect(result).toEqual({
-      page: '2',
       sort: 'updated_at',
       order: 'desc',
       search: 'halo',
@@ -151,6 +147,18 @@ describe('useGamesView helpers', () => {
     })
   })
 
+  it('drops valid page query so infinite scroll starts from the first page', () => {
+    const result = normalizeGamesPaginationRouteQuery({
+      page: '3',
+      limit: '48',
+      search: 'halo',
+    })
+
+    expect(result).toEqual({
+      search: 'halo',
+    })
+  })
+
   it('adds route seed when random sort is missing one', () => {
     const result = normalizeGamesSortRouteQuery({
       page: '2',
@@ -160,7 +168,6 @@ describe('useGamesView helpers', () => {
     })
 
     expect(result).toMatchObject({
-      page: '2',
       sort: 'random',
       order: 'desc',
       search: 'halo',
@@ -168,7 +175,7 @@ describe('useGamesView helpers', () => {
     expect(Number(result?.seed)).toBeGreaterThan(0)
   })
 
-  it('builds a cleaned route query and resets page for filter changes', () => {
+  it('drops pagination params when building a cleaned route query', () => {
     const result = buildGamesRouteQuery(
       {
         page: '3',
@@ -182,8 +189,6 @@ describe('useGamesView helpers', () => {
     )
 
     expect(result).toEqual({
-      page: '1',
-      limit: '48',
       search: 'halo',
     })
   })
@@ -199,13 +204,12 @@ describe('useGamesView helpers', () => {
         seed: '99',
         favorite: 'true',
       },
-      itemsPerPage: 48,
     })
 
     expect(result).toEqual({
       query: {
-        page: 2,
-        limit: 48,
+        page: 1,
+        limit: 24,
         search: 'halo',
         favorite: true,
       },
@@ -217,19 +221,18 @@ describe('useGamesView helpers', () => {
     })
   })
 
-  it('falls back to the supported default page size when route limit is unsupported', () => {
+  it('ignores route limit and always uses the fixed infinite scroll page size', () => {
     const result = buildGamesListRequest({
       routeQuery: {
         page: '2',
         limit: '13',
         search: 'halo',
       },
-      itemsPerPage: 24,
     })
 
     expect(result).toEqual({
       query: {
-        page: 2,
+        page: 1,
         limit: 24,
         search: 'halo',
         favorite: undefined,
@@ -243,12 +246,11 @@ describe('useGamesView helpers', () => {
         page: '2',
         search: '   ',
       },
-      itemsPerPage: 24,
     })
 
     expect(result).toEqual({
       query: {
-        page: 2,
+        page: 1,
         limit: 24,
         search: undefined,
         favorite: undefined,
@@ -263,13 +265,12 @@ describe('useGamesView helpers', () => {
         page: '2',
         sort: 'random',
       },
-      itemsPerPage: 48,
     })
 
     expect(result).toEqual({
       query: {
-        page: 2,
-        limit: 48,
+        page: 1,
+        limit: 24,
         search: undefined,
         favorite: undefined,
       },
@@ -292,57 +293,17 @@ describe('useGamesView helpers', () => {
     expect(result).toBeNull()
   })
 
-  it('rewrites out-of-range pages to the backend last page', () => {
-    const result = normalizeGamesPaginationResponseQuery(
-      {
-        page: '9',
-        limit: '24',
-        search: 'halo',
-      },
-      {
-        page: 9,
-        limit: 24,
-        totalPages: 3,
-      },
-    )
-
-    expect(result).toEqual({
-      page: '3',
-      limit: '24',
-      search: 'halo',
-    })
-  })
-
-  it('clears stale page query when the result set becomes empty', () => {
-    const result = normalizeGamesPaginationResponseQuery(
-      {
-        page: '3',
-        search: 'halo',
-      },
-      {
-        page: 3,
-        limit: 24,
-        totalPages: 0,
-      },
-    )
-
-    expect(result).toEqual({
-      search: 'halo',
-    })
-  })
-
   it('passes native favorite route semantics through to the backend request', () => {
     const result = buildGamesListRequest({
       routeQuery: {
         page: '2',
         favorite: 'true',
       },
-      itemsPerPage: 24,
     })
 
     expect(result).toEqual({
       query: {
-        page: 2,
+        page: 1,
         limit: 24,
         search: undefined,
         favorite: true,
@@ -356,12 +317,11 @@ describe('useGamesView helpers', () => {
         page: '2',
         favorite: 'false',
       },
-      itemsPerPage: 24,
     })
 
     expect(result).toEqual({
       query: {
-        page: 2,
+        page: 1,
         limit: 24,
         search: undefined,
         favorite: false,
@@ -375,12 +335,11 @@ describe('useGamesView helpers', () => {
         page: '2',
         favorite: 'favorites',
       },
-      itemsPerPage: 24,
     })
 
     expect(result).toEqual({
       query: {
-        page: 2,
+        page: 1,
         limit: 24,
         search: undefined,
         favorite: undefined,

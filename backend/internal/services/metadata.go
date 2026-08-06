@@ -3,10 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
-	"sort"
 	"strings"
-	"sync"
-	"time"
 	"unicode"
 
 	"github.com/hao/game/internal/domain"
@@ -14,13 +11,7 @@ import (
 )
 
 type MetadataService struct {
-	repo      *repositories.MetadataRepository
-	listCache sync.Map // table -> cachedMetadataList
-}
-
-type cachedMetadataList struct {
-	items    []domain.MetadataItem
-	cachedAt time.Time
+	repo *repositories.MetadataRepository
 }
 
 type MetadataResource struct {
@@ -36,16 +27,38 @@ type MetadataListOptions struct {
 	Search string
 	Limit  int
 	Sort   string
+	Page   int
+}
+
+type MetadataListResult struct {
+	Items      []domain.MetadataItem
+	Page       int
+	Limit      int
+	Total      int
+	TotalPages int
 }
 
 type SeriesDetail struct {
-	Series *domain.MetadataItem
-	Games  []domain.MetadataGameSummary
+	Series     *domain.MetadataItem
+	Games      []domain.MetadataGameSummary
+	Page       int
+	Limit      int
+	Total      int
+	TotalPages int
 }
 
 type PublisherDetail struct {
-	Publisher *domain.MetadataItem
-	Games     []domain.MetadataGameSummary
+	Publisher  *domain.MetadataItem
+	Games      []domain.MetadataGameSummary
+	Page       int
+	Limit      int
+	Total      int
+	TotalPages int
+}
+
+type MetadataDetailOptions struct {
+	Page  int
+	Limit int
 }
 
 func NewMetadataService(repo *repositories.MetadataRepository) *MetadataService {
@@ -54,48 +67,38 @@ func NewMetadataService(repo *repositories.MetadataRepository) *MetadataService 
 	}
 }
 
-func (s *MetadataService) invalidateListCache(types ...domain.MetadataType) {
-	for _, typ := range types {
-		s.listCache.Delete(typ)
-	}
-}
+func (s *MetadataService) ListPage(resource MetadataResource, includeAll bool, options MetadataListOptions) (*MetadataListResult, error) {
+	page, limit := normalizeMetadataPagination(options.Page, options.Limit)
+	search := strings.TrimSpace(options.Search)
 
-func (s *MetadataService) List(resource MetadataResource, includeAll bool, options MetadataListOptions) ([]domain.MetadataItem, error) {
-	// Check cache first
-	var items []domain.MetadataItem
-	if cached, ok := s.listCache.Load(resource.Type); ok {
-		entry := cached.(cachedMetadataList)
-		if time.Since(entry.cachedAt) < 60*time.Second {
-			items = make([]domain.MetadataItem, len(entry.items))
-			copy(items, entry.items)
-		}
+	total, err := s.repo.CountMetadata(resource.Type, search, includeAll)
+	if err != nil {
+		return nil, err
 	}
 
-	if items == nil {
-		var err error
-		items, err = s.repo.List(resource.Type)
-		if err != nil {
-			return nil, err
-		}
-		s.listCache.Store(resource.Type, cachedMetadataList{items: items, cachedAt: time.Now()})
+	offset := (page - 1) * limit
+	items, err := s.repo.ListMetadataPage(resource.Type, search, options.Sort, limit, offset, includeAll)
+	if err != nil {
+		return nil, err
 	}
-	if supportsMetadataGameGrouping(resource.Type) {
+	if supportsMetadataGameGrouping(resource.Type) && len(items) > 0 {
 		if err := s.enrichMetadataItems(items, resource.Type, includeAll); err != nil {
 			return nil, err
 		}
-		filtered := make([]domain.MetadataItem, 0, len(items))
-		for index := range items {
-			if includeAll || items[index].GameCount > 0 {
-				filtered = append(filtered, items[index])
-			}
-		}
-		items = filtered
 	}
-	items = filterMetadataItems(items, options)
-	if items == nil {
-		return []domain.MetadataItem{}, nil
+
+	totalPages := 0
+	if total > 0 {
+		totalPages = (total + limit - 1) / limit
 	}
-	return items, nil
+
+	return &MetadataListResult{
+		Items:      items,
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPages: totalPages,
+	}, nil
 }
 
 func (s *MetadataService) Create(resource MetadataResource, input domain.MetadataWriteInput) (*domain.MetadataItem, error) {
@@ -133,51 +136,63 @@ func (s *MetadataService) Create(resource MetadataResource, input domain.Metadat
 		if err != nil {
 			return nil, err
 		}
-		s.invalidateListCache(resource.Type)
 		return result, nil
 	default:
 		return nil, fmt.Errorf("unsupported metadata resource type: %d", resource.Type)
 	}
 }
 
-func (s *MetadataService) GetSeriesDetail(id int64, includeAll bool) (*SeriesDetail, error) {
-	detail, err := s.getMetadataDetail(domain.MetadataSeries, id, includeAll)
+func (s *MetadataService) GetSeriesDetail(id int64, includeAll bool, options MetadataDetailOptions) (*SeriesDetail, error) {
+	detail, err := s.getMetadataDetail(domain.MetadataSeries, id, includeAll, options)
 	if err != nil {
 		return nil, err
 	}
 
 	return &SeriesDetail{
-		Series: detail.Item,
-		Games:  detail.Games,
+		Series:     detail.Item,
+		Games:      detail.Games,
+		Page:       detail.Page,
+		Limit:      detail.Limit,
+		Total:      detail.Total,
+		TotalPages: detail.TotalPages,
 	}, nil
 }
 
-func (s *MetadataService) GetPublisherDetail(id int64, includeAll bool) (*PublisherDetail, error) {
-	detail, err := s.getMetadataDetail(domain.MetadataPublishers, id, includeAll)
+func (s *MetadataService) GetPublisherDetail(id int64, includeAll bool, options MetadataDetailOptions) (*PublisherDetail, error) {
+	detail, err := s.getMetadataDetail(domain.MetadataPublishers, id, includeAll, options)
 	if err != nil {
 		return nil, err
 	}
 
 	return &PublisherDetail{
-		Publisher: detail.Item,
-		Games:     detail.Games,
+		Publisher:  detail.Item,
+		Games:      detail.Games,
+		Page:       detail.Page,
+		Limit:      detail.Limit,
+		Total:      detail.Total,
+		TotalPages: detail.TotalPages,
 	}, nil
 }
 
 type metadataDetail struct {
-	Item  *domain.MetadataItem
-	Games []domain.MetadataGameSummary
+	Item       *domain.MetadataItem
+	Games      []domain.MetadataGameSummary
+	Page       int
+	Limit      int
+	Total      int
+	TotalPages int
 }
 
 func supportsMetadataGameGrouping(typ domain.MetadataType) bool {
 	return typ == domain.MetadataSeries || typ == domain.MetadataPublishers
 }
 
-func (s *MetadataService) getMetadataDetail(typ domain.MetadataType, id int64, includeAll bool) (*metadataDetail, error) {
+func (s *MetadataService) getMetadataDetail(typ domain.MetadataType, id int64, includeAll bool, options MetadataDetailOptions) (*metadataDetail, error) {
 	if !supportsMetadataGameGrouping(typ) {
 		return nil, fmt.Errorf("unsupported metadata detail type: %d", typ)
 	}
 
+	page, limit := normalizeMetadataPagination(options.Page, options.Limit)
 	item, err := s.repo.Get(typ, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -193,12 +208,43 @@ func (s *MetadataService) getMetadataDetail(typ domain.MetadataType, id int64, i
 		return nil, domain.ErrNotFound
 	}
 
-	games, err := s.repo.ListMetadataGames(typ, id, includeAll)
+	total, err := s.repo.CountMetadataGames(typ, id, includeAll)
 	if err != nil {
 		return nil, err
 	}
 
-	return &metadataDetail{Item: item, Games: games}, nil
+	offset := (page - 1) * limit
+	games, err := s.repo.ListMetadataGamesPage(typ, id, includeAll, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	totalPages := 0
+	if total > 0 {
+		totalPages = (total + limit - 1) / limit
+	}
+
+	return &metadataDetail{
+		Item:       item,
+		Games:      games,
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPages: totalPages,
+	}, nil
+}
+
+func normalizeMetadataPagination(page int, limit int) (int, int) {
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 24
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	return page, limit
 }
 
 func slugify(value string) string {
@@ -217,40 +263,6 @@ func slugify(value string) string {
 	}
 
 	return strings.Trim(builder.String(), "-")
-}
-
-func filterMetadataItems(items []domain.MetadataItem, options MetadataListOptions) []domain.MetadataItem {
-	search := strings.ToLower(strings.TrimSpace(options.Search))
-	if search != "" {
-		filtered := make([]domain.MetadataItem, 0, len(items))
-		for _, item := range items {
-			if strings.Contains(strings.ToLower(item.Name), search) {
-				filtered = append(filtered, item)
-			}
-		}
-		items = filtered
-	}
-
-	sortKey := strings.TrimSpace(strings.ToLower(options.Sort))
-	switch sortKey {
-	case "popular":
-		sort.SliceStable(items, func(i, j int) bool {
-			if items[i].GameCount != items[j].GameCount {
-				return items[i].GameCount > items[j].GameCount
-			}
-			return strings.Compare(items[i].Name, items[j].Name) < 0
-		})
-	default:
-		sort.SliceStable(items, func(i, j int) bool {
-			return strings.Compare(items[i].Name, items[j].Name) < 0
-		})
-	}
-
-	if options.Limit > 0 && len(items) > options.Limit {
-		items = items[:options.Limit]
-	}
-
-	return items
 }
 
 func (s *MetadataService) enrichMetadataItem(item *domain.MetadataItem, typ domain.MetadataType, includeAll bool) error {

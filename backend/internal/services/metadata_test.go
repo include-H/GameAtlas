@@ -28,47 +28,6 @@ func TestSlugify(t *testing.T) {
 	}
 }
 
-func TestFilterMetadataItems(t *testing.T) {
-	items := []domain.MetadataItem{
-		{ID: 1, Name: "Zelda", GameCount: 2},
-		{ID: 2, Name: "Mario", GameCount: 5},
-		{ID: 3, Name: "Metroid", GameCount: 3},
-	}
-
-	got := filterMetadataItems(items, MetadataListOptions{
-		Search: "m",
-		Sort:   "popular",
-		Limit:  2,
-	})
-
-	if len(got) != 2 {
-		t.Fatalf("len(filtered) = %d, want 2", len(got))
-	}
-	if got[0].Name != "Mario" || got[1].Name != "Metroid" {
-		t.Fatalf("filtered order = [%s, %s], want [Mario, Metroid]", got[0].Name, got[1].Name)
-	}
-}
-
-func TestFilterMetadataItemsForSimpleResources(t *testing.T) {
-	items := []domain.MetadataItem{
-		{ID: 1, Name: "Switch"},
-		{ID: 2, Name: "PC-98"},
-		{ID: 3, Name: "PC"},
-	}
-
-	got := filterMetadataItems(items, MetadataListOptions{
-		Search: "pc",
-		Limit:  1,
-	})
-
-	if len(got) != 1 {
-		t.Fatalf("len(filtered) = %d, want 1", len(got))
-	}
-	if got[0].Name != "PC" {
-		t.Fatalf("filtered[0].Name = %q, want PC", got[0].Name)
-	}
-}
-
 func TestApplyMetadataItemGamesPicksDistinctCoverCandidates(t *testing.T) {
 	item := &domain.MetadataItem{}
 	cover := "/assets/cover-a.jpg"
@@ -152,14 +111,15 @@ func TestMetadataServiceListPublishersEnrichesImagesAndRespectsVisibility(t *tes
 	}
 
 	service := NewMetadataService(repositories.NewMetadataRepository(db))
-	publicItems, err := service.List(
+	publicPage, err := service.ListPage(
 		MetadataResource{Type: domain.MetadataPublishers},
 		false,
-		MetadataListOptions{Sort: "name"},
+		MetadataListOptions{Page: 1, Limit: 100, Sort: "name"},
 	)
 	if err != nil {
-		t.Fatalf("List public publishers returned error: %v", err)
+		t.Fatalf("ListPage public publishers returned error: %v", err)
 	}
+	publicItems := publicPage.Items
 	if len(publicItems) != 1 || publicItems[0].ID != publisherID {
 		t.Fatalf("public publishers = %+v, want Atlus only", publicItems)
 	}
@@ -167,16 +127,88 @@ func TestMetadataServiceListPublishersEnrichesImagesAndRespectsVisibility(t *tes
 		t.Fatalf("public publisher enrichment = %+v, want one game and cover", publicItems[0])
 	}
 
-	allItems, err := service.List(
+	allPage, err := service.ListPage(
 		MetadataResource{Type: domain.MetadataPublishers},
 		true,
-		MetadataListOptions{Sort: "name"},
+		MetadataListOptions{Page: 1, Limit: 100, Sort: "name"},
 	)
 	if err != nil {
-		t.Fatalf("List all publishers returned error: %v", err)
+		t.Fatalf("ListPage all publishers returned error: %v", err)
 	}
+	allItems := allPage.Items
 	if len(allItems) != 2 || allItems[0].GameCount != 2 {
 		t.Fatalf("all publishers = %+v, want Atlus with two games and unused row", allItems)
+	}
+}
+
+func TestMetadataServiceListPagePaginatesSeriesAndDetailGames(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	insertSeries := func(name string, slug string) int64 {
+		t.Helper()
+		result, err := db.Exec(`INSERT INTO series (name, slug, sort_order) VALUES (?, ?, 0)`, name, slug)
+		if err != nil {
+			t.Fatalf("insert series %s: %v", name, err)
+		}
+		id, err := result.LastInsertId()
+		if err != nil {
+			t.Fatalf("LastInsertId for %s: %v", name, err)
+		}
+		return id
+	}
+
+	seriesAID := insertSeries("Alpha", "alpha")
+	seriesBID := insertSeries("Beta", "beta")
+	insertSeries("Gamma", "gamma")
+
+	gameAOne := insertServicesTestGame(t, db, "alpha-one", "Alpha One", domain.GameVisibilityPublic)
+	gameATwo := insertServicesTestGame(t, db, "alpha-two", "Alpha Two", domain.GameVisibilityPublic)
+	gameBeta := insertServicesTestGame(t, db, "beta-one", "Beta One", domain.GameVisibilityPublic)
+	gamePrivate := insertServicesTestGame(t, db, "alpha-private", "Alpha Private", domain.GameVisibilityPrivate)
+	for _, gameID := range []int64{gameAOne, gameATwo, gamePrivate} {
+		if _, err := db.Exec(`UPDATE games SET series_id = ? WHERE id = ?`, seriesAID, gameID); err != nil {
+			t.Fatalf("attach game to Alpha: %v", err)
+		}
+	}
+	if _, err := db.Exec(`UPDATE games SET series_id = ? WHERE id = ?`, seriesBID, gameBeta); err != nil {
+		t.Fatalf("attach game to Beta: %v", err)
+	}
+
+	service := NewMetadataService(repositories.NewMetadataRepository(db))
+	firstPage, err := service.ListPage(
+		MetadataResource{Type: domain.MetadataSeries},
+		false,
+		MetadataListOptions{Page: 1, Limit: 2, Sort: "name"},
+	)
+	if err != nil {
+		t.Fatalf("ListPage returned error: %v", err)
+	}
+	if firstPage.Total != 2 || firstPage.TotalPages != 1 || len(firstPage.Items) != 2 {
+		t.Fatalf("ListPage first page = total %d, pages %d, items %d, want 2, 1, 2", firstPage.Total, firstPage.TotalPages, len(firstPage.Items))
+	}
+	if firstPage.Items[0].Name != "Alpha" || firstPage.Items[0].GameCount != 2 {
+		t.Fatalf("ListPage first item = %+v, want Alpha with 2 public games", firstPage.Items[0])
+	}
+
+	secondPage, err := service.ListPage(
+		MetadataResource{Type: domain.MetadataSeries},
+		true,
+		MetadataListOptions{Page: 2, Limit: 2, Sort: "name"},
+	)
+	if err != nil {
+		t.Fatalf("ListPage admin second page returned error: %v", err)
+	}
+	if secondPage.Total != 3 || secondPage.TotalPages != 2 || len(secondPage.Items) != 1 || secondPage.Items[0].Name != "Gamma" {
+		t.Fatalf("ListPage admin second page = %+v, want Gamma only", secondPage)
+	}
+
+	detail, err := service.GetSeriesDetail(seriesAID, false, MetadataDetailOptions{Page: 1, Limit: 1})
+	if err != nil {
+		t.Fatalf("GetSeriesDetail returned error: %v", err)
+	}
+	if detail.Total != 2 || detail.TotalPages != 2 || len(detail.Games) != 1 {
+		t.Fatalf("GetSeriesDetail = total %d, pages %d, games %d, want 2, 2, 1", detail.Total, detail.TotalPages, len(detail.Games))
 	}
 }
 
@@ -187,17 +219,17 @@ func TestMetadataServiceListSeriesReturnsEnrichmentErrorInsteadOfSilentEmptyStat
 	if _, err := db.Exec(`INSERT INTO series (name, slug, sort_order) VALUES ('Broken Series', 'broken-series', 0)`); err != nil {
 		t.Fatalf("insert series: %v", err)
 	}
-	if _, err := db.Exec(`DROP TABLE games`); err != nil {
-		t.Fatalf("drop games table: %v", err)
+	if _, err := db.Exec(`DROP TABLE game_assets`); err != nil {
+		t.Fatalf("drop game_assets table: %v", err)
 	}
 
 	service := NewMetadataService(repositories.NewMetadataRepository(db))
-	_, err := service.List(MetadataResource{Type: domain.MetadataSeries}, true, MetadataListOptions{})
+	_, err := service.ListPage(MetadataResource{Type: domain.MetadataSeries}, true, MetadataListOptions{Page: 1, Limit: 24})
 	if err == nil {
-		t.Fatal("List returned nil error, want enrichment failure")
+		t.Fatal("ListPage returned nil error, want enrichment failure")
 	}
 	if !strings.Contains(err.Error(), "list series games by ids") {
-		t.Fatalf("List error = %v, want series enrichment context", err)
+		t.Fatalf("ListPage error = %v, want series enrichment context", err)
 	}
 }
 
@@ -255,7 +287,7 @@ func TestMetadataServiceCreateSeriesReturnsExistingBySlugWhenNameDiffers(t *test
 	}
 }
 
-func TestMetadataServiceCleanupUnusedGameMetadataInvalidatesSeriesListCache(t *testing.T) {
+func TestMetadataServiceCleanupUnusedGameMetadataRefreshesSeriesList(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()
 
@@ -275,24 +307,24 @@ func TestMetadataServiceCleanupUnusedGameMetadataInvalidatesSeriesListCache(t *t
 	}
 
 	service := NewMetadataService(repositories.NewMetadataRepository(db))
-	cached, err := service.List(MetadataResource{Type: domain.MetadataSeries}, true, MetadataListOptions{Sort: "name"})
+	before, err := service.ListPage(MetadataResource{Type: domain.MetadataSeries}, true, MetadataListOptions{Page: 1, Limit: 100, Sort: "name"})
 	if err != nil {
-		t.Fatalf("List returned error: %v", err)
+		t.Fatalf("ListPage before cleanup returned error: %v", err)
 	}
-	if len(cached) != 2 {
-		t.Fatalf("cached series = %+v, want both admin-visible rows before cleanup", cached)
+	if len(before.Items) != 2 {
+		t.Fatalf("series before cleanup = %+v, want both admin-visible rows", before.Items)
 	}
 
 	if err := service.CleanupUnusedGameMetadata(); err != nil {
 		t.Fatalf("CleanupUnusedGameMetadata returned error: %v", err)
 	}
 
-	refreshed, err := service.List(MetadataResource{Type: domain.MetadataSeries}, true, MetadataListOptions{Sort: "name"})
+	refreshed, err := service.ListPage(MetadataResource{Type: domain.MetadataSeries}, true, MetadataListOptions{Page: 1, Limit: 100, Sort: "name"})
 	if err != nil {
-		t.Fatalf("List after cleanup returned error: %v", err)
+		t.Fatalf("ListPage after cleanup returned error: %v", err)
 	}
-	if len(refreshed) != 1 || refreshed[0].ID != keepSeriesID {
-		t.Fatalf("refreshed series = %+v, want only keep series after cache invalidation", refreshed)
+	if len(refreshed.Items) != 1 || refreshed.Items[0].ID != keepSeriesID {
+		t.Fatalf("refreshed series = %+v, want only keep series after cleanup", refreshed.Items)
 	}
 }
 
@@ -410,7 +442,7 @@ func TestMetadataServiceGetSeriesDetailReturnsEnrichmentErrorInsteadOfSilentEmpt
 	}
 
 	service := NewMetadataService(repositories.NewMetadataRepository(db))
-	_, err = service.GetSeriesDetail(seriesID, true)
+	_, err = service.GetSeriesDetail(seriesID, true, MetadataDetailOptions{})
 	if err == nil {
 		t.Fatal("GetSeriesDetail returned nil error, want enrichment failure")
 	}

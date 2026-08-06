@@ -12,13 +12,13 @@
             class="app-input-action-row__field"
             placeholder="搜索系列"
             allow-clear
-            @press-enter="loadSeries"
+            @press-enter="handleSearchSubmit"
           >
             <template #prefix>
               <icon-search />
             </template>
           </a-input>
-          <a-button class="app-text-action-btn app-input-action-row__action" type="text" @click="loadSeries">
+          <a-button class="app-text-action-btn app-input-action-row__action" type="text" @click="handleSearchSubmit">
             搜索
           </a-button>
         </div>
@@ -33,58 +33,67 @@
     <template v-else>
       <a-empty v-if="hasLoadFailure" description="系列列表加载失败，请稍后重试。" />
 
-      <div class="series-library__meta">
-        共 {{ seriesCards.length }} 个系列
-      </div>
-
-      <div v-if="!hasLoadFailure && seriesCards.length > 0" class="series-library__grid">
-        <div
-          v-for="series in seriesCards"
-          :key="series.id"
-          class="series-card hover-lift app-glass-surface app-glass-surface--interactive"
-          role="button"
-          tabindex="0"
-          @click="openSeries(series.id)"
-          @keydown.enter="openSeries(series.id)"
-          @keydown.space.prevent="openSeries(series.id)"
-        >
-          <div class="series-card__cover">
-            <div
-              v-if="(series.game_count || 0) >= 4 && series.cover_candidates && series.cover_candidates.length >= 4"
-              class="series-card__collage"
-            >
+      <template v-if="!hasLoadFailure && seriesCards.length > 0">
+        <div class="series-library__grid">
+          <div
+            v-for="series in seriesCards"
+            :key="series.id"
+            class="series-card hover-lift app-glass-surface app-glass-surface--interactive"
+            role="button"
+            tabindex="0"
+            @click="openSeries(series.id)"
+            @keydown.enter="openSeries(series.id)"
+            @keydown.space.prevent="openSeries(series.id)"
+          >
+            <div class="series-card__cover">
               <div
-                v-for="(cover, index) in series.cover_candidates.slice(0, 4)"
-                :key="`${series.id}-${index}`"
-                class="series-card__collage-tile"
+                v-if="(series.game_count || 0) >= 4 && series.cover_candidates && series.cover_candidates.length >= 4"
+                class="series-card__collage"
               >
-                <img
-                  :src="cover"
-                  :alt="`${series.name}-${index + 1}`"
-                  class="series-card__collage-image"
-                />
+                <div
+                  v-for="(cover, index) in series.cover_candidates.slice(0, 4)"
+                  :key="`${series.id}-${index}`"
+                  class="series-card__collage-tile"
+                >
+                  <img
+                    :src="cover"
+                    :alt="`${series.name}-${index + 1}`"
+                    class="series-card__collage-image"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
               </div>
+              <img
+                v-else-if="series.cover_image"
+                :src="series.cover_image"
+                :alt="series.name"
+                class="series-card__image"
+                loading="lazy"
+                decoding="async"
+              />
+              <div v-else class="series-card__placeholder">
+                {{ series.name.charAt(0) || '?' }}
+              </div>
+              <div class="series-card__overlay" />
             </div>
-            <img
-              v-else-if="series.cover_image"
-              :src="series.cover_image"
-              :alt="series.name"
-              class="series-card__image"
-            />
-            <div v-else class="series-card__placeholder">
-              {{ series.name.charAt(0) || '?' }}
-            </div>
-            <div class="series-card__overlay" />
-          </div>
-          <div class="series-card__body">
-            <div class="series-card__title">{{ series.name }}</div>
-            <div class="series-card__meta-row">
-              <span>{{ series.game_count }} 部作品</span>
-              <span v-if="series.latest_updated_at">{{ formatDate(series.latest_updated_at) }}</span>
+            <div class="series-card__body">
+              <div class="series-card__title">{{ series.name }}</div>
+              <div class="series-card__meta-row">
+                <span>{{ series.game_count }} 部作品</span>
+                <span v-if="series.latest_updated_at">{{ formatDate(series.latest_updated_at) }}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+
+        <div
+          ref="loadMoreSentinel"
+          class="series-library__infinite-scroll"
+        >
+          <a-spin v-if="isLoadingMore" :size="20" />
+        </div>
+      </template>
 
       <a-empty v-else description="暂无系列数据" />
     </template>
@@ -92,17 +101,20 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import { IconSearch } from '@arco-design/web-vue/es/icon'
 import { useRouter } from 'vue-router'
 import { seriesService } from '@/services/series.service'
 import type { Series } from '@/services/types'
 import { formatDisplayDate } from '@/utils/date'
 import { useUiStore } from '@/stores/ui'
+import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 
 defineOptions({
   name: 'SeriesLibraryView',
 })
+
+const SERIES_PAGE_SIZE = 24
 
 interface SeriesCardItem extends Series {
   game_count: number
@@ -114,60 +126,51 @@ interface SeriesCardItem extends Series {
 
 const router = useRouter()
 const uiStore = useUiStore()
-const isLoading = ref(false)
-const hasLoadFailure = ref(false)
 const searchQuery = ref('')
-const seriesCards = ref<SeriesCardItem[]>([])
-let searchTimer: ReturnType<typeof setTimeout> | null = null
+const loadMoreSentinel = ref<HTMLElement | null>(null)
 
-const loadSeries = async () => {
-  isLoading.value = true
-  hasLoadFailure.value = false
-  try {
-    const allSeries = await seriesService.getAllSeries({
-      search: searchQuery.value.trim() || undefined,
+const {
+  items: seriesCards,
+  isLoading,
+  isLoadingMore,
+  hasLoadFailure,
+  loadFirstPage,
+} = useInfiniteScroll<SeriesCardItem>({
+  pageSize: SERIES_PAGE_SIZE,
+  sentinel: loadMoreSentinel,
+  searchQuery,
+  loadPage: async (params) => {
+    const response = await seriesService.getSeriesPage({
+      ...params,
       sort: 'name',
     })
-    seriesCards.value = allSeries
-      .map((item) => ({
+    return {
+      data: response.data as SeriesCardItem[],
+      pagination: response.pagination,
+    }
+  },
+  normalizeItems: (items) => items.map((item): SeriesCardItem => ({
         ...item,
         game_count: item.game_count || 0,
         cover_image: item.cover_image ?? null,
         cover_candidates: (item.cover_candidates || []).filter((value) => value.trim().length > 0).slice(0, 4),
         latest_updated_at: item.latest_updated_at ?? null,
-      }))
-  } catch {
-    hasLoadFailure.value = true
-    seriesCards.value = []
-    uiStore.addAlert('加载系列列表失败', 'error')
-  } finally {
-    isLoading.value = false
-  }
-}
+      })),
+  onError: (message) => uiStore.addAlert(message === '加载失败' ? '加载系列列表失败' : '加载更多系列失败', 'error'),
+})
 
 const openSeries = (id: number) => {
   router.push({ name: 'series-detail', params: { id: String(id) } })
 }
 
+const handleSearchSubmit = () => {
+  void loadFirstPage()
+}
+
 const formatDate = (value: string) => formatDisplayDate(value)
 
 onMounted(() => {
-  loadSeries()
-})
-
-watch(searchQuery, () => {
-  if (searchTimer) {
-    clearTimeout(searchTimer)
-  }
-  searchTimer = setTimeout(() => {
-    loadSeries()
-  }, 250)
-})
-
-onBeforeUnmount(() => {
-  if (searchTimer) {
-    clearTimeout(searchTimer)
-  }
+  void loadFirstPage()
 })
 </script>
 
@@ -202,12 +205,6 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
 }
 
-.series-library__meta {
-  margin-bottom: 10px;
-  color: var(--color-text-3);
-  font-size: 14px;
-}
-
 .series-library__loading {
   padding: 64px 0;
   display: flex;
@@ -222,6 +219,14 @@ onBeforeUnmount(() => {
   gap: 16px;
 }
 
+.series-library__infinite-scroll {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin-top: 24px;
+}
+
 .series-card {
   position: relative;
   padding: 0;
@@ -232,6 +237,8 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
   transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
   text-align: left;
 }

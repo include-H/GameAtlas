@@ -1,5 +1,5 @@
 import { get, post } from './api'
-import type { ApiEnvelope, GameListItem, GameListItemDto, Publisher, PublisherDetail } from './types'
+import type { ApiEnvelope, ApiPageEnvelope, GameListItem, GameListItemDto, MetadataPagination, Publisher, PublisherDetail } from './types'
 
 interface ListPublishersOptions {
   query?: string
@@ -12,21 +12,37 @@ async function listPublishersWithParams(options: ListPublishersOptions = {}): Pr
   if (options.query?.trim()) queryParams.append('search', options.query.trim())
   if (options.limit) queryParams.append('limit', String(options.limit))
   if (options.sort) queryParams.append('sort', options.sort)
-  const response = await get<ApiEnvelope<Publisher[]>>('/publishers', { params: queryParams })
+  const response = await get<ApiPageEnvelope<Publisher>>('/publishers', { params: queryParams })
   return response.data
 }
 
 export const publishersService = {
   async listPublishers(options: ListPublishersOptions = {}): Promise<Publisher[]> {
-    return listPublishersWithParams(options)
+    return listPublishersWithParams({ ...options, limit: options.limit ?? 100 })
   },
 
-  async getAllPublishers(options: ListPublishersOptions = {}): Promise<Publisher[]> {
-    return listPublishersWithParams(options)
+  async getPublishersPage(params: {
+    page: number
+    limit: number
+    search?: string
+    sort?: 'name' | 'popular'
+  }): Promise<ApiPageEnvelope<Publisher>> {
+    const queryParams = new URLSearchParams({
+      page: String(params.page),
+      limit: String(params.limit),
+    })
+    if (params.search?.trim()) queryParams.append('search', params.search.trim())
+    if (params.sort) queryParams.append('sort', params.sort)
+    return get<ApiPageEnvelope<Publisher>>('/publishers', { params: queryParams })
   },
 
-  async getPublisherDetail(id: number | string): Promise<PublisherDetail> {
-    const response = await get<ApiEnvelope<{ publisher: Publisher; games: GameListItemDto[] }>>(`/publishers/${id}`)
+  async getPublisherDetail(id: number | string, options?: { page?: number; limit?: number }): Promise<PublisherDetail> {
+    const queryParams = new URLSearchParams()
+    if (options?.page) queryParams.append('page', String(options.page))
+    if (options?.limit) queryParams.append('limit', String(options.limit))
+    const response = await get<ApiEnvelope<{ publisher: Publisher; games: GameListItemDto[]; pagination: MetadataPagination }>>(`/publishers/${id}`, {
+      params: queryParams,
+    })
     return {
       publisher: response.data.publisher,
       games: response.data.games.map((item): GameListItem => {
@@ -36,6 +52,7 @@ export const publishersService = {
           isFavorite: is_favorite,
         }
       }),
+      pagination: response.data.pagination,
     }
   },
 

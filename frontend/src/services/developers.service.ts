@@ -1,5 +1,5 @@
 import { get, post } from './api'
-import type { ApiEnvelope, Developer } from './types'
+import type { ApiEnvelope, ApiPageEnvelope, Developer } from './types'
 
 interface ListDevelopersOptions {
   query?: string
@@ -11,7 +11,8 @@ export const developersService = {
     const queryParams = new URLSearchParams()
     if (options.query?.trim()) queryParams.append('search', options.query.trim())
     if (options.limit) queryParams.append('limit', String(options.limit))
-    const response = await get<ApiEnvelope<Developer[]>>('/developers', { params: queryParams })
+    else queryParams.append('limit', '100')
+    const response = await get<ApiPageEnvelope<Developer>>('/developers', { params: queryParams })
     return response.data
   },
 

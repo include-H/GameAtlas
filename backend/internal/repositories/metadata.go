@@ -49,6 +49,38 @@ func metadataJoinColumn(typ domain.MetadataType) string {
 	}
 }
 
+func metadataCountGamesExpression(typ domain.MetadataType, includeAll bool) string {
+	if includeAll {
+		switch typ {
+		case domain.MetadataSeries:
+			return "(SELECT COUNT(*) FROM games g WHERE g.series_id = m.id)"
+		case domain.MetadataPublishers:
+			return "(SELECT COUNT(*) FROM game_publishers gp INNER JOIN games g ON g.id = gp.game_id WHERE gp.publisher_id = m.id)"
+		}
+		return "0"
+	}
+
+	switch typ {
+	case domain.MetadataSeries:
+		return "(SELECT COUNT(*) FROM games g WHERE g.series_id = m.id AND g.visibility = :visibility)"
+	case domain.MetadataPublishers:
+		return "(SELECT COUNT(*) FROM game_publishers gp INNER JOIN games g ON g.id = gp.game_id WHERE gp.publisher_id = m.id AND g.visibility = :visibility)"
+	default:
+		return "0"
+	}
+}
+
+func metadataPublicVisibilityExpression(typ domain.MetadataType) string {
+	switch typ {
+	case domain.MetadataSeries:
+		return "EXISTS (SELECT 1 FROM games g WHERE g.series_id = m.id AND g.visibility = :visibility)"
+	case domain.MetadataPublishers:
+		return "EXISTS (SELECT 1 FROM game_publishers gp INNER JOIN games g ON g.id = gp.game_id WHERE gp.publisher_id = m.id AND g.visibility = :visibility)"
+	default:
+		return ""
+	}
+}
+
 type MetadataRepository struct {
 	db *sqlx.DB
 }
@@ -57,19 +89,102 @@ func NewMetadataRepository(db *sqlx.DB) *MetadataRepository {
 	return &MetadataRepository{db: db}
 }
 
-func (r *MetadataRepository) List(typ domain.MetadataType) ([]domain.MetadataItem, error) {
+func (r *MetadataRepository) CountMetadata(typ domain.MetadataType, search string, includeAll bool) (int, error) {
 	table := metadataTableName(typ)
-	query := fmt.Sprintf(`
-		SELECT id, name, slug, sort_order, created_at
-		FROM %s
-		ORDER BY sort_order ASC, id ASC
-	`, table)
-
-	var items []domain.MetadataItem
-	if err := r.db.Select(&items, query); err != nil {
-		return nil, fmt.Errorf("list metadata from %s: %w", table, err)
+	if table == "" {
+		return 0, fmt.Errorf("unsupported metadata resource type: %d", typ)
 	}
 
+	where := []string{"1 = 1"}
+	args := map[string]any{}
+	if search != "" {
+		where = append(where, "INSTR(LOWER(m.name), LOWER(:search)) > 0")
+		args["search"] = search
+	}
+	if !includeAll {
+		if visibilityWhere := metadataPublicVisibilityExpression(typ); visibilityWhere != "" {
+			where = append(where, visibilityWhere)
+			args["visibility"] = domain.GameVisibilityPublic
+		}
+	}
+
+	query := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM %s m
+		WHERE %s
+	`, table, strings.Join(where, " AND "))
+
+	stmt, boundArgs, err := sqlx.Named(query, args)
+	if err != nil {
+		return 0, fmt.Errorf("build metadata count from %s: %w", table, err)
+	}
+	stmt = r.db.Rebind(stmt)
+
+	var total int
+	if err := r.db.Get(&total, stmt, boundArgs...); err != nil {
+		return 0, fmt.Errorf("count metadata from %s: %w", table, err)
+	}
+	return total, nil
+}
+
+func (r *MetadataRepository) ListMetadataPage(
+	typ domain.MetadataType,
+	search string,
+	sort string,
+	limit int,
+	offset int,
+	includeAll bool,
+) ([]domain.MetadataItem, error) {
+	table := metadataTableName(typ)
+	if table == "" {
+		return nil, fmt.Errorf("unsupported metadata resource type: %d", typ)
+	}
+
+	args := map[string]any{
+		"limit":  limit,
+		"offset": offset,
+	}
+	where := []string{"1 = 1"}
+	if search != "" {
+		where = append(where, "INSTR(LOWER(m.name), LOWER(:search)) > 0")
+		args["search"] = search
+	}
+	if !includeAll {
+		if visibilityWhere := metadataPublicVisibilityExpression(typ); visibilityWhere != "" {
+			where = append(where, visibilityWhere)
+			args["visibility"] = domain.GameVisibilityPublic
+		}
+	}
+
+	orderBy := "m.name COLLATE NOCASE ASC, m.id ASC"
+	if strings.TrimSpace(strings.ToLower(sort)) == "popular" {
+		orderBy = "game_count DESC, m.name COLLATE NOCASE ASC, m.id ASC"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			m.id,
+			m.name,
+			m.slug,
+			m.sort_order,
+			m.created_at,
+			%s AS game_count
+		FROM %s m
+		WHERE %s
+		ORDER BY %s
+		LIMIT :limit OFFSET :offset
+	`, metadataCountGamesExpression(typ, includeAll), table, strings.Join(where, " AND "), orderBy)
+
+	stmt, boundArgs, err := sqlx.Named(query, args)
+	if err != nil {
+		return nil, fmt.Errorf("build metadata page from %s: %w", table, err)
+	}
+	stmt = r.db.Rebind(stmt)
+
+	var items []domain.MetadataItem
+	if err := r.db.Select(&items, stmt, boundArgs...); err != nil {
+		return nil, fmt.Errorf("list metadata page from %s: %w", table, err)
+	}
 	return items, nil
 }
 
@@ -253,6 +368,71 @@ func (r *MetadataRepository) ListMetadataGames(typ domain.MetadataType, metadata
 	return games, nil
 }
 
+func (r *MetadataRepository) CountMetadataGames(typ domain.MetadataType, metadataID int64, includeAll bool) (int, error) {
+	relation, ok := metadataGamesRelationFor(typ)
+	if !ok {
+		return 0, fmt.Errorf("unsupported metadata games type: %d", typ)
+	}
+
+	where := []string{relation.groupColumn + " = ?"}
+	args := []any{metadataID}
+	if !includeAll {
+		where = append(where, "g.visibility = ?")
+		args = append(args, domain.GameVisibilityPublic)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM games g
+		%s
+		WHERE %s
+	`, relation.join, strings.Join(where, " AND "))
+
+	var total int
+	if err := r.db.Get(&total, query, args...); err != nil {
+		return 0, fmt.Errorf("count %s games: %w", relation.name, err)
+	}
+	return total, nil
+}
+
+func (r *MetadataRepository) ListMetadataGamesPage(
+	typ domain.MetadataType,
+	metadataID int64,
+	includeAll bool,
+	limit int,
+	offset int,
+) ([]domain.MetadataGameSummary, error) {
+	relation, ok := metadataGamesRelationFor(typ)
+	if !ok {
+		return nil, fmt.Errorf("unsupported metadata games type: %d", typ)
+	}
+
+	where := []string{relation.groupColumn + " = ?"}
+	args := []any{metadataID}
+	if !includeAll {
+		where = append(where, "g.visibility = ?")
+		args = append(args, domain.GameVisibilityPublic)
+	}
+	args = append(args, limit, offset)
+
+	query := fmt.Sprintf(`
+		SELECT %s
+		FROM games g
+		LEFT JOIN series s ON s.id = g.series_id
+		%s
+		WHERE %s
+		ORDER BY g.updated_at DESC, g.id DESC
+		LIMIT ? OFFSET ?
+	`, metadataGameSummarySelect(), relation.join, strings.Join(where, " AND "))
+
+	var games []domain.MetadataGameSummary
+	if err := r.db.Select(&games, query, args...); err != nil {
+		return nil, fmt.Errorf("list %s games page: %w", relation.name, err)
+	}
+
+	return games, nil
+}
+
 func (r *MetadataRepository) ListMetadataGamesByIDs(typ domain.MetadataType, metadataIDs []int64, includeAll bool) (map[int64][]domain.MetadataGameSummary, error) {
 	relation, ok := metadataGamesRelationFor(typ)
 	if !ok {
@@ -305,14 +485,6 @@ func (r *MetadataRepository) ListMetadataGamesByIDs(typ domain.MetadataType, met
 	}
 
 	return gamesByMetadataID, nil
-}
-
-func (r *MetadataRepository) ListSeriesGames(seriesID int64, includeAll bool) ([]domain.MetadataGameSummary, error) {
-	return r.ListMetadataGames(domain.MetadataSeries, seriesID, includeAll)
-}
-
-func (r *MetadataRepository) ListSeriesGamesBySeriesIDs(seriesIDs []int64, includeAll bool) (map[int64][]domain.MetadataGameSummary, error) {
-	return r.ListMetadataGamesByIDs(domain.MetadataSeries, seriesIDs, includeAll)
 }
 
 func (r *MetadataRepository) DeleteUnusedSeries() error {

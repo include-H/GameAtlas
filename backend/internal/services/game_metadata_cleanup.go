@@ -27,6 +27,5 @@ func (s *MetadataService) CleanupUnusedGameMetadata() error {
 		}
 	}
 
-	s.invalidateListCache(domain.MetadataSeries, domain.MetadataDevelopers, domain.MetadataPublishers)
 	return nil
 }

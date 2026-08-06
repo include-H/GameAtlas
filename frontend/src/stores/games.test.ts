@@ -2,13 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import type { GameDetail, GameListItem, GameStats } from '@/services/types'
 
-const { getStatsMock, setFavoriteMock } = vi.hoisted(() => ({
+const { getGamesMock, getStatsMock, setFavoriteMock } = vi.hoisted(() => ({
+  getGamesMock: vi.fn(),
   getStatsMock: vi.fn(),
   setFavoriteMock: vi.fn(),
 }))
 
 vi.mock('@/services/games.service', () => ({
   default: {
+    getGames: getGamesMock,
     getStats: getStatsMock,
     setFavorite: setFavoriteMock,
   },
@@ -22,6 +24,28 @@ describe('games store favorite sync', () => {
     setActivePinia(createPinia())
     getStatsMock.mockReset()
     setFavoriteMock.mockReset()
+    getGamesMock.mockReset()
+  })
+
+  it('appends games when infinite scroll requests the next page', async () => {
+    getGamesMock
+      .mockResolvedValueOnce({
+        data: [{ id: 1, public_id: 'game-1', is_favorite: false }],
+        pagination: { page: 1, limit: 24, total: 2, totalPages: 2 },
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: 2, public_id: 'game-2', is_favorite: false }],
+        pagination: { page: 2, limit: 24, total: 2, totalPages: 2 },
+      })
+
+    const store = useGamesStore()
+
+    await store.fetchGames({ query: { page: 1, limit: 24 } })
+    await store.fetchGames({ query: { page: 2, limit: 24 }, append: true })
+
+    expect(store.games.map((game) => game.public_id)).toEqual(['game-1', 'game-2'])
+    expect(store.pagination.page).toBe(2)
+    expect(store.hasMorePages).toBe(false)
   })
 
   it('syncs favorite state across store-managed surfaces', async () => {

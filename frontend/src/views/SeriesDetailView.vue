@@ -10,7 +10,7 @@
 
       <div class="page-hero__content">
         <h1 class="series-detail__title page-hero__title text-gradient">{{ seriesName }}</h1>
-        <p class="series-detail__subtitle page-hero__subtitle">共 {{ games.length }} 部作品</p>
+        <p class="series-detail__subtitle page-hero__subtitle">共 {{ totalGames }} 部作品</p>
       </div>
     </div>
 
@@ -19,20 +19,29 @@
       <p>加载系列作品中...</p>
     </div>
 
-    <div v-else-if="!hasLoadFailure && games.length > 0" class="series-detail__grid">
-      <div
-        v-for="game in games"
-        :key="game.id"
-        class="series-detail__grid-item"
-      >
-        <game-card
-          :game="game"
-          @view="openGame"
-          @view-series="openSeries"
-          @toggle-favorite="toggleFavorite"
-        />
+    <template v-else-if="!hasLoadFailure && games.length > 0">
+      <div class="series-detail__grid">
+        <div
+          v-for="game in games"
+          :key="game.id"
+          class="series-detail__grid-item"
+        >
+          <game-card
+            :game="game"
+            @view="openGame"
+            @view-series="openSeries"
+            @toggle-favorite="toggleFavorite"
+          />
+        </div>
       </div>
-    </div>
+
+      <div
+        ref="loadMoreSentinel"
+        class="series-detail__infinite-scroll"
+      >
+        <a-spin v-if="isLoadingMore" :size="20" />
+      </div>
+    </template>
 
     <a-empty v-else-if="hasLoadFailure" description="系列详情加载失败，请稍后重试。" />
 
@@ -47,6 +56,7 @@ import { IconLeft } from '@arco-design/web-vue/es/icon'
 import { useUiStore } from '@/stores/ui'
 import { useGamesStore } from '@/stores/games'
 import { seriesService } from '@/services/series.service'
+import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import GameCard from '@/components/GameCard.vue'
 import type { GameListItem } from '@/services/types'
 import { navigateBackOrFallback } from '@/utils/navigation'
@@ -57,17 +67,38 @@ defineOptions({
 })
 
 const AMBIENT_BACKGROUND_OWNER = 'series-detail'
+const DETAIL_PAGE_SIZE = 24
 
 const route = useRoute()
 const router = useRouter()
 const uiStore = useUiStore()
 const gamesStore = useGamesStore()
 
-const isLoading = ref(false)
-const hasLoadFailure = ref(false)
-const games = ref<GameListItem[]>([])
+const loadMoreSentinel = ref<HTMLElement | null>(null)
 const seriesName = ref('系列')
-let loadRequestId = 0
+
+const {
+  items: games,
+  isLoading,
+  isLoadingMore,
+  hasLoadFailure,
+  total: totalGames,
+  loadFirstPage,
+} = useInfiniteScroll<GameListItem>({
+  pageSize: DETAIL_PAGE_SIZE,
+  sentinel: loadMoreSentinel,
+  searchQuery: ref(''),
+  loadPage: async ({ page, limit }) => {
+    const id = Number(route.params.id)
+    const detail = await seriesService.getSeriesDetail(id, { page, limit })
+    seriesName.value = detail.series.name || `系列 ${id}`
+    return {
+      data: detail.games,
+      pagination: detail.pagination,
+    }
+  },
+  onError: (message) => uiStore.addAlert(message === '加载失败' ? '加载系列详情失败' : '加载更多系列作品失败', 'error'),
+})
 
 const syncAmbientBackground = (seriesId: number) => {
   const pool = getAmbientBackgroundPoolFromGames(games.value)
@@ -87,43 +118,15 @@ const handleGoBack = () => {
   navigateBackOrFallback(router, { name: 'series-library' })
 }
 
-const loadSeriesDetail = async () => {
-  const requestId = loadRequestId + 1
-  loadRequestId = requestId
+const loadSeriesDetail = () => {
   const id = Number(route.params.id)
   if (Number.isNaN(id) || id <= 0) {
     uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
     router.replace({ name: 'series-library' })
     return
   }
-
-  isLoading.value = true
-  hasLoadFailure.value = false
   uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
-  try {
-    const detail = await seriesService.getSeriesDetail(id)
-    if (requestId !== loadRequestId) {
-      return
-    }
-    seriesName.value = detail.series.name || `系列 ${id}`
-    games.value = detail.games
-    syncAmbientBackground(detail.series.id || id)
-  } catch {
-    if (requestId !== loadRequestId) {
-      return
-    }
-    // 2026-04-07: series route changes must not keep rendering the previous series
-    // when the current detail request fails. Failure is distinct from an empty series.
-    hasLoadFailure.value = true
-    games.value = []
-    seriesName.value = `系列 ${id}`
-    uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
-    uiStore.addAlert('加载系列详情失败', 'error')
-  } finally {
-    if (requestId === loadRequestId) {
-      isLoading.value = false
-    }
-  }
+  void loadFirstPage()
 }
 
 const openGame = (publicId: string) => {
@@ -159,10 +162,17 @@ const toggleFavorite = async (gameRef: string) => {
 watch(
   () => route.params.id,
   () => {
-    void loadSeriesDetail()
+    loadSeriesDetail()
   },
   { immediate: true },
 )
+
+watch(games, () => {
+  const id = Number(route.params.id)
+  if (!Number.isNaN(id) && id > 0) {
+    syncAmbientBackground(id)
+  }
+})
 
 onActivated(() => {
   const id = Number(route.params.id)
@@ -176,7 +186,6 @@ onDeactivated(() => {
 })
 
 onUnmounted(() => {
-  loadRequestId += 1
   uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
 })
 </script>
@@ -218,6 +227,16 @@ onUnmounted(() => {
 
 .series-detail__grid-item {
   min-width: 0;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 340px;
+}
+
+.series-detail__infinite-scroll {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin-top: 24px;
 }
 
 @media (max-width: 1199px) {
