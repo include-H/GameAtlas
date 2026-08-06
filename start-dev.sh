@@ -38,6 +38,20 @@ fi
 echo "构建前端..."
 (cd "$FRONTEND_DIR" && npm run build)
 
+# 兼容 Clash 类 HTTP 代理被误配成 GOPROXY 的环境：Go 模块协议不支持 CONNECT 代理，
+# 把 http:// 开头的 GOPROXY 改为 HTTPS_PROXY 出站 + 官方模块代理。
+if [[ "${GOPROXY:-}" == http://* ]]; then
+  proxy_url="${GOPROXY%%,*}"
+  export HTTPS_PROXY="${HTTPS_PROXY:-$proxy_url}"
+  export HTTP_PROXY="${HTTP_PROXY:-$proxy_url}"
+  export GOPROXY="https://proxy.golang.org,direct"
+  echo "检测到 GOPROXY 为 HTTP 代理（$proxy_url），已切换为 HTTPS_PROXY + proxy.golang.org"
+fi
+
+# 本地回环请求必须绕过代理：127.0.0.1 在代理端会被当成代理机自身，健康检查/本地联调会卡死。
+export NO_PROXY="${NO_PROXY:-127.0.0.1,localhost}"
+export no_proxy="$NO_PROXY"
+
 echo "预热 Go 依赖..."
 (
   cd "$BACKEND_DIR"

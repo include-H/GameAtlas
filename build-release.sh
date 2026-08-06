@@ -58,6 +58,13 @@ cp -R "$FRONTEND_DIR/dist/." "$EMBEDDED_WEB_DIR/"
 echo "构建后端..."
 (
   cd "$BACKEND_DIR"
+  # 兼容 Clash 类 HTTP 代理被误配成 GOPROXY 的环境（同 start-dev.sh）。
+  if [[ "${GOPROXY:-}" == http://* ]]; then
+    proxy_url="${GOPROXY%%,*}"
+    export HTTPS_PROXY="${HTTPS_PROXY:-$proxy_url}"
+    export HTTP_PROXY="${HTTP_PROXY:-$proxy_url}"
+    export GOPROXY="https://proxy.golang.org,direct"
+  fi
   go build -trimpath -ldflags="-s -w" -o "$PACKAGE_DIR/game-server" ./cmd/server
 )
 
