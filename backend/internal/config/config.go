@@ -58,19 +58,23 @@ func Load() (Config, error) {
 	backupDirSetting := getEnv("DB_BACKUP_DIR", "data/backups")
 
 	cfg := Config{
-		AppEnv:            getEnv("APP_ENV", "production"),
-		Host:              getEnv("HOST", "0.0.0.0"),
-		DBPath:            resolveRuntimePath(pathBaseDir, getEnv("DB_PATH", "data/db.db")),
-		DBBackupDir:       resolveRuntimePath(pathBaseDir, backupDirSetting),
-		StaticDir:         resolveRuntimePath(pathBaseDir, staticDirSetting),
-		AssetsDir:         resolveRuntimePath(pathBaseDir, assetsDirSetting),
-		PrimaryROMRoot:    resolveRuntimePath(pathBaseDir, primaryROMRootSetting),
-		Proxy:             proxy,
-		SMBPathMappings:   getEnv("SMB_PATH_MAPPINGS", ""),
-		SMBUsername:       getEnv("SMB_USERNAME", ""),
-		SMBPassword:       getEnv("SMB_PASSWORD", ""),
-		VHDDiffRoot:       getEnv("VHD_DIFF_ROOT", `C:`),
-		AdminDisplayName:  getEnv("ADMIN_DISPLAY_NAME", "Admin"),
+		AppEnv:           getEnv("APP_ENV", "production"),
+		Host:             getEnv("HOST", "0.0.0.0"),
+		DBPath:           resolveRuntimePath(pathBaseDir, getEnv("DB_PATH", "data/db.db")),
+		DBBackupDir:      resolveRuntimePath(pathBaseDir, backupDirSetting),
+		StaticDir:        resolveRuntimePath(pathBaseDir, staticDirSetting),
+		AssetsDir:        resolveRuntimePath(pathBaseDir, assetsDirSetting),
+		PrimaryROMRoot:   resolveRuntimePath(pathBaseDir, primaryROMRootSetting),
+		Proxy:            proxy,
+		SMBPathMappings:  getEnv("SMB_PATH_MAPPINGS", ""),
+		SMBUsername:      getEnv("SMB_USERNAME", ""),
+		SMBPassword:      getEnv("SMB_PASSWORD", ""),
+		VHDDiffRoot:      getEnv("VHD_DIFF_ROOT", `C:`),
+		AdminDisplayName: getEnv("ADMIN_DISPLAY_NAME", "Admin"),
+		// 保留默认密码 1234：ADMIN_PASSWORD 为空时 Validate() 会直接拒绝启动，
+		// 未显式配置的管理员将无法登录，连创建游戏都做不到，开箱即用必须依赖默认值。
+		// 该默认值只适用于家庭 / 内网可信环境；暴露到公网前必须通过设置页或
+		// ADMIN_PASSWORD 环境变量改掉默认密码，否则管理接口可被直接接管。
 		AdminPassword:     getEnv("ADMIN_PASSWORD", "1234"),
 		SteamGridDBAPIKey: getEnv("STEAMGRIDDB_API_KEY", ""),
 		AuthTrackBy:       getEnv("AUTH_TRACK_BY", "ip"),
