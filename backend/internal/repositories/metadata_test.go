@@ -188,7 +188,6 @@ func TestMetadataRepositoryDeleteUnusedRemovesOrphansOnly(t *testing.T) {
 func TestMetadataRepositoryListPageCountsAndPaginatesSeries(t *testing.T) {
 	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
-
 	seriesAID := insertRepositorySeries(t, db, "Alpha", "alpha")
 	seriesBID := insertRepositorySeries(t, db, "Beta", "beta")
 	insertRepositorySeries(t, db, "Gamma", "gamma")
@@ -292,5 +291,60 @@ func TestMetadataRepositoryListMetadataGamesPageCountsAndLimits(t *testing.T) {
 	}
 	if total != 3 {
 		t.Fatalf("CountMetadataGames all total = %d, want 3", total)
+	}
+}
+
+func TestMetadataRepositoryListPageFiltersDevelopersByGameVisibility(t *testing.T) {
+	db := openRepositoryTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	devPublicID := insertRepositoryDeveloper(t, db, "Public Dev", "public-dev")
+	devPrivateID := insertRepositoryDeveloper(t, db, "Private Dev", "private-dev")
+
+	publicGameID := insertRepositoryGame(t, db, "dev-public", "Dev Public", "public")
+	privateGameID := insertRepositoryGame(t, db, "dev-private", "Dev Private", "private")
+	linkRepositoryGameDeveloper(t, db, publicGameID, devPublicID, 0)
+	linkRepositoryGameDeveloper(t, db, privateGameID, devPrivateID, 0)
+
+	repo := NewMetadataRepository(db)
+
+	total, err := repo.CountMetadata(domain.MetadataDevelopers, "", false)
+	if err != nil {
+		t.Fatalf("CountMetadata developers public returned error: %v", err)
+	}
+	if total != 1 {
+		t.Fatalf("CountMetadata developers public total = %d, want 1 (only developer of public games)", total)
+	}
+
+	items, err := repo.ListMetadataPage(domain.MetadataDevelopers, "", "name", 10, 0, false)
+	if err != nil {
+		t.Fatalf("ListMetadataPage developers public returned error: %v", err)
+	}
+	if len(items) != 1 || items[0].Slug != "public-dev" {
+		t.Fatalf("ListMetadataPage developers public = %+v, want only Public Dev", items)
+	}
+
+	total, err = repo.CountMetadata(domain.MetadataDevelopers, "", true)
+	if err != nil {
+		t.Fatalf("CountMetadata developers all returned error: %v", err)
+	}
+	if total != 2 {
+		t.Fatalf("CountMetadata developers all total = %d, want 2", total)
+	}
+
+	items, err = repo.ListMetadataPage(domain.MetadataDevelopers, "", "name", 10, 0, true)
+	if err != nil {
+		t.Fatalf("ListMetadataPage developers all returned error: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("ListMetadataPage developers all = %+v, want both developers", items)
+	}
+
+	items, err = repo.ListMetadataPage(domain.MetadataDevelopers, "", "popular", 10, 0, false)
+	if err != nil {
+		t.Fatalf("ListMetadataPage developers popular returned error: %v", err)
+	}
+	if len(items) != 1 || items[0].Slug != "public-dev" || items[0].GameCount != 1 {
+		t.Fatalf("ListMetadataPage developers popular = %+v, want Public Dev with game count 1", items)
 	}
 }

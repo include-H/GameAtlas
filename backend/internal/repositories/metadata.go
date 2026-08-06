@@ -56,6 +56,8 @@ func metadataCountGamesExpression(typ domain.MetadataType, includeAll bool) stri
 			return "(SELECT COUNT(*) FROM games g WHERE g.series_id = m.id)"
 		case domain.MetadataPublishers:
 			return "(SELECT COUNT(*) FROM game_publishers gp INNER JOIN games g ON g.id = gp.game_id WHERE gp.publisher_id = m.id)"
+		case domain.MetadataDevelopers:
+			return "(SELECT COUNT(*) FROM game_developers gd INNER JOIN games g ON g.id = gd.game_id WHERE gd.developer_id = m.id)"
 		}
 		return "0"
 	}
@@ -65,6 +67,8 @@ func metadataCountGamesExpression(typ domain.MetadataType, includeAll bool) stri
 		return "(SELECT COUNT(*) FROM games g WHERE g.series_id = m.id AND g.visibility = :visibility)"
 	case domain.MetadataPublishers:
 		return "(SELECT COUNT(*) FROM game_publishers gp INNER JOIN games g ON g.id = gp.game_id WHERE gp.publisher_id = m.id AND g.visibility = :visibility)"
+	case domain.MetadataDevelopers:
+		return "(SELECT COUNT(*) FROM game_developers gd INNER JOIN games g ON g.id = gd.game_id WHERE gd.developer_id = m.id AND g.visibility = :visibility)"
 	default:
 		return "0"
 	}
@@ -76,6 +80,8 @@ func metadataPublicVisibilityExpression(typ domain.MetadataType) string {
 		return "EXISTS (SELECT 1 FROM games g WHERE g.series_id = m.id AND g.visibility = :visibility)"
 	case domain.MetadataPublishers:
 		return "EXISTS (SELECT 1 FROM game_publishers gp INNER JOIN games g ON g.id = gp.game_id WHERE gp.publisher_id = m.id AND g.visibility = :visibility)"
+	case domain.MetadataDevelopers:
+		return "EXISTS (SELECT 1 FROM game_developers gd INNER JOIN games g ON g.id = gd.game_id WHERE gd.developer_id = m.id AND g.visibility = :visibility)"
 	default:
 		return ""
 	}
