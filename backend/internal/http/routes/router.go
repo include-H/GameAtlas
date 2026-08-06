@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -173,12 +171,6 @@ type assetRouteStartScreenRepository interface {
 	GetGameVisibilityByImagePath(imagePath string) (string, error)
 }
 
-type assetRouteCacheEntry struct {
-	exists     bool
-	visibility string
-	loadedAt   time.Time
-}
-
 func registerAssetRoutes(
 	router *gin.Engine,
 	assetsDir string,
@@ -188,8 +180,6 @@ func registerAssetRoutes(
 	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
 		return
 	}
-
-	var assetCache sync.Map
 
 	serveAssetFile := func(c *gin.Context, rawPath string) {
 		targetPath := filepath.Join(assetsDir, filepath.FromSlash(rawPath))
@@ -256,28 +246,12 @@ func registerAssetRoutes(
 			return
 		}
 
-		// Check cache first
-		var gameExists bool
-		var gameVisibility string
-		if cached, ok := assetCache.Load(gamePublicID); ok {
-			entry := cached.(assetRouteCacheEntry)
-			if time.Since(entry.loadedAt) < 5*time.Minute {
-				gameExists = entry.exists
-				gameVisibility = entry.visibility
-			}
+		game, err := gamesRepo.GetByPublicID(gamePublicID)
+		if err != nil {
+			c.Status(http.StatusNotFound)
+			return
 		}
-
-		if !gameExists || gameVisibility == "" {
-			game, err := gamesRepo.GetByPublicID(gamePublicID)
-			if err != nil {
-				assetCache.Store(gamePublicID, assetRouteCacheEntry{exists: false, loadedAt: time.Now()})
-				c.Status(http.StatusNotFound)
-				return
-			}
-			gameExists = true
-			gameVisibility = game.Visibility
-			assetCache.Store(gamePublicID, assetRouteCacheEntry{exists: true, visibility: game.Visibility, loadedAt: time.Now()})
-		}
+		gameVisibility := game.Visibility
 
 		if !admin && gameVisibility == domain.GameVisibilityPrivate {
 			c.Status(http.StatusNotFound)
