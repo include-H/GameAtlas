@@ -1,11 +1,14 @@
 package services
 
 import (
+	"errors"
+	"mime/multipart"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/hao/game/internal/config"
+	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/repositories"
 )
 
@@ -128,7 +131,21 @@ func TestSettingsServiceRejectsInvalidDatabaseBackedConfig(t *testing.T) {
 	}
 	service := NewSettingsService(cfg, repo)
 
-	if err := service.UpdateConfig(map[string]string{"PORT": "abc"}); err == nil {
-		t.Fatalf("expected UpdateConfig to reject invalid PORT")
+	if err := service.UpdateConfig(map[string]string{"PORT": "abc"}); err == nil || !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("invalid PORT error = %v, want domain.ErrValidation", err)
+	}
+	if err := service.UpdateConfig(map[string]string{"NOT_A_SETTING": "value"}); err == nil || !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("unsupported setting error = %v, want domain.ErrValidation", err)
+	}
+}
+
+func TestSettingsServiceRejectsUnsupportedBackgroundImageFormat(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	service := NewSettingsService(config.Config{}, repositories.NewAppSettingsRepository(db))
+	err := service.SaveBackgroundImage(nil, &multipart.FileHeader{Filename: "background.svg"})
+	if err == nil || !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("unsupported background format error = %v, want domain.ErrValidation", err)
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/hao/game/internal/config"
+	"github.com/hao/game/internal/domain"
 	"github.com/hao/game/internal/repositories"
 )
 
@@ -74,7 +75,7 @@ func (s *SettingsService) UpdateConfig(updates map[string]string) error {
 	for k, v := range updates {
 		definition, ok := definitions[k]
 		if !ok {
-			return fmt.Errorf("不支持的配置项: %s", k)
+			return fmt.Errorf("%w: 不支持的配置项: %s", domain.ErrValidation, k)
 		}
 		if definition.Sensitive && (v == "****" || strings.TrimSpace(v) == "") {
 			continue
@@ -97,10 +98,10 @@ func (s *SettingsService) UpdateConfig(updates map[string]string) error {
 	}
 	cfg, err := s.cfg.ApplyRuntimeSettings(candidate)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %v", domain.ErrValidation, err)
 	}
 	if err := cfg.Validate(); err != nil {
-		return err
+		return fmt.Errorf("%w: %v", domain.ErrValidation, err)
 	}
 
 	return s.settingsRepo.UpsertMany(toSave)
@@ -110,7 +111,7 @@ func (s *SettingsService) SaveBackgroundImage(file multipart.File, header *multi
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	allowed := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true, ".gif": true}
 	if !allowed[ext] {
-		return fmt.Errorf("不支持的图片格式: %s", ext)
+		return fmt.Errorf("%w: 不支持的图片格式: %s", domain.ErrValidation, ext)
 	}
 
 	dstPath := filepath.Join(s.dataDir, "bg.jpg")

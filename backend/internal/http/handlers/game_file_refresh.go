@@ -23,7 +23,7 @@ func (h *GameFileRefreshHandler) RefreshSizes(c *gin.Context) {
 
 	result, err := h.refreshService.RefreshFileSizes()
 	if err != nil {
-		writeJSONError(c, http.StatusInternalServerError, "刷新文件大小失败: "+err.Error())
+		writeJSONError(c, http.StatusInternalServerError, "刷新文件大小失败")
 		return
 	}
 
