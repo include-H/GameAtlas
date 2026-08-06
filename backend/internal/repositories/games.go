@@ -81,10 +81,6 @@ func (r *GamesRepository) IsAssetPathReferenced(assetPath string) (bool, error) 
 	return count > 0, nil
 }
 
-func (r *GamesRepository) DB() *sqlx.DB {
-	return r.db
-}
-
 // gamesListItemSelectColumns defines the shared projection for catalog-oriented list rows.
 // Keep read-model specific query entry points in the split repositories instead of adding new
 // business methods back onto GamesRepository.

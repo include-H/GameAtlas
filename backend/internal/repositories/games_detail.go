@@ -109,29 +109,6 @@ func (r *GamesRepository) ListAllAssets(gameID int64) ([]domain.GameAsset, error
 	return assets, nil
 }
 
-func (r *GamesRepository) listAssetsByType(gameID int64, assetType string) ([]domain.GameAsset, error) {
-	var assets []domain.GameAsset
-	err := r.db.Select(&assets, `
-		SELECT id, game_id, asset_uid, asset_type, path, poster_path, sort_order, position_x, position_y, width_pct, created_at
-		FROM game_assets
-		WHERE game_id = ? AND asset_type = ?
-		ORDER BY sort_order ASC, id ASC
-	`, gameID, assetType)
-	if err != nil {
-		return nil, fmt.Errorf("list %s assets: %w", assetType, err)
-	}
-
-	return assets, nil
-}
-
-func (r *GamesRepository) ListScreenshots(gameID int64) ([]domain.GameAsset, error) {
-	return r.listAssetsByType(gameID, "screenshot")
-}
-
-func (r *GamesRepository) ListVideos(gameID int64) ([]domain.GameAsset, error) {
-	return r.listAssetsByType(gameID, "video")
-}
-
 // videoAssetRow 是批量预告片查询的行映射：在 GameAsset 上附带游戏可见性，
 // 供 service 层在返回前过滤私有游戏，避免把私有游戏的存在性泄露给匿名调用者。
 type videoAssetRow struct {
@@ -176,19 +153,6 @@ func (r *GamesRepository) ListVideosByPublicIDs(publicIDs []string) ([]videoAsse
 
 	return rows, nil
 }
-
-func (r *GamesRepository) ListCovers(gameID int64) ([]domain.GameAsset, error) {
-	return r.listAssetsByType(gameID, "cover")
-}
-
-func (r *GamesRepository) ListLogos(gameID int64) ([]domain.GameAsset, error) {
-	return r.listAssetsByType(gameID, "logo")
-}
-
-func (r *GamesRepository) ListBanners(gameID int64) ([]domain.GameAsset, error) {
-	return r.listAssetsByType(gameID, "banner")
-}
-
 func (r *GamesRepository) GetSeriesMetadata(gameID int64) (*domain.MetadataItem, error) {
 	const query = `
 		SELECT s.id, s.name, s.slug, s.sort_order, s.created_at

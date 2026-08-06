@@ -81,7 +81,6 @@ describe('games service', () => {
         page: 2,
         limit: 20,
         search: 'halo',
-        series: 12,
         pending: false,
       },
       sort: {
@@ -101,7 +100,7 @@ describe('games service', () => {
     expect(params.get('page')).toBe('2')
     expect(params.get('limit')).toBe('20')
     expect(params.get('search')).toBe('halo')
-    expect(params.get('series')).toBe('12')
+    expect(params.get('series')).toBeNull()
     expect(params.get('pending')).toBe('false')
     expect(params.get('favorite')).toBeNull()
     expect(params.get('sort')).toBe('updated_at')

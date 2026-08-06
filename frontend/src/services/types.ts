@@ -283,7 +283,6 @@ export interface GameListQuery {
   page?: number
   limit?: number
   search?: string
-  series?: number
   visibility?: 'public' | 'private'
   pending?: boolean
   pending_issue?: string

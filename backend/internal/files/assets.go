@@ -129,11 +129,6 @@ func (s *AssetStore) BaseDir() string {
 	return s.baseDir
 }
 
-// StagingDir returns the path to the staging directory.
-func (s *AssetStore) StagingDir() string {
-	return filepath.Join(s.baseDir, "_staging")
-}
-
 // CleanStaging deletes files in the staging directory that are older than maxAge.
 func (s *AssetStore) CleanStaging(maxAge time.Duration) (int, error) {
 	stagingDir := filepath.Join(s.baseDir, "_staging")

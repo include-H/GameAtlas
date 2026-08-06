@@ -82,13 +82,6 @@ func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart
 	return &UploadResult{Path: path, AssetUID: assetUID}, nil
 }
 
-// MoveStagingToPermanent moves an asset file from the staging directory to
-// the permanent game-specific directory. If the file is already in the permanent
-// location, it returns the path as-is.
-func (s *AssetsService) MoveStagingToPermanent(gamePublicID string, assetPath string) (string, error) {
-	return s.store.MoveToPermanent(assetPath, gamePublicID)
-}
-
 func newAssetUID() string {
 	buf := make([]byte, 16)
 	if _, err := rand.Read(buf); err != nil {

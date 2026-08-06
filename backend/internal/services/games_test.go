@@ -845,10 +845,7 @@ func TestGamesServiceUpdateAggregateReordersVideos(t *testing.T) {
 		t.Fatalf("game = %#v, want updated game", game)
 	}
 
-	videos, err := repositories.NewGamesRepository(db).ListVideos(gameID)
-	if err != nil {
-		t.Fatalf("ListVideos returned error: %v", err)
-	}
+	videos := listServicesVideos(t, db, gameID)
 	if len(videos) != 2 {
 		t.Fatalf("len(videos) = %d, want 2", len(videos))
 	}
@@ -890,10 +887,7 @@ func TestGamesServiceUpdateAggregateDeletesFirstVideoAndKeepsNextVideo(t *testin
 		t.Fatalf("game = %#v, want updated game", game)
 	}
 
-	videos, err := repositories.NewGamesRepository(db).ListVideos(gameID)
-	if err != nil {
-		t.Fatalf("ListVideos returned error: %v", err)
-	}
+	videos := listServicesVideos(t, db, gameID)
 	if len(videos) != 1 || videos[0].AssetUID != "video-b" {
 		t.Fatalf("videos = %+v, want only fallback video-b", videos)
 	}
@@ -1008,10 +1002,7 @@ func TestGamesServiceUpdateAggregatePersistsVideoPosterPath(t *testing.T) {
 		t.Fatalf("UpdateAggregate returned error: %v", err)
 	}
 
-	videos, err := repositories.NewGamesRepository(db).ListVideos(gameID)
-	if err != nil {
-		t.Fatalf("ListVideos returned error: %v", err)
-	}
+	videos := listServicesVideos(t, db, gameID)
 	if len(videos) != 1 {
 		t.Fatalf("len(videos) = %d, want 1", len(videos))
 	}
@@ -1060,10 +1051,7 @@ func TestGamesServiceUpdateAggregateBackfillsVideoPosterPath(t *testing.T) {
 		t.Fatalf("UpdateAggregate returned error: %v", err)
 	}
 
-	videos, err := repositories.NewGamesRepository(db).ListVideos(gameID)
-	if err != nil {
-		t.Fatalf("ListVideos returned error: %v", err)
-	}
+	videos := listServicesVideos(t, db, gameID)
 	if len(videos) != 1 {
 		t.Fatalf("len(videos) = %d, want 1", len(videos))
 	}
@@ -1096,10 +1084,7 @@ func TestGamesServiceUpdateAggregateBackfillsVideoPosterPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second UpdateAggregate returned error: %v", err)
 	}
-	videos, err = repositories.NewGamesRepository(db).ListVideos(gameID)
-	if err != nil {
-		t.Fatalf("second ListVideos returned error: %v", err)
-	}
+	videos = listServicesVideos(t, db, gameID)
 	if len(videos) != 1 || videos[0].PosterPath == nil || *videos[0].PosterPath != posterPath {
 		t.Fatalf("PosterPath after second update = %v, want %q unchanged", videos[0].PosterPath, posterPath)
 	}

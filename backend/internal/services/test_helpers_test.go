@@ -183,6 +183,23 @@ func mustLoadAssetCleanupTask(t *testing.T, db *sqlx.DB, assetPath string) repos
 	return task
 }
 
+func listServicesVideos(t *testing.T, db *sqlx.DB, gameID int64) []domain.GameAsset {
+	t.Helper()
+
+	assets, err := repositories.NewGamesRepository(db).ListAllAssets(gameID)
+	if err != nil {
+		t.Fatalf("ListAllAssets returned error: %v", err)
+	}
+
+	videos := make([]domain.GameAsset, 0, len(assets))
+	for _, asset := range assets {
+		if asset.AssetType == "video" {
+			videos = append(videos, asset)
+		}
+	}
+	return videos
+}
+
 func assertAssetCleanupTaskMissing(t *testing.T, db *sqlx.DB, assetPath string) {
 	t.Helper()
 
