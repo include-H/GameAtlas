@@ -4,13 +4,13 @@ GameAtlas 的 Go 后端：提供游戏库 API、素材与文件管理、Wiki、�
 
 ## 技术栈
 
-- Go 1.22+ / Gin / SQLX
+- Go 1.25+ / Gin / SQLX
 - SQLite（`mattn/go-sqlite3`，WAL 模式，单连接写入）
 - 内嵌迁移（`go:embed *.sql`）与内嵌前端（`go:embed web/dist`）
 
 ## 快速开始
 
-前置依赖：Go 1.22+、Node.js、npm、curl。
+前置依赖：Go 1.25+、Node.js、npm、curl。
 
 ```bash
 # 一键启动（根目录）：先构建前端、启动后端并等待健康检查，再启动 Vite
@@ -40,7 +40,7 @@ cd backend
 bash check.sh                # go test ./... + go vet ./...（自动设置 GODEBUG=goindex=0）
 ```
 
-`check.sh` 中的 `GODEBUG=goindex=0` 用于规避部分发行版 Go 1.22.x 的 goindex 误报，不要手动移除。
+`check.sh` 中的 `GODEBUG=goindex=0` 用于规避部分发行版 Go 1.22.x 的 goindex 误报，Go 1.25+ 下无害保留。
 
 ### 前端校验（后端改动涉及联调时）
 

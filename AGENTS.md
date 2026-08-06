@@ -15,7 +15,7 @@ cd backend && go run ./cmd/server        # → :3000
 cd frontend && npm run dev                # → :5173
 ```
 
-Prerequisites: Go 1.22+, Node.js, npm, curl.
+Prerequisites: Go 1.25+, Node.js, npm, curl.
 
 ## Toolchain Environment
 
@@ -136,7 +136,7 @@ Outputs to `release/game-release-<version>/`. The script:
 ### Pre-commit Checks
 - Frontend: `npm run lint` must pass
 - Backend: `cd backend && bash check.sh` must pass
-- `check.sh` sets `GODEBUG=goindex=0` to work around Go 1.22.x goindex bug on some distros
+- `check.sh` sets `GODEBUG=goindex=0` to work around the Go 1.22.x goindex bug on some distros (retained harmlessly on newer Go)
 
 ## Key Environment Variables
 
@@ -159,7 +159,7 @@ Outputs to `release/game-release-<version>/`. The script:
 
 1. **`backend/web/dist/` is embedded into the Go binary** — the release build copies frontend dist here before building. CI creates a `.gitkeep` placeholder. Never commit built artifacts.
 2. **Runtime settings are DB-backed** — update configurable values through the settings page or `app_settings`; keep `DB_PATH` as the only bootstrap override when needed.
-3. **`backend/check.sh`Appends `GODEBUG=goindex=0`** — required on some Linux distros with Go 1.22.x to avoid false "not in std" errors.
+3. **`backend/check.sh`Appends `GODEBUG=goindex=0`** — required on some Linux distros with Go 1.22.x to avoid false "not in std" errors; retained harmlessly on Go 1.25+.
 4. **Custom frontend lint step** — `npm run lint` includes a custom button policy check (`lint:policy`) beyond standard ESLint.
 5. **`docs/项目风格约定.md`** — the authoritative style guide. Read it before making significant changes.
 6. **`release/` directory is gitignored** — build artifacts are not committed.

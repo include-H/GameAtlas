@@ -194,7 +194,7 @@ python3 scripts/sync_wiki_to_prod.py --unmatched  # 显示无法匹配的游戏
 
 ## 本地开发
 
-需要 Go 1.22+、Node.js、npm、curl。
+需要 Go 1.25+、Node.js、npm、curl。
 
 ```bash
 bash start-dev.sh          # 一键启动：后端 :3000，前端 :5173
