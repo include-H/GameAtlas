@@ -278,7 +278,7 @@ func (h *GamesHandler) Favorite(c *gin.Context) {
 		return
 	}
 
-	isFavorite, err := h.favorites.Set(id, true)
+	isFavorite, err := h.favorites.Set(id, true, isAdminRequest(c))
 	if err != nil {
 		// 2026-05-09: 统一为中文错误信息
 		writeServiceError(c, err, "无效的游戏请求")
@@ -296,7 +296,7 @@ func (h *GamesHandler) Unfavorite(c *gin.Context) {
 		return
 	}
 
-	isFavorite, err := h.favorites.Set(id, false)
+	isFavorite, err := h.favorites.Set(id, false, isAdminRequest(c))
 	if err != nil {
 		// 2026-05-09: 统一为中文错误信息
 		writeServiceError(c, err, "无效的游戏请求")
