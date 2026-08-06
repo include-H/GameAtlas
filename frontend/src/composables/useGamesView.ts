@@ -301,6 +301,9 @@ export const useGamesView = ({
   const isTogglingFavorite = ref(false)
   let listRequestId = 0
   let loadMoreObserver: IntersectionObserver | null = null
+  // 记录最后一次真正发起加载时的 query 内容快照。keep-alive 返回时 route.query 引用
+  // 必然变化（每次导航重建对象），但内容相同；若直接重拉会清空已加载的深列表。
+  let lastLoadedQueryKey: string | null = null
 
   const sortOptions = [
     { label: '最近更新', value: 'updated_at:desc' },
@@ -386,6 +389,7 @@ export const useGamesView = ({
   }
 
   const loadGames = async () => {
+    lastLoadedQueryKey = JSON.stringify(route.query)
     const requestId = ++listRequestId
     isLoading.value = true
 
@@ -462,6 +466,11 @@ export const useGamesView = ({
   watch(() => route.query, () => {
     searchQuery.value = readSingleQueryValue(route.query.search) || ''
     if (route.name !== 'games') {
+      return
+    }
+    const queryKey = JSON.stringify(route.query)
+    if (queryKey === lastLoadedQueryKey) {
+      // keep-alive 恢复：query 内容未变，store 已有该查询的完整数据，跳过重拉
       return
     }
     void loadGames()

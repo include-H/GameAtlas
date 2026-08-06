@@ -349,8 +349,12 @@ const virtualItems = computed<VirtualGameItem[]>(() => {
   const stride = virtualRowHeight.value + VIRTUAL_GAP
   const items: VirtualGameItem[] = []
 
+  // 防御：keep-alive 恢复瞬间测量未就绪时 startRow 可能越过 endRow，
+  // 直接回退到第一屏，避免整个列表空白。
+  const startRow = Math.min(virtualStartRow.value, Math.max(0, virtualEndRow.value - 1))
+
   if (viewMode.value === 'list') {
-    for (let index = virtualStartRow.value; index < virtualEndRow.value; index += 1) {
+    for (let index = startRow; index < virtualEndRow.value; index += 1) {
       const game = games.value[index]
       if (!game) continue
       items.push({
@@ -367,7 +371,7 @@ const virtualItems = computed<VirtualGameItem[]>(() => {
   }
 
   const columns = virtualColumns.value
-  for (let row = virtualStartRow.value; row < virtualEndRow.value; row += 1) {
+  for (let row = startRow; row < virtualEndRow.value; row += 1) {
     for (let column = 0; column < columns; column += 1) {
       const gameIndex = row * columns + column
       const game = games.value[gameIndex]
@@ -471,23 +475,42 @@ const teardownVirtualScroll = () => {
 
 onActivated(() => {
   void refreshStartScreenTiles()
-  // keep-alive 恢复：重新绑定滚动监听并恢复上次位置，
-  // 避免虚拟列表位置与 .content 实际滚动错位导致白屏/跳动。
+  // keep-alive 恢复：重绑滚动监听。用双 rAF 等布局完全展开（列表总高就绪）后再
+  // 量测并恢复滚动位置——单 nextTick 时 canvas 高度未定型，scrollTo 会被夹在矮高度上。
+  // 恢复后再读回容器实际 scrollTop 作为渲染基准：若被外部（浏览器历史恢复等）覆盖，
+  // 虚拟列表与可视区仍保持对齐，不会出现顶部白屏。
   setupVirtualScroll()
-  virtualScrollRoot?.scrollTo({ top: virtualScrollTop.value })
+  const restore = () => {
+    updateVirtualMetrics()
+    const requested = virtualScrollTop.value
+    virtualScrollRoot?.scrollTo({ top: requested })
+    requestAnimationFrame(() => {
+      virtualScrollTop.value = virtualScrollRoot?.scrollTop ?? 0
+    })
+  }
+  requestAnimationFrame(() => {
+    requestAnimationFrame(restore)
+  })
 })
 
-onDeactivated(teardownVirtualScroll)
+onDeactivated(() => {
+  teardownVirtualScroll()
+})
 
 onMounted(() => {
   setupVirtualScroll()
 })
 
-watch(() => route.query, () => {
-  virtualScrollTop.value = 0
-  virtualScrollRoot?.scrollTo({ top: 0 })
-  updateVirtualMetrics()
-})
+watch(
+  () => JSON.stringify(route.query),
+  (current, previous) => {
+    // 仅在筛选/排序等 query 实际变化时重置滚动；keep-alive 返回时 query 未变，需保留浏览位置。
+    if (current === previous) return
+    virtualScrollTop.value = 0
+    virtualScrollRoot?.scrollTo({ top: 0 })
+    updateVirtualMetrics()
+  },
+)
 
 watch(viewMode, () => {
   virtualScrollTop.value = 0

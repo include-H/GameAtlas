@@ -110,17 +110,16 @@
         <shared-ambient-background />
 
         <a-layout-content class="content">
-          <router-view v-slot="{ Component, route }">
-            <!-- Vue 3.5's out-in transition clones KeepAlive with null slots during route changes. -->
-            <transition name="route-fade">
-              <keep-alive include="GamesView">
-                <component
-                  :is="Component"
-                  :key="String(route.name || route.path)"
-                  class="route-fade-shell"
-                />
-              </keep-alive>
-            </transition>
+          <router-view v-slot="{ Component }">
+            <!-- Vue 官方模式：v-if 包裹 + out-in，避免 keep-alive 在过渡期间
+                 残留空槽/旧组件 DOM（曾导致库页面残留详情页、返回时被重挂载）。 -->
+            <template v-if="Component">
+              <transition name="route-fade" mode="out-in">
+                <keep-alive include="GamesView">
+                  <component :is="Component" class="route-fade-shell" />
+                </keep-alive>
+              </transition>
+            </template>
           </router-view>
 
           <alert-banner />
@@ -159,7 +158,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import useMenu from '@/hooks/useMenu'
@@ -309,6 +308,17 @@ const scrollToTop = () => {
 
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
+
+// 共享滚动容器 .content 跨路由保留 scrollTop，切换页面必须回顶，
+// 否则从库中部点进详情会直接落在中间（如 wiki 区）。
+// 游戏库路由除外：keep-alive 恢复时由 GamesView 自己恢复离开位置。
+watch(
+  () => route.fullPath,
+  () => {
+    if (route.name === 'games') return
+    document.querySelector('.content')?.scrollTo({ top: 0 })
+  },
+)
 </script>
 
 <style scoped src="./App.css"></style>
