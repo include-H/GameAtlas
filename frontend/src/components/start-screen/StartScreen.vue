@@ -21,7 +21,7 @@
             </div>
 
             <div class="start-screen__header-actions">
-              <template v-if="!isEditing && canEdit && tiles.length > 0">
+              <template v-if="!isEditing && canEdit">
                 <a-button
                   class="app-text-action-btn"
                   type="text"
@@ -58,7 +58,7 @@
             <a-button type="primary" @click="emit('retry')">重试</a-button>
           </div>
 
-          <div v-else-if="tiles.length === 0" class="start-screen__state">
+          <div v-else-if="tiles.length === 0 && !isEditing" class="start-screen__state">
             <icon-star />
             <p>还没有磁贴</p>
             <a-space v-if="!isEditing">
@@ -75,51 +75,96 @@
           >
             <div class="start-screen__columns">
               <div
-                v-for="(column, columnIndex) in packedColumns"
+                v-for="(column, columnIndex) in visibleColumns"
                 :key="columnIndex"
                 class="start-screen__column"
               >
-                <input
-                  v-if="isEditing"
-                  class="start-screen__column-name-input"
-                  :value="columnNameOf(columnIndex)"
-                  :placeholder="`列 ${columnIndex + 1}`"
-                  @change="handleRenameColumn(columnIndex, $event)"
-                >
-                <span v-else class="start-screen__column-name">{{ columnNameOf(columnIndex) }}</span>
-                <TransitionGroup
-                  name="metro-tile"
-                  tag="div"
-                  class="start-screen__column-grid"
-                  @enter="onTileEnter"
-                  @leave="onTileLeave"
-                >
-                  <div
-                    v-for="slot in column.slots"
-                    :key="slot.tile.game_id"
-                    :class="[
-                      'start-screen__tile-slot',
-                      `start-screen__tile-slot--${slot.tile.tile_size}`,
-                      { 'start-screen__tile-slot--dragging': isDraggedTile(slot.tile) },
-                    ]"
-                    :style="{ gridColumnStart: slot.col + 1, gridRowStart: slot.row + 1 }"
-                    :data-tile-index="slot.globalIndex"
-                    :data-filtered-index="filteredIndexByGameId(slot.tile.game_id)"
-                    @pointerdown="onTilePointerDown(slot.globalIndex, $event)"
+                <div class="start-screen__column-header">
+                  <input
+                    v-if="isEditing"
+                    class="start-screen__column-name-input"
+                    :value="columnNameOf(columnIndex)"
+                    :placeholder="`列 ${columnIndex + 1}`"
+                    @change="handleRenameColumn(columnIndex, $event)"
                   >
-                    <MetroTile
-                      :tile="slot.tile"
-                      :color-index="slot.globalIndex"
-                      :editing="isEditing"
-                      @select="handleTileSelect"
-                      @crop="handleCrop"
-                      @resize="emit('resize', $event)"
-                      @remove="emit('remove', $event)"
+                  <span v-else class="start-screen__column-name">{{ columnNameOf(columnIndex) }}</span>
+                  <button
+                    v-if="isEditing && !columnHasTiles(columnIndex)"
+                    class="app-text-action-btn start-screen__column-remove"
+                    type="button"
+                    :aria-label="`删除空列 ${columnIndex + 1}`"
+                    @click="emit('removeColumn', columnIndex)"
+                  >
+                    <icon-close />
+                  </button>
+                </div>
+
+                <div class="start-screen__column-grid">
+                  <template v-if="isEditing">
+                    <div
+                      v-for="cell in gridCells"
+                      :key="`cell-${cell.row}-${cell.col}`"
+                      class="start-screen__drop-cell"
+                      :class="{ 'start-screen__drop-cell--target': isDropTarget(columnIndex, cell.row, cell.col) }"
+                      :data-start-screen-cell="true"
+                      :data-column-index="columnIndex"
+                      :data-row="cell.row"
+                      :data-col="cell.col"
+                      :style="{ gridColumnStart: cell.col + 1, gridRowStart: cell.row + 1 }"
                     />
-                  </div>
-                </TransitionGroup>
+                  </template>
+                  <TransitionGroup
+                    name="metro-tile"
+                    tag="div"
+                    class="start-screen__column-tiles"
+                    @enter="onTileEnter"
+                    @leave="onTileLeave"
+                  >
+                    <div
+                      v-for="slot in column.slots"
+                      :key="slot.tile.game_id"
+                      :class="[
+                        'start-screen__tile-slot',
+                        `start-screen__tile-slot--${slot.tile.tile_size}`,
+                        { 'start-screen__tile-slot--dragging': isDraggedTile(slot.tile) },
+                        { 'start-screen__tile-slot--target': isDropTarget(columnIndex, slot.row, slot.col) },
+                      ]"
+                      :style="{ gridColumnStart: slot.col + 1, gridRowStart: slot.row + 1 }"
+                      :data-tile-index="slot.globalIndex"
+                      :data-start-screen-cell="true"
+                      :data-column-index="columnIndex"
+                      :data-row="slot.row"
+                      :data-col="slot.col"
+                      @pointerdown="onTilePointerDown(slot.globalIndex, $event)"
+                    >
+                      <MetroTile
+                        :tile="slot.tile"
+                        :color-index="slot.globalIndex"
+                        :editing="isEditing"
+                        @select="handleTileSelect"
+                        @crop="handleCrop"
+                        @resize="emit('resize', $event)"
+                        @remove="emit('remove', $event)"
+                      />
+                    </div>
+                  </TransitionGroup>
+                </div>
               </div>
 
+              <button
+                v-if="isEditing"
+                type="button"
+                class="start-screen__new-column"
+                :class="{ 'start-screen__new-column--target': isNewColumnTarget }"
+                :data-start-screen-cell="true"
+                :data-column-index="newColumnIndex"
+                data-row="0"
+                data-col="0"
+                @click="handleAddColumn"
+              >
+                <icon-plus />
+                <span>新列</span>
+              </button>
             </div>
 
             <div
@@ -177,17 +222,24 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
+  IconClose,
   IconDesktop,
   IconEdit,
   IconExclamationCircle,
   IconPlayArrow,
+  IconPlus,
   IconStar,
 } from '@arco-design/web-vue/es/icon'
 import MetroTile from './MetroTile.vue'
 import TileCropModal from './TileCropModal.vue'
 import SharedAmbientBackground from '@/components/SharedAmbientBackground.vue'
 import type { StartScreenColumn, StartScreenTile, StartScreenTileSize } from '@/services/types'
-import { packStartScreenTiles } from '@/utils/start-screen-layout'
+import {
+  findStartScreenDropTarget,
+  layoutStartScreenTiles,
+  START_SCREEN_COLUMN_COLS,
+  START_SCREEN_COLUMN_ROWS,
+} from '@/utils/start-screen-layout'
 import gamesService, { mapGameVersions } from '@/services/games.service'
 
 const props = defineProps<{
@@ -211,7 +263,9 @@ const emit = defineEmits<{
   select: [publicId: string]
   resize: [gameId: number]
   remove: [gameId: number]
-  applyOrder: [tiles: StartScreenTile[]]
+  applyPlacement: [gameId: number, columnIndex: number, row: number, col: number]
+  addColumn: []
+  removeColumn: [index: number]
   applyCrop: [gameId: number, blobs: Record<StartScreenTileSize, Blob>]
   renameColumn: [index: number, name: string]
 }>()
@@ -229,7 +283,9 @@ const launchOptions = ref<Array<{ id: string; version: string; url: string }>>([
 interface TileDragState {
   gameId: number
   fromIndex: number
-  targetIndex: number
+  targetColumnIndex: number
+  targetRow: number
+  targetCol: number
 }
 
 const dragState = ref<TileDragState | null>(null)
@@ -245,27 +301,47 @@ const cropSource = computed(() => {
 
 const draggedTile = computed(() => props.tiles.find((tile) => tile.game_id === dragState.value?.gameId) ?? null)
 
-const filteredTiles = computed(() => props.tiles.filter((tile) => tile.game_id !== dragState.value?.gameId))
-
-// 拖拽预览：把被拖磁贴从队列抽出，按光标目标位置插回，其余磁贴自动让位重排。
+// 拖拽预览：被拖磁贴从布局中抽出，由 ghost 跟随光标；目标格高亮，落点时再写入坐标。
 const displayTiles = computed(() => {
   if (!dragState.value) return props.tiles
-  const next = filteredTiles.value.map((tile) => ({ ...tile }))
-  const dragged = props.tiles.find((tile) => tile.game_id === dragState.value?.gameId)
-  if (!dragged) return next
-  const target = Math.min(Math.max(dragState.value.targetIndex, 0), next.length)
-  next.splice(target, 0, { ...dragged })
-  return next
+  return props.tiles.filter((tile) => tile.game_id !== dragState.value?.gameId)
 })
 
-const packedColumns = computed(() => packStartScreenTiles(displayTiles.value))
+const layoutColumns = computed(() => layoutStartScreenTiles(displayTiles.value, props.columns.length))
+const visibleColumns = computed(() => {
+  const columns = layoutColumns.value
+  if (!props.isEditing) return columns.filter((column) => column.slots.length > 0)
+  if (props.tiles.length === 0 && props.columns.length === 0) return []
+  return columns
+})
+const gridCells = Array.from({ length: START_SCREEN_COLUMN_ROWS * START_SCREEN_COLUMN_COLS }, (_, index) => ({
+  row: Math.floor(index / START_SCREEN_COLUMN_COLS),
+  col: index % START_SCREEN_COLUMN_COLS,
+}))
+const newColumnIndex = computed(() => {
+  const maxTileColumn = props.tiles.reduce(
+    (max, tile) => Math.max(max, Number.isFinite(tile.column_index) ? tile.column_index : 0),
+    -1,
+  )
+  return Math.max(props.columns.length, maxTileColumn + 1)
+})
 
-const filteredIndexByGameId = (gameId: number) => {
-  const index = filteredTiles.value.findIndex((tile) => tile.game_id === gameId)
-  return index === -1 ? undefined : String(index)
-}
+const isNewColumnTarget = computed(() =>
+  Boolean(dragState.value && dragState.value.targetColumnIndex === newColumnIndex.value),
+)
 
 const isDraggedTile = (tile: StartScreenTile) => dragState.value?.gameId === tile.game_id
+
+const isDropTarget = (columnIndex: number, row: number, col: number) =>
+  Boolean(
+    dragState.value &&
+    dragState.value.targetColumnIndex === columnIndex &&
+    dragState.value.targetRow === row &&
+    dragState.value.targetCol === col,
+  )
+
+const columnHasTiles = (columnIndex: number) =>
+  props.tiles.some((tile) => (Number.isFinite(tile.column_index) ? tile.column_index : 0) === columnIndex)
 
 const columnNameOf = (index: number) => {
   const name = props.columns[index]?.name?.trim()
@@ -275,6 +351,10 @@ const columnNameOf = (index: number) => {
 const handleRenameColumn = (index: number, event: Event) => {
   const target = event.target as HTMLInputElement
   emit('renameColumn', index, target.value)
+}
+
+const handleAddColumn = () => {
+  emit('addColumn')
 }
 
 const handleClose = () => {
@@ -356,6 +436,7 @@ const onTilePointerDown = (index: number, event: PointerEvent) => {
   if (!props.isEditing) return
   const tile = props.tiles[index]
   if (!tile) return
+  if ((event.target as HTMLElement).closest('.metro-tile__action')) return
   pendingDrag = { gameId: tile.game_id, fromIndex: index }
   dragStart = { x: event.clientX, y: event.clientY }
   window.addEventListener('pointermove', onWindowPointerMove)
@@ -369,10 +450,13 @@ const onWindowPointerMove = (event: PointerEvent) => {
     return
   }
   if (!dragState.value) {
+    const fromTile = props.tiles[pendingDrag.fromIndex]
     dragState.value = {
       gameId: pendingDrag.gameId,
       fromIndex: pendingDrag.fromIndex,
-      targetIndex: pendingDrag.fromIndex,
+      targetColumnIndex: fromTile?.column_index ?? 0,
+      targetRow: fromTile?.grid_row ?? 0,
+      targetCol: fromTile?.grid_col ?? 0,
     }
   }
   dragPointer.value = { x: event.clientX, y: event.clientY }
@@ -383,14 +467,37 @@ const onWindowPointerMove = (event: PointerEvent) => {
 const updateDragTarget = (x: number, y: number) => {
   if (!dragState.value) return
   const hit = document.elementFromPoint(x, y)
-  const slot = hit?.closest?.('.start-screen__tile-slot')
-  if (!slot) return
-  const rawIndex = (slot as HTMLElement).dataset.filteredIndex
-  if (rawIndex === undefined || rawIndex === '') return
-  const target = Number(rawIndex)
-  if (Number.isInteger(target) && target >= 0) {
-    dragState.value.targetIndex = target
+  const cell = hit?.closest?.('[data-start-screen-cell]') as HTMLElement | null
+  if (!cell) return
+  const rawColumn = cell.dataset.columnIndex
+  const rawRow = cell.dataset.row
+  const rawCol = cell.dataset.col
+  const columnIndex = Number(rawColumn)
+  const row = Number(rawRow)
+  const col = Number(rawCol)
+  const dragged = draggedTile.value
+  if (
+    !dragged ||
+    !Number.isInteger(columnIndex) ||
+    !Number.isInteger(row) ||
+    !Number.isInteger(col) ||
+    columnIndex < 0 ||
+    row < 0 ||
+    col < 0
+  ) {
+    return
   }
+  const target = findStartScreenDropTarget(
+    props.tiles,
+    dragState.value.gameId,
+    columnIndex,
+    row,
+    col,
+    dragged.tile_size,
+  )
+  dragState.value.targetColumnIndex = target.columnIndex
+  dragState.value.targetRow = target.row
+  dragState.value.targetCol = target.col
 }
 
 const updateEdgeScroll = (x: number) => {
@@ -418,7 +525,13 @@ const updateEdgeScroll = (x: number) => {
 
 const onWindowPointerUp = () => {
   if (dragState.value) {
-    emit('applyOrder', displayTiles.value.map((tile) => ({ ...tile })))
+    emit(
+      'applyPlacement',
+      dragState.value.gameId,
+      dragState.value.targetColumnIndex,
+      dragState.value.targetRow,
+      dragState.value.targetCol,
+    )
   }
   endDrag()
 }
@@ -580,6 +693,7 @@ onUnmounted(() => {
   grid-template-columns: repeat(2, var(--start-cell));
   grid-template-rows: repeat(6, var(--start-cell));
   gap: var(--start-gap);
+  position: relative;
   width: max-content;
 }
 
@@ -589,7 +703,16 @@ onUnmounted(() => {
   gap: 10px;
 }
 
+.start-screen__column-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .start-screen__column-name {
+  flex: 1;
+  min-width: 0;
   font-size: 14px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.78);
@@ -598,7 +721,8 @@ onUnmounted(() => {
 }
 
 .start-screen__column-name-input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   box-sizing: border-box;
   padding: 6px 10px;
   border: 1px solid rgba(255, 255, 255, 0.35);
@@ -610,12 +734,76 @@ onUnmounted(() => {
   outline: none;
 }
 
+.start-screen__column-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 6px;
+}
+
 .start-screen__column-name-input:focus {
   border-color: rgba(255, 255, 255, 0.75);
   background: rgba(255, 255, 255, 0.14);
 }
 
+.start-screen__column-tiles {
+  display: contents;
+}
+
+.start-screen__drop-cell {
+  position: relative;
+  z-index: 0;
+  min-width: 0;
+  min-height: 0;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.start-screen__drop-cell--target {
+  border-color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45);
+}
+
+.start-screen__new-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-shrink: 0;
+  width: calc(var(--start-cell) * 2 + var(--start-gap));
+  min-height: calc(var(--start-cell) * 6 + var(--start-gap) * 5);
+  border: 2px dashed rgba(255, 255, 255, 0.42);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+.start-screen__new-column:hover,
+.start-screen__new-column--target {
+  border-color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45);
+}
+
+.start-screen__new-column .arco-icon {
+  font-size: 28px;
+}
+
 .start-screen__tile-slot {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   min-height: 0;
   /* Win8.1 磁贴层：上浮 10px 弹入（back-out 轻微过冲）+ 淡入 */
@@ -642,6 +830,12 @@ onUnmounted(() => {
 .start-screen__tile-slot--dragging {
   opacity: 0;
   pointer-events: none;
+}
+
+.start-screen__tile-slot--target {
+  outline: 3px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 .start-screen__metro.is-editing .start-screen__tile-slot {

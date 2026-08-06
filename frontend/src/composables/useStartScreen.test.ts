@@ -27,18 +27,30 @@ const makeGame = (publicId: string, id = 1): GameListItem => ({
   updated_at: '',
 } as unknown as GameListItem)
 
-const makeTile = (gameId: number, publicId: string, tileSize: StartScreenTile['tile_size'] = 'small'): StartScreenTile => ({
-  game_id: gameId,
-  public_id: publicId,
-  title: publicId,
-  cover_image: null,
-  banner_image: null,
-  tile_size: tileSize,
-  image_small_path: null,
-  image_wide_path: null,
-  image_large_path: null,
-  sort_order: 0,
-})
+const makeTile = (
+  gameId: number,
+  publicId: string,
+  tileSizeOrPosition: StartScreenTile['tile_size'] | Partial<Pick<StartScreenTile, 'column_index' | 'grid_row' | 'grid_col'>> = 'small',
+): StartScreenTile => {
+  const options = typeof tileSizeOrPosition === 'string' ? {} : tileSizeOrPosition
+  const tileSize = typeof tileSizeOrPosition === 'string' ? tileSizeOrPosition : 'small'
+  return {
+    game_id: gameId,
+    public_id: publicId,
+    title: publicId,
+    cover_image: null,
+    banner_image: null,
+    tile_size: tileSize,
+    image_small_path: null,
+    image_wide_path: null,
+    image_large_path: null,
+    sort_order: 0,
+    column_index: 0,
+    grid_row: 0,
+    grid_col: 0,
+    ...options,
+  }
+}
 
 const makeColumn = (name: string, id = 1): StartScreenColumn => ({
   id,
@@ -182,6 +194,9 @@ describe('useStartScreen', () => {
         image_small_path: null,
         image_wide_path: null,
         image_large_path: null,
+        column_index: 0,
+        grid_row: 0,
+        grid_col: 0,
       }],
     })
     expect(screen.columns.value[0]?.name).toBe('改名')
@@ -267,5 +282,53 @@ describe('useStartScreen', () => {
     expect(screen.tiles.value[0]?.image_wide_path).toBe('/assets/start-screen/wide.png')
     expect(screen.tiles.value[0]?.image_large_path).toBe('/assets/start-screen/large.png')
     expect(addAlert).toHaveBeenCalledWith('磁贴图片已更新', 'success')
+  })
+
+  it('adds and removes empty columns without moving occupied tiles', async () => {
+    const { screen } = createScreen({
+      fetchTiles: vi.fn().mockResolvedValue(makeLayout(
+        [makeTile(1, 'a', { column_index: 1 })],
+        [makeColumn('一'), makeColumn('二')],
+      )),
+    })
+
+    screen.open()
+    await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
+    await screen.startEdit()
+    screen.addColumn()
+    expect(screen.columns.value).toHaveLength(3)
+
+    screen.removeColumn(2)
+    expect(screen.tiles.value[0]?.column_index).toBe(1)
+    expect(screen.columns.value.map((column) => column.name)).toEqual(['一', '二'])
+  })
+
+  it('places a tile into an explicit empty column and saves it', async () => {
+    const saveTiles = vi.fn().mockResolvedValue(makeLayout([], []))
+    const { screen } = createScreen({
+      fetchTiles: vi.fn().mockResolvedValue(makeLayout([makeTile(1, 'a')])),
+      saveTiles,
+    })
+
+    screen.open()
+    await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
+    await screen.startEdit()
+    screen.applyTilePlacement(1, 2, 3, 0)
+    expect(screen.tiles.value[0]).toMatchObject({ column_index: 2, grid_row: 3, grid_col: 0 })
+    await screen.saveEdit()
+
+    expect(saveTiles).toHaveBeenCalledWith({
+      columns: [{ name: '' }, { name: '' }, { name: '' }],
+      tiles: [{
+        game_id: 1,
+        tile_size: 'small',
+        image_small_path: null,
+        image_wide_path: null,
+        image_large_path: null,
+        column_index: 2,
+        grid_row: 3,
+        grid_col: 0,
+      }],
+    })
   })
 })

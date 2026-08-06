@@ -4,6 +4,9 @@ const (
 	StartScreenTileSizeSmall StartScreenTileSize = "small"
 	StartScreenTileSizeWide  StartScreenTileSize = "wide"
 	StartScreenTileSizeLarge StartScreenTileSize = "large"
+
+	StartScreenColumnRows = 6
+	StartScreenColumnCols = 2
 )
 
 type StartScreenTileSize string
@@ -29,6 +32,9 @@ type StartScreenTile struct {
 	ImageWidePath  *string `db:"image_wide_path"`
 	ImageLargePath *string `db:"image_large_path"`
 	SortOrder      int     `db:"sort_order"`
+	ColumnIndex    int     `db:"column_index"`
+	GridRow        int     `db:"grid_row"`
+	GridCol        int     `db:"grid_col"`
 	CreatedAt      string  `db:"created_at"`
 	UpdatedAt      string  `db:"updated_at"`
 }
@@ -39,6 +45,9 @@ type StartScreenTileWrite struct {
 	ImageSmallPath *string
 	ImageWidePath  *string
 	ImageLargePath *string
+	ColumnIndex    int
+	GridRow        int
+	GridCol        int
 }
 
 type StartScreenColumn struct {

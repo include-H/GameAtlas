@@ -385,6 +385,9 @@ export interface StartScreenTile {
   image_wide_path: string | null
   image_large_path: string | null
   sort_order: number
+  column_index: number
+  grid_row: number
+  grid_col: number
 }
 
 export interface StartScreenTileWrite {
@@ -393,6 +396,9 @@ export interface StartScreenTileWrite {
   image_small_path: string | null
   image_wide_path: string | null
   image_large_path: string | null
+  column_index: number
+  grid_row: number
+  grid_col: number
 }
 
 export interface StartScreenColumn {

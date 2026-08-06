@@ -42,6 +42,9 @@ func (h *StartScreenTilesHandler) Update(c *gin.Context) {
 			ImageSmallPath *string `json:"image_small_path"`
 			ImageWidePath  *string `json:"image_wide_path"`
 			ImageLargePath *string `json:"image_large_path"`
+			ColumnIndex    *int    `json:"column_index"`
+			GridRow        *int    `json:"grid_row"`
+			GridCol        *int    `json:"grid_col"`
 		} `json:"tiles"`
 	}
 	if err := decodeJSONStrict(c, &request); err != nil {
@@ -62,6 +65,9 @@ func (h *StartScreenTilesHandler) Update(c *gin.Context) {
 			ImageSmallPath: item.ImageSmallPath,
 			ImageWidePath:  item.ImageWidePath,
 			ImageLargePath: item.ImageLargePath,
+			ColumnIndex:    intValueOrZero(item.ColumnIndex),
+			GridRow:        intValueOrZero(item.GridRow),
+			GridCol:        intValueOrZero(item.GridCol),
 		})
 	}
 
@@ -84,6 +90,9 @@ func (h *StartScreenTilesHandler) AddTile(c *gin.Context) {
 		ImageSmallPath *string `json:"image_small_path"`
 		ImageWidePath  *string `json:"image_wide_path"`
 		ImageLargePath *string `json:"image_large_path"`
+		ColumnIndex    *int    `json:"column_index"`
+		GridRow        *int    `json:"grid_row"`
+		GridCol        *int    `json:"grid_col"`
 	}
 	if err := decodeJSONStrict(c, &request); err != nil {
 		writeJSONError(c, http.StatusBadRequest, "无效的开始屏幕磁贴数据")
@@ -96,12 +105,22 @@ func (h *StartScreenTilesHandler) AddTile(c *gin.Context) {
 		ImageSmallPath: request.ImageSmallPath,
 		ImageWidePath:  request.ImageWidePath,
 		ImageLargePath: request.ImageLargePath,
+		ColumnIndex:    intValueOrZero(request.ColumnIndex),
+		GridRow:        intValueOrZero(request.GridRow),
+		GridCol:        intValueOrZero(request.GridCol),
 	})
 	if err != nil {
 		writeServiceError(c, err, "添加到开始屏幕失败")
 		return
 	}
 	writeJSONSuccess(c, http.StatusCreated, toStartScreenLayoutResponse(result))
+}
+
+func intValueOrZero(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 func (h *StartScreenTilesHandler) RemoveTile(c *gin.Context) {
@@ -178,6 +197,9 @@ func toStartScreenTileResponses(tiles []domain.StartScreenTile) []startScreenTil
 			ImageWidePath:  tile.ImageWidePath,
 			ImageLargePath: tile.ImageLargePath,
 			SortOrder:      tile.SortOrder,
+			ColumnIndex:    tile.ColumnIndex,
+			GridRow:        tile.GridRow,
+			GridCol:        tile.GridCol,
 		})
 	}
 	return result
@@ -205,4 +227,7 @@ type startScreenTileResponse struct {
 	ImageWidePath  *string `json:"image_wide_path"`
 	ImageLargePath *string `json:"image_large_path"`
 	SortOrder      int     `json:"sort_order"`
+	ColumnIndex    int     `json:"column_index"`
+	GridRow        int     `json:"grid_row"`
+	GridCol        int     `json:"grid_col"`
 }

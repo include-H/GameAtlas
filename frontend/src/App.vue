@@ -150,7 +150,9 @@
     @save-edit="saveStartScreenEdit"
     @resize="resizeStartScreenTile"
     @remove="removeStartScreenTile"
-    @apply-order="applyStartScreenOrder"
+    @apply-placement="applyStartScreenPlacement"
+    @add-column="addStartScreenColumn"
+    @remove-column="removeStartScreenColumn"
     @apply-crop="applyStartScreenCrop"
     @rename-column="renameStartScreenColumn"
   />
@@ -202,7 +204,9 @@ const {
   saveEdit: saveStartScreenEdit,
   resizeTile: resizeStartScreenTile,
   removeTile: removeStartScreenTile,
-  applyTileOrder: applyStartScreenOrder,
+  applyTilePlacement: applyStartScreenPlacement,
+  addColumn: addStartScreenColumn,
+  removeColumn: removeStartScreenColumn,
   applyTileCrop: applyStartScreenCrop,
   renameColumn: renameStartScreenColumn,
 } = useStartScreen({

@@ -27,7 +27,8 @@ func (r *StartScreenTilesRepository) List(includeAll bool) ([]domain.StartScreen
 		SELECT
 			t.id, t.game_id, g.public_id, g.title, g.cover_image, g.banner_image,
 			t.tile_size, t.image_small_path, t.image_wide_path, t.image_large_path,
-			t.sort_order, t.created_at, t.updated_at
+			t.sort_order, t.column_index, t.grid_row, t.grid_col,
+			t.created_at, t.updated_at
 		FROM start_screen_tiles t
 		INNER JOIN games g ON g.id = t.game_id
 		`+where+`
@@ -57,10 +58,12 @@ func (r *StartScreenTilesRepository) Replace(tiles []domain.StartScreenTileWrite
 	for index, tile := range tiles {
 		if _, err := tx.Exec(`
 			INSERT INTO start_screen_tiles (
-				game_id, tile_size, image_small_path, image_wide_path, image_large_path, sort_order
+				game_id, tile_size, image_small_path, image_wide_path, image_large_path,
+				sort_order, column_index, grid_row, grid_col
 			)
-			VALUES (?, ?, ?, ?, ?, ?)
-		`, tile.GameID, tile.TileSize, tile.ImageSmallPath, tile.ImageWidePath, tile.ImageLargePath, index); err != nil {
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, tile.GameID, tile.TileSize, tile.ImageSmallPath, tile.ImageWidePath, tile.ImageLargePath,
+			index, tile.ColumnIndex, tile.GridRow, tile.GridCol); err != nil {
 			return fmt.Errorf("insert start screen tile: %w", err)
 		}
 	}
@@ -84,7 +87,7 @@ func (r *StartScreenTilesRepository) RemoveByGameID(gameID int64) (bool, error) 
 	return rows > 0, nil
 }
 
-// Append 在末尾追加一个磁贴；game_id 已存在时不做任何修改并返回 false。
+// Append 以新的 sort_order 追加一个磁贴，位置由服务层计算后写入；game_id 已存在时不做任何修改并返回 false。
 func (r *StartScreenTilesRepository) Append(tile domain.StartScreenTileWrite) (bool, error) {
 	var maxOrder sql.NullInt64
 	if err := r.db.Get(&maxOrder, `SELECT MAX(sort_order) FROM start_screen_tiles`); err != nil {
@@ -97,10 +100,12 @@ func (r *StartScreenTilesRepository) Append(tile domain.StartScreenTileWrite) (b
 
 	result, err := r.db.Exec(`
 		INSERT OR IGNORE INTO start_screen_tiles (
-			game_id, tile_size, image_small_path, image_wide_path, image_large_path, sort_order
+			game_id, tile_size, image_small_path, image_wide_path, image_large_path,
+			sort_order, column_index, grid_row, grid_col
 		)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, tile.GameID, tile.TileSize, tile.ImageSmallPath, tile.ImageWidePath, tile.ImageLargePath, nextOrder)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, tile.GameID, tile.TileSize, tile.ImageSmallPath, tile.ImageWidePath, tile.ImageLargePath,
+		nextOrder, tile.ColumnIndex, tile.GridRow, tile.GridCol)
 	if err != nil {
 		return false, fmt.Errorf("append start screen tile: %w", err)
 	}

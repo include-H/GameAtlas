@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { packStartScreenTiles } from './start-screen-layout'
+import {
+  findStartScreenDropTarget,
+  layoutStartScreenTiles,
+  normalizeStartScreenTiles,
+  packStartScreenTiles,
+} from './start-screen-layout'
 import type { StartScreenTile } from '@/services/types'
 
-const makeTile = (gameId: number, tileSize: StartScreenTile['tile_size']): StartScreenTile => ({
+const makeTile = (
+  gameId: number,
+  tileSize: StartScreenTile['tile_size'],
+  position: Partial<Pick<StartScreenTile, 'column_index' | 'grid_row' | 'grid_col'>> = {},
+): StartScreenTile => ({
   game_id: gameId,
   public_id: `game-${gameId}`,
   title: `Game ${gameId}`,
@@ -13,6 +22,10 @@ const makeTile = (gameId: number, tileSize: StartScreenTile['tile_size']): Start
   image_wide_path: null,
   image_large_path: null,
   sort_order: 0,
+  column_index: 0,
+  grid_row: 0,
+  grid_col: 0,
+  ...position,
 })
 
 describe('packStartScreenTiles', () => {
@@ -94,5 +107,49 @@ describe('packStartScreenTiles', () => {
     ])
 
     expect(columns[0]?.slots.map((s) => s.globalIndex)).toEqual([0, 1, 2])
+  })
+
+  it('normalizes overlapping explicit placements', () => {
+    const normalized = normalizeStartScreenTiles([
+      makeTile(1, 'large', { column_index: 0, grid_row: 0, grid_col: 0 }),
+      makeTile(2, 'small', { column_index: 0, grid_row: 0, grid_col: 0 }),
+    ])
+
+    expect(normalized[0]).toMatchObject({ column_index: 0, grid_row: 0, grid_col: 0 })
+    expect(normalized[1]).toMatchObject({ column_index: 0, grid_row: 2, grid_col: 0 })
+  })
+
+  it('keeps explicit empty columns in the layout', () => {
+    const columns = layoutStartScreenTiles([
+      makeTile(1, 'small', { column_index: 2, grid_row: 1, grid_col: 1 }),
+    ], 4)
+
+    expect(columns).toHaveLength(4)
+    expect(columns[0]?.slots).toEqual([])
+    expect(columns[1]?.slots).toEqual([])
+    expect(columns[2]?.slots[0]).toMatchObject({
+      row: 1,
+      col: 1,
+      tile: expect.objectContaining({ game_id: 1 }),
+    })
+  })
+
+  it('finds the nearest free cell or opens a new column', () => {
+    const tiles = [
+      makeTile(1, 'small', { column_index: 0, grid_row: 0, grid_col: 0 }),
+    ]
+
+    expect(findStartScreenDropTarget(tiles, 99, 0, 0, 0, 'small'))
+      .toEqual({ columnIndex: 0, row: 0, col: 1 })
+
+    const fullColumn = Array.from({ length: 12 }, (_, index) =>
+      makeTile(index + 10, 'small', {
+        column_index: 0,
+        grid_row: Math.floor(index / 2),
+        grid_col: index % 2,
+      }),
+    )
+    expect(findStartScreenDropTarget(fullColumn, 99, 0, 5, 1, 'small'))
+      .toEqual({ columnIndex: 1, row: 0, col: 0 })
   })
 })

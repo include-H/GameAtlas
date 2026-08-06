@@ -53,10 +53,10 @@ func TestStartScreenTilesUpdatePersistsOrderAndSizes(t *testing.T) {
 	)
 
 	layout, err := service.Update(
-		[]domain.StartScreenColumnWrite{{Name: "第一列"}},
+		[]domain.StartScreenColumnWrite{{Name: "第一列"}, {Name: "第二列"}},
 		[]domain.StartScreenTileWrite{
-			{GameID: secondID, TileSize: "wide"},
-			{GameID: firstID, TileSize: "large"},
+			{GameID: secondID, TileSize: "wide", ColumnIndex: 1, GridRow: 3},
+			{GameID: firstID, TileSize: "large", ColumnIndex: 0, GridRow: 2},
 		},
 	)
 	if err != nil {
@@ -68,14 +68,47 @@ func TestStartScreenTilesUpdatePersistsOrderAndSizes(t *testing.T) {
 	if layout.Tiles[0].GameID != secondID || layout.Tiles[0].TileSize != "wide" || layout.Tiles[0].SortOrder != 0 {
 		t.Fatalf("first tile = %+v, want second game first with wide size", layout.Tiles[0])
 	}
+	if layout.Tiles[0].ColumnIndex != 1 || layout.Tiles[0].GridRow != 3 || layout.Tiles[0].GridCol != 0 {
+		t.Fatalf("first tile position = %+v, want column 1 row 3 col 0", layout.Tiles[0])
+	}
 	if layout.Tiles[1].GameID != firstID || layout.Tiles[1].TileSize != "large" || layout.Tiles[1].SortOrder != 1 {
 		t.Fatalf("second tile = %+v, want first game second with large size", layout.Tiles[1])
+	}
+	if layout.Tiles[1].ColumnIndex != 0 || layout.Tiles[1].GridRow != 2 || layout.Tiles[1].GridCol != 0 {
+		t.Fatalf("second tile position = %+v, want column 0 row 2 col 0", layout.Tiles[1])
 	}
 	if layout.Tiles[0].PublicID != "tile-b" || layout.Tiles[0].Title != "Tile B" {
 		t.Fatalf("first tile join = %+v, want tile-b metadata", layout.Tiles[0])
 	}
-	if len(layout.Columns) != 1 || layout.Columns[0].Name != "第一列" {
-		t.Fatalf("columns = %+v, want one column named 第一列", layout.Columns)
+	if len(layout.Columns) != 2 || layout.Columns[0].Name != "第一列" || layout.Columns[1].Name != "第二列" {
+		t.Fatalf("columns = %+v, want two columns with names", layout.Columns)
+	}
+}
+
+func TestStartScreenTilesUpdateKeepsEmptyColumns(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	gameID := insertServicesTestGame(t, db, "tile-empty-column", "Tile Empty Column", domain.GameVisibilityPublic)
+	service := NewStartScreenTilesService(
+		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewStartScreenColumnsRepository(db),
+		repositories.NewGamesRepository(db),
+		files.NewAssetStore(t.TempDir()),
+	)
+
+	layout, err := service.Update(
+		[]domain.StartScreenColumnWrite{{Name: "第一列"}, {Name: ""}, {Name: "第三列"}},
+		[]domain.StartScreenTileWrite{{GameID: gameID, TileSize: "small", ColumnIndex: 2}},
+	)
+	if err != nil {
+		t.Fatalf("Update returned error: %v", err)
+	}
+	if len(layout.Columns) != 3 || layout.Columns[1].Name != "" || layout.Columns[2].Name != "第三列" {
+		t.Fatalf("columns = %+v, want empty middle column preserved", layout.Columns)
+	}
+	if len(layout.Tiles) != 1 || layout.Tiles[0].ColumnIndex != 2 {
+		t.Fatalf("tiles = %+v, want tile in column 2", layout.Tiles)
 	}
 }
 
@@ -105,6 +138,15 @@ func TestStartScreenTilesUpdateRejectsInvalidInput(t *testing.T) {
 	}
 	if _, err := service.Update([]domain.StartScreenColumnWrite{{Name: strings.Repeat("名", 31)}}, nil); !errors.Is(err, domain.ErrValidation) {
 		t.Fatalf("long column name error = %v, want ErrValidation", err)
+	}
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{GameID: gameID, TileSize: "small", GridRow: 6}}); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("out of bounds row error = %v, want ErrValidation", err)
+	}
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{GameID: gameID, TileSize: "wide", GridCol: 1}}); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("wide tile second column error = %v, want ErrValidation", err)
+	}
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{GameID: gameID, TileSize: "large", GridRow: 5}}); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("large tile low row error = %v, want ErrValidation", err)
 	}
 }
 
@@ -293,6 +335,9 @@ func TestStartScreenTilesAddTileAppendsAtEnd(t *testing.T) {
 	if layout.Tiles[1].GameID != secondID || layout.Tiles[1].TileSize != "wide" || layout.Tiles[1].SortOrder != 1 {
 		t.Fatalf("appended tile = %+v, want second game at the end", layout.Tiles[1])
 	}
+	if layout.Tiles[1].ColumnIndex != 0 || layout.Tiles[1].GridRow != 1 || layout.Tiles[1].GridCol != 0 {
+		t.Fatalf("appended tile position = %+v, want next free wide cell in first column", layout.Tiles[1])
+	}
 
 	// 重复添加同一游戏：幂等，不产生重复磁贴。
 	layout, err = service.AddTile(domain.StartScreenTileWrite{GameID: secondID, TileSize: "large"})
@@ -301,6 +346,54 @@ func TestStartScreenTilesAddTileAppendsAtEnd(t *testing.T) {
 	}
 	if len(layout.Tiles) != 2 {
 		t.Fatalf("duplicate AddTile returned %d tiles, want 2", len(layout.Tiles))
+	}
+}
+
+func TestStartScreenTilesAddTileFillsEmptyColumnFirst(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	firstID := insertServicesTestGame(t, db, "tile-empty-add-a", "Tile Empty Add A", domain.GameVisibilityPublic)
+	secondID := insertServicesTestGame(t, db, "tile-empty-add-b", "Tile Empty Add B", domain.GameVisibilityPublic)
+	thirdID := insertServicesTestGame(t, db, "tile-empty-add-c", "Tile Empty Add C", domain.GameVisibilityPublic)
+	fourthID := insertServicesTestGame(t, db, "tile-empty-add-d", "Tile Empty Add D", domain.GameVisibilityPublic)
+	fifthID := insertServicesTestGame(t, db, "tile-empty-add-e", "Tile Empty Add E", domain.GameVisibilityPublic)
+
+	service := NewStartScreenTilesService(
+		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewStartScreenColumnsRepository(db),
+		repositories.NewGamesRepository(db),
+		files.NewAssetStore(t.TempDir()),
+	)
+
+	if _, err := service.Update(
+		[]domain.StartScreenColumnWrite{{Name: "第一列"}, {Name: ""}, {Name: "第三列"}},
+		[]domain.StartScreenTileWrite{
+			{GameID: thirdID, TileSize: "large", ColumnIndex: 0},
+			{GameID: fourthID, TileSize: "large", ColumnIndex: 0, GridRow: 2},
+			{GameID: fifthID, TileSize: "large", ColumnIndex: 0, GridRow: 4},
+			{GameID: firstID, TileSize: "small", ColumnIndex: 2},
+		},
+	); err != nil {
+		t.Fatalf("initial Update returned error: %v", err)
+	}
+
+	layout, err := service.AddTile(domain.StartScreenTileWrite{GameID: secondID, TileSize: "wide"})
+	if err != nil {
+		t.Fatalf("AddTile returned error: %v", err)
+	}
+	if len(layout.Tiles) != 5 {
+		t.Fatalf("AddTile returned %d tiles, want 5", len(layout.Tiles))
+	}
+	var added *domain.StartScreenTile
+	for index := range layout.Tiles {
+		if layout.Tiles[index].GameID == secondID {
+			added = &layout.Tiles[index]
+			break
+		}
+	}
+	if added == nil || added.ColumnIndex != 1 || added.GridRow != 0 || added.GridCol != 0 {
+		t.Fatalf("appended tile = %+v, want empty middle column first cell", added)
 	}
 }
 
