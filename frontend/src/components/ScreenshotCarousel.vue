@@ -57,6 +57,7 @@
                       :src="currentVideoPoster"
                       class="screenshot-carousel__loader-thumb"
                       alt=""
+                      @error="handlePosterError(currentVideoPoster)"
                     />
                     <svg class="screenshot-carousel__loader-arc" viewBox="0 0 100 100">
                       <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" style="opacity: 0.1" stroke-width="3" />
@@ -79,6 +80,7 @@
                   :src="currentVideoPoster"
                   class="screenshot-carousel__loader-thumb"
                   alt=""
+                  @error="handlePosterError(currentVideoPoster)"
                 >
                 <span class="screenshot-carousel__video-failed-text">视频加载失败</span>
               </div>
@@ -117,7 +119,7 @@
             v-if="item.thumbnail"
             :src="item.thumbnail"
             :alt="item.type === 'video' ? 'Video thumbnail' : `Screenshot ${index + 1}`"
-            @error="item.type === 'image' ? handleImageError(item.thumbnail) : undefined"
+            @error="item.type === 'image' ? handleImageError(item.thumbnail) : (item.poster ? handlePosterError(item.poster) : undefined)"
           />
           <div v-else class="screenshot-carousel__film-placeholder">
             <svg viewBox="0 0 24 24" width="24" height="24">
@@ -175,6 +177,7 @@ const videoRef = ref<HTMLVideoElement | null>(null)
 const viewportAspect = ref<'16 / 9' | '4 / 3'>('16 / 9')
 const viewportWidth = ref(0)
 const brokenImages = ref<string[]>([])
+const brokenPosters = ref<string[]>([])
 const aspectResolved = ref(false)
 const imageLoaded = ref(false)
 const videoReady = ref(false)
@@ -190,13 +193,17 @@ const visibleScreenshots = computed(() => {
 
 const mediaItems = computed<MediaItem[]>(() => {
   const items: MediaItem[] = []
+  const brokenSet = new Set(brokenPosters.value)
   const fallbackPoster = props.videoPoster ? resolveAssetUrl(props.videoPoster) : null
   props.previewVideos
     .filter((video) => Boolean(video.path))
     .forEach((video, index) => {
       const videoUrl = resolveAssetUrl(video.path)
       if (!videoUrl) return
-      const poster = video.poster_path ? resolveAssetUrl(video.poster_path) : fallbackPoster
+      const ownPoster = video.poster_path ? resolveAssetUrl(video.poster_path) : null
+      const poster = ownPoster && !brokenSet.has(ownPoster)
+        ? ownPoster
+        : (fallbackPoster && !brokenSet.has(fallbackPoster) ? fallbackPoster : null)
       items.push({
         key: `video:${index}:${videoUrl}`,
         type: 'video',
@@ -243,6 +250,7 @@ const viewportStyle = computed(() => {
 
 watch(() => [props.screenshots, props.previewVideos], () => {
   brokenImages.value = []
+  brokenPosters.value = []
   videoFailed.value = false
   aspectResolved.value = false
   const items = mediaItems.value
@@ -392,6 +400,11 @@ const handleVideoEnded = () => {
 const handleImageError = (url: string) => {
   if (!url || brokenImages.value.includes(url)) return
   brokenImages.value = [...brokenImages.value, url]
+}
+
+const handlePosterError = (url: string) => {
+  if (!url || brokenPosters.value.includes(url)) return
+  brokenPosters.value = [...brokenPosters.value, url]
 }
 </script>
 
