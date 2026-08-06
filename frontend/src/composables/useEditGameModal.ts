@@ -283,7 +283,6 @@ export const useEditGameModal = ({
 
   const uploadData = computed(() => ({
     game_id: String(props.game?.id || ''),
-    sort_order: '0',
   }))
 
   const bannerUploadAction = computed(() => {
@@ -292,7 +291,6 @@ export const useEditGameModal = ({
 
   const bannerUploadData = computed(() => ({
     game_id: String(props.game?.id || ''),
-    sort_order: '0',
   }))
 
   const screenshotUploadAction = computed(() => {
@@ -301,7 +299,6 @@ export const useEditGameModal = ({
 
   const screenshotUploadData = computed(() => ({
     game_id: String(props.game?.id || ''),
-    sort_order: String(form.value.screenshots.length),
   }))
 
   const logoUploadAction = computed(() => {
@@ -310,7 +307,6 @@ export const useEditGameModal = ({
 
   const logoUploadData = computed(() => ({
     game_id: String(props.game?.id || ''),
-    sort_order: '0',
   }))
 
   const uploadHeaders = computed(() => ({}))
@@ -494,7 +490,6 @@ export const useEditGameModal = ({
   const uploadAssetFromUrl = async (
     url: string,
     assetType: 'cover' | 'banner' | 'screenshot' | 'video' | 'logo',
-    sortOrder = 0,
   ) => {
     if (!props.game?.id) {
       throw new Error('缺少游戏 ID')
@@ -511,7 +506,7 @@ export const useEditGameModal = ({
       type: blob.type || 'image/jpeg',
     })
 
-    return uploadAsset(assetType, props.game.id, file, sortOrder)
+    return uploadAsset(assetType, props.game.id, file)
   }
 
   const {

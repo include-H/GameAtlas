@@ -12,12 +12,10 @@ export async function uploadAsset(
   assetType: AssetType,
   gameId: number,
   file: File,
-  sortOrder = 0,
   onProgress?: (percent: number) => void,
 ) {
   const form = new FormData()
   form.append('game_id', String(gameId))
-  form.append('sort_order', String(sortOrder))
   form.append('file', file)
 
   const { data } = await api.post<ApiEnvelope<UploadedAssetResult>>(`/assets/${assetType}`, form, {

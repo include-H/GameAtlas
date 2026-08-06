@@ -131,7 +131,7 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
         options.videoUploadProgress.value = 0
         options.videoUploadFileName.value = file.name
 
-        const uploaded = await uploadAsset('video', gameId, file, options.form.value.preview_videos.length, (percent) => {
+        const uploaded = await uploadAsset('video', gameId, file, (percent) => {
           options.videoUploadProgress.value = percent
         })
         const video = options.createEditableVideo(uploaded)

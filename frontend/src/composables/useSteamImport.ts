@@ -37,7 +37,6 @@ interface UseSteamImportOptions {
   uploadAssetFromUrl: (
     url: string,
     assetType: 'cover' | 'banner' | 'screenshot' | 'logo',
-    sortOrder?: number,
   ) => Promise<UploadedAssetLike>
   createEditableCover: (
     asset: UploadedAssetLike | string,
@@ -378,7 +377,6 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       const uploaded = await options.uploadAssetFromUrl(
         screenshotPreviewUrl.value,
         'screenshot',
-        options.form.value.screenshots.length,
       )
       options.form.value.screenshots.push(
         options.createEditableScreenshot(uploaded, options.form.value.screenshots.length),
@@ -407,7 +405,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
         const index = indices[i]
         const screenshotUrl = screenshotCandidatesData.value.screenshots[index]
         const currentIndex = options.form.value.screenshots.length
-        const uploaded = await options.uploadAssetFromUrl(screenshotUrl, 'screenshot', currentIndex)
+        const uploaded = await options.uploadAssetFromUrl(screenshotUrl, 'screenshot')
         options.form.value.screenshots.push(options.createEditableScreenshot(uploaded, currentIndex))
       }
 

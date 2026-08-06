@@ -128,13 +128,11 @@ describe('useSteamImport', () => {
       1,
       'https://cdn.example.com/hero-1.jpg',
       'screenshot',
-      0,
     )
     expect(uploadAssetFromUrl).toHaveBeenNthCalledWith(
       2,
       'https://cdn.example.com/hero-2.jpg',
       'screenshot',
-      1,
     )
     expect(form.value.screenshots.map((item) => item.path)).toEqual([
       '/assets/shot-1.jpg',

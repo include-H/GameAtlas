@@ -27,7 +27,6 @@ interface UseSteamImportDownloadOptions {
   uploadAssetFromUrl: (
     url: string,
     assetType: 'cover' | 'banner',
-    sortOrder?: number,
   ) => Promise<UploadedAssetLike>
   createEditableCover: (
     asset: UploadedAssetLike | string,

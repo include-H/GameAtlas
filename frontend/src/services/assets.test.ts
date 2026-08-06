@@ -37,7 +37,7 @@ describe('assets service', () => {
     })
 
     const file = new File(['hello'], 'cover.png', { type: 'image/png' })
-    const result = await uploadAsset('cover', 12, file, 3, (value) => {
+    const result = await uploadAsset('cover', 12, file, (value) => {
       progressValues.push(value)
     })
 
@@ -49,7 +49,6 @@ describe('assets service', () => {
       }),
     )
     expect(capturedForm?.get('game_id')).toBe('12')
-    expect(capturedForm?.get('sort_order')).toBe('3')
     expect(capturedForm?.get('file')).toBe(file)
     expect(progressValues).toEqual([25, 100])
     expect(result).toEqual({

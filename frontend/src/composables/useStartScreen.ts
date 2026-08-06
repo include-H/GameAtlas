@@ -14,7 +14,7 @@ interface UseStartScreenOptions {
   fetchTiles: () => Promise<StartScreenLayout>
   fetchFavorites: () => Promise<GameListItem[]>
   saveTiles: (input: StartScreenLayoutInput) => Promise<StartScreenLayout>
-  uploadTileImage: (file: File, size: StartScreenTileSize) => Promise<string>
+  uploadTileImage: (file: File) => Promise<string>
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
 }
 
@@ -208,9 +208,9 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     if (!tile) return
     try {
       const [smallPath, widePath, largePath] = await Promise.all([
-        options.uploadTileImage(new File([blobs.small], 'tile-small.png', { type: 'image/png' }), 'small'),
-        options.uploadTileImage(new File([blobs.wide], 'tile-wide.png', { type: 'image/png' }), 'wide'),
-        options.uploadTileImage(new File([blobs.large], 'tile-large.png', { type: 'image/png' }), 'large'),
+        options.uploadTileImage(new File([blobs.small], 'tile-small.png', { type: 'image/png' })),
+        options.uploadTileImage(new File([blobs.wide], 'tile-wide.png', { type: 'image/png' })),
+        options.uploadTileImage(new File([blobs.large], 'tile-large.png', { type: 'image/png' })),
       ])
       tile.image_small_path = smallPath
       tile.image_wide_path = widePath

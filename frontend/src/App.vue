@@ -211,7 +211,7 @@ const {
   renameColumn: renameStartScreenColumn,
 } = useStartScreen({
   fetchTiles: () => startScreenService.getTiles(),
-  uploadTileImage: (file, size) => startScreenService.uploadTileImage(file, size),
+  uploadTileImage: (file) => startScreenService.uploadTileImage(file),
   fetchFavorites: async () => {
     const favorites: GameListItem[] = []
     let page = 1
