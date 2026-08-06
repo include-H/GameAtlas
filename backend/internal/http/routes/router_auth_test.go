@@ -109,7 +109,6 @@ func TestNewAPIRouteAuthMatrix(t *testing.T) {
 		{name: "game detail", method: http.MethodGet, path: "/api/games/known-game"},
 		{name: "favorite", method: http.MethodPut, path: "/api/games/known-game/favorite"},
 		{name: "unfavorite", method: http.MethodDelete, path: "/api/games/known-game/favorite"},
-		{name: "game files", method: http.MethodGet, path: "/api/games/known-game/files"},
 		{name: "record download", method: http.MethodPost, path: "/api/games/known-game/files/1/downloads"},
 		{name: "download", method: http.MethodGet, path: "/api/games/known-game/files/1/download"},
 		{name: "launch script", method: http.MethodGet, path: "/api/games/known-game/files/1/launch-script"},

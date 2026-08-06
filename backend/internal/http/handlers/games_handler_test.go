@@ -266,6 +266,12 @@ func TestGamesHandlerGetHidesFilePathsForPublicAndIncludesThemForAdmin(t *testin
 	`, gameID); err != nil {
 		t.Fatalf("insert game asset: %v", err)
 	}
+	if _, err := db.Exec(`
+		INSERT INTO game_assets (game_id, asset_uid, asset_type, path, sort_order, position_x, position_y, width_pct)
+		VALUES (?, 'logo-a', 'logo', '/assets/detail-paths/logo-a.png', 0, 10, 20, 30)
+	`, gameID); err != nil {
+		t.Fatalf("insert logo asset: %v", err)
+	}
 	romPath := filepath.Join(t.TempDir(), "detail-paths.rom")
 	if _, err := db.Exec(`
 		INSERT INTO game_files (game_id, file_path, sort_order)
@@ -289,6 +295,7 @@ func TestGamesHandlerGetHidesFilePathsForPublicAndIncludesThemForAdmin(t *testin
 	var publicResponse struct {
 		Data struct {
 			PreviewVideos []map[string]any `json:"preview_videos"`
+			Logos         []map[string]any `json:"logos"`
 			Files         []map[string]any `json:"files"`
 		} `json:"data"`
 	}
@@ -300,6 +307,15 @@ func TestGamesHandlerGetHidesFilePathsForPublicAndIncludesThemForAdmin(t *testin
 	}
 	if publicResponse.Data.PreviewVideos[0]["path"] != "/assets/detail-paths/video-a.mp4" {
 		t.Fatalf("public preview_videos[0] = %#v, want first sorted path included", publicResponse.Data.PreviewVideos[0])
+	}
+	if _, ok := publicResponse.Data.PreviewVideos[0]["position_x"]; ok {
+		t.Fatalf("public preview_videos unexpectedly expose position_x: %#v", publicResponse.Data.PreviewVideos[0])
+	}
+	if len(publicResponse.Data.Logos) != 1 {
+		t.Fatalf("len(public logos) = %d, want 1", len(publicResponse.Data.Logos))
+	}
+	if publicResponse.Data.Logos[0]["position_x"] != float64(10) {
+		t.Fatalf("public logos[0] = %#v, want position_x preserved", publicResponse.Data.Logos[0])
 	}
 	if len(publicResponse.Data.Files) != 1 {
 		t.Fatalf("len(public files) = %d, want 1", len(publicResponse.Data.Files))

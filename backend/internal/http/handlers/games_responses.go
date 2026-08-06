@@ -152,9 +152,9 @@ type gameAssetResponse struct {
 	Path       string   `json:"path"`
 	PosterPath *string  `json:"poster_path,omitempty"`
 	SortOrder  int      `json:"sort_order"`
-	PositionX  *float64 `json:"position_x"`
-	PositionY  *float64 `json:"position_y"`
-	WidthPct   *float64 `json:"width_pct"`
+	PositionX  *float64 `json:"position_x,omitempty"`
+	PositionY  *float64 `json:"position_y,omitempty"`
+	WidthPct   *float64 `json:"width_pct,omitempty"`
 }
 
 type metadataItemResponse struct {

@@ -185,9 +185,9 @@ export interface LogoItem {
   asset_uid: string
   path: string
   sort_order: number
-  position_x: number | null
-  position_y: number | null
-  width_pct: number | null
+  position_x?: number | null
+  position_y?: number | null
+  width_pct?: number | null
 }
 
 export interface GameListItemDto {

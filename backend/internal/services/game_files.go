@@ -13,7 +13,6 @@ import (
 	"github.com/hao/game/internal/repositories"
 )
 
-
 type gameFilesGameRepository interface {
 	ResolveIDByPublicID(publicID string) (int64, error)
 	GetByID(id int64) (*domain.Game, error)
@@ -44,9 +43,9 @@ type DownloadFile struct {
 
 func NewGameFilesService(cfg config.Config, gamesRepo gameFilesGameRepository, gameFilesRepo *repositories.GameFilesRepository) *GameFilesService {
 	return &GameFilesService{
-		gamesRepo:     gamesRepo,
-		gameFilesRepo: gameFilesRepo,
-		fileGuard:     files.NewGuard(cfg.PrimaryROMRoot),
+		gamesRepo:      gamesRepo,
+		gameFilesRepo:  gameFilesRepo,
+		fileGuard:      files.NewGuard(cfg.PrimaryROMRoot),
 		downloadDedupe: make(map[string]time.Time),
 	}
 }
@@ -57,24 +56,6 @@ func (s *GameFilesService) ResolveGameID(publicID string) (int64, error) {
 		return 0, normalizeRepoError(err)
 	}
 	return id, nil
-}
-
-func (s *GameFilesService) List(gameID int64, includeAll bool) ([]domain.GameFile, error) {
-	game, err := s.gamesRepo.GetByID(gameID)
-	if err != nil {
-		return nil, normalizeRepoError(err)
-	}
-	if !includeAll && game.Visibility == domain.GameVisibilityPrivate {
-		return nil, domain.ErrNotFound
-	}
-	files, err := s.gameFilesRepo.ListByGameID(gameID)
-	if err != nil {
-		return nil, err
-	}
-	if files == nil {
-		return []domain.GameFile{}, nil
-	}
-	return files, nil
 }
 
 func (s *GameFilesService) GetDownloadFile(gameID, fileID int64, includeAll bool) (*DownloadFile, error) {

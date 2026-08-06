@@ -255,7 +255,6 @@ backend/
 - `POST /api/games/refresh-sizes`（管理员）
 
 **文件与启动**
-- `GET /api/games/:publicId/files`
 - `POST /api/games/:publicId/files/:fileId/downloads`
 - `GET /api/games/:publicId/files/:fileId/download`
 - `GET /api/games/:publicId/files/:fileId/launch-script`
@@ -272,7 +271,7 @@ backend/
 - `PUT/DELETE /api/games/:publicId/review-issues/:issueKey/ignore`
 
 **素材**
-- `POST /api/assets/cover` · `banner` · `video` · `screenshot` · `logo`
+- `POST /api/assets/cover` · `banner` · `video` · `poster` · `screenshot` · `logo`
 
 **目录浏览**
 - `GET /api/directory/default` · `GET /api/directory/list` · `GET /api/directory/search`
@@ -281,7 +280,8 @@ backend/
 - `GET/PUT /api/settings/config` · `POST/DELETE /api/settings/bg` · `POST /api/settings/restart`（均需管理员）
 
 **开始屏幕磁贴**
-- `GET /api/start-screen/tiles` · `PUT /api/start-screen/tiles`（保存需管理员）
+- `GET /api/start-screen/tiles`
+- `POST /api/start-screen/tiles` · `PUT /api/start-screen/tiles` · `DELETE /api/start-screen/tiles/:gameId`（写操作需管理员）
 - `POST /api/start-screen/tiles/image`（磁贴裁剪图上传，需管理员）
 
 **Steam / SteamGridDB**

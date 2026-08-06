@@ -59,7 +59,6 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	assetsHandler := handlers.NewAssetsHandler(assetsService)
 	directoryHandler := handlers.NewDirectoryHandler(directoryService)
 	gamesHandler := handlers.NewSplitGamesHandler(gameCatalogService, gameTimelineService, gameDetailService, gameAggregateService, gameFavoriteService)
-	gameFilesHandler := handlers.NewGameFilesHandler(gameFilesService)
 	downloadsHandler := handlers.NewDownloadsHandler(gameFilesService, windowsLaunchService, authService)
 	// These endpoints are exposed as first-class resources for admin UX, but
 	// they still point at metadata that is auto-pruned once unreferenced by any
@@ -111,7 +110,6 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.PUT("/games/:publicId/aggregate", gamesHandler.UpdateAggregate)
 	api.DELETE("/games/:publicId", gamesHandler.Delete)
 	api.POST("/games/refresh-sizes", gameFileRefreshHandler.RefreshSizes)
-	api.GET("/games/:publicId/files", gameFilesHandler.List)
 	api.POST("/games/:publicId/files/:fileId/downloads", downloadsHandler.RecordDownload)
 	api.GET("/games/:publicId/files/:fileId/download", downloadsHandler.Download)
 	api.GET("/games/:publicId/files/:fileId/launch-script", downloadsHandler.LaunchScript)
