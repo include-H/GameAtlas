@@ -236,20 +236,38 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
     if (indices.length === 0) return
 
     isDownloadingSteamCovers.value = true
+    let succeeded = 0
+    const failedIndices: number[] = []
+    let firstError = ''
     try {
       for (const index of indices) {
-        const coverUrl = steamCoverImages.value[index]
-        const uploaded = await options.uploadAssetFromUrl(coverUrl, 'cover')
-        options.form.value.covers.push(options.createEditableCover(uploaded))
+        try {
+          const coverUrl = steamCoverImages.value[index]
+          const uploaded = await options.uploadAssetFromUrl(coverUrl, 'cover')
+          options.form.value.covers.push(options.createEditableCover(uploaded))
+          succeeded += 1
+        } catch (error) {
+          failedIndices.push(index)
+          if (!firstError) firstError = getHttpErrorMessage(error)
+        }
       }
-      await options.onAssetPersisted?.()
-      showCoverSelector.value = false
-      backToCoverGameSearch()
-      coverSteamPicker.setQuery('')
-      coverSteamPicker.clearResults()
-      options.addAlert(`成功添加 ${indices.length} 张封面`, 'success')
+      if (succeeded > 0) {
+        await options.onAssetPersisted?.()
+      }
+      if (failedIndices.length === 0) {
+        showCoverSelector.value = false
+        backToCoverGameSearch()
+        coverSteamPicker.setQuery('')
+        coverSteamPicker.clearResults()
+        options.addAlert(`成功添加 ${succeeded} 张封面`, 'success')
+      } else if (succeeded > 0) {
+        selectedCovers.value = new Set(failedIndices)
+        options.addAlert(`成功添加 ${succeeded} 张封面，${failedIndices.length} 张失败`, 'warning')
+      } else {
+        options.addAlert(`下载失败 ${failedIndices.length} 张：${firstError}`, 'error')
+      }
     } catch (error) {
-      options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
+      options.addAlert('保存失败：' + getHttpErrorMessage(error), 'error')
     } finally {
       isDownloadingSteamCovers.value = false
     }
@@ -338,22 +356,40 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
     if (indices.length === 0) return
 
     isDownloadingSteamBanners.value = true
+    let succeeded = 0
+    const failedIndices: number[] = []
+    let firstError = ''
     try {
       for (const index of indices) {
-        const bannerUrl = steamBannerImages.value[index]
-        const uploaded = await options.uploadAssetFromUrl(bannerUrl, 'banner')
-        options.form.value.banners.push(options.createEditableBanner(uploaded))
+        try {
+          const bannerUrl = steamBannerImages.value[index]
+          const uploaded = await options.uploadAssetFromUrl(bannerUrl, 'banner')
+          options.form.value.banners.push(options.createEditableBanner(uploaded))
+          succeeded += 1
+        } catch (error) {
+          failedIndices.push(index)
+          if (!firstError) firstError = getHttpErrorMessage(error)
+        }
       }
-      await options.onAssetPersisted?.()
-      showBannerSelector.value = false
-      backToBannerGameSearch()
-      bannerSteamPicker.setQuery('')
-      bannerSteamPicker.clearResults()
-      bannerSearchUrl.value = ''
-      bannerPreviewUrl.value = ''
-      options.addAlert(`成功添加 ${indices.length} 张横幅`, 'success')
+      if (succeeded > 0) {
+        await options.onAssetPersisted?.()
+      }
+      if (failedIndices.length === 0) {
+        showBannerSelector.value = false
+        backToBannerGameSearch()
+        bannerSteamPicker.setQuery('')
+        bannerSteamPicker.clearResults()
+        bannerSearchUrl.value = ''
+        bannerPreviewUrl.value = ''
+        options.addAlert(`成功添加 ${succeeded} 张横幅`, 'success')
+      } else if (succeeded > 0) {
+        selectedBanners.value = new Set(failedIndices)
+        options.addAlert(`成功添加 ${succeeded} 张横幅，${failedIndices.length} 张失败`, 'warning')
+      } else {
+        options.addAlert(`下载失败 ${failedIndices.length} 张：${firstError}`, 'error')
+      }
     } catch (error) {
-      options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
+      options.addAlert('保存失败：' + getHttpErrorMessage(error), 'error')
     } finally {
       isDownloadingSteamBanners.value = false
     }
