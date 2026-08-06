@@ -430,29 +430,49 @@ func (r *GamesRepository) updateLogoPositionsTx(tx *sqlx.Tx, gameID int64, posit
 		return nil
 	}
 
-	var caseX, caseY, caseW strings.Builder
-	args := make([]any, 0, len(positions)*3+2)
-	for i, lp := range positions {
-		trimmedUID := strings.TrimSpace(lp.AssetUID)
-		if trimmedUID == "" {
+	// 按 asset_uid 去空行，SQL 里 CASE WHEN 与 args 都按列优先展开（先全部 X、再 Y、再 W），
+	// 与查询占位符顺序保持一致，避免多 logo 时各列参数错位。
+	valid := make([]domain.LogoPositionInput, 0, len(positions))
+	for _, lp := range positions {
+		if strings.TrimSpace(lp.AssetUID) == "" {
 			continue
 		}
-		if i > 0 {
-			caseX.WriteString(" ")
-			caseY.WriteString(" ")
-			caseW.WriteString(" ")
-		}
-		caseX.WriteString("WHEN asset_uid = ? THEN ?")
-		caseY.WriteString("WHEN asset_uid = ? THEN ?")
-		caseW.WriteString("WHEN asset_uid = ? THEN ?")
-		args = append(args, trimmedUID, lp.PositionX, trimmedUID, lp.PositionY, trimmedUID, lp.WidthPct)
+		lp.AssetUID = strings.TrimSpace(lp.AssetUID)
+		valid = append(valid, lp)
+	}
+	if len(valid) == 0 {
+		return nil
 	}
 
-	uidPlaceholders := strings.Repeat("?,", len(positions))
+	var caseX, caseY, caseW strings.Builder
+	writeWhen := func(b *strings.Builder) {
+		if b.Len() > 0 {
+			b.WriteString(" ")
+		}
+		b.WriteString("WHEN asset_uid = ? THEN ?")
+	}
+	for range valid {
+		writeWhen(&caseX)
+		writeWhen(&caseY)
+		writeWhen(&caseW)
+	}
+
+	args := make([]any, 0, len(valid)*6+1+len(valid))
+	for _, lp := range valid {
+		args = append(args, lp.AssetUID, lp.PositionX)
+	}
+	for _, lp := range valid {
+		args = append(args, lp.AssetUID, lp.PositionY)
+	}
+	for _, lp := range valid {
+		args = append(args, lp.AssetUID, lp.WidthPct)
+	}
+
+	uidPlaceholders := strings.Repeat("?,", len(valid))
 	uidPlaceholders = uidPlaceholders[:len(uidPlaceholders)-1]
 	args = append(args, gameID)
-	for _, lp := range positions {
-		args = append(args, strings.TrimSpace(lp.AssetUID))
+	for _, lp := range valid {
+		args = append(args, lp.AssetUID)
 	}
 
 	query := fmt.Sprintf(`

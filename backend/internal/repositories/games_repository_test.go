@@ -647,6 +647,76 @@ func strPtr(s string) *string {
 	return &s
 }
 
+func TestGamesRepositoryUpdateAggregatePersistsLogoPositionsForMultipleLogos(t *testing.T) {
+	db := openRepositoryTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	repo := NewGamesRepository(db)
+	gameID := insertRepositoryGame(t, db, "repo-logo-positions", "Repo Logo Positions", "public")
+	insertRepositoryAsset(t, db, gameID, "logo-a", "logo", "/assets/repo-logo-positions/logo-a.png", 0)
+	insertRepositoryAsset(t, db, gameID, "logo-b", "logo", "/assets/repo-logo-positions/logo-b.png", 1)
+
+	posX, posY, width := 21.0, 50.0, 10.0
+	otherX, otherY, otherWidth := 11.0, 22.0, 33.0
+	if _, err := repo.UpdateAggregate(gameID, domain.GameAggregateUpdateInput{
+		Game: domain.GameAggregateCoreUpdateInput{
+			GameCoreInput: domain.GameCoreInput{Title: "Repo Logo Positions", Visibility: "public"},
+		},
+		Assets: domain.GameAggregateAssetsInput{
+			LogoOrderAssetUIDs: []string{"logo-a", "logo-b"},
+			LogoPositions: []domain.LogoPositionInput{
+				{AssetUID: "logo-a", PositionX: &posX, PositionY: &posY, WidthPct: &width},
+				{AssetUID: "logo-b", PositionX: &otherX, PositionY: &otherY, WidthPct: &otherWidth},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("UpdateAggregate returned error: %v", err)
+	}
+
+	var rows []struct {
+		AssetUID  string   `db:"asset_uid"`
+		PositionX *float64 `db:"position_x"`
+		PositionY *float64 `db:"position_y"`
+		WidthPct  *float64 `db:"width_pct"`
+	}
+	if err := db.Select(&rows, `
+		SELECT asset_uid, position_x, position_y, width_pct
+		FROM game_assets
+		WHERE game_id = ? AND asset_type = 'logo'
+		ORDER BY asset_uid
+	`, gameID); err != nil {
+		t.Fatalf("select logo positions: %v", err)
+	}
+
+	assertLogoPositionRow(t, rows, "logo-a", posX, posY, width)
+	assertLogoPositionRow(t, rows, "logo-b", otherX, otherY, otherWidth)
+}
+
+func assertLogoPositionRow(t *testing.T, rows []struct {
+	AssetUID  string   `db:"asset_uid"`
+	PositionX *float64 `db:"position_x"`
+	PositionY *float64 `db:"position_y"`
+	WidthPct  *float64 `db:"width_pct"`
+}, assetUID string, wantX, wantY, wantW float64) {
+	t.Helper()
+	for _, row := range rows {
+		if row.AssetUID != assetUID {
+			continue
+		}
+		if row.PositionX == nil || *row.PositionX != wantX {
+			t.Fatalf("%s position_x = %v, want %v", assetUID, row.PositionX, wantX)
+		}
+		if row.PositionY == nil || *row.PositionY != wantY {
+			t.Fatalf("%s position_y = %v, want %v", assetUID, row.PositionY, wantY)
+		}
+		if row.WidthPct == nil || *row.WidthPct != wantW {
+			t.Fatalf("%s width_pct = %v, want %v", assetUID, row.WidthPct, wantW)
+		}
+		return
+	}
+	t.Fatalf("logo asset %s not found in %#v", assetUID, rows)
+}
+
 func insertRepositoryGame(t *testing.T, db *sqlx.DB, publicID string, title string, visibility string) int64 {
 	t.Helper()
 
