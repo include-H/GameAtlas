@@ -236,6 +236,8 @@ func (s *AssetReconcileService) loadAllReferencedAssetPaths() (map[string]struct
 			UNION
 			SELECT path FROM game_assets WHERE COALESCE(TRIM(path), '') != ''
 			UNION
+			SELECT poster_path AS path FROM game_assets WHERE COALESCE(TRIM(poster_path), '') != ''
+			UNION
 			SELECT image_small_path AS path FROM start_screen_tiles WHERE COALESCE(TRIM(image_small_path), '') != ''
 			UNION
 			SELECT image_wide_path AS path FROM start_screen_tiles WHERE COALESCE(TRIM(image_wide_path), '') != ''

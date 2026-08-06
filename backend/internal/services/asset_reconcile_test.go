@@ -139,6 +139,39 @@ func TestCleanOrphanedAssetFilesDeletesUnreferencedFiles(t *testing.T) {
 	assertFileMissing(t, filepath.Join(assetsDir, "orphan-b", "stale-banner.png"))
 }
 
+func TestCleanOrphanedAssetFilesKeepsVideoPosterReferencedViaPosterPath(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	assetsDir := filepath.Join(t.TempDir(), "assets")
+	gameID := insertServicesTestGame(t, db, "poster-ref", "Poster Ref", domain.GameVisibilityPublic)
+
+	// 预告片封面的文件只挂在 game_assets.poster_path 上，不作为独立资产行登记。
+	if _, err := db.Exec(`
+		INSERT INTO game_assets (game_id, asset_uid, asset_type, path, poster_path, sort_order)
+		VALUES (?, ?, 'video', ?, ?, 0)
+	`, gameID, "vid-1", "/assets/poster-ref/video.mp4", "/assets/poster-ref/video-poster.jpg"); err != nil {
+		t.Fatalf("insert video asset with poster_path: %v", err)
+	}
+
+	writeServicesAssetFile(t, assetsDir, "poster-ref", "video.mp4", []byte("video"))
+	writeServicesAssetFile(t, assetsDir, "poster-ref", "video-poster.jpg", []byte("poster"))
+	writeServicesAssetFile(t, assetsDir, "poster-ref", "stale.jpg", []byte("orphan"))
+
+	service := NewAssetReconcileService(config.Config{AssetsDir: assetsDir}, db)
+	deleted, err := service.CleanOrphanedAssetFiles()
+	if err != nil {
+		t.Fatalf("CleanOrphanedAssetFiles returned error: %v", err)
+	}
+	if deleted != 1 {
+		t.Fatalf("deleted = %d, want 1 (only the stale file)", deleted)
+	}
+
+	assertFileExists(t, filepath.Join(assetsDir, "poster-ref", "video.mp4"))
+	assertFileExists(t, filepath.Join(assetsDir, "poster-ref", "video-poster.jpg"))
+	assertFileMissing(t, filepath.Join(assetsDir, "poster-ref", "stale.jpg"))
+}
+
 func TestCleanOrphanedAssetFilesQuarantinesUnreferencedFilesByDefault(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()
