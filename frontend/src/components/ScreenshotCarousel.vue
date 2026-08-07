@@ -37,7 +37,6 @@
                 class="screenshot-carousel__video"
                 :class="{ 'screenshot-carousel__video--ready': videoReady }"
                 :poster="currentVideoPoster || undefined"
-                autoplay
                 controls
                 muted
                 playsinline
@@ -283,6 +282,7 @@ watch(currentMedia, (nextMedia, previousMedia) => {
       videoReady.value = false
       videoFailed.value = false
       userUnmuted.value = false
+      markLoaderShown()
     }
     aspectResolved.value = true
     viewportAspect.value = '16 / 9'
@@ -311,6 +311,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopImageAutoplay()
+  if (playTimer !== undefined) {
+    window.clearTimeout(playTimer)
+    playTimer = undefined
+  }
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null
@@ -355,7 +359,45 @@ const onVideoVolumeChange = () => {
   }
 }
 
-let videoAutoplayDeferred = false
+// 与 CSS 中 loader 动画时长保持一致：淡入 1.5s + spinner-fade 淡出 0.3s。
+// 视频就绪后必须等 loader 动画完整播完再播放，否则半透明 loader 会盖在
+// 已启播的视频上（画面透出 → "先播后转圈"的错乱观感）。
+const LOADER_FADE_IN_MS = 1500
+const LOADER_FADE_OUT_MS = 300
+let loaderShownAt = 0
+let playScheduled = false
+let playTimer: number | undefined
+
+const markLoaderShown = () => {
+  loaderShownAt = Date.now()
+  playScheduled = false
+  if (playTimer !== undefined) {
+    window.clearTimeout(playTimer)
+    playTimer = undefined
+  }
+}
+
+const schedulePlayAfterLoader = () => {
+  const video = videoRef.value
+  if (!video || playScheduled) return
+  playScheduled = true
+  const elapsed = Date.now() - loaderShownAt
+  const remainingFadeIn = Math.max(0, LOADER_FADE_IN_MS - elapsed)
+  playTimer = window.setTimeout(() => {
+    // loader 淡入完成：隐藏 loader（淡出），彻底消失后再开始播放
+    videoReady.value = true
+    playTimer = window.setTimeout(() => {
+      playTimer = undefined
+      playScheduled = false
+      const playPromise = video.play()
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {
+          // Ignore autoplay rejections; controls remain available for manual play.
+        })
+      }
+    }, LOADER_FADE_OUT_MS)
+  }, remainingFadeIn)
+}
 
 const tryPlayVideo = () => {
   const video = videoRef.value
@@ -363,29 +405,16 @@ const tryPlayVideo = () => {
   if (!userUnmuted.value) {
     video.muted = true
   }
-  // 已加载/播放中的视频不会再次触发 canplay/playing，直接按 readyState 恢复可见。
   if (video.readyState >= 2) {
-    videoReady.value = true
-  }
-  const startPlay = () => {
-    const playPromise = video.play()
-    if (playPromise && typeof playPromise.catch === 'function') {
-      playPromise.catch(() => {
-        // Ignore autoplay rejections; controls remain available for manual play.
-      })
-    }
-  }
-  if (!videoAutoplayDeferred) {
-    // 首次自动播放延迟到主线程空闲后，避免视频初始化（~800ms 解封装）阻塞详情页首帧绘制。
-    videoAutoplayDeferred = true
-    if (typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(startPlay, { timeout: 800 })
-    } else {
-      window.setTimeout(startPlay, 600)
-    }
+    // 已就绪（缓存/已加载完成）：等 loader 动画播完再播放
+    schedulePlayAfterLoader()
     return
   }
-  startPlay()
+  // 未就绪：触发加载但不播放（preload=none 下只有 load() 会启动拉流），
+  // 期间 loader 转圈；canplay 后走 readyState >= 2 分支调度播放
+  if (video.networkState === 0 || video.readyState === 0) {
+    video.load()
+  }
 }
 
 const stopImageAutoplay = () => {
