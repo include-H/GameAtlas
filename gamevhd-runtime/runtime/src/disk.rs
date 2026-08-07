@@ -159,12 +159,42 @@ pub fn build_net_resource(remote_unc: &str) -> NetResourceSpec {
     }
 }
 
-/// `CREATE_VIRTUAL_DISK_PARAMETERS` Version 2 的字段规格（差分盘）。
+/// VHD 文件格式（决定 CREATE_VIRTUAL_DISK_PARAMETERS 版本与 device_id）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VhdFormat {
+    /// 传统 VHD：`VIRTUAL_STORAGE_TYPE_DEVICE_VHD`=2，参数 Version 1。
+    Vhd,
+    /// VHDX：`VIRTUAL_STORAGE_TYPE_DEVICE_VHDX`=3，参数 Version 2。
+    Vhdx,
+}
+
+impl VhdFormat {
+    /// 对应 `VIRTUAL_STORAGE_TYPE.DeviceId`。
+    pub fn device_id(self) -> u32 {
+        match self {
+            VhdFormat::Vhd => 2,
+            VhdFormat::Vhdx => 3,
+        }
+    }
+
+    /// 按路径扩展名探测格式：`.vhd`（大小写不敏感）→ Vhd，其余 → Vhdx。
+    pub fn detect(path: &str) -> VhdFormat {
+        let lower = path.to_ascii_lowercase();
+        if lower.ends_with(".vhd") && !lower.ends_with(".vhdx") {
+            VhdFormat::Vhd
+        } else {
+            VhdFormat::Vhdx
+        }
+    }
+}
+
+/// `CREATE_VIRTUAL_DISK_PARAMETERS` 的字段规格（差分盘）。
 /// 差分盘：大小/块/扇区继承 parent，仅 parent 路径与 parent 类型有效。
+/// `version` 依格式：VHD=1 / VHDX=2（两者结构体布局不同，见 imp）。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreateDiffParamsSpec {
-    pub version: u32,
-    /// parent（基础盘）UNC 路径，如 `\\192.168.1.4\Game\base.vhdx`。
+    pub format: VhdFormat,
+    /// parent（基础盘）UNC 路径，如 `\\192.168.1.4\Game\base.vhd`。
     pub parent_path: String,
     /// parent 虚拟磁盘类型（VHDX=3 / VHD=2）。
     pub parent_device_id: u32,
@@ -172,13 +202,14 @@ pub struct CreateDiffParamsSpec {
     pub parent_vendor: [u32; 2],
 }
 
-/// 构造差分盘创建参数（Version 2，VHDX，Microsoft 厂商）。
+/// 构造差分盘创建参数（按 parent 格式选版本，Microsoft 厂商）。
 pub fn build_create_diff_params(parent_unc: &str) -> CreateDiffParamsSpec {
     // VIRTUAL_STORAGE_TYPE_VENDOR_MICROSOFT = {EC984AEC-A0F9-47e9-901F-71415A66345B}
+    let format = VhdFormat::detect(parent_unc);
     CreateDiffParamsSpec {
-        version: 2, // CREATE_VIRTUAL_DISK_VERSION_2
+        format,
         parent_path: parent_unc.to_string(),
-        parent_device_id: 3, // VIRTUAL_STORAGE_TYPE_DEVICE_VHDX
+        parent_device_id: format.device_id(),
         parent_vendor: [0xEC98_4AEC, 0xA0F9_47E9],
     }
 }
@@ -325,7 +356,7 @@ mod imp {
 
     /// `CREATE_VIRTUAL_DISK_PARAMETERS`，仅展开 Version 2 分支（VHDX）。
     /// 布局：Version(4) + pad(4) [union 对齐 8] + Version2 字段序列。
-    /// x64 总大小 128B，各字段偏移见 `layout_*` 单测。
+    /// x64 总大小 128B；关键偏移见下方编译期断言（布局错 → 编译失败）。
     #[repr(C)]
     #[allow(dead_code)]
     pub struct CreateVirtualDiskParameters {
@@ -344,6 +375,35 @@ mod imp {
         pub source_vst: VirtualStorageType, // 88
         pub resiliency_guid: Guid, // 108
     } // size 124 → align 8 → 128
+
+    /// `CREATE_VIRTUAL_DISK_PARAMETERS`，仅展开 Version 1 分支（VHD）。
+    /// 布局：Version(4) + pad(4) [union 对齐 8] + Version1 字段序列。
+    /// x64 总大小 64B（比 V2 少 4 字段：无 PhysicalSectorSize /
+    /// ParentVirtualStorageType / SourceVirtualStorageType / ResiliencyGuid）。
+    #[repr(C)]
+    #[allow(dead_code)]
+    pub struct CreateVirtualDiskParametersV1 {
+        pub version: u32,
+        _pad: u32,
+        pub unique_id: Guid, // 8
+        pub maximum_size: u64, // 24（差分盘继承 parent，填 0）
+        pub block_size: u32, // 32
+        pub sector_size: u32, // 36
+        _pad2: u32,          // 40（指针对齐）
+        pub parent_path: *const u16, // 48
+        pub source_path: *const u16, // 56
+    } // size 64
+
+    // 编译期布局锁定（x64 启动器；与 MSVC ABI 头文件一致。布局错即编译失败，
+    // 真机 ERROR_FILE_CORRUPT=0x570 教训：VHD/VHDX 参数结构不同，不得混用）。
+    #[cfg(target_pointer_width = "64")]
+    const _: () = {
+        assert!(std::mem::size_of::<CreateVirtualDiskParameters>() == 128);
+        assert!(std::mem::size_of::<CreateVirtualDiskParametersV1>() == 64);
+        assert!(std::mem::offset_of!(CreateVirtualDiskParameters, unique_id) == 8);
+        assert!(std::mem::offset_of!(CreateVirtualDiskParameters, parent_path) == 48);
+        assert!(std::mem::offset_of!(CreateVirtualDiskParametersV1, parent_path) == 48);
+    };
 
     /// `ATTACH_VIRTUAL_DISK_PARAMETERS`（Version 1：Reserved）。
     #[repr(C)]
@@ -410,7 +470,8 @@ mod imp {
             security_descriptor: *const u8,
             flags: u32,
             provider_specific_flags: u32,
-            parameters: *const CreateVirtualDiskParameters,
+            // VHD→Version1 结构 / VHDX→Version2 结构，统一裸指针传入。
+            parameters: *const u8,
             overlapped: *const u8,
             handle: *mut HANDLE,
         ) -> DWORD;
@@ -594,7 +655,8 @@ mod imp {
         }
     }
 
-    /// 创建差分盘（parent = UNC）。diff 已存在 → Err(DiffAlreadyExists) 由调用方幂等跳过。
+    /// 创建差分盘（parent = UNC，格式按 parent 扩展名 VHD/VHDX 自适应）。
+    /// diff 已存在 → Err(DiffAlreadyExists) 由调用方幂等跳过。
     pub fn create_diff_vhd(diff_path: &str, parent_unc: &str) -> Result<(), DiskError> {
         let spec = build_create_diff_params(parent_unc);
         let vst = VirtualStorageType {
@@ -603,27 +665,50 @@ mod imp {
         };
         let diff_wide = to_wide(diff_path);
         let parent_wide = to_wide(parent_unc);
-        let params = CreateVirtualDiskParameters {
-            version: spec.version,
-            _pad: 0,
-            unique_id: Guid::zero(),
-            maximum_size: 0, // 差分盘继承 parent
-            block_size: 0,
-            sector_size: 0,
-            physical_sector_size: 0,
-            _pad2: 0,
-            parent_path: parent_wide.as_ptr(),
-            source_path: std::ptr::null(),
-            open_flags: OPEN_VIRTUAL_DISK_FLAG_NONE,
-            parent_vst: VirtualStorageType {
-                device_id: spec.parent_device_id,
-                vendor_id: VENDOR_MICROSOFT,
-            },
-            source_vst: VirtualStorageType {
-                device_id: 0,
-                vendor_id: Guid::zero(),
-            },
-            resiliency_guid: Guid::zero(),
+        // 参数版本依格式：VHD→Version 1（64B），VHDX→Version 2（128B）。
+        // 两结构布局不同，分别构造后按裸指针传入（FFI 参数均为 *const）。
+        let params_v1: CreateVirtualDiskParametersV1;
+        let params_v2: CreateVirtualDiskParameters;
+        let params_ptr: *const u8 = match spec.format {
+            VhdFormat::Vhd => {
+                params_v1 = CreateVirtualDiskParametersV1 {
+                    version: 1,
+                    _pad: 0,
+                    unique_id: Guid::zero(),
+                    maximum_size: 0, // 差分盘继承 parent
+                    block_size: 0,
+                    sector_size: 0,
+                    _pad2: 0,
+                    parent_path: parent_wide.as_ptr(),
+                    source_path: std::ptr::null(),
+                };
+                &params_v1 as *const CreateVirtualDiskParametersV1 as *const u8
+            }
+            VhdFormat::Vhdx => {
+                params_v2 = CreateVirtualDiskParameters {
+                    version: 2,
+                    _pad: 0,
+                    unique_id: Guid::zero(),
+                    maximum_size: 0,
+                    block_size: 0,
+                    sector_size: 0,
+                    physical_sector_size: 0,
+                    _pad2: 0,
+                    parent_path: parent_wide.as_ptr(),
+                    source_path: std::ptr::null(),
+                    open_flags: OPEN_VIRTUAL_DISK_FLAG_NONE,
+                    parent_vst: VirtualStorageType {
+                        device_id: spec.parent_device_id,
+                        vendor_id: VENDOR_MICROSOFT,
+                    },
+                    source_vst: VirtualStorageType {
+                        device_id: 0,
+                        vendor_id: Guid::zero(),
+                    },
+                    resiliency_guid: Guid::zero(),
+                };
+                &params_v2 as *const CreateVirtualDiskParameters as *const u8
+            }
         };
         let mut handle: HANDLE = 0;
         let code = unsafe {
@@ -634,7 +719,7 @@ mod imp {
                 std::ptr::null(),
                 CREATE_VIRTUAL_DISK_FLAG_NONE,
                 0,
-                &params as *const CreateVirtualDiskParameters,
+                params_ptr,
                 std::ptr::null(),
                 &mut handle,
             )
@@ -1024,12 +1109,32 @@ mod tests {
 
     #[test]
     fn build_create_diff_params_spec() {
+        // VHDX parent → Version 2 结构 + device_id 3。
         let spec = build_create_diff_params(r"\\192.168.1.4\Game\base.vhdx");
-        assert_eq!(spec.version, 2);
+        assert_eq!(spec.format, VhdFormat::Vhdx);
         assert_eq!(spec.parent_path, r"\\192.168.1.4\Game\base.vhdx");
         assert_eq!(spec.parent_device_id, 3); // VHDX
         // Microsoft 厂商 GUID 前两字段。
         assert_eq!(spec.parent_vendor, [0xEC98_4AEC, 0xA0F9_47E9]);
+    }
+
+    #[test]
+    fn vhd_format_detect_by_extension() {
+        assert_eq!(VhdFormat::detect(r"\\nas\Game\base.vhd"), VhdFormat::Vhd);
+        assert_eq!(VhdFormat::detect(r"\\nas\Game\base.VHD"), VhdFormat::Vhd);
+        assert_eq!(VhdFormat::detect(r"\\nas\Game\base.vhdx"), VhdFormat::Vhdx);
+        assert_eq!(VhdFormat::detect(r"\\nas\Game\base"), VhdFormat::Vhdx);
+        assert_eq!(VhdFormat::detect(r"\\nas\Game\base.vhd.bak"), VhdFormat::Vhdx);
+        assert_eq!(VhdFormat::detect(""), VhdFormat::Vhdx);
+        assert_eq!(VhdFormat::Vhd.device_id(), 2);
+        assert_eq!(VhdFormat::Vhdx.device_id(), 3);
+    }
+
+    #[test]
+    fn build_diff_params_vhd_parent_uses_version1() {
+        let spec = build_create_diff_params(r"\\192.168.1.4\Game\base.vhd");
+        assert_eq!(spec.format, VhdFormat::Vhd);
+        assert_eq!(spec.parent_device_id, 2); // VHD
     }
 
     #[test]
@@ -1105,48 +1210,5 @@ mod tests {
         let r = smb_connect_with_retry(0, || Ok(()));
         assert!(r.is_err());
         assert_eq!(r.unwrap_err().kind, DiskErrorKind::Other(0));
-    }
-
-    /// Windows 专属结构体布局锁定（x64 MSVC ABI；启动器仅 x64）。
-    /// Linux 原生测试跑 x86_64，布局与 x64 Windows 一致。
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn layout_create_virtual_disk_parameters_x64() {
-        use std::mem::{offset_of, size_of};
-        let p = imp::CreateVirtualDiskParameters {
-            version: 0,
-            _pad: 0,
-            unique_id: imp::Guid::zero(),
-            maximum_size: 0,
-            block_size: 0,
-            sector_size: 0,
-            physical_sector_size: 0,
-            _pad2: 0,
-            parent_path: std::ptr::null(),
-            source_path: std::ptr::null(),
-            open_flags: 0,
-            parent_vst: imp::VirtualStorageType {
-                device_id: 0,
-                vendor_id: imp::Guid::zero(),
-            },
-            source_vst: imp::VirtualStorageType {
-                device_id: 0,
-                vendor_id: imp::Guid::zero(),
-            },
-            resiliency_guid: imp::Guid::zero(),
-        };
-        let _ = p;
-        assert_eq!(size_of::<imp::CreateVirtualDiskParameters>(), 128);
-        assert_eq!(offset_of!(imp::CreateVirtualDiskParameters, version), 0);
-        assert_eq!(offset_of!(imp::CreateVirtualDiskParameters, unique_id), 8);
-        assert_eq!(offset_of!(imp::CreateVirtualDiskParameters, maximum_size), 24);
-        assert_eq!(offset_of!(imp::CreateVirtualDiskParameters, parent_path), 48);
-        assert_eq!(offset_of!(imp::CreateVirtualDiskParameters, open_flags), 64);
-        assert_eq!(offset_of!(imp::CreateVirtualDiskParameters, parent_vst), 68);
-        assert_eq!(offset_of!(imp::CreateVirtualDiskParameters, resiliency_guid), 108);
-
-        // NETRESOURCEW x64 = 48B；VIRTUAL_STORAGE_TYPE = 20B。
-        assert_eq!(size_of::<imp::VirtualStorageType>(), 20);
-        assert_eq!(size_of::<imp::Guid>(), 16);
     }
 }
