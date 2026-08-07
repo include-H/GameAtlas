@@ -21,6 +21,7 @@ const (
 	PendingIssueDetailMissingBanner      PendingIssueDetailKey = "missing-banner"
 	PendingIssueDetailMissingScreenshots PendingIssueDetailKey = "missing-screenshots"
 	PendingIssueDetailMissingLogo        PendingIssueDetailKey = "missing-logo"
+	PendingIssueDetailMissingVideo       PendingIssueDetailKey = "missing-video"
 	PendingIssueDetailMissingWikiContent PendingIssueDetailKey = "missing-wiki-content"
 	PendingIssueDetailMissingFilesList   PendingIssueDetailKey = "missing-files-list"
 	PendingIssueDetailMissingDeveloper   PendingIssueDetailKey = "missing-developer"
@@ -70,7 +71,7 @@ type PendingIssueSeverityPolicy struct {
 }
 
 var pendingIssueDefinitions = []PendingIssueDefinition{
-	{Key: PendingIssueMissingAssets, Label: "缺少图片", Description: "封面、横幅或截图未补齐"},
+	{Key: PendingIssueMissingAssets, Label: "缺少图片或视频", Description: "封面、横幅、截图或预告片未补齐"},
 	{Key: PendingIssueMissingWiki, Label: "缺少 Wiki", Description: "还没有游戏介绍内容"},
 	{Key: PendingIssueMissingFiles, Label: "缺少文件", Description: "还没有可下载文件条目"},
 	{Key: PendingIssueMissingMetadata, Label: "基础信息不完整", Description: "开发商、发行商或简介缺失"},
@@ -81,6 +82,7 @@ var pendingIssueDetailDefinitions = []PendingIssueDetailDefinition{
 	{Key: PendingIssueDetailMissingBanner, Label: "缺横幅", Group: PendingIssueMissingAssets},
 	{Key: PendingIssueDetailMissingScreenshots, Label: "缺截图", Group: PendingIssueMissingAssets},
 	{Key: PendingIssueDetailMissingLogo, Label: "缺 Logo", Group: PendingIssueMissingAssets},
+	{Key: PendingIssueDetailMissingVideo, Label: "缺预告片", Group: PendingIssueMissingAssets},
 	{Key: PendingIssueDetailMissingWikiContent, Label: "缺 Wiki 内容", Group: PendingIssueMissingWiki},
 	{Key: PendingIssueDetailMissingFilesList, Label: "缺下载文件", Group: PendingIssueMissingFiles},
 	{Key: PendingIssueDetailMissingDeveloper, Label: "缺开发商", Group: PendingIssueMissingMetadata},
@@ -206,12 +208,13 @@ type pendingIssueGameFields struct {
 	PrimaryScreenshot *string
 	ScreenshotCount   int64
 	LogoCount         int64
+	VideoCount        int64
 	FileCount         int64
 	DeveloperCount    int64
 	PublisherCount    int64
 }
 
-func EvaluatePendingIssues(game Game, screenshotCount int64, logoCount int64, fileCount int64, developerCount int64, publisherCount int64, ignoredReasons map[PendingIssueDetailKey]*string) PendingIssueEvaluation {
+func EvaluatePendingIssues(game Game, screenshotCount int64, logoCount int64, videoCount int64, fileCount int64, developerCount int64, publisherCount int64, ignoredReasons map[PendingIssueDetailKey]*string) PendingIssueEvaluation {
 	return evaluatePendingIssues(pendingIssueGameFields{
 		Summary:           game.Summary,
 		CoverImage:        game.CoverImage,
@@ -220,6 +223,7 @@ func EvaluatePendingIssues(game Game, screenshotCount int64, logoCount int64, fi
 		PrimaryScreenshot: game.PrimaryScreenshot,
 		ScreenshotCount:   screenshotCount,
 		LogoCount:         logoCount,
+		VideoCount:        videoCount,
 		FileCount:         fileCount,
 		DeveloperCount:    developerCount,
 		PublisherCount:    publisherCount,
@@ -235,6 +239,7 @@ func EvaluatePendingIssuesForListItem(game GameListItem, ignoredReasons map[Pend
 		PrimaryScreenshot: game.PrimaryScreenshot,
 		ScreenshotCount:   game.ScreenshotCount,
 		LogoCount:         game.LogoCount,
+		VideoCount:        game.VideoCount,
 		FileCount:         game.FileCount,
 		DeveloperCount:    game.DeveloperCount,
 		PublisherCount:    game.PublisherCount,
@@ -279,6 +284,9 @@ func evaluatePendingIssues(game pendingIssueGameFields, ignoredReasons map[Pendi
 	}
 	if game.LogoCount <= 0 {
 		appendDetail(PendingIssueDetailMissingLogo)
+	}
+	if game.VideoCount <= 0 {
+		appendDetail(PendingIssueDetailMissingVideo)
 	}
 	if !hasMeaningfulWikiContent {
 		appendDetail(PendingIssueDetailMissingWikiContent)

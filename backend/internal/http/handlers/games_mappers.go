@@ -25,6 +25,7 @@ func toGameListItemResponse(game domain.GameListItem) gameListItemResponse {
 		PrimaryScreenshot: game.PrimaryScreenshot,
 		ScreenshotCount:   game.ScreenshotCount,
 		LogoVisible:       game.LogoVisible,
+		VideoCount:        game.VideoCount,
 		FileCount:         game.FileCount,
 		DeveloperCount:    game.DeveloperCount,
 		PublisherCount:    game.PublisherCount,

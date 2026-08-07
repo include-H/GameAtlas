@@ -37,6 +37,7 @@ var pendingIssueConditionDefinitions = []pendingIssueConditionDefinition{
 	newPendingFieldIssue(domain.PendingIssueDetailMissingBanner, "g.banner_image"),
 	newPendingRelationIssue(domain.PendingIssueDetailMissingScreenshots, "game_assets ga", "ga.game_id = g.id AND ga.asset_type = 'screenshot'"),
 	newPendingRelationIssue(domain.PendingIssueDetailMissingLogo, "game_assets gl", "gl.game_id = g.id AND gl.asset_type = 'logo'"),
+	newPendingRelationIssue(domain.PendingIssueDetailMissingVideo, "game_assets gv", "gv.game_id = g.id AND gv.asset_type = 'video'"),
 	newPendingWikiIssue(),
 	newPendingRelationIssue(domain.PendingIssueDetailMissingFilesList, "game_files gf", "gf.game_id = g.id"),
 	newPendingRelationIssue(domain.PendingIssueDetailMissingDeveloper, "game_developers gd", "gd.game_id = g.id"),
@@ -101,6 +102,7 @@ func gamesListItemSelectColumns() string {
 			COALESCE(ss.screenshot_count, 0) AS screenshot_count,
 			COALESCE(ls.logo_count, 0) AS logo_count,
 			g.logo_visible,
+			COALESCE(vs.video_count, 0) AS video_count,
 			COALESCE(fs.file_count, 0) AS file_count,
 			COALESCE(ds.developer_count, 0) AS developer_count,
 			COALESCE(ps.publisher_count, 0) AS publisher_count,
@@ -143,6 +145,13 @@ func gameListItemStatsCTEs(sourceTable string) string {
 			WHERE gl.asset_type = 'logo'
 			GROUP BY gl.game_id
 		),
+		video_stats AS (
+			SELECT gv.game_id, COUNT(*) AS video_count
+			FROM game_assets gv
+			INNER JOIN %s src ON src.id = gv.game_id
+			WHERE gv.asset_type = 'video'
+			GROUP BY gv.game_id
+		),
 		file_stats AS (
 			SELECT gf.game_id, COUNT(*) AS file_count
 			FROM game_files gf
@@ -161,7 +170,7 @@ func gameListItemStatsCTEs(sourceTable string) string {
 			INNER JOIN %s src ON src.id = gp.game_id
 			GROUP BY gp.game_id
 		)
-	`, sourceTable, sourceTable, sourceTable, sourceTable, sourceTable)
+	`, sourceTable, sourceTable, sourceTable, sourceTable, sourceTable, sourceTable)
 }
 
 // buildGamesListWhere owns the common catalog filtering DSL used by list-like read models.

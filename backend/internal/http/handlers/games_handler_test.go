@@ -388,6 +388,12 @@ func TestGamesHandlerListPendingUsesNativePendingFilter(t *testing.T) {
 	}
 	if _, err := db.Exec(`
 		INSERT INTO game_assets (game_id, asset_uid, asset_type, path, sort_order)
+		VALUES (?, 'resolved-video', 'video', '/assets/pending-resolved/trailer.mp4', 0)
+	`, resolvedID); err != nil {
+		t.Fatalf("insert resolved video: %v", err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO game_assets (game_id, asset_uid, asset_type, path, sort_order)
 		VALUES (?, 'ignored-shot', 'screenshot', '/assets/pending-ignored/shot.png', 0)
 	`, ignoredID); err != nil {
 		t.Fatalf("insert ignored screenshot: %v", err)
@@ -397,6 +403,12 @@ func TestGamesHandlerListPendingUsesNativePendingFilter(t *testing.T) {
 		VALUES (?, 'ignored-logo', 'logo', '/assets/pending-ignored/logo.png', 0)
 	`, ignoredID); err != nil {
 		t.Fatalf("insert ignored logo: %v", err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO game_assets (game_id, asset_uid, asset_type, path, sort_order)
+		VALUES (?, 'ignored-video', 'video', '/assets/pending-ignored/trailer.mp4', 0)
+	`, ignoredID); err != nil {
+		t.Fatalf("insert ignored video: %v", err)
 	}
 	if _, err := db.Exec(`
 		INSERT INTO game_files (game_id, file_path, sort_order)

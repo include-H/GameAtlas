@@ -89,6 +89,7 @@ type gameListItemResponse struct {
 	PrimaryScreenshot *string                         `json:"primary_screenshot"`
 	ScreenshotCount   int64                           `json:"screenshot_count,omitempty"`
 	LogoVisible       bool                            `json:"logo_visible"`
+	VideoCount        int64                           `json:"video_count,omitempty"`
 	FileCount         int64                           `json:"file_count,omitempty"`
 	DeveloperCount    int64                           `json:"developer_count,omitempty"`
 	PublisherCount    int64                           `json:"publisher_count,omitempty"`

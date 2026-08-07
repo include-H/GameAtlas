@@ -75,7 +75,7 @@ func (s *GameDetailService) Get(id int64, includeAll bool) (*GameDetail, error) 
 	if err != nil {
 		return nil, err
 	}
-	pendingIssues, err := getPendingIssueEvaluation(*game, int64(len(screenshots)), int64(len(logos)), int64(len(files)), int64(len(developers)), int64(len(publishers)), s.reviewIssueOverridesRepo)
+	pendingIssues, err := getPendingIssueEvaluation(*game, int64(len(screenshots)), int64(len(logos)), int64(len(videos)), int64(len(files)), int64(len(developers)), int64(len(publishers)), s.reviewIssueOverridesRepo)
 	if err != nil {
 		return nil, err
 	}

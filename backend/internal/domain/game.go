@@ -48,6 +48,7 @@ type GameListItem struct {
 	ScreenshotCount   int64   `db:"screenshot_count"`
 	LogoCount         int64   `db:"logo_count"`
 	LogoVisible       bool    `db:"logo_visible"`
+	VideoCount        int64   `db:"video_count"`
 	FileCount         int64   `db:"file_count"`
 	DeveloperCount    int64   `db:"developer_count"`
 	PublisherCount    int64   `db:"publisher_count"`

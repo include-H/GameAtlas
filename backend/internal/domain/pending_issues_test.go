@@ -49,11 +49,58 @@ func TestEvaluatePendingIssuesUsesDomainSeverityRules(t *testing.T) {
 		WikiContent:       &ready,
 	}
 
-	evaluation := EvaluatePendingIssues(game, 1, 1, 0, 1, 1, nil)
+	evaluation := EvaluatePendingIssues(game, 1, 1, 1, 0, 1, 1, nil)
 	if !evaluation.Severe {
 		t.Fatalf("evaluation.severe = false, want true when missing files is visible")
 	}
 	if len(evaluation.Groups) != 1 || evaluation.Groups[0] != PendingIssueMissingFiles {
 		t.Fatalf("evaluation.groups = %#v, want only missing-files", evaluation.Groups)
 	}
+}
+
+func TestEvaluatePendingIssuesMissingVideo(t *testing.T) {
+	t.Parallel()
+
+	ready := "ready"
+	game := Game{
+		Title:             "Missing Video Test",
+		CoverImage:        &ready,
+		BannerImage:       &ready,
+		Summary:           &ready,
+		PrimaryScreenshot: &ready,
+		WikiContent:       &ready,
+	}
+
+	// 素材齐全但无视频：应报"缺预告片"，归属 missing-assets 组
+	evaluation := EvaluatePendingIssues(game, 1, 1, 0, 1, 1, 1, nil)
+	if !hasDetail(evaluation, PendingIssueDetailMissingVideo) {
+		t.Fatalf("evaluation should include missing-video detail, got %#v", evaluation.Details)
+	}
+	if !hasGroup(evaluation, PendingIssueMissingAssets) {
+		t.Fatalf("evaluation should include missing-assets group, got %#v", evaluation.Groups)
+	}
+
+	// 有视频：不应报缺预告片
+	evaluation = EvaluatePendingIssues(game, 1, 1, 1, 1, 1, 1, nil)
+	if hasDetail(evaluation, PendingIssueDetailMissingVideo) {
+		t.Fatalf("evaluation should not include missing-video detail, got %#v", evaluation.Details)
+	}
+}
+
+func hasDetail(evaluation PendingIssueEvaluation, key PendingIssueDetailKey) bool {
+	for _, detail := range evaluation.Details {
+		if detail.Key == key {
+			return true
+		}
+	}
+	return false
+}
+
+func hasGroup(evaluation PendingIssueEvaluation, key PendingIssueKey) bool {
+	for _, group := range evaluation.Groups {
+		if group == key {
+			return true
+		}
+	}
+	return false
 }
