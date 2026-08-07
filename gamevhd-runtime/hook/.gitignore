@@ -1,0 +1,4 @@
+# 构建产物（Makefile 生成），不入库（与 release/ 约定一致）
+gvhook-x64.dll
+gvhook-x86.dll
+src/build/
