@@ -879,7 +879,20 @@ mod imp {
             )?;
         }
 
-        // 2. 创建差分盘（parent 提供时；已存在幂等跳过）。
+        // 2. 确保 diff 父目录存在（CreateVirtualDisk 不自动建目录；
+        //    首次运行 diff 根缺失会返回 ERROR_PATH_NOT_FOUND=3）。
+        if let Some(parent_dir) = std::path::Path::new(&params.diff_path).parent() {
+            if !parent_dir.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent_dir).map_err(|e| {
+                    DiskError::new(
+                        DiskErrorKind::Other(0),
+                        format!("创建 diff 父目录 {} 失败: {e}", parent_dir.display()),
+                    )
+                })?;
+            }
+        }
+
+        // 3. 创建差分盘（parent 提供时；已存在幂等跳过）。
         if let Some(parent) = &params.parent_unc {
             match create_diff_vhd(&params.diff_path, parent) {
                 Ok(()) => {}
@@ -890,7 +903,7 @@ mod imp {
             }
         }
 
-        // 3. 打开 + attach。
+        // 4. 打开 + attach。
         let handle = open_vhd(&params.diff_path)?;
         if let Err(e) = attach_vhd(handle) {
             unsafe { CloseHandle(handle) };
