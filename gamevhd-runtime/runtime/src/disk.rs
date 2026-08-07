@@ -298,8 +298,10 @@ mod imp {
     pub const ATTACH_VIRTUAL_DISK_FLAG_PERMANENT_LIFETIME: u32 = 0x0000_0004;
     /// virtdisk：detach 无特殊位。
     pub const DETACH_VIRTUAL_DISK_FLAG_NONE: u32 = 0;
-    /// virtdisk：`VIRTUAL_DISK_ACCESS_NONE`（创建/打开时）。
+    /// virtdisk：`VIRTUAL_DISK_ACCESS_NONE`（V2/VHDX 创建时，文档强制）。
     pub const VIRTUAL_DISK_ACCESS_NONE: u32 = 0;
+    /// virtdisk：`VIRTUAL_DISK_ACCESS_CREATE`（V1/VHD 创建时，官方示例用）。
+    pub const VIRTUAL_DISK_ACCESS_CREATE: u32 = 0x0010_0000;
     /// virtdisk：`VIRTUAL_DISK_ACCESS_ALL`。
     pub const VIRTUAL_DISK_ACCESS_ALL: u32 = 0x003F_0000;
 
@@ -309,8 +311,7 @@ mod imp {
     /// `DefineDosDevice`：移除盘符定义。
     pub const DDD_REMOVE_DEFINITION: DWORD = 0x0000_0002;
 
-    /// `CreateFileW`：打开卷句柄（卷名如 `\\?\Volume{GUID}\`）。
-    pub const GENERIC_READ: DWORD = 0x8000_0000;
+    /// `CreateFileW`：打开卷句柄（卷名如 `\\?\Volume{GUID}\`，desired access 恒 0）。
     pub const FILE_SHARE_READ: DWORD = 0x0000_0001;
     pub const FILE_SHARE_WRITE: DWORD = 0x0000_0002;
     pub const OPEN_EXISTING: DWORD = 3;
@@ -713,12 +714,18 @@ mod imp {
                 &params_v2 as *const CreateVirtualDiskParameters as *const u8
             }
         };
+        // VIRTUAL_DISK_ACCESS_MASK：文档规定 V2（VHDX）必须 NONE；微软官方
+        // 示例（CppVhdAPI）V1（VHD）创建用 VIRTUAL_DISK_ACCESS_CREATE。
+        let access_mask = match spec.format {
+            VhdFormat::Vhd => VIRTUAL_DISK_ACCESS_CREATE,
+            VhdFormat::Vhdx => VIRTUAL_DISK_ACCESS_NONE,
+        };
         let mut handle: HANDLE = 0;
         let code = unsafe {
             CreateVirtualDisk(
                 &vst as *const VirtualStorageType,
                 diff_wide.as_ptr(),
-                VIRTUAL_DISK_ACCESS_NONE,
+                access_mask,
                 std::ptr::null(),
                 CREATE_VIRTUAL_DISK_FLAG_NONE,
                 0,
@@ -738,10 +745,12 @@ mod imp {
         Ok(())
     }
 
-    /// 打开差分盘句柄（attach/detach 前置）。
+    /// 打开差分盘句柄（attach/detach 前置）。类型按路径扩展名自适应
+    /// （VHD=2 / VHDX=3）；access mask 用 ALL（含 DETACH 位 0x40000，
+    /// 打开永久挂载盘必需，OpenVirtualDisk 文档要求）。
     pub fn open_vhd(path: &str) -> Result<HANDLE, DiskError> {
         let vst = VirtualStorageType {
-            device_id: 3, // VHDX
+            device_id: VhdFormat::detect(path).device_id(),
             vendor_id: VENDOR_MICROSOFT,
         };
         let path_wide = to_wide(path);
@@ -802,21 +811,16 @@ mod imp {
     }
 
     /// 查询 attach 后 VHD 的物理盘路径（`\\?\PhysicalDriveN`）。
+    /// 单次调用 + MAX_PATH 缓冲：该 API 无"传 NULL 探测大小"语义（真机
+    /// 实测两段式首调用返回 0x7a ERROR_INSUFFICIENT_BUFFER=122）。
     pub fn physical_path(handle: HANDLE) -> Result<String, DiskError> {
-        let mut size: DWORD = 0;
-        let code = unsafe { GetVirtualDiskPhysicalPath(handle, &mut size, std::ptr::null_mut()) };
-        if code != 0 || size == 0 {
-            return Err(DiskError::new(
-                classify_win32_error(code),
-                format!("GetVirtualDiskPhysicalPath(探测大小) 失败: {code:#x}"),
-            ));
-        }
-        let mut buf = vec![0u16; (size / 2) as usize];
+        let mut buf = vec![0u16; 260]; // MAX_PATH
+        let mut size: DWORD = (buf.len() * 2) as DWORD;
         let code = unsafe { GetVirtualDiskPhysicalPath(handle, &mut size, buf.as_mut_ptr()) };
         if code != 0 {
             return Err(DiskError::new(
                 classify_win32_error(code),
-                format!("GetVirtualDiskPhysicalPath(读取) 失败: {code:#x}"),
+                format!("GetVirtualDiskPhysicalPath 失败: {code:#x}"),
             ));
         }
         let s = unsafe { from_wide(buf.as_ptr()) };
@@ -862,12 +866,14 @@ mod imp {
     }
 
     /// 打开卷句柄，IOCTL 查询其磁盘 extent，判断是否落在目标物理盘上。
+    /// 卷设备必须用 dwDesiredAccess=0 打开（GENERIC_READ 会被卷拒绝 → 静默
+    /// 失败 → VolumeNotFound），share 为读写共享，见 IOCTL 文档惯例。
     fn volume_has_disk(volume_guid: &str, disk_number: u32) -> bool {
         let volume_wide = to_wide(volume_guid);
         let h = unsafe {
             CreateFileW(
                 volume_wide.as_ptr(),
-                GENERIC_READ,
+                0, // 卷设备：desired access 必须为 0
                 FILE_SHARE_READ | FILE_SHARE_WRITE,
                 std::ptr::null(),
                 OPEN_EXISTING,
