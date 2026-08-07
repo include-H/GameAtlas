@@ -554,6 +554,13 @@ mod imp {
         ) -> BOOL;
         /// 移除卷挂载点（`DeleteVolumeMountPointW("E:\\")`）。
         pub fn DeleteVolumeMountPointW(lpsz_volume_mount_point: *const u16) -> BOOL;
+        /// 查询卷的所有挂载路径（盘符/挂载点），输出多字符串 `X:\0Y:\0\0`。
+        pub fn GetVolumePathNamesForVolumeNameW(
+            lpsz_volume_name: *const u16,
+            lpsz_volume_path_names: *mut u16,
+            cch_buffer_length: DWORD,
+            lpcch_return_length: *mut DWORD,
+        ) -> BOOL;
         /// 位图：bit i 置位表示盘符 (A + i) 已占用。
         pub fn GetLogicalDrives() -> DWORD;
     }
@@ -787,15 +794,21 @@ mod imp {
     /// attach 差分盘。重复挂载（0xC03A001E）报 AlreadyAttached 供调用方决策。
     /// 标志：
     /// - PERMANENT_LIFETIME：句柄关闭后挂载保持（游戏运行期依赖），卸载走显式 detach
-    /// - NO_DRIVE_LETTER：禁止系统自动分配盘符——盘符必须由启动器 `DefineDosDevice`
-    ///   显式分配（v2 定案 §3.2；否则系统自动分配与显式分配冲突，实际生效的是
-    ///   系统字母而非启动器选择的字母）。
-    pub fn attach_vhd(handle: HANDLE) -> Result<(), DiskError> {
+    /// - `preferred.is_some()` 时加 NO_DRIVE_LETTER：禁止系统自动分配，盘符由
+    ///   启动器 SetVolumeMountPoint 强挂到指定字母（显式控制能力）
+    /// - `preferred.is_none()` 时不加：让系统自动分配（零干预、无注册表残留），
+    ///   挂载后 GetVolumePathNamesForVolumeNameW 读回实际字母
+    pub fn attach_vhd(handle: HANDLE, preferred: Option<char>) -> Result<(), DiskError> {
+        let flags = if preferred.is_some() {
+            ATTACH_VIRTUAL_DISK_FLAG_PERMANENT_LIFETIME | ATTACH_VIRTUAL_DISK_FLAG_NO_DRIVE_LETTER
+        } else {
+            ATTACH_VIRTUAL_DISK_FLAG_PERMANENT_LIFETIME
+        };
         let code = unsafe {
             AttachVirtualDisk(
                 handle,
                 std::ptr::null(),
-                ATTACH_VIRTUAL_DISK_FLAG_PERMANENT_LIFETIME | ATTACH_VIRTUAL_DISK_FLAG_NO_DRIVE_LETTER,
+                flags,
                 0,
                 std::ptr::null(),
                 std::ptr::null(),
@@ -992,6 +1005,40 @@ mod imp {
         out
     }
 
+    /// 读取系统实际分配给卷的盘符（`GetVolumePathNamesForVolumeNameW`）。
+    /// 输出是多字符串 `X:\0Y:\0\0`（双 NUL 结尾），取首个单字母盘符路径。
+    /// 系统自动分配模式（preferred=None）下用于获知实际盘符。
+    fn read_assigned_letter(volume_guid: &str) -> Option<char> {
+        let volume_wide = to_wide(volume_guid);
+        let mut buf = vec![0u16; 512];
+        let mut len: DWORD = 0;
+        let ok = unsafe {
+            GetVolumePathNamesForVolumeNameW(
+                volume_wide.as_ptr(),
+                buf.as_mut_ptr(),
+                buf.len() as DWORD,
+                &mut len,
+            )
+        };
+        if ok == 0 {
+            return None;
+        }
+        // 多字符串：逐段解析，找 `X:\` 形态（单字母盘符）的首个。
+        let mut i = 0usize;
+        while i < buf.len() && buf[i] != 0 {
+            let seg: Vec<u16> = buf[i..].iter().take_while(|&&c| c != 0).copied().collect();
+            let s = String::from_utf16_lossy(&seg);
+            let mut cs = s.chars();
+            if let (Some(c), Some(':')) = (cs.next(), cs.next()) {
+                if c.is_ascii_alphabetic() {
+                    return Some(c.to_ascii_uppercase());
+                }
+            }
+            i += seg.len() + 1;
+        }
+        None
+    }
+
     /// 完整挂载流程：SMB → 建差分（幂等）→ attach → 物理路径 → 卷匹配 → 分配盘符。
     /// 各步骤打 ASCII `[STEP-n]` 到 stdout：真机崩溃（0xC0000005）时用于定位
     /// 崩溃点（GBK 控制台会乱码中文日志，ASCII marker 可机器解析）。
@@ -1034,9 +1081,9 @@ mod imp {
         }
 
         println!("[STEP-4] open-attach");
-        // 4. 打开 + attach。
+        // 4. 打开 + attach（preferred 指定时禁系统分配，否则系统自动分配）。
         let handle = open_vhd(&params.diff_path)?;
-        if let Err(e) = attach_vhd(handle) {
+        if let Err(e) = attach_vhd(handle, params.preferred_letter) {
             unsafe { CloseHandle(handle) };
             return Err(e);
         }
@@ -1055,12 +1102,16 @@ mod imp {
         // 5. 卷枚举匹配。
         let volume_guid = find_volume_for_disk(disk_number)?;
 
-        // 6. 分配盘符（优先 preferred，否则第一个空闲）。
-        let used = used_drive_letters();
-        let letter = pick_drive_letter(&used, params.preferred_letter).ok_or_else(|| {
-            DiskError::new(DiskErrorKind::NoFreeDriveLetter, "系统无空闲盘符")
-        })?;
-        assign_drive_letter(&volume_guid, letter)?;
+        // 6. 盘符：preferred 指定 → SetVolumeMountPoint 强挂；未指定 → 读系统分配。
+        let letter = match params.preferred_letter {
+            Some(letter) => {
+                assign_drive_letter(&volume_guid, letter)?;
+                letter
+            }
+            None => read_assigned_letter(&volume_guid).ok_or_else(|| {
+                DiskError::new(DiskErrorKind::NoFreeDriveLetter, "系统未分配盘符")
+            })?,
+        };
 
         Ok(MountResult {
             drive_letter: letter,
