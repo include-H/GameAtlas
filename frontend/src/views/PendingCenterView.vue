@@ -207,26 +207,6 @@
           </div>
 
           <div class="detail-panel__section">
-            <div class="detail-panel__section-title">问题概览</div>
-            <a-space wrap size="small">
-              <a-tag
-                v-for="issue in getVisibleIssueGroups(activeGame)"
-                :key="issue"
-                color="arcoblue"
-              >
-                {{ getPendingIssueLabel(issue) }}
-              </a-tag>
-              <a-tag
-                v-for="detail in getIgnoredIssueDetails(activeGame)"
-                :key="`active-ignored-${detail.key}`"
-                color="gray"
-              >
-                已忽略 {{ getPendingIssueDetailLabel(detail.key) }}
-              </a-tag>
-            </a-space>
-          </div>
-
-          <div class="detail-panel__section">
             <div class="detail-panel__section-title">缺失项清单</div>
             <div class="detail-checklist">
               <div
@@ -235,12 +215,8 @@
                 class="detail-checklist__item"
                 :class="{ 'detail-checklist__item--ignored': detail.ignored }"
               >
-                <div class="detail-checklist__main">
-                  <span>{{ detail.label }}</span>
-                  <span v-if="detail.reason" class="detail-checklist__reason">{{ detail.reason }}</span>
-                </div>
-                <div class="detail-checklist__side">
-                  <span class="detail-checklist__group">{{ getPendingIssueLabel(detail.group) }}</span>
+                <div class="detail-checklist__top">
+                  <span class="detail-checklist__label">{{ detail.label }}</span>
                   <a-button
                     v-if="!detail.ignored"
                     class="app-text-action-btn"
@@ -261,28 +237,7 @@
                     恢复
                   </a-button>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="detail-panel__section">
-            <div class="detail-panel__section-title">当前状态</div>
-            <div class="detail-overview">
-              <div class="detail-overview__item">
-                <span>文件</span>
-                <strong>{{ activeGame.file_count || 0 }}</strong>
-              </div>
-              <div class="detail-overview__item">
-                <span>截图</span>
-                <strong>{{ activeGame.screenshot_count || 0 }}</strong>
-              </div>
-              <div class="detail-overview__item">
-                <span>开发商</span>
-                <strong>{{ activeGame.developer_count || 0 }}</strong>
-              </div>
-              <div class="detail-overview__item">
-                <span>发行商</span>
-                <strong>{{ activeGame.publisher_count || 0 }}</strong>
+                <span v-if="detail.reason" class="detail-checklist__reason">{{ detail.reason }}</span>
               </div>
             </div>
           </div>
@@ -355,8 +310,6 @@ const {
   getDisplayImage,
   getIgnoredIssueDetails,
   getPendingIssueDetailLabel,
-  getPendingIssueLabel,
-  getVisibleIssueGroups,
   getVisibleIssueDetails,
   handleEditSuccess,
   handleEditSync,
