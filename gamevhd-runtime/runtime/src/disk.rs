@@ -953,7 +953,10 @@ mod imp {
     }
 
     /// 完整挂载流程：SMB → 建差分（幂等）→ attach → 物理路径 → 卷匹配 → 分配盘符。
+    /// 各步骤打 ASCII `[STEP-n]` 到 stdout：真机崩溃（0xC0000005）时用于定位
+    /// 崩溃点（GBK 控制台会乱码中文日志，ASCII marker 可机器解析）。
     pub fn mount_vhd(params: &MountParams) -> Result<MountResult, DiskError> {
+        println!("[STEP-1] smb-connect");
         // 1. SMB（可选）。
         if let Some(remote) = &params.smb_remote {
             smb_connect(
@@ -964,6 +967,7 @@ mod imp {
             )?;
         }
 
+        println!("[STEP-2] ensure-diff-dir");
         // 2. 确保 diff 父目录存在（CreateVirtualDisk 不自动建目录；
         //    首次运行 diff 根缺失会返回 ERROR_PATH_NOT_FOUND=3）。
         if let Some(parent_dir) = std::path::Path::new(&params.diff_path).parent() {
@@ -977,6 +981,7 @@ mod imp {
             }
         }
 
+        println!("[STEP-3] create-diff");
         // 3. 创建差分盘（parent 提供时；已存在幂等跳过）。
         if let Some(parent) = &params.parent_unc {
             match create_diff_vhd(&params.diff_path, parent) {
@@ -988,6 +993,7 @@ mod imp {
             }
         }
 
+        println!("[STEP-4] open-attach");
         // 4. 打开 + attach。
         let handle = open_vhd(&params.diff_path)?;
         if let Err(e) = attach_vhd(handle) {
@@ -995,7 +1001,8 @@ mod imp {
             return Err(e);
         }
 
-        // 4. 物理盘路径 → 盘号。
+        println!("[STEP-5] physical-path");
+        // 5. 物理盘路径 → 盘号。
         let phys = physical_path(handle)?;
         unsafe { CloseHandle(handle) };
         let disk_number = parse_physical_drive(&phys).ok_or_else(|| {
