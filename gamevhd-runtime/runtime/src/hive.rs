@@ -133,6 +133,11 @@ mod win {
         validate_key_name(game_id)?;
         let key_name = format!("GameVHD_{game_id}");
 
+        // RegLoadKeyW 每次都需要 SE_RESTORE_NAME（RegSaveKeyW 需 SE_BACKUP_NAME），
+        // 且管理员令牌中该特权默认 disabled——必须在挂载前无条件启用
+        // （bootstrap 只在文件缺失时走，但 RegLoadKeyW 与文件是否存在无关）。
+        enable_backup_privilege()?;
+
         // 崩溃残留的模板键：无论本次是否自举都先幂等清理（自举中断可能留下它）。
         let _ = unsafe { RegDeleteKeyW(HKEY_CURRENT_USER, to_wide(TEMPLATE_KEY).as_ptr()) };
 
@@ -173,8 +178,8 @@ mod win {
 
     /// hive 文件缺失时自举：RegCreateKeyExW(HKCU, GVHD_HiveTemplate) → RegSaveKeyW
     /// （需 SE_BACKUP_NAME）→ RegCloseKey → RegDeleteKeyW。生成的空 hive 几 KB，可挂载。
+    /// 特权已在 [`mount_hive_impl`] 入口统一启用，此处不再重复。
     fn bootstrap_hive(hive_path: &str) -> Result<(), HiveError> {
-        enable_backup_privilege()?;
         let template = to_wide(TEMPLATE_KEY);
         let mut hkey: HANDLE = 0;
         let mut disposition: u32 = 0;
