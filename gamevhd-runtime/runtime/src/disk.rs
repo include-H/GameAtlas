@@ -95,7 +95,7 @@ impl std::error::Error for DiskError {}
 pub fn classify_win32_error(code: u32) -> DiskErrorKind {
     match code {
         // SMB / 网络（WNetAddConnection2 返回码）。
-        53 | 67 => DiskErrorKind::SmbPathNotFound, // ERROR_BAD_NET_PATH / ERROR_BAD_NET_NAME
+        53 | 67 | 1203 => DiskErrorKind::SmbPathNotFound, // BAD_NET_PATH / BAD_NET_NAME / NO_NET_OR_BAD_PATH
         5 | 1326 | 1219 => DiskErrorKind::SmbAccessDenied, // ACCESS_DENIED / LOGON_FAILURE / SESSION_CREDENTIAL_CONFLICT
         // virtdisk：parent 差分链。
         0xC03A_000E | 0xC03A_000F | 0xC03A_0017 => DiskErrorKind::ParentMismatch, // ID/TIMESTAMP/SIZE_MISMATCH
@@ -989,6 +989,7 @@ mod tests {
         // SMB 网络路径错误。
         assert_eq!(classify_win32_error(53), DiskErrorKind::SmbPathNotFound);
         assert_eq!(classify_win32_error(67), DiskErrorKind::SmbPathNotFound);
+        assert_eq!(classify_win32_error(1203), DiskErrorKind::SmbPathNotFound);
         // SMB 访问拒绝。
         assert_eq!(classify_win32_error(5), DiskErrorKind::SmbAccessDenied);
         assert_eq!(classify_win32_error(1326), DiskErrorKind::SmbAccessDenied);
