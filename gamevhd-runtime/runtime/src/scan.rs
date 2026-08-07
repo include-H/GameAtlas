@@ -68,7 +68,8 @@ fn resolve_root(drive: &str) -> PathBuf {
 }
 
 /// 递归收集候选 exe（BFS，排序输出，忽略不可读目录）。
-fn collect_exes(root: &Path, max_depth: usize) -> Vec<PathBuf> {
+/// 供 `cmd_scan` 与 run 主流程（[`crate::run`]）共同消费。
+pub fn collect_exes(root: &Path, max_depth: usize) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let mut stack = vec![(root.to_path_buf(), 0usize)];
     while let Some((dir, depth)) = stack.pop() {
