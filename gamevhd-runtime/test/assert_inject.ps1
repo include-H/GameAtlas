@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     GameVHD Runtime 阶段 1 注入验收断言：test-app 自检 marker + 子进程链全覆盖。
 

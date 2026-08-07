@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     GameVHD Runtime 阶段 4 磁盘层验收断言：SMB → 建差分 → attach → 定盘符 全流程。
 

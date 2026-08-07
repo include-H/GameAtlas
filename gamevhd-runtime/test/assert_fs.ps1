@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     GameVHD Runtime 阶段 2 文件系统重定向验收断言（W3T11）：test-app file 模式经
     gvhook sandbox 后，%USERPROFILE%\Documents 下的写入被重定向到

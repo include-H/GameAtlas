@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     GameVHD Runtime 阶段 3 注册表沙箱验收断言：hive 落盘隔离 + host 零痕迹 + 读穿透 + 持久化。
 

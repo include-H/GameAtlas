@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     GameVHD Runtime 断言框架公共库：Assert-True / Write-Step / Finish-Assertions /
     Require-Admin。被同目录 assert_*.ps1 dot-source。
