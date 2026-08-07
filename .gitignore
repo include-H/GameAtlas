@@ -33,6 +33,10 @@ vnite/
 Wiki/
 Game_Wiki/
 
+# GameVHD 参考实现（只读参照，非本仓库资产）
+Sandboxie/
+gamevhd-runtime/runtime/target/
+
 # Root level package files (from opencode)
 /package.json
 /package-lock.json
