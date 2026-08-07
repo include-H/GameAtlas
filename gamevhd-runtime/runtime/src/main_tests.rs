@@ -16,14 +16,22 @@ fn parse_help_and_version() {
 
 #[test]
 fn parse_positional_subcommands() {
-    assert_eq!(
-        parse_args(&args(&["gv", "mount", "test.vhd"])),
-        Ok(Command::Mount("test.vhd".into()))
-    );
-    assert_eq!(
-        parse_args(&args(&["gv", "unmount", "t.vhd"])),
-        Ok(Command::Unmount("t.vhd".into()))
-    );
+    let mount_base = Command::Mount {
+        vhd: "test.vhd".into(),
+        parent: None,
+        smb: None,
+        user: None,
+        pass: None,
+        letter: None,
+        retries: 3,
+    };
+    assert_eq!(parse_args(&args(&["gv", "mount", "test.vhd"])), Ok(mount_base.clone()));
+    let unmount_base = Command::Unmount {
+        vhd: "t.vhd".into(),
+        letter: None,
+        smb: None,
+    };
+    assert_eq!(parse_args(&args(&["gv", "unmount", "t.vhd"])), Ok(unmount_base));
     assert_eq!(
         parse_args(&args(&["gv", "scan", "E"])),
         Ok(Command::Scan("E".into()))
@@ -32,6 +40,84 @@ fn parse_positional_subcommands() {
         parse_args(&args(&["gv", "probe", "game.exe"])),
         Ok(Command::Probe("game.exe".into()))
     );
+}
+
+#[test]
+fn parse_mount_full_options() {
+    let want = Command::Mount {
+        vhd: r"C:\diff\g.vhdx".into(),
+        parent: Some(r"\\192.168.1.4\Game\base.vhdx".into()),
+        smb: Some(r"\\192.168.1.4\Game".into()),
+        user: Some("rom".into()),
+        pass: Some("secret".into()),
+        letter: Some('G'),
+        retries: 5,
+    };
+    assert_eq!(
+        parse_args(&args(&[
+            "gv", "mount", r"C:\diff\g.vhdx",
+            "--parent", r"\\192.168.1.4\Game\base.vhdx",
+            "--smb", r"\\192.168.1.4\Game",
+            "--user", "rom", "--pass", "secret",
+            "--letter", "g", "--retries", "5",
+        ])),
+        Ok(want)
+    );
+}
+
+#[test]
+fn parse_mount_partial_options() {
+    // 只给 --letter：其余缺省。
+    let want = Command::Mount {
+        vhd: "a.vhdx".into(),
+        parent: None,
+        smb: None,
+        user: None,
+        pass: None,
+        letter: Some('D'),
+        retries: 3,
+    };
+    assert_eq!(
+        parse_args(&args(&["gv", "mount", "a.vhdx", "--letter", "D"])),
+        Ok(want)
+    );
+}
+
+#[test]
+fn parse_mount_bad_args() {
+    assert!(parse_args(&args(&["gv", "mount"])).is_err(), "mount 缺 vhd");
+    assert!(
+        parse_args(&args(&["gv", "mount", "a.vhdx", "--letter", "EE"])).is_err(),
+        "盘符必须单字母"
+    );
+    assert!(
+        parse_args(&args(&["gv", "mount", "a.vhdx", "--retries", "0"])).is_err(),
+        "retries 必须 ≥ 1"
+    );
+    assert!(
+        parse_args(&args(&["gv", "mount", "a.vhdx", "--retries", "x"])).is_err(),
+        "retries 必须为数字"
+    );
+    assert!(
+        parse_args(&args(&["gv", "mount", "a.vhdx", "--parent"])).is_err(),
+        "--parent 缺值"
+    );
+}
+
+#[test]
+fn parse_unmount_options() {
+    let want = Command::Unmount {
+        vhd: "b.vhdx".into(),
+        letter: Some('E'),
+        smb: Some(r"\\192.168.1.4\Game".into()),
+    };
+    assert_eq!(
+        parse_args(&args(&[
+            "gv", "unmount", "b.vhdx", "--letter", "e", "--smb", r"\\192.168.1.4\Game"
+        ])),
+        Ok(want)
+    );
+    assert!(parse_args(&args(&["gv", "unmount"])).is_err(), "unmount 缺 vhd");
 }
 
 #[test]

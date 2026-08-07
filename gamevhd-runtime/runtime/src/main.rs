@@ -12,6 +12,7 @@
 
 mod boxfile;
 mod cleanup;
+mod disk;
 mod hive;
 mod inject;
 mod json;
@@ -30,8 +31,20 @@ use std::process::ExitCode;
 /// 解析后的子命令。
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Command {
-    Mount(String),
-    Unmount(String),
+    Mount {
+        vhd: String,
+        parent: Option<String>,
+        smb: Option<String>,
+        user: Option<String>,
+        pass: Option<String>,
+        letter: Option<char>,
+        retries: u32,
+    },
+    Unmount {
+        vhd: String,
+        letter: Option<char>,
+        smb: Option<String>,
+    },
     Scan(String),
     Probe(String),
     Run { drive: char, box_path: String },
@@ -57,8 +70,10 @@ fn run_cli(args: &[String]) -> u8 {
             println!("gamevhd-runtime {}", env!("CARGO_PKG_VERSION"));
             0
         }
-        Ok(Command::Mount(vhd)) => cmd_mount(&vhd),
-        Ok(Command::Unmount(vhd)) => cmd_unmount(&vhd),
+        Ok(Command::Mount { vhd, parent, smb, user, pass, letter, retries }) => {
+            cmd_mount(&vhd, parent.as_deref(), smb.as_deref(), user.as_deref(), pass.as_deref(), letter, retries)
+        }
+        Ok(Command::Unmount { vhd, letter, smb }) => cmd_unmount(&vhd, letter, smb.as_deref()),
         Ok(Command::Scan(drive)) => scan::cmd_scan(&drive),
         Ok(Command::Probe(exe)) => cmd_probe(&exe),
         Ok(Command::Run { drive, box_path }) => cmd_run(drive, &box_path),
@@ -80,8 +95,8 @@ fn parse_args(args: &[String]) -> Result<Command, String> {
     match sub.as_str() {
         "--help" | "-h" => Ok(Command::Help),
         "--version" | "-V" => Ok(Command::Version),
-        "mount" => positional(rest, "mount", "<vhd>").map(Command::Mount),
-        "unmount" => positional(rest, "unmount", "<vhd>").map(Command::Unmount),
+        "mount" => parse_mount(&rest[1..]),
+        "unmount" => parse_unmount(&rest[1..]),
         "scan" => positional(rest, "scan", "<drive>").map(Command::Scan),
         "probe" => positional(rest, "probe", "<exe>").map(Command::Probe),
         "run" => parse_run(&rest[1..]),
@@ -106,6 +121,69 @@ fn positional(rest: &[String], cmd: &str, argname: &str) -> Result<String, Strin
         crate::log_warn!("{cmd}: 忽略多余参数 {:?}", &rest[2..]);
     }
     Ok(value)
+}
+
+/// 解析单个盘符参数（`E` / `e` → 'E'；非法 → Err）。
+fn parse_letter(s: &str, what: &str) -> Result<char, String> {
+    let mut cs = s.chars();
+    match (cs.next(), cs.next()) {
+        (Some(c), None) if c.is_ascii_alphabetic() => Ok(c.to_ascii_uppercase()),
+        _ => Err(format!("非法的{what} '{s}'（需单个字母，如 E）")),
+    }
+}
+
+/// `mount <vhd> [--parent <UNC>] [--smb <UNC>] [--user <U>] [--pass <P>]
+///       [--letter <L>] [--retries <N>]`
+///
+/// `<vhd>` 为本地差分盘路径（`%LOCALAPPDATA%\GameAtlas\diff\*.vhdx`）。
+/// `--parent` 提供时若差分盘不存在则基于该 UNC 基础盘创建（已存在幂等跳过）。
+/// `--smb` 提供时先连接只读共享（`--user`/`--pass` 可缺省走当前会话）。
+/// `--letter` 指定首选盘符，缺省取第一个空闲。`--retries` 为 SMB 重试次数。
+fn parse_mount(rest: &[String]) -> Result<Command, String> {
+    let vhd = rest
+        .first()
+        .ok_or_else(|| "mount 需要 <vhd>（本地差分盘路径）".to_string())?
+        .clone();
+    let opts = parse_kv_opts(&rest[1..], "mount", &["--parent", "--smb", "--user", "--pass", "--letter", "--retries"])?;
+    let parent = opt_value(&opts, "--parent").cloned();
+    let smb = opt_value(&opts, "--smb").cloned();
+    let user = opt_value(&opts, "--user").cloned();
+    let pass = opt_value(&opts, "--pass").cloned();
+    let letter = opt_value(&opts, "--letter")
+        .map(|v| parse_letter(v, "盘符"))
+        .transpose()?;
+    let retries = match opt_value(&opts, "--retries") {
+        Some(v) => v
+            .parse::<u32>()
+            .map_err(|_| format!("mount: --retries 需为正整数，收到 '{v}'"))?,
+        None => 3,
+    };
+    if retries == 0 {
+        return Err("mount: --retries 必须 ≥ 1".into());
+    }
+    Ok(Command::Mount {
+        vhd,
+        parent,
+        smb,
+        user,
+        pass,
+        letter,
+        retries,
+    })
+}
+
+/// `unmount <vhd> [--letter <L>] [--smb <UNC>]`
+fn parse_unmount(rest: &[String]) -> Result<Command, String> {
+    let vhd = rest
+        .first()
+        .ok_or_else(|| "unmount 需要 <vhd>（本地差分盘路径）".to_string())?
+        .clone();
+    let opts = parse_kv_opts(&rest[1..], "unmount", &["--letter", "--smb"])?;
+    let letter = opt_value(&opts, "--letter")
+        .map(|v| parse_letter(v, "盘符"))
+        .transpose()?;
+    let smb = opt_value(&opts, "--smb").cloned();
+    Ok(Command::Unmount { vhd, letter, smb })
 }
 
 /// `run --drive <letter> --box <path>`：选项乱序均可，未知 `--x` 告警后忽略。
@@ -159,14 +237,37 @@ fn opt_value<'a>(opts: &'a [(String, String)], key: &str) -> Option<&'a String> 
     opts.iter().find(|(k, _)| k == key).map(|(_, v)| v)
 }
 
-/// 仅 Windows：挂载 VHD。Linux：不支持（退出码 3）。
+/// 仅 Windows：挂载 VHD（阶段 4：virtdisk API 全流程，替代 diskpart）。
+/// Linux：不支持（退出码 3）。
 #[cfg_attr(not(target_os = "windows"), allow(unused_variables))]
-fn cmd_mount(vhd: &str) -> u8 {
+fn cmd_mount(
+    vhd: &str,
+    parent: Option<&str>,
+    smb: Option<&str>,
+    user: Option<&str>,
+    pass: Option<&str>,
+    letter: Option<char>,
+    retries: u32,
+) -> u8 {
     #[cfg(target_os = "windows")]
     {
-        match winffi::diskpart_mount(vhd) {
-            Ok(()) => {
-                crate::log_info!("mount: VHD 已挂载: {vhd}");
+        let params = disk::MountParams {
+            diff_path: vhd.to_string(),
+            parent_unc: parent.map(str::to_string),
+            smb_remote: smb.map(str::to_string),
+            smb_user: user.map(str::to_string),
+            smb_pass: pass.map(str::to_string),
+            preferred_letter: letter,
+            smb_retries: retries,
+        };
+        match disk::mount_vhd(&params) {
+            Ok(result) => {
+                crate::log_info!(
+                    "mount: 挂载成功 {} → {}:（卷 {}）",
+                    vhd,
+                    result.drive_letter,
+                    result.volume_guid
+                );
                 0
             }
             Err(e) => {
@@ -177,16 +278,22 @@ fn cmd_mount(vhd: &str) -> u8 {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        unsupported("mount", "Windows + diskpart")
+        unsupported("mount", "Windows + virtdisk API")
     }
 }
 
-/// 仅 Windows：卸载 VHD。Linux：不支持（退出码 3）。
+/// 仅 Windows：卸载 VHD（阶段 4：detach + 断 SMB，替代 diskpart）。
+/// Linux：不支持（退出码 3）。
 #[cfg_attr(not(target_os = "windows"), allow(unused_variables))]
-fn cmd_unmount(vhd: &str) -> u8 {
+fn cmd_unmount(vhd: &str, letter: Option<char>, smb: Option<&str>) -> u8 {
     #[cfg(target_os = "windows")]
     {
-        match winffi::diskpart_unmount(vhd) {
+        let params = disk::UnmountParams {
+            drive_letter: letter.unwrap_or('E'),
+            diff_path: vhd.to_string(),
+            smb_remote: smb.map(str::to_string),
+        };
+        match disk::unmount_vhd(&params) {
             Ok(()) => {
                 crate::log_info!("unmount: VHD 已卸载: {vhd}");
                 0
@@ -199,7 +306,7 @@ fn cmd_unmount(vhd: &str) -> u8 {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        unsupported("unmount", "Windows + diskpart")
+        unsupported("unmount", "Windows + virtdisk API")
     }
 }
 
@@ -277,8 +384,9 @@ fn print_usage() {
     println!("用法: gamevhd-runtime <子命令> [参数]");
     println!();
     println!("子命令:");
-    println!("  mount <vhd>               挂载 VHD（Windows）");
-    println!("  unmount <vhd>             卸载 VHD（Windows）");
+    println!("  mount <vhd> [--parent <UNC>] [--smb <UNC>] [--user <U>] [--pass <P>] [--letter <L>] [--retries <N>]");
+    println!("                挂载 VHD（Windows；SMB→建差分→attach→定盘符）");
+    println!("  unmount <vhd> [--letter <L>] [--smb <UNC>]   卸载 VHD（Windows）");
     println!("  scan <drive>              扫描盘符下的 exe 候选并标注位数（如 scan E）");
     println!("  probe <exe>               探测 exe 位数（x64 / x86 / not-pe）");
     println!("  run --drive <letter> --box <path>   沙箱启动游戏（Windows）");
