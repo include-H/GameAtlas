@@ -200,7 +200,8 @@ GVHD_API uint32_t GVHD_CALL gvhook_init(void *param_block)
         return GVHD_INIT_ERR_MINHOOK;
     }
 
-    /* 7. 安装钩子（proc.c：子进程注入；file.c：NtQueryAttributesFile 日志桩） */
+    /* 7. 安装钩子（proc.c：子进程注入；file.c：NtQueryAttributesFile 日志桩；
+     *    reg.c：注册表重定向） */
     if (gvhd_install_process_hooks() != 0) {
         gvhd_log_write(L"INIT_FAILED code=%u reason=gvhd_install_process_hooks",
                        (unsigned)GVHD_INIT_ERR_HOOK);
@@ -208,6 +209,11 @@ GVHD_API uint32_t GVHD_CALL gvhook_init(void *param_block)
     }
     if (gvhd_install_file_hooks() != 0) {
         gvhd_log_write(L"INIT_FAILED code=%u reason=gvhd_install_file_hooks",
+                       (unsigned)GVHD_INIT_ERR_HOOK);
+        return GVHD_INIT_ERR_HOOK;
+    }
+    if (gvhd_install_registry_hooks() != 0) {
+        gvhd_log_write(L"INIT_FAILED code=%u reason=gvhd_install_registry_hooks",
                        (unsigned)GVHD_INIT_ERR_HOOK);
         return GVHD_INIT_ERR_HOOK;
     }

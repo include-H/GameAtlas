@@ -1,9 +1,10 @@
 //! 零依赖 JSON 子集解析器（阶段 0，本波交付；box.json 专用）。
 //!
-//! 只支持本模型所需的扁平对象 `{ "k": "v", ... }`（值仅字符串）：
-//! 字符串转义 `\"` `\\` `\n` `\r` `\t` `\b` `\f` `\/` 与 `\uXXXX`（含代理对）。
-//! 超集 JSON（数组/数字/null/嵌套）按非法输入报错——box.json 是我们自己写的文件，
-//! 严格是特性。错误以 `String`（消息）返回，由调用方包装为领域错误。
+//! 只支持本模型所需的扁平对象 `{ "k": "v", ... }`（值为字符串或布尔字面量）：
+//! 字符串转义 `\"` `\\` `\n` `\r` `\t` `\b` `\f` `\/` 与 `\uXXXX`（含代理对）；
+//! 布尔字面量 `true` / `false` 以文本 `"true"` / `"false"` 返回（供 `skip_cache_dirs`
+//! 等布尔字段消费）。超集 JSON（数组/数字/null/嵌套）按非法输入报错——box.json
+//! 是我们自己写的文件，严格是特性。错误以 `String`（消息）返回，由调用方包装为领域错误。
 
 // 本模块当前仅被 boxfile 与测试使用；后续 wave（run/cleanup 生命周期）将直接消费。
 #![allow(dead_code)]
@@ -46,7 +47,7 @@ pub fn parse_json_object(s: &str) -> Result<Vec<(String, String)>, String> {
             .trim_start()
             .strip_prefix(':')
             .ok_or_else(|| "字段名后期望 ':'".to_string())?;
-        let (value, after_value) = parse_json_string(after_colon.trim_start())?;
+        let (value, after_value) = parse_json_value(after_colon.trim_start())?;
         fields.push((key, value));
         let tail = after_value.trim_start();
         if let Some(r) = tail.strip_prefix(',') {
@@ -59,6 +60,27 @@ pub fn parse_json_object(s: &str) -> Result<Vec<(String, String)>, String> {
         return Err("期望 ',' 或对象结尾".into());
     }
     Ok(fields)
+}
+
+/// 解析一个 JSON 值：字符串字面量或布尔字面量（本模型不需要数字/null/嵌套）。
+/// 返回 (解码值, 剩余输入)。布尔返回文本 `"true"` / `"false"`。
+fn parse_json_value(s: &str) -> Result<(String, &str), String> {
+    if s.starts_with('"') {
+        return parse_json_string(s);
+    }
+    for lit in ["true", "false"] {
+        if s.starts_with(lit) {
+            let rest = &s[lit.len()..];
+            let boundary_ok = match rest.chars().next() {
+                None => true,
+                Some(c) => !c.is_alphanumeric(),
+            };
+            if boundary_ok {
+                return Ok((lit.to_string(), rest));
+            }
+        }
+    }
+    Err("期望字符串或布尔值".into())
 }
 
 /// 解析一个 JSON 字符串字面量，返回 (解码值, 剩余输入)。
@@ -200,6 +222,19 @@ mod tests {
     #[test]
     fn object_parse_empty() {
         assert!(parse_json_object("{}").unwrap().is_empty());
+    }
+
+    #[test]
+    fn object_parse_boolean_literals() {
+        assert_eq!(
+            parse_json_object(r#"{ "skip": true, "no": false }"#).unwrap(),
+            vec![
+                ("skip".into(), "true".into()),
+                ("no".into(), "false".into())
+            ]
+        );
+        assert!(parse_json_object(r#"{"a": truex}"#).is_err(), "truex 不是布尔");
+        assert!(parse_json_object(r#"{"a": null}"#).is_err(), "null 不支持");
     }
 
     #[test]

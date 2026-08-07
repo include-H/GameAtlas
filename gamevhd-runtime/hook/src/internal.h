@@ -17,6 +17,7 @@
  * 返回 0 成功；失败返回 GVHD_INIT_ERR_HOOK。 */
 uint32_t gvhd_install_process_hooks(void);   /* proc.c */
 uint32_t gvhd_install_file_hooks(void);      /* file.c */
+uint32_t gvhd_install_registry_hooks(void);  /* reg.c */
 
 /* 当前进程 id（诊断辅助）。 */
 DWORD gvhd_current_pid(void);                /* init.c */
