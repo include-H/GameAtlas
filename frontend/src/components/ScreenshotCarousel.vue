@@ -30,13 +30,16 @@
               @error="handleImageError(currentMedia.url)"
             />
             <template v-else>
+              <!-- 2026-08-07: 无 autoplay/poster。
+                   autoplay 会在 src 切换瞬间由浏览器直接播放，绕过下方
+                   loader 调度 → "先播后转圈"；poster 在首帧渲染前显示
+                   banner，与 loader 的封面展示重复。 -->
               <video
                 ref="videoRef"
                 v-show="!videoFailed"
                 :src="currentMedia.url"
                 class="screenshot-carousel__video"
                 :class="{ 'screenshot-carousel__video--ready': videoReady }"
-                :poster="currentVideoPoster || undefined"
                 controls
                 muted
                 playsinline
@@ -299,14 +302,20 @@ watch(currentMedia, (nextMedia, previousMedia) => {
 })
 
 onMounted(() => {
-  if (!viewportRef.value || typeof ResizeObserver === 'undefined') return
-  resizeObserver = new ResizeObserver((entries) => {
-    const entry = entries[0]
-    if (!entry) return
-    const width = entry.contentRect?.width || viewportRef.value?.clientWidth || 0
-    if (width) viewportWidth.value = width
-  })
-  resizeObserver.observe(viewportRef.value)
+  if (viewportRef.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      const width = entry.contentRect?.width || viewportRef.value?.clientWidth || 0
+      if (width) viewportWidth.value = width
+    })
+    resizeObserver.observe(viewportRef.value)
+  }
+  // 2026-08-07: 首次进入时接管原 autoplay 属性的职责。
+  // loader 已在首帧挂载（videoReady 初始 false），记录淡入起点并触发加载；
+  // watch(currentMedia) 首次求值不触发，只有这里能启动首次拉流。
+  loaderShownAt = Date.now()
+  tryPlayVideo()
 })
 
 onBeforeUnmount(() => {
@@ -359,11 +368,27 @@ const onVideoVolumeChange = () => {
   }
 }
 
-// 与 CSS 中 loader 动画时长保持一致：淡入 1.5s + spinner-fade 淡出 0.3s。
-// 视频就绪后必须等 loader 动画完整播完再播放，否则半透明 loader 会盖在
-// 已启播的视频上（画面透出 → "先播后转圈"的错乱观感）。
-const LOADER_FADE_IN_MS = 1500
-const LOADER_FADE_OUT_MS = 300
+// ===== 2026-08-07 视频播放时序设计（回归必读） =====
+// 背景：轮播切换预告片时曾出现"视频先播、loader 转圈后淡入盖在画面上"的
+// 错乱观感。控制台取证（拦截 play/playing/canplay + loader opacity 采样）确认：
+// 1) video 元素原带 autoplay 属性——src 切换瞬间由浏览器直接触发加载播放，
+//    完全绕过代码调度（play 事件先于任何代码调用出现）；
+// 2) loader 背景是半透明 scrim，视频在 loader 底下播放时画面透出，
+//    视觉上"先播后转圈"；
+// 3) loader 的 1.5s 淡入 CSS animation 会压制 leave transition，导致
+//    loader 必须等淡入动画播完才消失（曾表现为"播放后 1.5s 转圈才消失"）。
+// 修复决策：
+// - 移除 autoplay 属性，播放完全由代码调度（见模板 video 元素注释）；
+// - 视频就绪后不立即 play()：等 loader 淡入（LOADER_FADE_IN_MS）+
+//   淡出（LOADER_FADE_OUT_MS）动画完整播完再播放，保证"先动画后播放"；
+// - 首次进入由 onMounted 触发加载（watch(currentMedia) 首次求值不触发，
+//   autoplay 移除后必须显式接管）；
+// - 移除 video poster：首帧渲染前会显示 banner，与 loader 的封面展示重复。
+// 动画时长权衡：1.5s → 0.8s → 0.5s（用户迭代：入场等待过长），
+// 淡出 0.3s → 0.1s（用户迭代：淡出拖慢播放）。改动必须 CSS 与常量同步。
+// ==================================================
+const LOADER_FADE_IN_MS = 500
+const LOADER_FADE_OUT_MS = 100
 let loaderShownAt = 0
 let playScheduled = false
 let playTimer: number | undefined
@@ -561,9 +586,9 @@ const handlePosterError = (url: string) => {
   justify-content: center;
   background: var(--app-scrim);
   z-index: 5;
-  /* 长入场动画（1.5s）：期间视频已在 requestIdleCallback 后开始缓冲，
-     动画结束即就绪，切视频时没有"突然出现"的跳变 */
-  animation: screenshot-carousel-loader-in 1.5s ease;
+  /* 短入场动画（0.8s）：期间视频已开始加载，动画结束即播放，
+     切视频时没有"突然出现"的跳变 */
+  animation: screenshot-carousel-loader-in 0.5s ease;
 }
 
 .screenshot-carousel__loader-ring {
@@ -582,7 +607,7 @@ const handlePosterError = (url: string) => {
   border-radius: 50%;
   object-fit: cover;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-  animation: screenshot-carousel-thumb-in 1.5s ease;
+  animation: screenshot-carousel-thumb-in 0.5s ease;
 }
 
 @keyframes screenshot-carousel-loader-in {
@@ -648,7 +673,7 @@ const handlePosterError = (url: string) => {
 
 .screenshot-carousel-spinner-fade-enter-active,
 .screenshot-carousel-spinner-fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.1s ease;
 }
 
 .screenshot-carousel-spinner-fade-enter-from,
