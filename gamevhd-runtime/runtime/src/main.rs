@@ -271,6 +271,9 @@ fn cmd_mount(
                     result.drive_letter,
                     result.volume_guid
                 );
+                // ASCII marker 到 stdout：断言脚本/自动化依赖此格式（PS 5.1
+                // GBK 控制台会乱码中文，marker 必须纯 ASCII 可机器解析）。
+                println!("[MOUNT-OK] {}:", result.drive_letter);
                 0
             }
             Err(e) => {
@@ -299,6 +302,7 @@ fn cmd_unmount(vhd: &str, letter: Option<char>, smb: Option<&str>) -> u8 {
         match disk::unmount_vhd(&params) {
             Ok(()) => {
                 crate::log_info!("unmount: VHD 已卸载: {vhd}");
+                println!("[UNMOUNT-OK]");
                 0
             }
             Err(e) => {

@@ -1,20 +1,25 @@
 ﻿<#
 .SYNOPSIS
-    GameVHD Runtime 断言框架公共库：Assert-True / Write-Step / Finish-Assertions /
-    Require-Admin。被同目录 assert_*.ps1 dot-source。
+    GameVHD Runtime assertion framework common lib: Assert-True /
+    Write-Step / Finish-Assertions / Require-Admin. Dot-sourced by
+    assert_*.ps1 in the same directory.
 
 .DESCRIPTION
-    统一的验收断言基础设施：
-      Assert-True <bool> <string>    断言；失败记录并继续（汇总后非零退出）
-      Write-Step <string>            步骤标题输出（带分隔线）
-      Finish-Assertions              收尾：打印通过/失败汇总，有失败则 exit 1
-      Require-Admin                  非管理员直接 throw（挂载/注入需提权）
+    Unified acceptance assertion infrastructure:
+      Assert-True <bool> <string>    assert; record failure, continue,
+                                     non-zero exit at Finish-Assertions
+      Write-Step <string>            step header output (with separator)
+      Finish-Assertions              summary: pass/fail counts, exit 1 on fail
+      Require-Admin                  throw if not elevated (mount/inject need it)
 
-    用法（在断言脚本中）：
+    NOTE: pure ASCII on purpose. PowerShell 5.1 decodes .ps1 by ANSI
+    codepage; UTF-8 Chinese garbles parsing. Runtime markers are ASCII too.
+
+    Usage (in an assert script):
       . (Join-Path $PSScriptRoot 'assert_common.ps1')
       Require-Admin
-      Write-Step "步骤标题"
-      Assert-True (Test-Path $x) "描述"
+      Write-Step "step title"
+      Assert-True (Test-Path $x) "description"
       Finish-Assertions
 #>
 
@@ -44,12 +49,12 @@ function Write-Step {
 
 function Finish-Assertions {
     Write-Host ""
-    Write-Host ("断言汇总：{0} 项，失败 {1} 项" -f $script:__gvhd_assertions, $script:__gvhd_failures)
+    Write-Host ("assertions: {0}, failures: {1}" -f $script:__gvhd_assertions, $script:__gvhd_failures)
     if ($script:__gvhd_failures -gt 0) {
-        Write-Host "验收未通过" -ForegroundColor Red
+        Write-Host "ACCEPTANCE FAILED" -ForegroundColor Red
         exit 1
     }
-    Write-Host "验收通过" -ForegroundColor Green
+    Write-Host "ACCEPTANCE PASSED" -ForegroundColor Green
     exit 0
 }
 
@@ -57,6 +62,6 @@ function Require-Admin {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
     if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        throw '需要管理员权限运行（挂载 VHD / 注入需要提权）'
+        throw 'administrator privileges required (VHD mount / inject need elevation)'
     }
 }
