@@ -11,6 +11,7 @@ use super::*;
             game_data_root: r"E:\GameData".into(),
             user_profile: r"C:\Users\Hao".into(),
             registry_hive: r"GameData\Registry\user.dat".into(),
+            skip_cache_dirs: false,
             state: BoxState::Clean,
         }
     }
@@ -101,6 +102,41 @@ use super::*;
             );
             assert_eq!(bf.state, from, "失败时状态不得改变");
         }
+    }
+
+    #[test]
+    fn skip_cache_dirs_optional_and_round_trip() {
+        // 缺省字段 → false（向后兼容旧 box.json）。
+        let legacy = r#"{
+            "game_id": "g",
+            "exe_relative": "Game\\a.exe",
+            "game_data_root": "E:\\GameData",
+            "user_profile": "C:\\Users\\Hao",
+            "registry_hive": "GameData\\Registry\\user.dat",
+            "state": "clean"
+        }"#;
+        let bf = BoxFile::from_json(legacy).unwrap();
+        assert!(!bf.skip_cache_dirs);
+
+        // 布尔字面量 true 解析。
+        let with_flag = r#"{
+            "game_id": "g",
+            "exe_relative": "Game\\a.exe",
+            "game_data_root": "E:\\GameData",
+            "user_profile": "C:\\Users\\Hao",
+            "registry_hive": "GameData\\Registry\\user.dat",
+            "skip_cache_dirs": true,
+            "state": "clean"
+        }"#;
+        let bf2 = BoxFile::from_json(with_flag).unwrap();
+        assert!(bf2.skip_cache_dirs);
+        assert!(bf2.to_json().contains("\"skip_cache_dirs\": true"));
+        let back = BoxFile::from_json(&bf2.to_json()).unwrap();
+        assert_eq!(back, bf2);
+
+        // 非法布尔值报错。
+        let bad = with_flag.replace("true", "\"maybe\"");
+        assert!(BoxFile::from_json(&bad).is_err());
     }
 
     #[test]
