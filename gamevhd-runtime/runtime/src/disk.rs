@@ -296,6 +296,8 @@ mod imp {
     /// 直到显式 `DetachVirtualDisk`。启动器 mount 后立即关句柄，游戏运行期间
     /// 挂载必须存活，故 attach 必须带此标志（否则句柄关闭即自动分离）。
     pub const ATTACH_VIRTUAL_DISK_FLAG_PERMANENT_LIFETIME: u32 = 0x0000_0004;
+    /// attach 时禁止系统自动分配盘符（盘符由启动器显式 DefineDosDevice）。
+    pub const ATTACH_VIRTUAL_DISK_FLAG_NO_DRIVE_LETTER: u32 = 0x0000_0002;
     /// virtdisk：detach 无特殊位。
     pub const DETACH_VIRTUAL_DISK_FLAG_NONE: u32 = 0;
     /// virtdisk：`VIRTUAL_DISK_ACCESS_NONE`（V2/VHDX 创建时，文档强制）。
@@ -308,8 +310,7 @@ mod imp {
     /// `IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS`（winioctl.h，METHOD_BUFFERED）。
     pub const IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS: DWORD = 0x0056_0000;
 
-    /// `DefineDosDevice`：移除盘符定义。
-    pub const DDD_REMOVE_DEFINITION: DWORD = 0x0000_0002;
+    /// `CreateFileW`：打开卷句柄（卷名如 `\\?\Volume{GUID}\`，desired access 恒 0）。
 
     /// `CreateFileW`：打开卷句柄（卷名如 `\\?\Volume{GUID}\`，desired access 恒 0）。
     pub const FILE_SHARE_READ: DWORD = 0x0000_0001;
@@ -544,6 +545,15 @@ mod imp {
             lp_device_name: *const u16,
             lp_target_path: *const u16,
         ) -> BOOL;
+        /// 给卷分配盘符/挂载点（`SetVolumeMountPointW("E:\\", "\\?\Volume{GUID}\\")`）。
+        /// 给卷分配盘符的正确 API（DefineDosDevice 只定义进程命名空间设备名，
+        /// 文件资源管理器不可见——v2 定案 §3.2 的实现偏差，真机实证）。
+        pub fn SetVolumeMountPointW(
+            lpsz_volume_mount_point: *const u16,
+            lpsz_volume_name: *const u16,
+        ) -> BOOL;
+        /// 移除卷挂载点（`DeleteVolumeMountPointW("E:\\")`）。
+        pub fn DeleteVolumeMountPointW(lpsz_volume_mount_point: *const u16) -> BOOL;
         /// 位图：bit i 置位表示盘符 (A + i) 已占用。
         pub fn GetLogicalDrives() -> DWORD;
     }
@@ -775,14 +785,17 @@ mod imp {
     }
 
     /// attach 差分盘。重复挂载（0xC03A001E）报 AlreadyAttached 供调用方决策。
-    /// 必须带 PERMANENT_LIFETIME：句柄关闭后挂载保持（游戏运行期依赖），
-    /// 卸载走显式 `DetachVirtualDisk`。
+    /// 标志：
+    /// - PERMANENT_LIFETIME：句柄关闭后挂载保持（游戏运行期依赖），卸载走显式 detach
+    /// - NO_DRIVE_LETTER：禁止系统自动分配盘符——盘符必须由启动器 `DefineDosDevice`
+    ///   显式分配（v2 定案 §3.2；否则系统自动分配与显式分配冲突，实际生效的是
+    ///   系统字母而非启动器选择的字母）。
     pub fn attach_vhd(handle: HANDLE) -> Result<(), DiskError> {
         let code = unsafe {
             AttachVirtualDisk(
                 handle,
                 std::ptr::null(),
-                ATTACH_VIRTUAL_DISK_FLAG_PERMANENT_LIFETIME,
+                ATTACH_VIRTUAL_DISK_FLAG_PERMANENT_LIFETIME | ATTACH_VIRTUAL_DISK_FLAG_NO_DRIVE_LETTER,
                 0,
                 std::ptr::null(),
                 std::ptr::null(),
@@ -847,9 +860,17 @@ mod imp {
         let mut found: Option<String> = None;
         loop {
             let name = unsafe { from_wide(buf.as_ptr()) };
-            if volume_has_disk(&name, disk_number) {
-                found = Some(name);
-                break;
+            match volume_has_disk(&name, disk_number) {
+                Ok(true) => {
+                    found = Some(name);
+                    break;
+                }
+                Ok(false) => {
+                    crate::log_warn!("卷 {name} 不在物理盘 {disk_number} 上，跳过");
+                }
+                Err(reason) => {
+                    crate::log_warn!("卷 {name} 查询失败: {reason}");
+                }
             }
             let ok = unsafe { FindNextVolumeW(handle, buf.as_mut_ptr(), VOLUME_NAME_MAX) };
             if ok == 0 {
@@ -866,10 +887,16 @@ mod imp {
     }
 
     /// 打开卷句柄，IOCTL 查询其磁盘 extent，判断是否落在目标物理盘上。
-    /// 卷设备必须用 dwDesiredAccess=0 打开（GENERIC_READ 会被卷拒绝 → 静默
-    /// 失败 → VolumeNotFound），share 为读写共享，见 IOCTL 文档惯例。
-    fn volume_has_disk(volume_guid: &str, disk_number: u32) -> bool {
-        let volume_wide = to_wide(volume_guid);
+    /// 返回 Err(原因) 区分「无法查询」与「不在该盘」（诊断用）。
+    /// 卷设备句柄：desired access=0（GENERIC_READ 被卷拒绝 → VolumeNotFound）、
+    /// dwFlagsAndAttributes=0（设备句柄不适用文件属性）、share 含 FILE_SHARE_WRITE
+    /// （CreateFile 文档 Physical Disks and Volumes 节硬性要求）。
+    /// 卷名必须去尾反斜杠（`\\?\Volume{GUID}\` → `\\?\Volume{GUID}`）：
+    /// FindFirstVolume 返回带尾斜杠，但 CreateFile 打开卷设备路径不带尾斜杠，
+    /// 否则所有卷 CreateFileW 0x3 ERROR_PATH_NOT_FOUND（真机诊断实证）。
+    fn volume_has_disk(volume_guid: &str, disk_number: u32) -> Result<bool, String> {
+        let trimmed = volume_guid.trim_end_matches('\\');
+        let volume_wide = to_wide(trimmed);
         let h = unsafe {
             CreateFileW(
                 volume_wide.as_ptr(),
@@ -877,12 +904,13 @@ mod imp {
                 FILE_SHARE_READ | FILE_SHARE_WRITE,
                 std::ptr::null(),
                 OPEN_EXISTING,
-                FILE_ATTRIBUTE_NORMAL,
+                0, // 设备句柄：flags 必须为 0，FILE_ATTRIBUTE_NORMAL 不适用
                 0,
             )
         };
         if h == INVALID_HANDLE_VALUE {
-            return false;
+            let code = unsafe { GetLastError() };
+            return Err(format!("CreateFileW 失败: {code:#x}"));
         }
         let mut extents = VolumeDiskExtents {
             number_of_disk_extents: 0,
@@ -907,42 +935,45 @@ mod imp {
         };
         unsafe { CloseHandle(h) };
         if ok == 0 {
-            return false;
+            let code = unsafe { GetLastError() };
+            return Err(format!("IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS 失败: {code:#x}"));
         }
-        (0..extents.number_of_disk_extents)
-            .any(|i| extents.extents[i as usize].disk_number == disk_number)
+        let on_disk = (0..extents.number_of_disk_extents)
+            .any(|i| extents.extents[i as usize].disk_number == disk_number);
+        Ok(on_disk)
     }
 
-    /// 用 `DefineDosDevice` 显式分配盘符（`E:` → `\\?\Volume{GUID}\`）。
+    /// 用 `SetVolumeMountPointW` 给卷分配盘符（`E:\` → `\\?\Volume{GUID}\`）。
+    /// 这是给卷分配盘符的正确 API；`DefineDosDevice` 只定义进程命名空间的
+    /// 设备名，文件资源管理器不可见（真机实证：DefineDosDevice "成功"但无盘符）。
+    /// 卷名带尾反斜杠（SetVolumeMountPoint 文档要求 `\\?\Volume{GUID}\`）。
     pub fn assign_drive_letter(volume_guid: &str, letter: char) -> Result<(), DiskError> {
-        let device = format!("{}:", letter.to_ascii_uppercase());
-        let target = to_wide(volume_guid);
-        let device_wide = to_wide(&device);
-        let ok = unsafe { DefineDosDeviceW(0, device_wide.as_ptr(), target.as_ptr()) };
+        let mount_point = format!("{}:\\", letter.to_ascii_uppercase());
+        let mount_wide = to_wide(&mount_point);
+        let target_wide = to_wide(volume_guid);
+        let ok = unsafe { SetVolumeMountPointW(mount_wide.as_ptr(), target_wide.as_ptr()) };
         if ok == 0 {
             let code = unsafe { GetLastError() };
             return Err(DiskError::new(
                 classify_win32_error(code),
-                format!("DefineDosDeviceW({device} → {volume_guid}) 失败: {code:#x}"),
+                format!("SetVolumeMountPointW({mount_point} → {volume_guid}) 失败: {code:#x}"),
             ));
         }
         Ok(())
     }
 
-    /// 移除盘符定义（DDD_REMOVE_DEFINITION）。
+    /// 移除盘符挂载点（`DeleteVolumeMountPointW("E:\\")`）。
     pub fn remove_drive_letter(letter: char) -> Result<(), DiskError> {
-        let device = format!("{}:", letter.to_ascii_uppercase());
-        let device_wide = to_wide(&device);
-        let ok = unsafe {
-            DefineDosDeviceW(DDD_REMOVE_DEFINITION, device_wide.as_ptr(), std::ptr::null())
-        };
+        let mount_point = format!("{}:\\", letter.to_ascii_uppercase());
+        let mount_wide = to_wide(&mount_point);
+        let ok = unsafe { DeleteVolumeMountPointW(mount_wide.as_ptr()) };
         if ok == 0 {
             let code = unsafe { GetLastError() };
             // ERROR_FILE_NOT_FOUND(2)：盘符本就不存在，幂等成功。
             if code != 2 {
                 return Err(DiskError::new(
                     classify_win32_error(code),
-                    format!("DefineDosDeviceW(移除 {device}) 失败: {code:#x}"),
+                    format!("DeleteVolumeMountPointW({mount_point}) 失败: {code:#x}"),
                 ));
             }
         }
