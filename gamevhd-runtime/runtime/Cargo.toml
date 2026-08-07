@@ -1,0 +1,21 @@
+# gamevhd-runtime — GameVHD 沙箱编排器（GameAtlas VHD 远程启动）
+# 阶段 0：工程骨架。零外部依赖（手写 JSON / PE 解析，纯 std），保持 Linux 可测试。
+# 独立 crate，不隶属于任何 workspace；父级（gamevhd-runtime/、仓库根）无 Cargo.toml。
+
+[package]
+name = "gamevhd-runtime"
+version = "0.1.0"
+edition = "2021"
+description = "GameVHD sandbox orchestrator: mount VHD, inject gvhook, manage hive & lifecycle"
+publish = false
+
+[[bin]]
+name = "gamevhd-runtime"
+path = "src/main.rs"
+
+# 零依赖：无 [dependencies] 段，无 build-dependencies。
+
+[profile.release]
+opt-level = 2
+lto = true
+strip = true
