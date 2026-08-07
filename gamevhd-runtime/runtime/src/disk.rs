@@ -377,9 +377,12 @@ mod imp {
     } // size 124 → align 8 → 128
 
     /// `CREATE_VIRTUAL_DISK_PARAMETERS`，仅展开 Version 1 分支（VHD）。
-    /// 布局：Version(4) + pad(4) [union 对齐 8] + Version1 字段序列。
-    /// x64 总大小 64B（比 V2 少 4 字段：无 PhysicalSectorSize /
-    /// ParentVirtualStorageType / SourceVirtualStorageType / ResiliencyGuid）。
+    /// 布局（真机 layout_probe 实测，mingw x64）：
+    /// Version(4) + pad(4) [union 对齐 8] + Version1 字段序列：
+    ///   unique_id@8, maximum_size@24, block_size@32, sector_size@36,
+    ///   parent_path@40, source_path@48（SectorSize 结束于 40 恰为 8 倍数，
+    ///   **无 padding**——V2 才有 pad 因 PhysicalSectorSize 结束于 44）。
+    /// 注意：union 整体大小由最大成员 V2(128B) 决定；本结构独立 size = 56。
     #[repr(C)]
     #[allow(dead_code)]
     pub struct CreateVirtualDiskParametersV1 {
@@ -389,20 +392,21 @@ mod imp {
         pub maximum_size: u64, // 24（差分盘继承 parent，填 0）
         pub block_size: u32, // 32
         pub sector_size: u32, // 36
-        _pad2: u32,          // 40（指针对齐）
-        pub parent_path: *const u16, // 48
-        pub source_path: *const u16, // 56
-    } // size 64
+        pub parent_path: *const u16, // 40（无 pad！40 恰为 8 倍数）
+        pub source_path: *const u16, // 48
+    } // size 56（union 内成员；整体结构为 V2 大小 128）
 
-    // 编译期布局锁定（x64 启动器；与 MSVC ABI 头文件一致。布局错即编译失败，
-    // 真机 ERROR_FILE_CORRUPT=0x570 教训：VHD/VHDX 参数结构不同，不得混用）。
+    // 编译期布局锁定（x64 启动器；与真机 layout_probe 实测一致）。
+    // 布局错即编译失败。真机教训：V1 曾多加 _pad2 致 parent_path@48 错位，
+    // CreateVirtualDisk 读到错误指针 → 0x5 ACCESS_DENIED。
     #[cfg(target_pointer_width = "64")]
     const _: () = {
         assert!(std::mem::size_of::<CreateVirtualDiskParameters>() == 128);
-        assert!(std::mem::size_of::<CreateVirtualDiskParametersV1>() == 64);
+        assert!(std::mem::size_of::<CreateVirtualDiskParametersV1>() == 56);
         assert!(std::mem::offset_of!(CreateVirtualDiskParameters, unique_id) == 8);
         assert!(std::mem::offset_of!(CreateVirtualDiskParameters, parent_path) == 48);
-        assert!(std::mem::offset_of!(CreateVirtualDiskParametersV1, parent_path) == 48);
+        assert!(std::mem::offset_of!(CreateVirtualDiskParametersV1, parent_path) == 40);
+        assert!(std::mem::offset_of!(CreateVirtualDiskParametersV1, source_path) == 48);
     };
 
     /// `ATTACH_VIRTUAL_DISK_PARAMETERS`（Version 1：Reserved）。
@@ -676,9 +680,8 @@ mod imp {
                     _pad: 0,
                     unique_id: Guid::zero(),
                     maximum_size: 0, // 差分盘继承 parent
-                    block_size: 0,
-                    sector_size: 0,
-                    _pad2: 0,
+                    block_size: 0,   // DEFAULT_BLOCK_SIZE（2MB）
+                    sector_size: 0x200, // 512——VHD V1 结构文档硬性要求，0 会拒绝
                     parent_path: parent_wide.as_ptr(),
                     source_path: std::ptr::null(),
                 };
