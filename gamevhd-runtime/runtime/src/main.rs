@@ -325,6 +325,8 @@ fn cmd_run(drive: char, box_path: &str) -> u8 {
         match run::run_game(drive, box_path) {
             Ok(()) => {
                 crate::log_info!("run: 游戏已退出，清理完毕");
+                // ASCII marker：断言脚本/自动化依赖此格式（同 [MOUNT-OK]）。
+                println!("[RUN-OK]");
                 0
             }
             Err(e) => {

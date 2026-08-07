@@ -137,6 +137,15 @@ mod win {
         let _ = unsafe { RegDeleteKeyW(HKEY_CURRENT_USER, to_wide(TEMPLATE_KEY).as_ptr()) };
 
         if !std::path::Path::new(hive_path).exists() {
+            // 自举前确保父目录存在（RegSaveKeyW 不自动建目录）。
+            if let Some(parent) = std::path::Path::new(hive_path).parent() {
+                if let Err(e) = std::fs::create_dir_all(parent) {
+                    return Err(HiveError::Win32 {
+                        op: "create_dir_all(hive 父目录)",
+                        code: e.raw_os_error().unwrap_or(0) as u32,
+                    });
+                }
+            }
             bootstrap_hive(hive_path)?;
         }
         rotate_backup(hive_path);
