@@ -336,7 +336,9 @@ const hasResolvedGameFilePath = (file: GameFileEntry): file is AdminGameFileEntr
 
 export const isAdminGameDetail = (game: GameDetail | null | undefined): game is AdminGameDetail => {
   if (!game) return false
-  return game.files.length > 0 && game.files.every((file) => hasResolvedGameFilePath(file))
+  // 空文件列表是合法管理态（待处理工作台的"缺文件"游戏也要能打开编辑），
+  // 仅当存在文件但 file_path 未解析时才判定为非管理态（auth 失效的公开 payload 信号）。
+  return game.files.every((file) => hasResolvedGameFilePath(file))
 }
 
 export interface GameVersion {

@@ -35,8 +35,9 @@ describe('isAdminGameDetail', () => {
     expect(isAdminGameDetail(undefined)).toBe(false)
   })
 
-  it('rejects a detail without files instead of treating it as editable', () => {
-    expect(isAdminGameDetail(gameWithFiles([]))).toBe(false)
+  it('accepts a detail without files as an editable empty admin state', () => {
+    // 待处理工作台专治"缺文件"游戏：无文件详情必须能打开编辑，否则永远无法补文件。
+    expect(isAdminGameDetail(gameWithFiles([]))).toBe(true)
   })
 
   it('requires every file to have a resolved file path', () => {
