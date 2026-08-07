@@ -123,10 +123,19 @@ def main():
     games = fetch_all_games(prod)
     print(f"生产库共 {len(games)} 款，本次导入 {min(args.count, len(games) - args.start)} 款")
 
-    created = failed = 0
+    # 幂等保护：导入前拉取本地全部标题，已存在则跳过创建（脚本可重复执行）
+    local_games = fetch_all_games(local)
+    local_titles = {g.get("title", "").strip().lower() for g in local_games if g.get("title")}
+    print(f"本地库共 {len(local_games)} 款，其中 {len(local_titles)} 个不重复标题")
+
+    created = failed = skipped = 0
     for item in games[args.start:args.start + args.count]:
         pid = item.get("public_id")
         title = item.get("title", "")
+        if title.strip().lower() in local_titles:
+            print(f"[跳过] {title}：本地已存在同名游戏")
+            skipped += 1
+            continue
         detail = get_json(prod, f"{PROD_URL}/api/games/{pid}").get("data") or {}
 
         status, resp = post_json(local, f"{LOCAL_URL}/api/games", {"title": title, "visibility": item.get("visibility") or "public"})
@@ -146,7 +155,7 @@ def main():
         if created % 10 == 0:
             print(f"进度 {created}/{args.count}")
 
-    print(f"完成：成功 {created}，失败 {failed}")
+    print(f"完成：成功 {created}，失败 {failed}，跳过重复 {skipped}")
     if failed:
         print("提示：系列/开发商/发行商引用不存在的本地 ID 会跳过关系但保留游戏，属预期。")
 
