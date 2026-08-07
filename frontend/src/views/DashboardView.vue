@@ -136,13 +136,13 @@
         重新加载
       </a-button>
     </a-empty>
-  </div>
 
-  <add-game-modal
-    v-model:visible="showAddGameModal"
-    :submitting="addGameSubmitting"
-    @submit="handleAddGameSubmit"
-  />
+    <add-game-modal
+      v-model:visible="showAddGameModal"
+      :submitting="addGameSubmitting"
+      @submit="handleAddGameSubmit"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
