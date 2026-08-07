@@ -1,2 +1,0 @@
-# Cargo 构建产物（交叉编译 target 体积大且可再生，不入库）
-/target/
