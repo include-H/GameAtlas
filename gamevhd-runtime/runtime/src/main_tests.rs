@@ -12,6 +12,13 @@ fn parse_help_and_version() {
     assert_eq!(parse_args(&args(&["gv", "--help"])), Ok(Command::Help));
     assert_eq!(parse_args(&args(&["gv", "-h"])), Ok(Command::Help));
     assert_eq!(parse_args(&args(&["gv", "--version"])), Ok(Command::Version));
+    assert_eq!(parse_args(&args(&["gv", "--selftest"])), Ok(Command::Selftest));
+    assert_eq!(parse_args(&args(&["gv", "selftest"])), Ok(Command::Selftest));
+}
+
+#[test]
+fn selftest_exit_code_zero() {
+    assert_eq!(run_cli(&args(&["gv", "--selftest"])), 0);
 }
 
 #[test]
