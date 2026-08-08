@@ -215,7 +215,14 @@ static BOOLEAN gvhd_file_system_passthrough(const WCHAR *path)
 
 static WCHAR gvhd_file_game_drive(void)
 {
-    const WCHAR *root = gvhd_get_param()->game_data_root;
+    const struct gvhd_param_block *param = gvhd_get_param();
+    const WCHAR *root = param->game_data_root;
+    uint32_t encoded = (param->flags & GVHD_PARAM_FLAG_GAME_DRIVE_MASK) >>
+                       GVHD_PARAM_FLAG_GAME_DRIVE_SHIFT;
+
+    if (encoded >= 1u && encoded <= 26u) {
+        return (WCHAR)(L'a' + encoded - 1u);
+    }
 
     if (root[0] != L'\0' && root[1] == L':') {
         WCHAR drive = root[0];

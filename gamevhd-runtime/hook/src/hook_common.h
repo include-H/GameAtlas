@@ -50,6 +50,9 @@ extern "C" {
 /* 参数块 flags（bit 字段，可组合） */
 #define GVHD_PARAM_FLAG_CHILD_INJECT  0x00000001u  /* 启用子进程自动注入（proc.c） */
 #define GVHD_PARAM_FLAG_LOG_VERBOSE   0x00000002u  /* 详细日志 */
+/* 实际游戏 VHD 盘符编码：1=A ... 26=Z，0 表示旧协议未提供。 */
+#define GVHD_PARAM_FLAG_GAME_DRIVE_SHIFT 8u
+#define GVHD_PARAM_FLAG_GAME_DRIVE_MASK  (0x1Fu << GVHD_PARAM_FLAG_GAME_DRIVE_SHIFT)
 
 /* gvhook_init 返回值（编排经 GetExitCodeThread 读取诊断） */
 #define GVHD_INIT_OK           0u

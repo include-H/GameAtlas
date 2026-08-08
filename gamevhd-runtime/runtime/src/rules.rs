@@ -31,6 +31,10 @@ pub const GVHD_RULE_STRING_MAX: usize = 1024;
 pub const GVHD_RULE_MAX: u32 = 32;
 /// 规则动作标志：命中 → 重写到 `replacement`。
 pub const GVHD_RULE_FLAG_REWRITE: u32 = 0x0000_0001;
+/// 参数 flags 中实际游戏 VHD 盘符的起始位（1=A，26=Z）。
+pub const GVHD_PARAM_FLAG_GAME_DRIVE_SHIFT: u32 = 8;
+/// 参数 flags 中实际游戏 VHD 盘符的掩码。
+pub const GVHD_PARAM_FLAG_GAME_DRIVE_MASK: u32 = 0x1f << GVHD_PARAM_FLAG_GAME_DRIVE_SHIFT;
 /// 规则动作标志：命中 → 不重写（直通宿主/原路径）。
 pub const GVHD_RULE_FLAG_PASSTHROUGH: u32 = 0x0000_0002;
 /// 参数块大小（字节）。
@@ -206,6 +210,32 @@ pub fn param_block_with(
     game_id: &str,
     rule_table: &[Rule],
 ) -> Vec<u8> {
+    param_block_with_drive(
+        hook_dll_path,
+        game_data_root,
+        user_profile,
+        log_path,
+        registry_hive,
+        game_id,
+        rule_table,
+        '\0',
+    )
+}
+
+/// 构建参数块并编码实际游戏 VHD 盘符。
+///
+/// 外部状态根可能位于宿主 C:，不能再从 `game_data_root` 推断游戏盘符；
+/// 盘符编码放在 flags 的扩展位中，不改变参数块的固定布局。
+pub fn param_block_with_drive(
+    hook_dll_path: &str,
+    game_data_root: &str,
+    user_profile: &str,
+    log_path: &str,
+    registry_hive: &str,
+    game_id: &str,
+    rule_table: &[Rule],
+    game_drive: char,
+) -> Vec<u8> {
     let rule_count = rule_table.len();
     debug_assert!(rule_count as u32 <= GVHD_RULE_MAX);
     let mut buf = vec![0u8; PARAM_BLOCK_SIZE + rule_count * RULE_ENTRY_SIZE];
@@ -213,7 +243,8 @@ pub fn param_block_with(
     // 标量头部。
     buf[0..4].copy_from_slice(&GVHD_PARAM_MAGIC.to_le_bytes());
     buf[4..8].copy_from_slice(&GVHD_PROTOCOL_VERSION.to_le_bytes());
-    buf[8..12].copy_from_slice(&0u32.to_le_bytes()); // flags = 0
+    let flags = encode_game_drive_flag(game_drive);
+    buf[8..12].copy_from_slice(&flags.to_le_bytes());
     buf[12..16].copy_from_slice(&(rule_count as u32).to_le_bytes());
     buf[16..20].copy_from_slice(&(PARAM_BLOCK_SIZE as u32).to_le_bytes());
     // game_id_len = 实际写入的码元数（不含 NUL）。
@@ -233,6 +264,16 @@ pub fn param_block_with(
     buf[PARAM_BLOCK_SIZE..].copy_from_slice(&rule_bytes);
 
     buf
+}
+
+fn encode_game_drive_flag(game_drive: char) -> u32 {
+    let upper = game_drive.to_ascii_uppercase();
+    if upper.is_ascii_uppercase() {
+        ((upper as u32 - 'A' as u32 + 1) << GVHD_PARAM_FLAG_GAME_DRIVE_SHIFT)
+            & GVHD_PARAM_FLAG_GAME_DRIVE_MASK
+    } else {
+        0
+    }
 }
 
 #[cfg(test)]
@@ -447,5 +488,22 @@ mod tests {
         let block = param_block_with("d", "e", "u", "l", "h", "g", &[]);
         assert_eq!(block.len(), PARAM_BLOCK_SIZE);
         assert_eq!(u32at(&block, 16) % 4, 0);
+    }
+
+    #[test]
+    fn param_block_encodes_actual_game_drive_without_changing_layout() {
+        let block = param_block_with_drive(
+            "d",
+            r"C:\GameData\Horizon",
+            "u",
+            "l",
+            "h",
+            "g",
+            &[],
+            'g',
+        );
+        assert_eq!(u32at(&block, 8), 7 << GVHD_PARAM_FLAG_GAME_DRIVE_SHIFT);
+        assert_eq!(u32at(&block, 8) & !GVHD_PARAM_FLAG_GAME_DRIVE_MASK, 0);
+        assert_eq!(block.len(), PARAM_BLOCK_SIZE);
     }
 }

@@ -87,7 +87,9 @@ struct gvhd_param_block {
 |---|---|---|---|
 | 0 | `0x00000001` | `GVHD_PARAM_FLAG_CHILD_INJECT` | 启用子进程自动注入（proc.c 安装 `NtCreateUserProcess`/`NtCreateProcessEx` 钩子）。编排应默认置位 |
 | 1 | `0x00000002` | `GVHD_PARAM_FLAG_LOG_VERBOSE` | 详细日志（记录 NtQueryAttributesFile 等调用，阶段 1 验证链路用） |
-| 2–31 | — | 预留 | 必须为 0 |
+| 2–7 | — | 预留 | 必须为 0 |
+| 8–12 | `0x00001F00` | `GVHD_PARAM_FLAG_GAME_DRIVE_SHIFT` / `GVHD_PARAM_FLAG_GAME_DRIVE_MASK` | 实际游戏 VHD 盘符编码：`1=A` ... `26=Z`。外部 GameData 位于宿主盘时，编排必须提供该值；`0` 表示未提供，Hook 回退从 `game_data_root` 推断。 |
+| 13–31 | — | 预留 | 必须为 0 |
 
 ---
 

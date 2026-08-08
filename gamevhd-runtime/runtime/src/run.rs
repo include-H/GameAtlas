@@ -316,7 +316,7 @@ mod win {
 
         // 8. 重写规则表 + 注入参数块（5280 + n×4104 字节）。
         let rule_table = rules::generate_rules(&bf.user_profile, &game_data_root, bf.skip_cache_dirs);
-        let param_block = rules::param_block_with(
+        let param_block = rules::param_block_with_drive(
             &hook_dll,
             &game_data_root,
             &bf.user_profile,
@@ -324,6 +324,7 @@ mod win {
             &registry_hive_path,
             &bf.game_id,
             &rule_table,
+            drive_letter,
         );
 
         // 9. 命名 Job Object（KILL_ON_JOB_CLOSE：句柄关闭强杀整树）。
