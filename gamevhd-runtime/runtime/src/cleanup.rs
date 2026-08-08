@@ -71,6 +71,8 @@ mod tests {
             registry_hive: r"GameData\Registry\user.dat".into(),
             skip_cache_dirs: false,
             state: BoxState::Clean,
+            game_data_base: String::new(),
+            game_data_name: String::new(),
         };
         bf.save(&path).unwrap();
 
@@ -92,6 +94,8 @@ mod tests {
             registry_hive: String::new(),
             skip_cache_dirs: false,
             state: BoxState::Clean,
+            game_data_base: String::new(),
+            game_data_name: String::new(),
         };
         assert!(bf.transition(BoxState::Running).is_ok());
         assert!(bf.transition(BoxState::Cleaning).is_ok());

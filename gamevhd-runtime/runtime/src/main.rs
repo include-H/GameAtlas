@@ -47,6 +47,17 @@ enum Command {
     },
     Scan(String),
     Probe(String),
+    InjectPoc {
+        exe: String,
+        work_dir: String,
+        hook: String,
+        log: String,
+        mode: String,
+        args: String,
+        game_data_root: String,
+        user_profile: String,
+        game_id: String,
+    },
     Run { drive: char, box_path: String },
     Cleanup { box_path: String },
     Selftest,
@@ -77,6 +88,29 @@ fn run_cli(args: &[String]) -> u8 {
         Ok(Command::Unmount { vhd, letter, smb }) => cmd_unmount(&vhd, letter, smb.as_deref()),
         Ok(Command::Scan(drive)) => scan::cmd_scan(&drive),
         Ok(Command::Probe(exe)) => cmd_probe(&exe),
+        Ok(Command::InjectPoc {
+            exe,
+            work_dir,
+            hook,
+            log,
+            mode,
+            args,
+            game_data_root,
+            user_profile,
+            game_id,
+        }) => {
+            cmd_inject_poc(
+                &exe,
+                &work_dir,
+                &hook,
+                &log,
+                &mode,
+                &args,
+                &game_data_root,
+                &user_profile,
+                &game_id,
+            )
+        }
         Ok(Command::Run { drive, box_path }) => cmd_run(drive, &box_path),
         Ok(Command::Cleanup { box_path }) => cmd_cleanup(&box_path),
         Ok(Command::Selftest) => cmd_selftest(),
@@ -102,6 +136,7 @@ fn parse_args(args: &[String]) -> Result<Command, String> {
         "unmount" => parse_unmount(&rest[1..]),
         "scan" => positional(rest, "scan", "<drive>").map(Command::Scan),
         "probe" => positional(rest, "probe", "<exe>").map(Command::Probe),
+        "inject-poc" => parse_inject_poc(&rest[1..]),
         "run" => parse_run(&rest[1..]),
         "cleanup" => {
             let opts = parse_kv_opts(&rest[1..], "cleanup", &["--box"])?;
@@ -205,6 +240,62 @@ fn parse_run(rest: &[String]) -> Result<Command, String> {
     Ok(Command::Run {
         drive,
         box_path: box_path.clone(),
+    })
+}
+
+/// Wine 联调专用注入入口；不读取 manifest/box，也不参与正式启动流程。
+fn parse_inject_poc(rest: &[String]) -> Result<Command, String> {
+    let opts = parse_kv_opts(
+        rest,
+        "inject-poc",
+        &[
+            "--exe",
+            "--work-dir",
+            "--hook",
+            "--log",
+            "--mode",
+            "--args",
+            "--game-data-root",
+            "--user-profile",
+            "--game-id",
+        ],
+    )?;
+    let exe = opt_value(&opts, "--exe")
+        .ok_or_else(|| "inject-poc 需要 --exe <Windows 路径>".to_string())?
+        .clone();
+    let hook = opt_value(&opts, "--hook")
+        .ok_or_else(|| "inject-poc 需要 --hook <Windows DLL 路径>".to_string())?
+        .clone();
+    let log = opt_value(&opts, "--log")
+        .ok_or_else(|| "inject-poc 需要 --log <Windows 路径>".to_string())?
+        .clone();
+    let work_dir = opt_value(&opts, "--work-dir").cloned().unwrap_or_default();
+    let mode = opt_value(&opts, "--mode")
+        .cloned()
+        .unwrap_or_else(|| "remote".into());
+    let args = opt_value(&opts, "--args").cloned().unwrap_or_default();
+    let game_data_root = opt_value(&opts, "--game-data-root")
+        .cloned()
+        .unwrap_or_default();
+    let user_profile = opt_value(&opts, "--user-profile")
+        .cloned()
+        .unwrap_or_default();
+    let game_id = opt_value(&opts, "--game-id")
+        .cloned()
+        .unwrap_or_default();
+    if mode != "remote" && mode != "early-bird" {
+        return Err(format!("inject-poc: --mode 只支持 remote 或 early-bird，收到 '{mode}'"));
+    }
+    Ok(Command::InjectPoc {
+        exe,
+        work_dir,
+        hook,
+        log,
+        mode,
+        args,
+        game_data_root,
+        user_profile,
+        game_id,
     })
 }
 
@@ -377,6 +468,91 @@ fn cmd_probe(exe: &str) -> u8 {
     }
 }
 
+/// Windows/Wine 联调专用：挂起创建目标进程，选择一种注入路径后等待其退出。
+#[cfg_attr(not(target_os = "windows"), allow(unused_variables))]
+fn cmd_inject_poc(
+    exe: &str,
+    work_dir: &str,
+    hook: &str,
+    log: &str,
+    mode: &str,
+    args: &str,
+    game_data_root: &str,
+    user_profile: &str,
+    game_id: &str,
+) -> u8 {
+    #[cfg(target_os = "windows")]
+    {
+        let (hproc, hthread) = match inject::launch_suspended_with_args(exe, work_dir, args) {
+            Ok(handles) => handles,
+            Err(e) => {
+                crate::log_error!("inject-poc: 创建挂起进程失败: {e}");
+                return 1;
+            }
+        };
+
+        // 默认仍使用空参数块进行纯注入验证；提供路径参数时可单独联调
+        // 文件/注册表重定向，不需要准备完整 manifest/box 生命周期。
+        let param_block = rules::param_block_with(
+            hook,
+            game_data_root,
+            user_profile,
+            log,
+            "",
+            game_id,
+            &[],
+        );
+        let result = (|| -> Result<(), String> {
+            if mode == "early-bird" {
+                inject::inject_into_process_early_bird(hproc, hthread, &param_block, hook)
+                    .map_err(|e| e.to_string())?;
+            } else {
+                inject::inject_into_process(hproc, &param_block, hook)
+                    .map_err(|e| e.to_string())?;
+                let prev = unsafe { winffi::ResumeThread(hthread) };
+                if prev == u32::MAX {
+                    return Err(format!("ResumeThread 失败 (Win32 错误 {})", unsafe {
+                        winffi::GetLastError()
+                    }));
+                }
+            }
+            let wait = unsafe { winffi::WaitForSingleObject(hproc, winffi::INFINITE) };
+            if wait == winffi::WAIT_FAILED {
+                return Err(format!("等待目标进程失败 (Win32 错误 {})", unsafe {
+                    winffi::GetLastError()
+                }));
+            }
+            Ok(())
+        })();
+
+        if result.is_err() {
+            unsafe {
+                winffi::TerminateProcess(hproc, 1);
+                winffi::WaitForSingleObject(hproc, 5000);
+            }
+        }
+        unsafe {
+            winffi::CloseHandle(hthread);
+            winffi::CloseHandle(hproc);
+        }
+
+        match result {
+            Ok(()) => {
+                println!("[INJECT-OK] {mode}");
+                0
+            }
+            Err(e) => {
+                crate::log_error!("inject-poc [{mode}] 失败: {e}");
+                1
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        unsupported("inject-poc", "Windows/Wine")
+    }
+}
+
 /// 自检模式（`--selftest`，v2 定案 §5.1）：footer 自定位 / 规则生成 / PE 探测。
 /// 跨平台可跑；任一项失败退出码 1，全部通过 0。
 fn cmd_selftest() -> u8 {
@@ -457,6 +633,9 @@ fn print_usage() {
     println!("  unmount <vhd> [--letter <L>] [--smb <UNC>]   卸载 VHD（Windows）");
     println!("  scan <drive>              扫描盘符下的 exe 候选并标注位数（如 scan E）");
     println!("  probe <exe>               探测 exe 位数（x64 / x86 / not-pe）");
+    println!("  inject-poc --exe <path> --hook <dll> --log <log> [--work-dir <dir>] [--mode remote|early-bird]");
+    println!("             [--args <raw-args>] [--game-data-root <dir> --user-profile <dir> --game-id <id>]");
+    println!("                Wine 联调专用：对照测试远程线程与 Early-Bird APC 注入");
     println!("  run --drive <letter> --box <path>   沙箱启动游戏（Windows）");
     println!("  cleanup --box <path>      清理残留沙箱状态（Windows）");
     println!("  --help, -h                显示本帮助");

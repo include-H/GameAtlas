@@ -27,6 +27,7 @@ pub const MEM_COMMIT: u32 = 0x0000_1000;
 pub const MEM_RESERVE: u32 = 0x0000_2000;
 pub const MEM_RELEASE: u32 = 0x0000_8000;
 pub const PAGE_READWRITE: u32 = 0x0000_0004;
+pub const PAGE_EXECUTE_READWRITE: u32 = 0x0000_0040;
 pub const INFINITE: u32 = 0xFFFF_FFFF;
 pub const WAIT_OBJECT_0: u32 = 0;
 pub const WAIT_FAILED: u32 = 0xFFFF_FFFF;
@@ -46,6 +47,8 @@ pub const HKEY_USERS: HANDLE = 0x8000_0003;
 
 /// RegCreateKeyExW：所有访问权（模板键由本进程新建，无 ACL 顾虑）。
 pub const KEY_ALL_ACCESS: u32 = 0x000F_003F;
+/// RegOpenKeyExW：只查询已挂载 hive 是否存在。
+pub const KEY_READ: u32 = 0x0002_0019;
 /// RegCreateKeyExW：非易失键（落盘，随文件保存）。
 pub const REG_OPTION_NON_VOLATILE: u32 = 0;
 
@@ -208,6 +211,14 @@ extern "system" {
         lp_number_of_bytes_written: *mut SIZE_T,
     ) -> BOOL;
 
+    pub fn ReadProcessMemory(
+        h_process: HANDLE,
+        lp_base_address: LPVOID,
+        lp_buffer: *mut u8,
+        n_size: SIZE_T,
+        lp_number_of_bytes_read: *mut SIZE_T,
+    ) -> BOOL;
+
     pub fn CreateRemoteThread(
         h_process: HANDLE,
         lp_thread_attributes: *const u8,
@@ -225,6 +236,14 @@ extern "system" {
     pub fn CloseHandle(h_object: HANDLE) -> BOOL;
 
     pub fn ResumeThread(h_thread: HANDLE) -> DWORD;
+
+    pub fn QueueUserAPC(
+        pfn_apc: LPVOID,
+        h_thread: HANDLE,
+        dw_data: usize,
+    ) -> DWORD;
+
+    pub fn Sleep(milliseconds: DWORD);
 
     pub fn GetModuleHandleW(lp_module_name: *const u16) -> HMODULE;
 
@@ -260,6 +279,14 @@ extern "system" {
     pub fn RegLoadKeyW(h_key: HANDLE, lp_sub_key: *const u16, lp_file: *const u16) -> LSTATUS;
 
     pub fn RegUnLoadKeyW(h_key: HANDLE, lp_sub_key: *const u16) -> LSTATUS;
+
+    pub fn RegOpenKeyExW(
+        h_key: HANDLE,
+        lp_sub_key: *const u16,
+        ul_options: DWORD,
+        sam_desired: u32,
+        phk_result: *mut HANDLE,
+    ) -> LSTATUS;
 
     pub fn RegSaveKeyW(
         h_key: HANDLE,

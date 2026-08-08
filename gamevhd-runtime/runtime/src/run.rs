@@ -43,18 +43,104 @@ fn volume_root_of(letter: char) -> String {
     format!("{}:\\", letter.to_ascii_uppercase())
 }
 
-/// box.json 相对卷根路径 → 绝对路径；已含盘符前缀（如 `D:\x`）则原样返回。
+/// Windows 路径是否已经是绝对路径（盘符或 UNC）。
+fn is_windows_absolute_path(path: &str) -> bool {
+    let trimmed = path.trim();
+    let mut chars = trimmed.chars();
+    match (chars.next(), chars.next(), chars.next()) {
+        (Some(first), Some(':'), Some('\\' | '/')) if first.is_ascii_alphabetic() => true,
+        _ => trimmed.starts_with(r"\\") || trimmed.starts_with("//"),
+    }
+}
+
+/// box.json 相对卷根路径 → 绝对路径；已含盘符/UNC 前缀则原样返回。
 /// 相对形式如 `GameData` / `GameData\Registry\user.dat`（v2 §3.9 路径相对卷根）。
 fn abs_path(volume_root: &str, rel_or_abs: &str) -> String {
     let t = rel_or_abs.trim();
-    let mut cs = t.chars();
-    let is_absolute = matches!((cs.next(), cs.next()), (Some(c), Some(':')) if c.is_ascii_alphabetic());
-    if is_absolute {
+    if is_windows_absolute_path(t) {
         t.to_string()
     } else {
         let root = volume_root.trim_end_matches(['\\', '/']);
         format!("{root}\\{}", t.trim_start_matches(['\\', '/']))
     }
+}
+
+/// Windows 风格路径拼接。该模块在 Linux 上测试 Windows 字符串，不能使用
+/// `Path::join`，否则会按宿主机的 `/` 规则处理。
+fn join_windows_path(base: &str, child: &str) -> String {
+    let base = base.trim().trim_end_matches(['\\', '/']);
+    let child = child.trim().trim_start_matches(['\\', '/']);
+    if child.is_empty() {
+        base.to_string()
+    } else {
+        format!("{base}\\{child}")
+    }
+}
+
+/// 取 Windows 路径最后一段，并去掉最后一个扩展名。
+fn path_stem(path: &str) -> Option<String> {
+    let leaf = path
+        .trim()
+        .trim_end_matches(['\\', '/'])
+        .rsplit(['\\', '/'])
+        .next()?;
+    let stem = leaf.rsplit_once('.').map_or(leaf, |(prefix, _)| prefix).trim();
+    (!stem.is_empty()).then(|| stem.to_string())
+}
+
+/// 外部状态目录必须是单层目录名，避免配置把状态库逃逸到父目录之外。
+fn validate_game_data_name(name: &str) -> Result<String, String> {
+    let value = name.trim();
+    if value.is_empty() || value == "." || value == ".." {
+        return Err("game_data_name 不能为空或为 . / ..".into());
+    }
+    if value.ends_with('.') || value.ends_with(' ') {
+        return Err(format!("game_data_name '{value}' 不能以点或空格结尾"));
+    }
+    if value.chars().any(|ch| {
+        ch.is_control() || matches!(ch, '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|')
+    }) {
+        return Err(format!("game_data_name '{value}' 含非法 Windows 文件名字符"));
+    }
+    Ok(value.to_string())
+}
+
+/// 解析最终 GameData 根：显式 root > 外部父目录/游戏名 > VHD 内默认目录。
+fn resolve_game_data_root(
+    volume_root: &str,
+    configured_root: &str,
+    external_base: &str,
+    configured_name: &str,
+    fallback_name: &str,
+) -> Result<String, String> {
+    if !configured_root.trim().is_empty() {
+        return Ok(abs_path(volume_root, configured_root));
+    }
+    if external_base.trim().is_empty() {
+        return Ok(join_windows_path(volume_root, "GameData"));
+    }
+
+    let name = if configured_name.trim().is_empty() {
+        fallback_name
+    } else {
+        configured_name
+    };
+    let name = validate_game_data_name(name)?;
+    Ok(join_windows_path(&abs_path(volume_root, external_base), &name))
+}
+
+/// hive 未单独指定时，跟随最终 GameData 根，确保外部状态库完整可同步。
+fn resolve_registry_hive(volume_root: &str, configured_hive: &str, game_data_root: &str) -> String {
+    if configured_hive.trim().is_empty() {
+        join_windows_path(game_data_root, r"Registry\user.dat")
+    } else {
+        abs_path(volume_root, configured_hive)
+    }
+}
+
+/// 从基础 VHD 文件名推导外部状态目录名；失败时回退到稳定的 game_id。
+fn derive_game_data_name(base_vhd: &str, game_id: &str) -> String {
+    path_stem(base_vhd).unwrap_or_else(|| game_id.to_string())
 }
 
 /// exe 选择（v2 §3.7）：记忆命中 → exe_hint 命中 → 排序第一
@@ -167,8 +253,24 @@ mod win {
         bf.save(&box_path_buf).map_err(|e| format!("box.json 写 running 失败: {e}"))?;
 
         let volume_root = volume_root_of(drive_letter);
-        let game_data_root = abs_path(&volume_root, &bf.game_data_root);
-        let registry_hive_path = abs_path(&volume_root, &bf.registry_hive);
+        let fallback_data_name = derive_game_data_name(&manifest.base_vhd, &bf.game_id);
+        let game_data_root = resolve_game_data_root(
+            &volume_root,
+            &bf.game_data_root,
+            &bf.game_data_base,
+            &bf.game_data_name,
+            &fallback_data_name,
+        )?;
+        let registry_hive_path = resolve_registry_hive(
+            &volume_root,
+            &bf.registry_hive,
+            &game_data_root,
+        );
+        crate::log_info!(
+            "run: GameData root={} registry_hive={}",
+            game_data_root,
+            registry_hive_path
+        );
 
         // RAII 清理守卫：此后任何 Err 提前返回都走 Drop 兜底。
         let mut guard = RunGuard {
@@ -239,11 +341,17 @@ mod win {
 
         let run_result = (|| -> Result<(), String> {
             process::assign_to_job(job, hproc).map_err(|e| format!("进程划入 Job 失败: {e}"))?;
-            inject::inject_into_process(hproc, &param_block, &hook_dll)
-                .map_err(|e| format!("gvhook 注入失败: {e}"))?;
-            let prev = unsafe { winffi::ResumeThread(hthread) };
-            if prev == u32::MAX {
-                return Err("ResumeThread 失败".into());
+            if std::env::var("GAMEVHD_INJECT_MODE").as_deref() == Ok("early-bird") {
+                crate::log_info!("run: 使用 Early-Bird APC 注入实验路径");
+                inject::inject_into_process_early_bird(hproc, hthread, &param_block, &hook_dll)
+                    .map_err(|e| format!("gvhook Early-Bird APC 注入失败: {e}"))?;
+            } else {
+                inject::inject_into_process(hproc, &param_block, &hook_dll)
+                    .map_err(|e| format!("gvhook 注入失败: {e}"))?;
+                let prev = unsafe { winffi::ResumeThread(hthread) };
+                if prev == u32::MAX {
+                    return Err("ResumeThread 失败".into());
+                }
             }
             process::wait_process_tree(job).map_err(|e| format!("等待进程树退出失败: {e}"))?;
             Ok(())
@@ -288,7 +396,52 @@ mod tests {
         );
         assert_eq!(abs_path(r"E:\", "D:\\x"), "D:\\x");
         assert_eq!(abs_path(r"E:\", "/GameData"), r"E:\GameData");
+        assert_eq!(abs_path(r"E:\", r"\\nas\share\GameData"), r"\\nas\share\GameData");
         assert_eq!(abs_path(r"E:", "GameData"), r"E:\GameData");
+    }
+
+    #[test]
+    fn external_data_root_appends_vhd_stem() {
+        assert_eq!(
+            resolve_game_data_root(r"G:\", "", r"D:\GameAtlas", "", "地平线").unwrap(),
+            r"D:\GameAtlas\地平线"
+        );
+        assert_eq!(
+            resolve_game_data_root(
+                r"G:\",
+                "",
+                r"D:\GameAtlas",
+                "Horizon",
+                "地平线"
+            )
+            .unwrap(),
+            r"D:\GameAtlas\Horizon"
+        );
+        assert_eq!(
+            resolve_game_data_root(r"G:\", r"G:\GameData", r"D:\GameAtlas", "地平线", "x")
+                .unwrap(),
+            r"G:\GameData"
+        );
+    }
+
+    #[test]
+    fn data_root_name_is_derived_and_validated() {
+        assert_eq!(derive_game_data_name(r"\\nas\share\地平线.vhd", "fallback"), "地平线");
+        assert_eq!(derive_game_data_name("", "horizon-zero-dawn"), "horizon-zero-dawn");
+        assert!(validate_game_data_name(r"bad\name").is_err());
+        assert!(validate_game_data_name("地平线").is_ok());
+    }
+
+    #[test]
+    fn registry_hive_follows_external_root_when_unspecified() {
+        assert_eq!(
+            resolve_registry_hive(r"G:\", "", r"D:\GameAtlas\地平线"),
+            r"D:\GameAtlas\地平线\Registry\user.dat"
+        );
+        assert_eq!(
+            resolve_registry_hive(r"G:\", r"GameData\Registry\user.dat", r"D:\GameAtlas\地平线"),
+            r"G:\GameData\Registry\user.dat"
+        );
     }
 
     #[test]

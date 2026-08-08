@@ -1,7 +1,9 @@
 //! 沙箱状态文件 `box.json` 模型（阶段 0，本波交付；§3.6 定案）。
 //!
-//! 字段（7 个标量，6 必填 + 1 可选）：`game_id`、`exe_relative`、`game_data_root`、
-//! `user_profile`、`registry_hive`、`skip_cache_dirs`（可选，缺省 false）、`state`。
+//! 字段：`game_id`、`exe_relative`、`user_profile`、`state` 必填；
+//! `game_data_root`、`registry_hive`、`skip_cache_dirs`、`game_data_base`、
+//! `game_data_name` 可选。空的 `game_data_root` 表示使用 VHD 内的
+//! `<drive>:\GameData`；设置 `game_data_base` 后，运行时会追加游戏目录名。
 //! 状态机：`clean → running → cleaning → clean`，非法迁移报错。
 //! 原子保存：写同目录临时文件 + `rename`；Windows 下目标已存在时先删后换。
 //! JSON 编解码委托 [`crate::json`]（零依赖手写子集解析器）。
@@ -58,15 +60,19 @@ pub struct BoxFile {
     pub game_id: String,
     /// exe 相对 VHD 根（如 `Game\HorizonZeroDawn.exe`）。
     pub exe_relative: String,
-    /// 沙箱重定向根（如 `E:\GameData`）。
+    /// 沙箱重定向根（如 `E:\GameData`）；为空时由 runtime 解析默认根或外部根。
     pub game_data_root: String,
     /// 生成规则表时的 `%USERPROFILE%`（如 `C:\Users\Hao`）。
     pub user_profile: String,
-    /// hive 相对 VHD 根（如 `GameData\Registry\user.dat`）。
+    /// hive 路径；为空时放在解析后的 GameData 根下。
     pub registry_hive: String,
     /// 为 `true` 时规则表排除 AppData 重写（直通宿主缓存）。
     pub skip_cache_dirs: bool,
     pub state: BoxState,
+    /// 外部状态库的父目录（如 `D:\GameAtlas`），为空时不启用外部状态库。
+    pub game_data_base: String,
+    /// 外部状态库的游戏目录名（如 `地平线`）；为空时由启动器配置推导。
+    pub game_data_name: String,
 }
 
 /// box.json 相关错误。
@@ -129,7 +135,7 @@ impl BoxFile {
     /// 序列化为 box.json 文本（2 空格缩进，与 §3.6 示例一致）。
     pub fn to_json(&self) -> String {
         format!(
-            "{{\n  \"game_id\": \"{}\",\n  \"exe_relative\": \"{}\",\n  \"game_data_root\": \"{}\",\n  \"user_profile\": \"{}\",\n  \"registry_hive\": \"{}\",\n  \"skip_cache_dirs\": {},\n  \"state\": \"{}\"\n}}",
+            "{{\n  \"game_id\": \"{}\",\n  \"exe_relative\": \"{}\",\n  \"game_data_root\": \"{}\",\n  \"user_profile\": \"{}\",\n  \"registry_hive\": \"{}\",\n  \"skip_cache_dirs\": {},\n  \"state\": \"{}\",\n  \"game_data_base\": \"{}\",\n  \"game_data_name\": \"{}\"\n}}",
             escape_json(&self.game_id),
             escape_json(&self.exe_relative),
             escape_json(&self.game_data_root),
@@ -137,11 +143,13 @@ impl BoxFile {
             escape_json(&self.registry_hive),
             if self.skip_cache_dirs { "true" } else { "false" },
             escape_json(self.state.as_str()),
+            escape_json(&self.game_data_base),
+            escape_json(&self.game_data_name),
         )
     }
 
-    /// 从 box.json 文本解析；必填字段缺失/未知/重复均报错，
-    /// `skip_cache_dirs` 可选（缺省 false，向后兼容）。
+    /// 从 box.json 文本解析；必填字段缺失/未知/重复均报错。
+    /// 路径覆盖字段和 `skip_cache_dirs` 可省略，省略时使用默认策略。
     pub fn from_json(s: &str) -> Result<BoxFile, BoxError> {
         let mut bf = BoxFile {
             game_id: String::new(),
@@ -151,8 +159,10 @@ impl BoxFile {
             registry_hive: String::new(),
             skip_cache_dirs: false,
             state: BoxState::Clean,
+            game_data_base: String::new(),
+            game_data_name: String::new(),
         };
-        let mut seen = [false; 7];
+        let mut seen = [false; 9];
         for (key, value) in parse_json_object(s).map_err(BoxError::InvalidJson)? {
             let idx = match key.as_str() {
                 "game_id" => 0,
@@ -162,6 +172,8 @@ impl BoxFile {
                 "registry_hive" => 4,
                 "skip_cache_dirs" => 5,
                 "state" => 6,
+                "game_data_base" => 7,
+                "game_data_name" => 8,
                 other => return Err(BoxError::InvalidJson(format!("未知字段 '{other}'"))),
             };
             if seen[idx] {
@@ -185,19 +197,20 @@ impl BoxFile {
                         }
                     }
                 }
-                _ => {
+                6 => {
                     bf.state = BoxState::from_str(&value).ok_or_else(|| {
                         BoxError::InvalidJson(format!("非法 state 值 '{value}'"))
                     })?
                 }
+                7 => bf.game_data_base = value,
+                8 => bf.game_data_name = value,
+                _ => unreachable!("box.json 字段索引超出范围"),
             }
         }
-        const REQUIRED: [(&str, usize); 6] = [
+        const REQUIRED: [(&str, usize); 4] = [
             ("game_id", 0),
             ("exe_relative", 1),
-            ("game_data_root", 2),
             ("user_profile", 3),
-            ("registry_hive", 4),
             ("state", 6),
         ];
         for (name, i) in REQUIRED {

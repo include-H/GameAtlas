@@ -3,7 +3,7 @@
 //! 职责（§3.5）：hive 自举（文件缺失时在 Windows 侧现场生成空模板：RegCreateKeyExW +
 //! RegSaveKeyW + RegDeleteKeyW，RegSaveKeyW 需 SE_BACKUP_NAME 特权）→ `.bak` 轮换 →
 //! `RegLoadKey(HKUS, "GameVHD_<game_id>", ...)` 挂载 / `RegUnLoadKey` 卸载（ERROR_BUSY
-//! 句柄等待重试）与崩溃残留清理（启动时先幂等卸载）；hive 损坏时从 `.bak` 恢复并警告。
+//! 句柄等待重试）与崩溃残留清理（启动时先查询后幂等卸载）；hive 损坏时从 `.bak` 恢复并警告。
 //!
 //! Windows 专属实现；Linux 上挂载/卸载/清理返回 [`HiveError::UnsupportedPlatform`]，
 //! 键名校验为纯逻辑跨平台可测。main.rs 尚未接线（W4T16 拥有），故允许 dead_code。
@@ -90,8 +90,8 @@ impl Hive {
     }
 }
 
-/// 幂等清理崩溃残留：`RegUnLoadKey(HKUS, "GameVHD_<game_id>")`，忽略
-/// ERROR_FILE_NOT_FOUND（本未挂载即视为已清理）。启动时调用一次。
+/// 幂等清理崩溃残留：先查询 `HKU\GameVHD_<game_id>`，存在时调用
+/// `RegUnLoadKey`；未挂载即视为已清理。启动时调用一次。
 pub fn cleanup_residue(game_id: &str) -> Result<(), HiveError> {
     #[cfg(target_os = "windows")]
     {
@@ -110,9 +110,9 @@ mod win {
     use crate::winffi::{
         AdjustTokenPrivileges, CloseHandle, ERROR_BUSY, ERROR_FILE_NOT_FOUND, ERROR_INVALID_PARAMETER,
         ERROR_NOT_ALL_ASSIGNED, ERROR_SUCCESS, GetCurrentProcess, GetLastError, HANDLE,
-        HKEY_CURRENT_USER, HKEY_USERS, KEY_ALL_ACCESS, LookupPrivilegeValueW, Luid,
+        HKEY_CURRENT_USER, HKEY_USERS, KEY_ALL_ACCESS, KEY_READ, LookupPrivilegeValueW, Luid,
         LuidAndAttributes, OpenProcessToken, RegCloseKey, RegCreateKeyExW, RegDeleteKeyW,
-        RegLoadKeyW, RegSaveKeyW, RegUnLoadKeyW, SE_BACKUP_NAME, SE_PRIVILEGE_ENABLED,
+        RegLoadKeyW, RegOpenKeyExW, RegSaveKeyW, RegUnLoadKeyW, SE_BACKUP_NAME, SE_PRIVILEGE_ENABLED,
         SE_RESTORE_NAME, TOKEN_ADJUST_PRIVILEGES, TOKEN_QUERY, TokenPrivileges,
         REG_OPTION_NON_VOLATILE,
     };
@@ -304,6 +304,10 @@ mod win {
     }
 
     pub(super) fn unmount_hive_impl(key_name: &str) -> Result<(), HiveError> {
+        // RegUnLoadKeyW requires SeRestorePrivilege. Keep this explicit so
+        // direct cleanup/unmount calls do not depend on an earlier mount call
+        // having enabled the privilege in the same process.
+        enable_backup_privilege()?;
         let key_wide = to_wide(key_name);
         let mut status = unsafe { RegUnLoadKeyW(HKEY_USERS, key_wide.as_ptr()) };
         let mut retries = 0u32;
@@ -325,7 +329,43 @@ mod win {
         validate_key_name(game_id)?;
         let key_name = format!("GameVHD_{game_id}");
         let key_wide = to_wide(&key_name);
-        let status = unsafe { RegUnLoadKeyW(HKEY_USERS, key_wide.as_ptr()) };
+
+        // RegUnLoadKeyW returns ERROR_INVALID_PARAMETER (87) on some Windows
+        // versions when the named hive is not loaded. Query HKU first so a
+        // missing residue remains an idempotent successful cleanup.
+        let mut loaded_key: HANDLE = 0;
+        let query_status = unsafe {
+            RegOpenKeyExW(
+                HKEY_USERS,
+                key_wide.as_ptr(),
+                0,
+                KEY_READ,
+                &mut loaded_key,
+            )
+        };
+        match query_status {
+            ERROR_FILE_NOT_FOUND => return Ok(()),
+            ERROR_SUCCESS => {
+                unsafe { RegCloseKey(loaded_key) };
+            }
+            code => {
+                return Err(HiveError::Win32 {
+                    op: "RegOpenKeyExW(HKEY_USERS)",
+                    code: code as u32,
+                });
+            }
+        }
+
+        // cleanup runs in a fresh process after a failed run; privileges from
+        // the original run process are not inherited as enabled state.
+        enable_backup_privilege()?;
+        let mut status = unsafe { RegUnLoadKeyW(HKEY_USERS, key_wide.as_ptr()) };
+        let mut retries = 0u32;
+        while status == ERROR_BUSY && retries < UNLOAD_RETRIES {
+            std::thread::sleep(std::time::Duration::from_millis(UNLOAD_RETRY_MS));
+            retries += 1;
+            status = unsafe { RegUnLoadKeyW(HKEY_USERS, key_wide.as_ptr()) };
+        }
         match status {
             ERROR_SUCCESS | ERROR_FILE_NOT_FOUND => Ok(()),
             code => Err(HiveError::Win32 {

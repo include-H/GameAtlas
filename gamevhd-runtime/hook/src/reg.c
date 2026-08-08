@@ -321,13 +321,15 @@ static wchar_t *gvhd_reg_rewrite(const wchar_t *native, wchar_t *out, size_t out
         prefix_len = wcslen(GVHD_REG_HIVE_ROOT);
         game_len = wcslen(param->game_id);
         rest_len = wcslen(rest);
-        total = prefix_len + game_len + rest_len;
+        total = prefix_len + game_len + 1 + rest_len;
         if (total + 1 > out_cap) {
             return NULL;   /* 超缓冲：宁可直通也不截断 */
         }
         memcpy(out, GVHD_REG_HIVE_ROOT, prefix_len * sizeof(wchar_t));
         memcpy(out + prefix_len, param->game_id, game_len * sizeof(wchar_t));
-        memcpy(out + prefix_len + game_len, rest, (rest_len + 1) * sizeof(wchar_t));
+        out[prefix_len + game_len] = L'\\';
+        memcpy(out + prefix_len + game_len + 1, rest,
+               (rest_len + 1) * sizeof(wchar_t));
         return out;
     }
 
@@ -424,8 +426,15 @@ static NTSTATUS gvhd_reg_open_or_create(const wchar_t *key_path)
     oa.ObjectName = &name;
     oa.Attributes = OBJ_CASE_INSENSITIVE;
 
-    status = pfnOrig_NtCreateKeyEx(&hKey, KEY_CREATE_SUB_KEY | KEY_WOW64_64KEY,
-                                   &oa, 0, NULL, 0, NULL, NULL);
+    if (pfnOrig_NtCreateKeyEx != NULL) {
+        status = pfnOrig_NtCreateKeyEx(&hKey, KEY_CREATE_SUB_KEY | KEY_WOW64_64KEY,
+                                       &oa, 0, NULL, 0, NULL, NULL);
+    } else {
+        /* NtCreateKeyEx is absent on some Windows builds; the Ex parameters
+         * are optional for this parent-chain operation. */
+        status = pfnOrig_NtCreateKey(&hKey, KEY_CREATE_SUB_KEY | KEY_WOW64_64KEY,
+                                     &oa, 0, NULL, 0, NULL);
+    }
     if (hKey != NULL) {
         gvhd_reg_close(hKey);
     }
@@ -570,7 +579,7 @@ static NTSTATUS gvhd_reg_delete_hive_key(const wchar_t *hive_path, ULONG flags)
 
     status = pfnOrig_NtOpenKeyEx(&hKey, DELETE, &oa, 0);
     if (NT_SUCCESS(status)) {
-        if (flags != 0) {
+        if (flags != 0 && pfnOrig_NtDeleteKeyEx != NULL) {
             status = pfnOrig_NtDeleteKeyEx(hKey, flags);
         } else {
             status = pfnOrig_NtDeleteKey(hKey);
@@ -968,6 +977,14 @@ static NTSTATUS NTAPI Hook_NtNotifyChangeKey(
         }                                                                       \
     } while (0)
 
+#define GVHD_REG_RESOLVE_OPTIONAL(FN)                                           \
+    do {                                                                        \
+        __sys_##FN = (LPVOID)GetProcAddress(hNtdll, #FN);                       \
+        if (__sys_##FN == NULL) {                                               \
+            gvhd_log_write(L"REG_HOOK_OPTIONAL_SKIPPED fn=%S", #FN);            \
+        }                                                                       \
+    } while (0)
+
 #define GVHD_REG_CREATE(FN)                                                     \
     do {                                                                        \
         mh = MH_CreateHook(__sys_##FN, (LPVOID)&Hook_##FN,                      \
@@ -978,12 +995,35 @@ static NTSTATUS NTAPI Hook_NtNotifyChangeKey(
         }                                                                       \
     } while (0)
 
+#define GVHD_REG_CREATE_OPTIONAL(FN)                                            \
+    do {                                                                        \
+        if (__sys_##FN != NULL) {                                               \
+            mh = MH_CreateHook(__sys_##FN, (LPVOID)&Hook_##FN,                  \
+                               (LPVOID *)&pfnOrig_##FN);                        \
+            if (mh != MH_OK) {                                                  \
+                gvhd_log_write(L"REG_HOOK_OPTIONAL_CREATE_FAILED fn=%S mh=%d",  \
+                               #FN, (int)mh);                                   \
+            }                                                                   \
+        }                                                                       \
+    } while (0)
+
 #define GVHD_REG_ENABLE(FN)                                                     \
     do {                                                                        \
         mh = MH_EnableHook(__sys_##FN);                                         \
         if (mh != MH_OK) {                                                      \
             gvhd_log_write(L"REG_HOOK_ENABLE_FAILED fn=%S mh=%d", #FN, (int)mh);\
             return GVHD_INIT_ERR_HOOK;                                          \
+        }                                                                       \
+    } while (0)
+
+#define GVHD_REG_ENABLE_OPTIONAL(FN)                                             \
+    do {                                                                        \
+        if (pfnOrig_##FN != NULL) {                                             \
+            mh = MH_EnableHook(__sys_##FN);                                     \
+            if (mh != MH_OK) {                                                  \
+                gvhd_log_write(L"REG_HOOK_OPTIONAL_ENABLE_FAILED fn=%S mh=%d",  \
+                               #FN, (int)mh);                                   \
+            }                                                                   \
         }                                                                       \
     } while (0)
 
@@ -1007,15 +1047,15 @@ uint32_t gvhd_install_registry_hooks(void)
     GVHD_REG_RESOLVE(NtOpenKey);
     GVHD_REG_RESOLVE(NtOpenKeyEx);
     GVHD_REG_RESOLVE(NtOpenKeyTransacted);
-    GVHD_REG_RESOLVE(NtOpenKeyTransactedEx);
+    GVHD_REG_RESOLVE_OPTIONAL(NtOpenKeyTransactedEx);
     GVHD_REG_RESOLVE(NtCreateKey);
-    GVHD_REG_RESOLVE(NtCreateKeyEx);
+    GVHD_REG_RESOLVE_OPTIONAL(NtCreateKeyEx);
     GVHD_REG_RESOLVE(NtCreateKeyTransacted);
-    GVHD_REG_RESOLVE(NtCreateKeyTransactedEx);
+    GVHD_REG_RESOLVE_OPTIONAL(NtCreateKeyTransactedEx);
     GVHD_REG_RESOLVE(NtSetValueKey);
     GVHD_REG_RESOLVE(NtDeleteValueKey);
     GVHD_REG_RESOLVE(NtDeleteKey);
-    GVHD_REG_RESOLVE(NtDeleteKeyEx);
+    GVHD_REG_RESOLVE_OPTIONAL(NtDeleteKeyEx);
     GVHD_REG_RESOLVE(NtQueryValueKey);
     GVHD_REG_RESOLVE(NtQueryMultipleValueKey);
     GVHD_REG_RESOLVE(NtEnumerateValueKey);
@@ -1034,15 +1074,15 @@ uint32_t gvhd_install_registry_hooks(void)
     GVHD_REG_CREATE(NtOpenKey);
     GVHD_REG_CREATE(NtOpenKeyEx);
     GVHD_REG_CREATE(NtOpenKeyTransacted);
-    GVHD_REG_CREATE(NtOpenKeyTransactedEx);
+    GVHD_REG_CREATE_OPTIONAL(NtOpenKeyTransactedEx);
     GVHD_REG_CREATE(NtCreateKey);
-    GVHD_REG_CREATE(NtCreateKeyEx);
+    GVHD_REG_CREATE_OPTIONAL(NtCreateKeyEx);
     GVHD_REG_CREATE(NtCreateKeyTransacted);
-    GVHD_REG_CREATE(NtCreateKeyTransactedEx);
+    GVHD_REG_CREATE_OPTIONAL(NtCreateKeyTransactedEx);
     GVHD_REG_CREATE(NtSetValueKey);
     GVHD_REG_CREATE(NtDeleteValueKey);
     GVHD_REG_CREATE(NtDeleteKey);
-    GVHD_REG_CREATE(NtDeleteKeyEx);
+    GVHD_REG_CREATE_OPTIONAL(NtDeleteKeyEx);
     GVHD_REG_CREATE(NtQueryValueKey);
     GVHD_REG_CREATE(NtQueryMultipleValueKey);
     GVHD_REG_CREATE(NtEnumerateValueKey);
@@ -1055,15 +1095,15 @@ uint32_t gvhd_install_registry_hooks(void)
     GVHD_REG_ENABLE(NtOpenKey);
     GVHD_REG_ENABLE(NtOpenKeyEx);
     GVHD_REG_ENABLE(NtOpenKeyTransacted);
-    GVHD_REG_ENABLE(NtOpenKeyTransactedEx);
+    GVHD_REG_ENABLE_OPTIONAL(NtOpenKeyTransactedEx);
     GVHD_REG_ENABLE(NtCreateKey);
-    GVHD_REG_ENABLE(NtCreateKeyEx);
+    GVHD_REG_ENABLE_OPTIONAL(NtCreateKeyEx);
     GVHD_REG_ENABLE(NtCreateKeyTransacted);
-    GVHD_REG_ENABLE(NtCreateKeyTransactedEx);
+    GVHD_REG_ENABLE_OPTIONAL(NtCreateKeyTransactedEx);
     GVHD_REG_ENABLE(NtSetValueKey);
     GVHD_REG_ENABLE(NtDeleteValueKey);
     GVHD_REG_ENABLE(NtDeleteKey);
-    GVHD_REG_ENABLE(NtDeleteKeyEx);
+    GVHD_REG_ENABLE_OPTIONAL(NtDeleteKeyEx);
     GVHD_REG_ENABLE(NtQueryValueKey);
     GVHD_REG_ENABLE(NtQueryMultipleValueKey);
     GVHD_REG_ENABLE(NtEnumerateValueKey);

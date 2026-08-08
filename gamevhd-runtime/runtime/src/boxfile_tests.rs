@@ -13,6 +13,8 @@ use super::*;
             registry_hive: r"GameData\Registry\user.dat".into(),
             skip_cache_dirs: false,
             state: BoxState::Clean,
+            game_data_base: String::new(),
+            game_data_name: String::new(),
         }
     }
 
@@ -137,6 +139,23 @@ use super::*;
         // 非法布尔值报错。
         let bad = with_flag.replace("true", "\"maybe\"");
         assert!(BoxFile::from_json(&bad).is_err());
+    }
+
+    #[test]
+    fn external_data_location_is_optional_and_unicode_safe() {
+        let json = r#"{
+            "game_id": "horizon-zero-dawn",
+            "exe_relative": "HorizonZeroDawnRemastered.exe",
+            "user_profile": "C:\\Users\\Hao",
+            "state": "clean",
+            "game_data_base": "D:\\GameAtlas",
+            "game_data_name": "地平线"
+        }"#;
+        let bf = BoxFile::from_json(json).unwrap();
+        assert!(bf.game_data_root.is_empty());
+        assert!(bf.registry_hive.is_empty());
+        assert_eq!(bf.game_data_base, r"D:\GameAtlas");
+        assert_eq!(bf.game_data_name, "地平线");
     }
 
     #[test]

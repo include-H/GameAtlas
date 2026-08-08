@@ -495,6 +495,7 @@ uint32_t gvhd_install_process_hooks(void)
 
     hNtdll = GetModuleHandleW(L"ntdll.dll");
     if (hNtdll == NULL) {
+        gvhd_log_write(L"PROC_HOOK_RESOLVE_FAILED reason=ntdll_missing");
         return GVHD_INIT_ERR_HOOK;
     }
 
@@ -502,31 +503,49 @@ uint32_t gvhd_install_process_hooks(void)
     __sys_NtCreateProcessEx = (LPVOID)GetProcAddress(hNtdll, "NtCreateProcessEx");
     __sys_NtQueryInformationProcess = (P_NtQueryInformationProcess)(LPVOID)GetProcAddress(
         hNtdll, "NtQueryInformationProcess");
-    if (__sys_NtCreateUserProcess == NULL || __sys_NtCreateProcessEx == NULL ||
-        __sys_NtQueryInformationProcess == NULL) {
+    if (__sys_NtCreateUserProcess == NULL || __sys_NtQueryInformationProcess == NULL) {
+        gvhd_log_write(L"PROC_HOOK_RESOLVE_FAILED user=%p process=%p query=%p",
+                       __sys_NtCreateUserProcess,
+                       __sys_NtCreateProcessEx,
+                       __sys_NtQueryInformationProcess);
         return GVHD_INIT_ERR_HOOK;
+    }
+    if (__sys_NtCreateProcessEx == NULL) {
+        gvhd_log_write(L"PROC_HOOK_OPTIONAL_SKIPPED fn=NtCreateProcessEx");
     }
 
     mh = MH_CreateHook(__sys_NtCreateUserProcess,
                        (LPVOID)&Hook_NtCreateUserProcess,
                        (LPVOID *)&pfnOrig_NtCreateUserProcess);
     if (mh != MH_OK) {
+        gvhd_log_write(L"PROC_HOOK_CREATE_FAILED fn=NtCreateUserProcess mh=%d",
+                       (int)mh);
         return GVHD_INIT_ERR_HOOK;
     }
-    mh = MH_CreateHook(__sys_NtCreateProcessEx,
-                       (LPVOID)&Hook_NtCreateProcessEx,
-                       (LPVOID *)&pfnOrig_NtCreateProcessEx);
-    if (mh != MH_OK) {
-        return GVHD_INIT_ERR_HOOK;
+    if (__sys_NtCreateProcessEx != NULL) {
+        mh = MH_CreateHook(__sys_NtCreateProcessEx,
+                           (LPVOID)&Hook_NtCreateProcessEx,
+                           (LPVOID *)&pfnOrig_NtCreateProcessEx);
+        if (mh != MH_OK) {
+            gvhd_log_write(L"PROC_HOOK_CREATE_FAILED fn=NtCreateProcessEx mh=%d",
+                           (int)mh);
+            return GVHD_INIT_ERR_HOOK;
+        }
     }
 
     mh = MH_EnableHook(__sys_NtCreateUserProcess);
     if (mh != MH_OK) {
+        gvhd_log_write(L"PROC_HOOK_ENABLE_FAILED fn=NtCreateUserProcess mh=%d",
+                       (int)mh);
         return GVHD_INIT_ERR_HOOK;
     }
-    mh = MH_EnableHook(__sys_NtCreateProcessEx);
-    if (mh != MH_OK) {
-        return GVHD_INIT_ERR_HOOK;
+    if (__sys_NtCreateProcessEx != NULL) {
+        mh = MH_EnableHook(__sys_NtCreateProcessEx);
+        if (mh != MH_OK) {
+            gvhd_log_write(L"PROC_HOOK_ENABLE_FAILED fn=NtCreateProcessEx mh=%d",
+                           (int)mh);
+            return GVHD_INIT_ERR_HOOK;
+        }
     }
     return 0;
 }
