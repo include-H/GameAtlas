@@ -109,3 +109,48 @@ describe('games store favorite sync', () => {
     expect(store.listError).toBeNull()
   })
 })
+
+describe('games store aggregate list item sync', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    getStatsMock.mockReset()
+    setFavoriteMock.mockReset()
+    getGamesMock.mockReset()
+  })
+
+  it('replaces the matching list item in place with the aggregate save result', () => {
+    const store = useGamesStore()
+    store.games = [
+      { id: 1, public_id: 'game-1', title: 'Old Title', cover_image: null },
+      { id: 2, public_id: 'game-2', title: 'Untouched', cover_image: null },
+    ] as unknown as GameListItem[]
+
+    store.applyAggregateListItem({
+      id: 1,
+      public_id: 'game-1',
+      title: 'New Title',
+      cover_image: '/assets/cover.jpg',
+    } as unknown as GameListItem)
+
+    expect(store.games).toHaveLength(2)
+    expect(store.games[0]?.title).toBe('New Title')
+    expect(store.games[0]?.cover_image).toBe('/assets/cover.jpg')
+    expect(store.games[1]?.title).toBe('Untouched')
+  })
+
+  it('keeps the list untouched when the saved game is not present', () => {
+    const store = useGamesStore()
+    store.games = [
+      { id: 2, public_id: 'game-2', title: 'Untouched' },
+    ] as unknown as GameListItem[]
+
+    store.applyAggregateListItem({
+      id: 99,
+      public_id: 'missing-game',
+      title: 'Nope',
+    } as unknown as GameListItem)
+
+    expect(store.games).toHaveLength(1)
+    expect(store.games[0]?.title).toBe('Untouched')
+  })
+})

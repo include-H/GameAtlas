@@ -199,6 +199,16 @@ export const useGamesStore = defineStore('games', () => {
     }
   }
 
+  // 2026-08-08: 编辑保存（updateGameAggregate）响应里已携带最新状态的 GameListItem，
+  // 原地替换列表项即可让 keep-alive 恢复后的游戏库立即显示新素材状态，无需重拉列表。
+  // 数组长度不变 → 虚拟滚动 canvas 高度与滚动位置不受影响。
+  const applyAggregateListItem = (item: GameListItem) => {
+    const index = games.value.findIndex((game) => game.public_id === item.public_id)
+    if (index >= 0) {
+      games.value[index] = item
+    }
+  }
+
   const toggleFavorite = async (gameId: string) => {
     favoriteError.value = null
     try {
@@ -234,5 +244,6 @@ export const useGamesStore = defineStore('games', () => {
     fetchGame,
     fetchStats,
     toggleFavorite,
+    applyAggregateListItem,
   }
 })

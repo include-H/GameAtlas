@@ -20,6 +20,7 @@ import { useEditGameMediaState } from '@/composables/useEditGameMediaState'
 import { useEditGameMetadataPickers } from '@/composables/useEditGameMetadataPickers'
 import { useEditGameUploadUrls } from '@/composables/useEditGameUploadUrls'
 import { useUiStore } from '@/stores/ui'
+import { useGamesStore } from '@/stores/games'
 import type { AdminGameDetail } from '@/services/types'
 
 interface UseEditGameModalOptions {
@@ -60,6 +61,8 @@ export const useEditGameModal = ({
   const addAlert = (message: string, type: 'success' | 'warning' | 'error') => {
     uiStore.addAlert(message, type)
   }
+
+  const gamesStore = useGamesStore()
 
   const {
     CREATE_DEVELOPER_OPTION_VALUE,
@@ -255,6 +258,11 @@ export const useEditGameModal = ({
     },
     closeModal: () => {
       visible.value = false
+    },
+    // 2026-08-08: 保存成功后把最新 GameListItem 原地写入 games 列表，
+    // keep-alive 恢复的游戏库无需重拉即可显示新素材状态。
+    onGameSaved: (game) => {
+      gamesStore.applyAggregateListItem(game)
     },
   })
 

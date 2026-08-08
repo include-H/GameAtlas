@@ -6,6 +6,7 @@ import type {
   AdminGameDetail,
   GameAggregateGameUpdateRequest,
   GameAggregateNewAsset,
+  GameListItem,
 } from '@/services/types'
 
 interface UseEditGameWorkflowOptions {
@@ -16,6 +17,9 @@ interface UseEditGameWorkflowOptions {
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
   emitSuccess: () => void
   closeModal: () => void
+  // 2026-08-08: 保存成功后把后端返回的最新 GameListItem 上抛，供调用方同步列表/详情缓存，
+  // 避免 keep-alive 恢复的游戏库继续显示旧素材状态。
+  onGameSaved?: (game: GameListItem) => void
 }
 
 const toNullableFormText = (value: string | null | undefined) => {
@@ -150,6 +154,7 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       if (aggregateResult.warnings.length > 0) {
         options.addAlert('部分素材文件未能物理删除，系统稍后可重试', 'warning')
       }
+      options.onGameSaved?.(aggregateResult.game)
       options.addAlert('保存成功', 'success')
       options.emitSuccess()
       options.closeModal()
