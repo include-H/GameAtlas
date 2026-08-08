@@ -65,7 +65,7 @@
         :is-primary="index === 0"
         :dragged-key="draggedVideoKey"
         :drag-over-key="dragOverVideoKey"
-        badge="首个展示"
+        :badge="index === 0 ? '首个展示' : undefined"
         delete-title="删除预告片"
         confirm-label="这个预告片"
         @drag-start="(key) => emit('video-drag-start', key)"
