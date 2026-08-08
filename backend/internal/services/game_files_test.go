@@ -218,7 +218,7 @@ func TestPowerShellMainSaveTemplateRendersMenuAndAction(t *testing.T) {
 	}
 	ps := decodePayload(t, script)
 
-	if !strings.Contains(ps, "挂载并打开存档目录") {
+	if !strings.Contains(ps, "打开存档目录") {
 		t.Fatalf("ps missing save-dir menu option: %s", ps)
 	}
 	if !strings.Contains(ps, "[Environment]::ExpandEnvironmentVariables($SaveTemplate)") {
@@ -233,6 +233,84 @@ func TestPowerShellMainSaveTemplateRendersMenuAndAction(t *testing.T) {
 	}
 }
 
+// TestPowerShellMainLocalSaveTemplateSkipsMount 存档模板不含 %GAME_DRIVE%（存档在本地而非
+// VHD 内）时，mode 3 免挂载：直接展开模板打开文件夹并退出，不触碰 SMB 与 VHD。
+func TestPowerShellMainLocalSaveTemplateSkipsMount(t *testing.T) {
+	gameID, fileID, service := newLaunchServiceForTest(t, `%USERPROFILE%\Documents\My Games\Save Template Game\SaveGame`)
+	script, _, err := service.BuildLaunchScript(gameID, fileID, false)
+	if err != nil {
+		t.Fatalf("BuildLaunchScript returned error: %v", err)
+	}
+	ps := decodePayload(t, script)
+
+	if !strings.Contains(ps, "$SaveOnVHD   = $false") {
+		t.Fatalf("ps must mark template as non-VHD: %s", ps)
+	}
+	if !strings.Contains(ps, "if ($mode -eq '3' -and -not $SaveOnVHD)") {
+		t.Fatalf("ps missing no-mount save branch: %s", ps)
+	}
+	// 免挂载分支以 exit 0 收尾，后续 SMB/VHD 逻辑不再执行。
+	if !strings.Contains(ps, "template without %GAME_DRIVE% opens folder directly") {
+		t.Fatalf("ps missing local-save branch marker: %s", ps)
+	}
+	// dispatch 的存档分支对非 VHD 模板不可达（条件被 -and $SaveOnVHD 挡住）。
+	if !strings.Contains(ps, "if ($mode -eq '3' -and $SaveOnVHD)") {
+		t.Fatalf("ps missing VHD-only save dispatch guard: %s", ps)
+	}
+}
+
+// TestPowerShellMainVHDSaveTemplateRequiresMount 存档模板含 %GAME_DRIVE%（存档在 VHD 内）时，
+// mode 3 必须挂载：不生成免挂载分支，dispatch 内用游戏盘符替换 %GAME_DRIVE%。
+func TestPowerShellMainVHDSaveTemplateRequiresMount(t *testing.T) {
+	gameID, fileID, service := newLaunchServiceForTest(t, `%GAME_DRIVE%\SaveGame\Slot1`)
+	script, _, err := service.BuildLaunchScript(gameID, fileID, false)
+	if err != nil {
+		t.Fatalf("BuildLaunchScript returned error: %v", err)
+	}
+	ps := decodePayload(t, script)
+
+	if !strings.Contains(ps, "$SaveOnVHD   = $true") {
+		t.Fatalf("ps must mark template as VHD: %s", ps)
+	}
+	if strings.Contains(ps, "-not $SaveOnVHD") {
+		t.Fatalf("ps must not render no-mount save branch for VHD template: %s", ps)
+	}
+	if !strings.Contains(ps, "$saveDir.Replace('%GAME_DRIVE%', $gameDrive)") {
+		t.Fatalf("ps missing GAME_DRIVE substitution: %s", ps)
+	}
+}
+
+// TestPowerShellMainAlreadyAttachedVHDReuse 已挂载的差分盘直接复用：Get-VHD 检测 Attached
+// 状态；attach 失败时用 diskpart detail vdisk 复核"已附加"，避免把已挂载误判为失败。
+func TestPowerShellMainAlreadyAttachedVHDReuse(t *testing.T) {
+	gameID, fileID, service := newLaunchServiceForTest(t, "")
+	script, _, err := service.BuildLaunchScript(gameID, fileID, false)
+	if err != nil {
+		t.Fatalf("BuildLaunchScript returned error: %v", err)
+	}
+	ps := decodePayload(t, script)
+
+	if !strings.Contains(ps, "Get-VHD -Path $DiffVHD -ErrorAction SilentlyContinue") {
+		t.Fatalf("ps missing Get-VHD attach detection: %s", ps)
+	}
+	if !strings.Contains(ps, "$v.Attached") {
+		t.Fatalf("ps missing Attached property check: %s", ps)
+	}
+	if !strings.Contains(ps, "detail vdisk") {
+		t.Fatalf("ps missing diskpart detail fallback: %s", ps)
+	}
+	if !strings.Contains(ps, "-match 'Attached|已附加'") {
+		t.Fatalf("ps missing attached-state matcher: %s", ps)
+	}
+	if !strings.Contains(ps, "直接复用现有挂载") {
+		t.Fatalf("ps missing reuse message: %s", ps)
+	}
+	// 复用场景按磁盘号定位盘符（Get-VHD 可用时），不再依赖盘符 diff。
+	if !strings.Contains(ps, "Get-Partition -DiskNumber $diffDiskNumber") {
+		t.Fatalf("ps missing drive lookup by disk number: %s", ps)
+	}
+}
+
 func TestPowerShellMainWithoutSaveTemplateOmitsMenuOption(t *testing.T) {
 	gameID, fileID, service := newLaunchServiceForTest(t, "")
 	script, _, err := service.BuildLaunchScript(gameID, fileID, false)
@@ -241,7 +319,7 @@ func TestPowerShellMainWithoutSaveTemplateOmitsMenuOption(t *testing.T) {
 	}
 	ps := decodePayload(t, script)
 
-	if strings.Contains(ps, "挂载并打开存档目录") {
+	if strings.Contains(ps, "打开存档目录") {
 		t.Fatalf("ps should not render save-dir option when template empty: %s", ps)
 	}
 	if strings.Contains(ps, "$hasSave") {

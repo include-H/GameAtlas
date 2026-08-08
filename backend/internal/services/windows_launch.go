@@ -180,6 +180,7 @@ $SMBPass     = __SMB_PASS__
 $BaseVHD     = __BASE_VHD__
 $DiffVHD     = __DIFF_VHD__
 $SaveTemplate = __SAVE_TEMPLATE__
+$SaveOnVHD   = __SAVE_ON_VHD__
 
 function Write-Step  { param([string]$m) Write-Host $m -ForegroundColor Yellow }
 function Write-Ok    { param([string]$m) Write-Host $m -ForegroundColor Green }
@@ -229,6 +230,7 @@ __CLEANUP_COND__
   exit 0
 }
 
+__LOCAL_SAVE_BRANCH__
 $cleanupOnExit = ($mode -ne '2')
 
 # ---- connect SMB (reuse existing session) ----
@@ -248,58 +250,104 @@ if ($existing | Select-String -SimpleMatch $SMBShare -Quiet) {
   Write-Ok 'SMB 共享连接成功。'
 }
 
-# ---- snapshot drives before mount ----
-$beforeDrives = @(Get-Partition -ErrorAction SilentlyContinue | Where-Object { $_.DriveLetter } | Select-Object -ExpandProperty DriveLetter)
+# ---- detect whether diff VHD is already attached (reuse existing mount) ----
+$diffAttached = $false
+$diffDiskNumber = $null
+if (Get-Command Get-VHD -ErrorAction SilentlyContinue) {
+  $v = Get-VHD -Path $DiffVHD -ErrorAction SilentlyContinue
+  if ($v -and $v.Attached) {
+    $diffAttached = $true
+    $diffDiskNumber = $v.DiskNumber
+  }
+}
+if (-not $diffAttached) {
+  # ---- snapshot drives before mount ----
+  $beforeDrives = @(Get-Partition -ErrorAction SilentlyContinue | Where-Object { $_.DriveLetter } | Select-Object -ExpandProperty DriveLetter)
 
-# ---- mount VHD (create diff disk when missing) ----
-$dp = Join-Path $env:TEMP ('ga-diskpart-' + [guid]::NewGuid().ToString('N') + '.txt')
-$scriptLines = New-Object System.Collections.Generic.List[string]
-if (Test-Path -LiteralPath $DiffVHD) {
-  Write-Step '差分 VHD 已存在，准备挂载...'
-  $scriptLines.Add('select vdisk file="' + $DiffVHD + '"')
-  $scriptLines.Add('attach vdisk')
+  # ---- mount VHD (create diff disk when missing) ----
+  $dp = Join-Path $env:TEMP ('ga-diskpart-' + [guid]::NewGuid().ToString('N') + '.txt')
+  $scriptLines = New-Object System.Collections.Generic.List[string]
+  if (Test-Path -LiteralPath $DiffVHD) {
+    Write-Step '差分 VHD 已存在，准备挂载...'
+    $scriptLines.Add('select vdisk file="' + $DiffVHD + '"')
+    $scriptLines.Add('attach vdisk')
+  } else {
+    Write-Step '创建差分 VHD...'
+    $scriptLines.Add('create vdisk file="' + $DiffVHD + '" parent="' + $BaseVHD + '"')
+    $scriptLines.Add('select vdisk file="' + $DiffVHD + '"')
+    $scriptLines.Add('attach vdisk')
+  }
+  Write-Host '--- diskpart 脚本内容 ---' -ForegroundColor DarkGray
+  $scriptLines | ForEach-Object { Write-Host ('  ' + $_) -ForegroundColor DarkGray }
+  Write-Host ('  [脚本路径] ' + $dp) -ForegroundColor DarkGray
+  Write-Host ('  [脚本命令数] ' + $scriptLines.Count) -ForegroundColor DarkGray
+  # List 逐行 Add：PS 5.1 的 @(...) 多行数组 + 字符串拼接会被解析成单元素（真机事故）。
+  # GetEncoding(936)=GBK/ANSI：diskpart /s 只认 ANSI 脚本（真机验证 UTF-16 返回 0 无回显，
+  # 原始 BAT 用 GBK 能执行到挂载），与中文系统代码页匹配。
+  [System.IO.File]::WriteAllLines($dp, $scriptLines, [System.Text.Encoding]::GetEncoding(936))
+  Write-Host ('  [脚本文件字节数] ' + (Get-Item -LiteralPath $dp).Length) -ForegroundColor DarkGray
+  Write-Step '正在挂载 VHD...'
+  diskpart /s $dp
+  $err = $LASTEXITCODE
+  Write-Host ('  [diskpart 退出码] ' + $err) -ForegroundColor DarkGray
+  Remove-Item -LiteralPath $dp -Force -ErrorAction SilentlyContinue
+  if ($err -ne 0) {
+    # attach 失败也可能是"已挂载"（对已附加的 vdisk 再 attach 会报错）：用 detail vdisk 复核，
+    # 命中则降级为复用，避免把"已挂载"误判成失败。
+    $checkDp = Join-Path $env:TEMP ('ga-diskpart-check-' + [guid]::NewGuid().ToString('N') + '.txt')
+    $checkLines = New-Object System.Collections.Generic.List[string]
+    $checkLines.Add('select vdisk file="' + $DiffVHD + '"')
+    $checkLines.Add('detail vdisk')
+    [System.IO.File]::WriteAllLines($checkDp, $checkLines, [System.Text.Encoding]::GetEncoding(936))
+    $detailOut = (diskpart /s $checkDp 2>&1 | Out-String)
+    Remove-Item -LiteralPath $checkDp -Force -ErrorAction SilentlyContinue
+    if ($detailOut -match 'Attached|已附加') {
+      Write-Ok 'VHD 已处于挂载状态，直接复用现有挂载。'
+      $diffAttached = $true
+    } else {
+      Write-Err ('VHD 挂载失败，错误码 ' + $err + '。凭据可能已残留，可再次运行本脚本选择清理选项。')
+      Wait-Key
+      exit $err
+    }
+  }
 } else {
-  Write-Step '创建差分 VHD...'
-  $scriptLines.Add('create vdisk file="' + $DiffVHD + '" parent="' + $BaseVHD + '"')
-  $scriptLines.Add('select vdisk file="' + $DiffVHD + '"')
-  $scriptLines.Add('attach vdisk')
-}
-Write-Host '--- diskpart 脚本内容 ---' -ForegroundColor DarkGray
-$scriptLines | ForEach-Object { Write-Host ('  ' + $_) -ForegroundColor DarkGray }
-Write-Host ('  [脚本路径] ' + $dp) -ForegroundColor DarkGray
-Write-Host ('  [脚本命令数] ' + $scriptLines.Count) -ForegroundColor DarkGray
-# List 逐行 Add：PS 5.1 的 @(...) 多行数组 + 字符串拼接会被解析成单元素（真机事故）。
-# GetEncoding(936)=GBK/ANSI：diskpart /s 只认 ANSI 脚本（真机验证 UTF-16 返回 0 无回显，
-# 原始 BAT 用 GBK 能执行到挂载），与中文系统代码页匹配。
-[System.IO.File]::WriteAllLines($dp, $scriptLines, [System.Text.Encoding]::GetEncoding(936))
-Write-Host ('  [脚本文件字节数] ' + (Get-Item -LiteralPath $dp).Length) -ForegroundColor DarkGray
-Write-Step '正在挂载 VHD...'
-diskpart /s $dp
-$err = $LASTEXITCODE
-Write-Host ('  [diskpart 退出码] ' + $err) -ForegroundColor DarkGray
-Remove-Item -LiteralPath $dp -Force -ErrorAction SilentlyContinue
-if ($err -ne 0) {
-  Write-Err ('VHD 挂载失败，错误码 ' + $err + '。凭据可能已残留，可再次运行本脚本选择清理选项。')
-  Wait-Key
-  exit $err
+  Write-Ok 'VHD 已挂载，直接复用现有挂载。'
 }
 if (Test-Path -LiteralPath $DiffVHD) {
-  Write-Ok '差分 VHD 已挂载成功。'
+  Write-Ok '差分 VHD 已就绪。'
 } else {
   Write-Err ('[检查] 差分 VHD 文件未生成：' + $DiffVHD)
 }
 
-# ---- find game drive by diff (new partition since mount) ----
+# ---- find game drive ----
 $gameDrive = ''
-$afterDrives = @(Get-Partition -ErrorAction SilentlyContinue | Where-Object { $_.DriveLetter } | Select-Object -ExpandProperty DriveLetter)
-Write-Host ('  [挂载前盘符] ' + ($beforeDrives -join ',')) -ForegroundColor DarkGray
-Write-Host ('  [挂载后盘符] ' + ($afterDrives -join ',')) -ForegroundColor DarkGray
-$newDrives = @($afterDrives | Where-Object { $beforeDrives -notcontains $_ })
-Write-Host ('  [新增盘符] ' + ($newDrives -join ',')) -ForegroundColor DarkGray
-if ($newDrives.Count -gt 0) {
-  $gameDrive = $newDrives[0]
-  Write-Info ('游戏盘符：' + $gameDrive + ':')
-} else {
+if ($diffAttached -and $diffDiskNumber -ne $null) {
+  # 复用已挂载：直接按磁盘号定位盘符（盘符 diff 对已挂载盘无意义）
+  $part = Get-Partition -DiskNumber $diffDiskNumber -ErrorAction SilentlyContinue | Where-Object { $_.DriveLetter } | Select-Object -First 1
+  if ($part) {
+    $gameDrive = $part.DriveLetter
+    Write-Info ('游戏盘符：' + $gameDrive + ':')
+  }
+}
+if ($gameDrive -eq '') {
+  if (-not $diffAttached) {
+    # 新挂载：挂载前后盘符 diff 取新增盘
+    $afterDrives = @(Get-Partition -ErrorAction SilentlyContinue | Where-Object { $_.DriveLetter } | Select-Object -ExpandProperty DriveLetter)
+    Write-Host ('  [挂载前盘符] ' + ($beforeDrives -join ',')) -ForegroundColor DarkGray
+    Write-Host ('  [挂载后盘符] ' + ($afterDrives -join ',')) -ForegroundColor DarkGray
+    $newDrives = @($afterDrives | Where-Object { $beforeDrives -notcontains $_ })
+    Write-Host ('  [新增盘符] ' + ($newDrives -join ',')) -ForegroundColor DarkGray
+    if ($newDrives.Count -gt 0) {
+      $gameDrive = $newDrives[0]
+      Write-Info ('游戏盘符：' + $gameDrive + ':')
+    }
+  } else {
+    # 复用且磁盘号不可用（无 Hyper-V 模块）：列出全部带盘符的分区供参考
+    $currentDrives = @(Get-Partition -ErrorAction SilentlyContinue | Where-Object { $_.DriveLetter } | Select-Object -ExpandProperty DriveLetter)
+    Write-Host ('  [当前盘符] ' + ($currentDrives -join ',')) -ForegroundColor DarkGray
+  }
+}
+if ($gameDrive -eq '') {
   Write-Info '请打开“此电脑”找到新出现的盘符进入游戏。'
 }
 
@@ -385,12 +433,14 @@ Wait-Key
 exit 0
 `
 
-	var menuOptions, cleanupCond, dispatch strings.Builder
+	var menuOptions, cleanupCond, dispatch, localSaveBranch strings.Builder
 	if savePathTemplate != "" {
-		menuOptions.WriteString("  Write-Host '  [3] 挂载并打开存档目录（结束后自动卸载并清理凭据）'\n")
+		menuOptions.WriteString("  Write-Host '  [3] 打开存档目录（存档在 VHD 内时自动挂载）'\n")
 		menuOptions.WriteString("  Write-Host '  [4] 清理 SMB 凭据并断开共享'\n")
 		cleanupCond.WriteString("if ($mode -eq '4') {\n")
-		dispatch.WriteString("if ($mode -eq '3') {\n")
+		// mode 3 需挂载时（模板含 %GAME_DRIVE%）才在此分支处理存档；
+		// 免挂载（模板不含 %GAME_DRIVE%）时已在上方 __LOCAL_SAVE_BRANCH__ 直接打开退出。
+		dispatch.WriteString("if ($mode -eq '3' -and $SaveOnVHD) {\n")
 		dispatch.WriteString("  $saveDir = [Environment]::ExpandEnvironmentVariables($SaveTemplate)\n")
 		dispatch.WriteString("  if ($gameDrive -ne '') { $saveDir = $saveDir.Replace('%GAME_DRIVE%', $gameDrive) }\n")
 		dispatch.WriteString("  if (Test-Path -LiteralPath $saveDir) {\n")
@@ -403,6 +453,24 @@ exit 0
 		dispatch.WriteString("  }\n")
 		dispatch.WriteString("  Read-Host '查看完毕后按任意键卸载...' | Out-Null\n")
 		dispatch.WriteString("} else {\n")
+		// 存档模板不引用 %GAME_DRIVE%（存档在本地而非 VHD 内）时，mode 3 免挂载：
+		// 直接展开模板打开文件夹并退出，不触碰 SMB 与 VHD。
+		if !strings.Contains(savePathTemplate, "%GAME_DRIVE%") {
+			localSaveBranch.WriteString("# ---- MODE=SAVE: template without %GAME_DRIVE% opens folder directly (no VHD mount) ----\n")
+			localSaveBranch.WriteString("if ($mode -eq '3' -and -not $SaveOnVHD) {\n")
+			localSaveBranch.WriteString("  $saveDir = [Environment]::ExpandEnvironmentVariables($SaveTemplate)\n")
+			localSaveBranch.WriteString("  if (Test-Path -LiteralPath $saveDir) {\n")
+			localSaveBranch.WriteString("    Write-Ok ('存档目录：' + $saveDir)\n")
+			localSaveBranch.WriteString("    Start-Process explorer.exe -ArgumentList $saveDir\n")
+			localSaveBranch.WriteString("    Write-Host '存档目录已打开，可在此查看或备份存档。'\n")
+			localSaveBranch.WriteString("  } else {\n")
+			localSaveBranch.WriteString("    Write-Err ('存档目录不存在：' + $saveDir)\n")
+			localSaveBranch.WriteString("    Write-Err '可能尚未游玩过（存档目录在首次运行后创建），或模板配置有误。'\n")
+			localSaveBranch.WriteString("  }\n")
+			localSaveBranch.WriteString("  Wait-Key\n")
+			localSaveBranch.WriteString("  exit 0\n")
+			localSaveBranch.WriteString("}\n")
+		}
 	} else {
 		menuOptions.WriteString("  Write-Host '  [3] 清理 SMB 凭据并断开共享'\n")
 		cleanupCond.WriteString("if ($mode -eq '3') {\n")
@@ -410,6 +478,11 @@ exit 0
 	dispatchEnd := ""
 	if savePathTemplate != "" {
 		dispatchEnd = "}"
+	}
+
+	saveOnVHD := "$false"
+	if strings.Contains(savePathTemplate, "%GAME_DRIVE%") {
+		saveOnVHD = "$true"
 	}
 
 	replacer := strings.NewReplacer(
@@ -421,6 +494,8 @@ exit 0
 		"__BASE_VHD__", psQuoted(baseVHDPath),
 		"__DIFF_VHD__", psQuoted(buildDiffVHDPath(s.cfg.VHDDiffRoot, diffFileName)),
 		"__SAVE_TEMPLATE__", psQuoted(savePathTemplate),
+		"__SAVE_ON_VHD__", saveOnVHD,
+		"__LOCAL_SAVE_BRANCH__", localSaveBranch.String(),
 		"__MENU_OPTIONS__", menuOptions.String(),
 		"__CLEANUP_COND__", cleanupCond.String(),
 		"__MODE_DISPATCH__", dispatch.String(),
