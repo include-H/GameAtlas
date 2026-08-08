@@ -17,6 +17,7 @@
         </a-option>
       </a-select>
       <a-input
+        class="save-path-template-input__input"
         :model-value="subpath"
         :placeholder="inputPlaceholder"
         allow-clear
@@ -115,6 +116,11 @@ const handleInput = (value: string) => {
 .save-path-template-input__select {
   width: 220px;
   flex-shrink: 0;
+}
+
+.save-path-template-input__input {
+  flex: 1;
+  min-width: 0;
 }
 
 .save-path-template-input__hint {
