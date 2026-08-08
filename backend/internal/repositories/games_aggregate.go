@@ -192,6 +192,10 @@ func (r *GamesRepository) updateGameRowTx(tx *sqlx.Tx, id int64, input domain.Ga
 		setClauses = append(setClauses, "logo_visible = ?")
 		args = append(args, *input.LogoVisible)
 	}
+	if input.SavePathTemplate != nil {
+		setClauses = append(setClauses, "save_path_template = ?")
+		args = append(args, *input.SavePathTemplate)
+	}
 	setClauses = append(setClauses, "series_id = ?")
 	args = append(args, input.SeriesID)
 	setClauses = append(setClauses, "updated_at = CURRENT_TIMESTAMP")

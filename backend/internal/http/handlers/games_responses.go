@@ -186,31 +186,32 @@ type gameFileResponse struct {
 }
 
 type gameDetailResponse struct {
-	ID            int64                           `json:"id"`
-	PublicID      string                          `json:"public_id"`
-	Title         string                          `json:"title"`
-	TitleAlt      *string                         `json:"title_alt"`
-	Visibility    string                          `json:"visibility"`
-	Summary       *string                         `json:"summary"`
-	ReleaseDate   *string                         `json:"release_date"`
-	CoverImage    *string                         `json:"cover_image"`
-	BannerImage   *string                         `json:"banner_image"`
-	WikiContent   *string                         `json:"wiki_content"`
-	Downloads     int64                           `json:"downloads"`
-	PreviewVideos []gameAssetResponse             `json:"preview_videos"`
-	Screenshots   []gameAssetResponse             `json:"screenshots"`
-	Covers        []gameAssetResponse             `json:"covers"`
-	Banners       []gameAssetResponse             `json:"banners"`
-	Logos         []gameAssetResponse             `json:"logos"`
-	Series        *metadataItemResponse           `json:"series"`
-	Developers    []metadataItemResponse          `json:"developers"`
-	Publishers    []metadataItemResponse          `json:"publishers"`
-	Files         []gameFileResponse              `json:"files"`
-	LogoVisible   bool                            `json:"logo_visible"`
-	IsFavorite    bool                            `json:"is_favorite"`
-	PendingIssues *pendingIssueEvaluationResponse `json:"pending_issues,omitempty"`
-	CreatedAt     string                          `json:"created_at"`
-	UpdatedAt     string                          `json:"updated_at"`
+	ID               int64                           `json:"id"`
+	PublicID         string                          `json:"public_id"`
+	Title            string                          `json:"title"`
+	TitleAlt         *string                         `json:"title_alt"`
+	Visibility       string                          `json:"visibility"`
+	Summary          *string                         `json:"summary"`
+	ReleaseDate      *string                         `json:"release_date"`
+	CoverImage       *string                         `json:"cover_image"`
+	BannerImage      *string                         `json:"banner_image"`
+	WikiContent      *string                         `json:"wiki_content"`
+	Downloads        int64                           `json:"downloads"`
+	PreviewVideos    []gameAssetResponse             `json:"preview_videos"`
+	Screenshots      []gameAssetResponse             `json:"screenshots"`
+	Covers           []gameAssetResponse             `json:"covers"`
+	Banners          []gameAssetResponse             `json:"banners"`
+	Logos            []gameAssetResponse             `json:"logos"`
+	Series           *metadataItemResponse           `json:"series"`
+	Developers       []metadataItemResponse          `json:"developers"`
+	Publishers       []metadataItemResponse          `json:"publishers"`
+	Files            []gameFileResponse              `json:"files"`
+	LogoVisible      bool                            `json:"logo_visible"`
+	SavePathTemplate string                          `json:"save_path_template"`
+	IsFavorite       bool                            `json:"is_favorite"`
+	PendingIssues    *pendingIssueEvaluationResponse `json:"pending_issues,omitempty"`
+	CreatedAt        string                          `json:"created_at"`
+	UpdatedAt        string                          `json:"updated_at"`
 }
 
 type reviewIssueOverrideResponse struct {

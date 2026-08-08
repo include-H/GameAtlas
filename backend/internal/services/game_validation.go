@@ -14,6 +14,7 @@ func normalizeGameCoreInput(input domain.GameCoreInput) domain.GameCoreInput {
 	input.Visibility = strings.TrimSpace(input.Visibility)
 	input.Summary = trimStringPtr(input.Summary)
 	input.ReleaseDate = trimStringPtr(input.ReleaseDate)
+	input.SavePathTemplate = trimStringPtr(input.SavePathTemplate)
 	return input
 }
 

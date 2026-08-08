@@ -15,15 +15,16 @@ type gameCreateRequest struct {
 }
 
 type gameAggregateCoreUpdateRequest struct {
-	Title        string  `json:"title"`
-	TitleAlt     *string `json:"title_alt"`
-	Visibility   string  `json:"visibility"`
-	Summary      *string `json:"summary"`
-	ReleaseDate  *string `json:"release_date"`
-	LogoVisible  *bool   `json:"logo_visible"`
-	SeriesID     *int64  `json:"series_id"`
-	DeveloperIDs []int64 `json:"developer_ids"`
-	PublisherIDs []int64 `json:"publisher_ids"`
+	Title            string  `json:"title"`
+	TitleAlt         *string `json:"title_alt"`
+	Visibility       string  `json:"visibility"`
+	Summary          *string `json:"summary"`
+	ReleaseDate      *string `json:"release_date"`
+	LogoVisible      *bool   `json:"logo_visible"`
+	SavePathTemplate *string `json:"save_path_template"`
+	SeriesID         *int64  `json:"series_id"`
+	DeveloperIDs     []int64 `json:"developer_ids"`
+	PublisherIDs     []int64 `json:"publisher_ids"`
 }
 
 type gameAggregateAssetsRequest struct {
@@ -83,12 +84,13 @@ func (request gameAggregateUpdateRequest) toInput() domain.GameAggregateUpdateIn
 
 func (request gameAggregateCoreUpdateRequest) toDomain() domain.GameCoreInput {
 	return domain.GameCoreInput{
-		Title:       request.Title,
-		TitleAlt:    request.TitleAlt,
-		Visibility:  request.Visibility,
-		Summary:     request.Summary,
-		ReleaseDate: request.ReleaseDate,
-		LogoVisible: request.LogoVisible,
+		Title:            request.Title,
+		TitleAlt:         request.TitleAlt,
+		Visibility:       request.Visibility,
+		Summary:          request.Summary,
+		ReleaseDate:      request.ReleaseDate,
+		LogoVisible:      request.LogoVisible,
+		SavePathTemplate: request.SavePathTemplate,
 	}
 }
 

@@ -71,6 +71,7 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
       release_date: game.release_date || undefined,
       series_id: game.series?.id ?? null,
       summary: game.summary || '',
+      save_path_template: game.save_path_template || '',
       covers: game.covers.map((asset) =>
         options.createEditableCover(asset),
       ),

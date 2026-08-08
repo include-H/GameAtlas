@@ -27,6 +27,7 @@ type Game struct {
 	Downloads         int64   `db:"downloads"`
 	PrimaryScreenshot *string `db:"primary_screenshot"`
 	LogoVisible       bool    `db:"logo_visible"`
+	SavePathTemplate  string  `db:"save_path_template"`
 	IsFavorite        bool    `db:"is_favorite"`
 	CreatedAt         string  `db:"created_at"`
 	UpdatedAt         string  `db:"updated_at"`
@@ -191,12 +192,13 @@ type TimelineGame struct {
 }
 
 type GameCoreInput struct {
-	Title       string
-	TitleAlt    *string
-	Visibility  string
-	Summary     *string
-	ReleaseDate *string
-	LogoVisible *bool
+	Title            string
+	TitleAlt         *string
+	Visibility       string
+	Summary          *string
+	ReleaseDate      *string
+	LogoVisible      *bool
+	SavePathTemplate *string
 }
 
 // Create keeps the add-game flow intentionally narrow: it only creates the base game row.

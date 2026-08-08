@@ -133,6 +133,14 @@
       </div>
 
       <div class="game-detail__download-section">
+        <div v-if="game.save_path_template" class="save-path-panel app-glass-surface">
+          <div class="save-path-row">
+            <span class="save-path-label">存档目录</span>
+            <code class="save-path-value">{{ game.save_path_template }}</code>
+            <span class="save-path-hint">启动脚本中"打开存档目录"按此模板定位</span>
+          </div>
+        </div>
+
         <div v-if="versions.length > 0" class="download-version-panel app-glass-surface">
           <div class="download-version-list">
             <div

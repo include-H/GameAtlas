@@ -38,6 +38,7 @@ func TestRunMigrationsOnFreshDatabaseAppliesAllEmbeddedFiles(t *testing.T) {
 	assertColumnExists(t, db, "start_screen_tiles", "grid_col")
 	assertColumnExists(t, db, "games", "series_id")
 	assertColumnExists(t, db, "games", "logo_visible")
+	assertColumnExists(t, db, "games", "save_path_template")
 	assertColumnMissing(t, db, "games", "needs_review")
 	assertIndexExists(t, db, "idx_games_release_date_id")
 	assertIndexExists(t, db, "idx_games_public_id")

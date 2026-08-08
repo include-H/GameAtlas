@@ -210,13 +210,14 @@ backend/
 
 ### Windows 启动脚本（VHD 远程启动）
 
-`services/windows_launch.go` 生成 BAT：
+`services/windows_launch.go` 生成启动脚本：
 
 1. 校验 SMB 配置、游戏可见性、文件路径与扩展名；
 2. 根据 `SMB_PATH_MAPPINGS` 把本地路径映射为 UNC 路径（最长前缀优先，`EvalSymlinks` 后比对）；
-3. 渲染脚本：提权 → `cmdkey` + `net use` 连接共享 → 差分盘不存在则 `create vdisk ... parent=...`，已存在则直接 `attach` → `diskpart` 挂载；
-4. 差分盘路径为 `<VHD_DIFF_ROOT>\<基础盘文件名>`，盘符由 `VHD_DIFF_ROOT` 规范化（非盘符输入回退 `C:`）；
-5. 菜单提供三个选项：挂载并游玩（结束后自动卸载 VHD、断开共享并删除凭据）、仅挂载、删除 SMB 凭据 / 断开共享。
+3. 渲染：`.bat` 引导壳（全 ASCII）内嵌 base64 载荷，载荷是 UTF-16LE+BOM 编码的 PowerShell 主脚本。bat 壳负责提权、解码写临时 `.ps1` 并执行，避免 BAT 内嵌 PS 的转义与编码问题；
+4. PS 主脚本：复用已连接的 SMB 共享（`net use` 检测命中则跳过凭据注入）→ 差分盘不存在则 `create vdisk ... parent=...`，已存在则直接 `attach` → `diskpart` 挂载 → 盘符 diff（挂载前后 `Get-Partition` 对比取新增盘）→ 自动扫描游戏 exe（限深 3、排除安装器，多候选列出选择）→ 可配置存档目录（`explorer` 打开，模板支持 `%USERPROFILE%` / `%GAME_DRIVE%` 等变量）；
+5. 差分盘路径为 `<VHD_DIFF_ROOT>\<基础盘文件名>`，盘符由 `VHD_DIFF_ROOT` 规范化（非盘符输入回退 `C:`）；
+6. 菜单：挂载并游玩（自动启动游戏，结束后自动卸载 VHD、断开共享并删除凭据）、仅挂载、打开存档目录（配置了 `games.save_path_template` 时出现）、删除 SMB 凭据 / 断开共享。
 
 脚本携带 SMB 凭据，是面向家庭可信环境的显式设计约束，不是多用户安全默认值。游玩结束后脚本会自动删除已保存的 SMB 凭据，减少凭据在客户端上的暴露窗口。
 

@@ -221,6 +221,7 @@ export interface GameSeriesSummary {
 }
 
 interface GameDetailDtoBase<TFile extends GameFileEntry = GameFileEntry> extends Omit<GameListItemDto, 'primary_screenshot' | 'screenshot_count' | 'file_count' | 'developer_count' | 'publisher_count'> {
+  save_path_template: string
   preview_videos: VideoAssetItem[]
   screenshots: ScreenshotItem[]
   covers: CoverItem[]
@@ -257,6 +258,7 @@ interface GameAggregateCoreRequest {
   summary: string | null
   release_date: string | null
   logo_visible: boolean
+  save_path_template: string
 }
 
 // Aggregate update rewrites the editable game aggregate in one request.

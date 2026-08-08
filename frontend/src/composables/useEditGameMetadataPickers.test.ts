@@ -12,6 +12,7 @@ const buildForm = () => ref<EditGameForm>({
   release_date: undefined,
   series_id: null,
   summary: '',
+  save_path_template: '',
   covers: [],
   banners: [],
   logos: [],

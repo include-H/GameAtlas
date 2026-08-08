@@ -117,6 +117,42 @@
   min-width: 0;
 }
 
+.save-path-panel {
+  margin-bottom: 10px;
+  padding: 10px 14px;
+}
+
+.save-path-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.save-path-label {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-2);
+}
+
+.save-path-value {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  color: var(--color-text-1);
+  background: var(--color-fill-2);
+  padding: 2px 8px;
+  border-radius: var(--radius-small);
+  word-break: break-all;
+}
+
+.save-path-hint {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
 .game-detail__wiki-wrapper {
   display: flex;
   align-items: start;
