@@ -65,7 +65,6 @@
       :visible="historyPreviewVisible"
       :footer="false"
       :mask-closable="true"
-      :width="1040"
       modal-class="wiki-edit-history-modal"
       @cancel="historyPreviewVisible = false"
     >
@@ -96,8 +95,12 @@
               type="text"
               @click="openHistoryPreview(entry)"
             >
-              <strong>{{ entry.change_summary || '未填写修改说明' }}</strong>
-              <span class="wiki-edit-history-label">{{ formatDateTime(entry.created_at) }}</span>
+              <span class="wiki-edit-history-item-content">
+                <strong class="wiki-edit-history-summary">{{ entry.change_summary || '未填写修改说明' }}</strong>
+                <time class="wiki-edit-history-label" :datetime="entry.created_at">
+                  {{ formatDateTime(entry.created_at) || '时间未知' }}
+                </time>
+              </span>
             </a-button>
           </aside>
 
@@ -105,7 +108,9 @@
             <div class="wiki-edit-history-preview-header">
               <div class="wiki-edit-history-preview-meta">
                 <strong class="wiki-edit-history-preview-summary">{{ selectedHistory.change_summary || '未填写修改说明' }}</strong>
-                <span>{{ formatDateTime(selectedHistory.created_at) }}</span>
+                <time :datetime="selectedHistory.created_at">
+                  {{ formatDateTime(selectedHistory.created_at) || '时间未知' }}
+                </time>
               </div>
 
               <div class="wiki-edit-history-preview-actions">
@@ -399,30 +404,71 @@ watch(
 .wiki-edit-history-item {
   font-size: 12px;
   text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: 100%;
+  box-sizing: border-box;
   padding: 12px;
   border-radius: 10px;
   background: color-mix(in srgb, var(--app-card-surface) 86%, transparent);
   color: var(--color-text-1);
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease;
+  white-space: normal;
+  min-width: 0;
 }
 
-.wiki-edit-history-item:deep(.arco-btn-content) {
+.wiki-edit-history-item.arco-btn {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
   width: 100%;
+  height: auto;
+  min-height: 64px;
+  gap: 4px;
+  white-space: normal;
+}
+
+.wiki-edit-history-item-content {
   display: flex;
   flex-direction: column;
-  gap: 4px;
   align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+
+.wiki-edit-history-summary,
+.wiki-edit-history-label {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.wiki-edit-history-summary {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.wiki-edit-history-label {
+  color: var(--color-text-3);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .wiki-edit-history-item:hover,
 .wiki-edit-history-item--active {
   border-color: rgb(var(--primary-6));
   background: rgba(var(--primary-6), 0.08);
-}
-
-.wiki-edit-history-label {
-  color: var(--color-text-3);
 }
 
 .wiki-edit-history-empty {
@@ -441,6 +487,8 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
+  min-width: 0;
   color: var(--color-text-2);
   font-size: 12px;
 }
@@ -449,12 +497,18 @@ watch(
   font-size: 18px;
   line-height: 1.5;
   color: var(--color-text-1);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .wiki-edit-history-preview {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   min-height: 0;
 }
 
@@ -462,9 +516,13 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
   max-height: min(70vh, 720px);
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 4px;
+  min-width: 0;
 }
 
 .wiki-edit-history-preview-main {
@@ -483,8 +541,9 @@ watch(
 
 .wiki-edit-history-preview-actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -599,16 +658,12 @@ watch(
 </style>
 
 <style>
-.wiki-edit-history-modal {
-  --wiki-surface-bg: color-mix(in srgb, var(--app-card-surface) 92%, transparent);
-}
-
-/* 模态玻璃覆盖：仅声明与全局 .arco-modal 不同的属性，共享 border 由全局提供 */
-.wiki-edit-history-modal .arco-modal {
+/* 仅约束历史弹窗的布局，底色、边框和阴影沿用全局 .arco-modal，避免编辑器内容透出。 */
+.wiki-edit-history-modal.arco-modal {
+  width: min(1040px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
   overflow: hidden;
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--app-card-surface) 92%, transparent);
-  box-shadow: var(--shadow-float);
 }
 
 .wiki-edit-history-modal .arco-modal-header {
@@ -618,6 +673,8 @@ watch(
 }
 
 .wiki-edit-history-modal .arco-modal-body {
+  box-sizing: border-box;
+  min-width: 0;
   padding: 16px 20px 20px;
   background: transparent;
 }

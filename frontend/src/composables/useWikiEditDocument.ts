@@ -34,7 +34,7 @@ export const useWikiEditDocument = ({
     change_summary: '',
   })
 
-  const isExisting = computed(() => wiki.value !== null)
+  const isExisting = computed(() => Boolean(wiki.value && wiki.value.content !== null))
 
   const resetWikiEditorState = () => {
     wiki.value = null
@@ -63,7 +63,7 @@ export const useWikiEditDocument = ({
       wiki.value = wikiContent
       wikiData.value = {
         content: wikiContent.content ?? '',
-        change_summary: '',
+        change_summary: wikiContent.content === null ? '首次添加' : '',
       }
     } catch (error) {
       uiStore.addAlert(getHttpErrorMessage(error, '加载 Wiki 失败'), 'error')

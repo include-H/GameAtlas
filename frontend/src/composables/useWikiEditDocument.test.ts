@@ -136,6 +136,54 @@ describe('useWikiEditDocument', () => {
     expect(document.isExisting.value).toBe(true)
   })
 
+  it('defaults the first wiki change summary and treats a null document as new', async () => {
+    const addAlert = vi.fn()
+    const { gamesStore, uiStore } = createWikiHarness({
+      fetchGame: async (gameId, store) => {
+        const game = {
+          id: 1,
+          public_id: gameId,
+          title: 'Game One',
+        } as GameDetail
+        store.currentGame = game
+        return game
+      },
+      addAlert,
+    })
+    getWikiPageMock.mockResolvedValue({
+      content: null,
+      updated_at: '2026-04-03T00:00:00Z',
+    })
+    updateWikiPageMock.mockResolvedValue({
+      content: '# First Wiki',
+      updated_at: '2026-04-03T00:00:00Z',
+    })
+
+    const document = useWikiEditDocument({
+      gamesStore,
+      uiStore,
+      requestedGameId: ref('game-1'),
+      onLoadGameFailed: vi.fn(),
+    })
+
+    await document.loadWikiEditorData('game-1')
+
+    expect(document.isExisting.value).toBe(false)
+    expect(document.wikiData.value).toEqual({
+      content: '',
+      change_summary: '首次添加',
+    })
+
+    document.wikiData.value.content = '# First Wiki'
+    await document.handleSave()
+
+    expect(updateWikiPageMock).toHaveBeenCalledWith('game-1', {
+      content: '# First Wiki',
+      change_summary: '首次添加',
+    })
+    expect(addAlert).toHaveBeenCalledWith('Wiki 已创建', 'success')
+  })
+
   it('ignores stale currentGame data that does not match the requested route game', async () => {
     const { gamesStore, uiStore } = createWikiHarness({
       currentGame: {
