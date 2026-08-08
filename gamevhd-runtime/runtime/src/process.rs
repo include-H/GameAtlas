@@ -90,19 +90,59 @@ pub fn assign_to_job(
     Ok(())
 }
 
-/// 阻塞等待 job 内全部进程退出（job 句柄置信号）。返回时整棵进程树已终结。
+/// 阻塞等待一个进程退出。
 #[cfg(target_os = "windows")]
-pub fn wait_process_tree(job: crate::winffi::HANDLE) -> Result<(), ProcError> {
+pub fn wait_process(hproc: crate::winffi::HANDLE) -> Result<(), ProcError> {
     use crate::winffi;
 
-    let r = unsafe { winffi::WaitForSingleObject(job, winffi::INFINITE) };
+    let r = unsafe { winffi::WaitForSingleObject(hproc, winffi::INFINITE) };
     if r != winffi::WAIT_OBJECT_0 {
         return Err(ProcError::Win32 {
-            op: "WaitForSingleObject",
+            op: "WaitForSingleObject(process)",
             code: last_error(),
         });
     }
     Ok(())
+}
+
+/// 等待 job 内全部进程退出，允许调用方设置有限的宽限期。
+#[cfg(target_os = "windows")]
+pub fn wait_process_tree_timeout(
+    job: crate::winffi::HANDLE,
+    timeout_ms: crate::winffi::DWORD,
+) -> Result<bool, ProcError> {
+    use crate::winffi;
+
+    let r = unsafe { winffi::WaitForSingleObject(job, timeout_ms) };
+    match r {
+        winffi::WAIT_OBJECT_0 => Ok(true),
+        winffi::WAIT_TIMEOUT => Ok(false),
+        _ => Err(ProcError::Win32 {
+            op: "WaitForSingleObject(job)",
+            code: last_error(),
+        }),
+    }
+}
+
+/// 终止 job 内仍存活的辅助进程；调用方随后应等待 job 句柄变为有信号。
+#[cfg(target_os = "windows")]
+pub fn terminate_job(job: crate::winffi::HANDLE) -> Result<(), ProcError> {
+    use crate::winffi;
+
+    let ok = unsafe { winffi::TerminateJobObject(job, 1) };
+    if ok == 0 {
+        return Err(ProcError::Win32 {
+            op: "TerminateJobObject",
+            code: last_error(),
+        });
+    }
+    Ok(())
+}
+
+/// 阻塞等待 job 内全部进程退出（job 句柄置信号）。返回时整棵进程树已终结。
+#[cfg(target_os = "windows")]
+pub fn wait_process_tree(job: crate::winffi::HANDLE) -> Result<(), ProcError> {
+    wait_process_tree_timeout(job, crate::winffi::INFINITE).map(|_| ())
 }
 
 #[cfg(target_os = "windows")]
@@ -131,6 +171,21 @@ pub fn assign_to_job(_job: usize, _hproc: usize) -> Result<(), ProcError> {
 
 #[cfg(not(target_os = "windows"))]
 pub fn wait_process_tree(_job: usize) -> Result<(), ProcError> {
+    Err(ProcError::UnsupportedPlatform)
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn wait_process(_hproc: usize) -> Result<(), ProcError> {
+    Err(ProcError::UnsupportedPlatform)
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn wait_process_tree_timeout(_job: usize, _timeout_ms: u32) -> Result<bool, ProcError> {
+    Err(ProcError::UnsupportedPlatform)
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn terminate_job(_job: usize) -> Result<(), ProcError> {
     Err(ProcError::UnsupportedPlatform)
 }
 

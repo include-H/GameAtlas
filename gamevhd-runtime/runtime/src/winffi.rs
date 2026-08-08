@@ -30,6 +30,7 @@ pub const PAGE_READWRITE: u32 = 0x0000_0004;
 pub const PAGE_EXECUTE_READWRITE: u32 = 0x0000_0040;
 pub const INFINITE: u32 = 0xFFFF_FFFF;
 pub const WAIT_OBJECT_0: u32 = 0;
+pub const WAIT_TIMEOUT: u32 = 0x0000_0102;
 pub const WAIT_FAILED: u32 = 0xFFFF_FFFF;
 pub const INVALID_HANDLE_VALUE: usize = usize::MAX;
 
@@ -254,6 +255,8 @@ extern "system" {
     pub fn GetLastError() -> DWORD;
 
     pub fn TerminateProcess(h_process: HANDLE, u_exit_code: u32) -> BOOL;
+
+    pub fn TerminateJobObject(h_job: HANDLE, u_exit_code: u32) -> BOOL;
 
     pub fn CreateJobObjectW(lp_job_attributes: *const u8, lp_name: *const u16) -> HANDLE;
 

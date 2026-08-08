@@ -330,7 +330,12 @@ mod win {
         let job = process::create_kill_on_close_job(&bf.game_id)
             .map_err(|e| format!("创建 Job Object 失败: {e}"))?;
 
-        // 10. 挂起启动 → 划入 job → 注入 hook → resume → 等待整棵树退出。
+        // 10. 挂起启动 → 划入 job → 注入 hook → resume → 等待游戏主进程退出。
+        //
+        // Job Object 的“所有进程退出”信号会被游戏留下的辅助进程拖住；
+        // 主游戏进程才是用户可见会话的结束点。主进程结束后仍给子进程
+        // 一个短宽限期，超时则终止本次 job，保证 hive 卸载不会无限等待。
+        const CHILD_PROCESS_GRACE_MS: u32 = 2_000;
         let work_dir = exe_abs
             .parent()
             .map(|p| p.to_string_lossy().into_owned())
@@ -353,7 +358,20 @@ mod win {
                     return Err("ResumeThread 失败".into());
                 }
             }
-            process::wait_process_tree(job).map_err(|e| format!("等待进程树退出失败: {e}"))?;
+            crate::log_info!("run: 等待游戏主进程退出");
+            process::wait_process(hproc).map_err(|e| format!("等待游戏主进程退出失败: {e}"))?;
+            crate::log_info!(
+                "run: 游戏主进程已退出，等待辅助进程（最多 {} ms）",
+                CHILD_PROCESS_GRACE_MS
+            );
+            if !process::wait_process_tree_timeout(job, CHILD_PROCESS_GRACE_MS)
+                .map_err(|e| format!("等待辅助进程退出失败: {e}"))?
+            {
+                crate::log_warn!("run: 辅助进程仍在运行，终止本次 Job Object 以完成清理");
+                process::terminate_job(job).map_err(|e| format!("终止残留进程失败: {e}"))?;
+                process::wait_process_tree(job)
+                    .map_err(|e| format!("等待残留进程终止失败: {e}"))?;
+            }
             Ok(())
         })();
 
