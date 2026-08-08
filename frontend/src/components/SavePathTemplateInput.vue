@@ -2,7 +2,6 @@
   <div class="save-path-template-input">
     <div class="save-path-template-input__row">
       <a-select
-        class="save-path-template-input__select"
         :model-value="baseKey"
         placeholder="选择基础目录"
         @update:model-value="handleBaseChange"
@@ -17,7 +16,6 @@
         </a-option>
       </a-select>
       <a-input
-        class="save-path-template-input__input"
         :model-value="subpath"
         :placeholder="inputPlaceholder"
         allow-clear
@@ -107,20 +105,33 @@ const handleInput = (value: string) => {
 </script>
 
 <style scoped>
+.save-path-template-input {
+  width: 100%;
+  min-width: 0;
+}
+
 .save-path-template-input__row {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
-.save-path-template-input__select {
+.save-path-template-input__row :deep(.arco-select) {
   width: 220px;
   flex-shrink: 0;
 }
 
-.save-path-template-input__input {
+.save-path-template-input__row :deep(.arco-input-wrapper) {
   flex: 1;
   min-width: 0;
+}
+
+.save-path-template-input__row :deep(.arco-input-wrapper .arco-input) {
+  flex: 1;
+  min-width: 0;
+  width: auto;
 }
 
 .save-path-template-input__hint {

@@ -6,6 +6,13 @@
   font-weight: 700;
 }
 
+/* This vertical item contains a composite control that should use the modal width. */
+.save-path-form-item :deep(.arco-form-item-wrapper-col),
+.save-path-form-item :deep(.arco-form-item-content),
+.save-path-form-item :deep(.arco-form-item-content-wrapper) {
+  width: 100%;
+}
+
 /* Keep EditGameModal text-buttons aligned with global typography color tokens. */
 :deep(.arco-btn.arco-btn-text) {
   color: var(--color-text-2);

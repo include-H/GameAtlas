@@ -180,7 +180,7 @@
         />
       </a-form-item>
 
-      <a-form-item label="存档目录（Windows 模板）">
+      <a-form-item class="save-path-form-item" label="存档目录（Windows 模板）">
         <save-path-template-input v-model="form.save_path_template" />
       </a-form-item>
 
