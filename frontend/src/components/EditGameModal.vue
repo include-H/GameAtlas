@@ -180,6 +180,10 @@
         />
       </a-form-item>
 
+      <a-form-item label="存档目录（Windows 模板）">
+        <save-path-template-input v-model="form.save_path_template" />
+      </a-form-item>
+
       <game-file-paths-section
         :file-paths="form.file_paths"
         @update-item="handleFilePathItemUpdate"
@@ -254,6 +258,7 @@ import FileBrowserModal from '@/components/FileBrowserModal.vue'
 import GameFilePathsSection from '@/components/edit-game/GameFilePathsSection.vue'
 import EditGameWikiMetadataPickerModal from '@/components/edit-game/EditGameWikiMetadataPickerModal.vue'
 import SummaryImportModal from '@/components/edit-game/import-modals/SummaryImportModal.vue'
+import SavePathTemplateInput from '@/components/SavePathTemplateInput.vue'
 import { useEditGameModal } from '@/composables/useEditGameModal'
 
 interface Props {

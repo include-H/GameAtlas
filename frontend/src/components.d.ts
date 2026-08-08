@@ -91,6 +91,7 @@ declare module 'vue' {
     Pupil: typeof import('./components/login/Pupil.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SavePathTemplateInput: typeof import('./components/SavePathTemplateInput.vue')['default']
     ScreenshotCarousel: typeof import('./components/ScreenshotCarousel.vue')['default']
     ScreenshotSelectorModal: typeof import('./components/edit-game/import-modals/ScreenshotSelectorModal.vue')['default']
     SharedAmbientBackground: typeof import('./components/SharedAmbientBackground.vue')['default']
