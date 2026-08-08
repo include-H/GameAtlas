@@ -36,6 +36,8 @@ interface UseSteamImportDownloadOptions {
   ) => EditGameEditableBanner
   addAlert: (message: string, type: AlertType) => void
   onAssetPersisted?: () => Promise<void> | void
+  rememberedSteamGame?: Ref<SteamGameSearchResult | null>
+  onGameSelected?: (game: SteamGameSearchResult) => void
 }
 
 export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) => {
@@ -72,6 +74,7 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
       steamCoverImages.value = images
       selectedCoverImage.value = ''
       selectedCovers.value = new Set()
+      options.onGameSelected?.(game)
       return images
     },
     onError: (message) => {
@@ -85,6 +88,7 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
       const images = Array.from(new Set([details.bannerImage, details.coverImage].filter(Boolean) as string[]))
       steamBannerImages.value = images
       selectedBanners.value = new Set()
+      options.onGameSelected?.(game)
       return images
     },
     onError: (message) => {
@@ -170,6 +174,7 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
           selectedCoverImage.value = ''
           selectedCovers.value = new Set()
         })
+        options.onGameSelected?.(game)
       } catch (e) {
         options.addAlert('SteamGridDB 获取封面失败：' + getHttpErrorMessage(e), 'error')
       }
@@ -310,6 +315,7 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
           steamBannerImages.value = images
           selectedBanners.value = new Set()
         })
+        options.onGameSelected?.(game)
       } catch (e) {
         options.addAlert('SteamGridDB 获取横幅失败：' + getHttpErrorMessage(e), 'error')
       }
@@ -439,9 +445,14 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
     selectedBanners.value = next
   }
 
-  // Watch selectors opening — auto-populate search query
+  // Watch selectors opening — auto-populate search query or reuse remembered game
   watch(showCoverSelector, (isOpen) => {
     if (!isOpen) return
+    const remembered = options.rememberedSteamGame?.value
+    if (remembered) {
+      void selectSteamCoverGame(remembered)
+      return
+    }
     const query = options.pickSteamSearchQuery()
     if (!query) return
     coverSteamPicker.setQuery(query)
@@ -450,6 +461,11 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
 
   watch(showBannerSelector, (isOpen) => {
     if (!isOpen) return
+    const remembered = options.rememberedSteamGame?.value
+    if (remembered) {
+      void selectSteamBannerGame(remembered)
+      return
+    }
     const query = options.pickSteamSearchQuery()
     if (!query) return
     bannerSteamPicker.setQuery(query)

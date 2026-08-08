@@ -37,6 +37,8 @@ vi.mock('@/services/steamgriddb.service', () => ({
   },
 }))
 
+const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0))
+
 const buildForm = () => ref<EditGameForm>({
   title: 'Example Game',
   title_alt: '',
@@ -313,5 +315,87 @@ describe('useSteamImport', () => {
     expect(steamImport.screenshotSearchQuery.value).toBe('')
     expect(steamImport.screenshotSearchResults.value).toEqual([])
     expect(steamImport.screenshotCandidatesData.value).toBeNull()
+  })
+
+  it('reuses the last selected Steam game for later asset pickers', async () => {
+    searchGamesMock.mockResolvedValue([{ id: '2285650', name: 'Picked Game' }])
+    getGameDetailsMock.mockResolvedValue({
+      name: 'Picked Game',
+      description: '',
+      releaseDate: '2024',
+      developers: [],
+      publishers: [],
+      screenshots: [],
+      coverImage: 'https://cdn.example.com/cover.jpg',
+      bannerImage: 'https://cdn.example.com/banner.jpg',
+    })
+
+    const steamImport = useSteamImport({
+      form: buildForm(),
+      gameId: ref(42),
+      getWikiContent: () => '',
+      uploadAssetFromUrl: vi.fn(),
+      createEditableCover: vi.fn(),
+      createEditableBanner: vi.fn(),
+      createEditableLogo: vi.fn(),
+      createEditableScreenshot: vi.fn(),
+      ensureDeveloperNames: vi.fn().mockResolvedValue([]),
+      ensurePublisherNames: vi.fn().mockResolvedValue([]),
+      addAlert: vi.fn(),
+    })
+
+    steamImport.showCoverSelector.value = true
+    await flushPromises()
+    expect(searchGamesMock).toHaveBeenCalledTimes(1)
+
+    await steamImport.selectSteamCoverGame(steamImport.coverSearchResults.value[0]!)
+    expect(getGameDetailsMock).toHaveBeenCalledTimes(1)
+
+    steamImport.showBannerSelector.value = true
+    await flushPromises()
+    expect(searchGamesMock).toHaveBeenCalledTimes(1)
+    expect(getGameDetailsMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('clears the remembered Steam game when switching edited game', async () => {
+    searchGamesMock.mockResolvedValue([{ id: '2285650', name: 'Picked Game' }])
+    getGameDetailsMock.mockResolvedValue({
+      name: 'Picked Game',
+      description: '',
+      releaseDate: '2024',
+      developers: [],
+      publishers: [],
+      screenshots: [],
+      coverImage: 'https://cdn.example.com/cover.jpg',
+      bannerImage: 'https://cdn.example.com/banner.jpg',
+    })
+
+    const gameId = ref(42)
+    const steamImport = useSteamImport({
+      form: buildForm(),
+      gameId,
+      getWikiContent: () => '',
+      uploadAssetFromUrl: vi.fn(),
+      createEditableCover: vi.fn(),
+      createEditableBanner: vi.fn(),
+      createEditableLogo: vi.fn(),
+      createEditableScreenshot: vi.fn(),
+      ensureDeveloperNames: vi.fn().mockResolvedValue([]),
+      ensurePublisherNames: vi.fn().mockResolvedValue([]),
+      addAlert: vi.fn(),
+    })
+
+    steamImport.showCoverSelector.value = true
+    await flushPromises()
+    await steamImport.selectSteamCoverGame(steamImport.coverSearchResults.value[0]!)
+    expect(getGameDetailsMock).toHaveBeenCalledTimes(1)
+
+    gameId.value = 99
+    await flushPromises()
+
+    steamImport.showBannerSelector.value = true
+    await flushPromises()
+    expect(searchGamesMock).toHaveBeenCalledTimes(2)
+    expect(getGameDetailsMock).toHaveBeenCalledTimes(1)
   })
 })

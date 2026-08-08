@@ -60,6 +60,12 @@ interface UseSteamImportOptions {
 }
 
 export const useSteamImport = (options: UseSteamImportOptions) => {
+  const rememberedSteamGame = ref<SteamGameSearchResult | null>(null)
+
+  watch(options.gameId, () => {
+    rememberedSteamGame.value = null
+  })
+
   const showScreenshotSelector = ref(false)
   const screenshotSearchUrl = ref('')
   const screenshotPreviewUrl = ref('')
@@ -140,6 +146,10 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     ensureDeveloperNames: options.ensureDeveloperNames,
     ensurePublisherNames: options.ensurePublisherNames,
     addAlert: options.addAlert,
+    rememberedSteamGame,
+    onGameSelected: (game) => {
+      rememberedSteamGame.value = game
+    },
   })
 
   // Cover & Banner download logic (extracted)
@@ -201,6 +211,10 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     createEditableBanner: options.createEditableBanner,
     addAlert: options.addAlert,
     onAssetPersisted: options.onAssetPersisted,
+    rememberedSteamGame,
+    onGameSelected: (game) => {
+      rememberedSteamGame.value = game
+    },
   })
 
   const screenshotSteamPicker = useSteamPicker<ScreenshotCandidatesData>({
@@ -224,6 +238,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       }
       screenshotCandidatesData.value = data
       selectedRemoteScreenshots.value.clear()
+      rememberedSteamGame.value = game
       return data
     },
     onError: (message) => {
@@ -347,6 +362,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
           usedFallbackAssets: false,
         }
         selectedRemoteScreenshots.value = new Set()
+        rememberedSteamGame.value = game
       } catch (error) {
         options.addAlert('SteamGridDB 获取横幅失败：' + getHttpErrorMessage(error), 'error')
         screenshotSteamPicker.back()
@@ -479,6 +495,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       const logos = await steamGridDBService.getLogosByGameId(Number(game.id))
       logoImages.value = logos.map((logo) => logo.url)
       selectedLogos.value = new Set()
+      rememberedSteamGame.value = game
     } catch (error) {
       options.addAlert('SteamGridDB 获取 Logo 失败：' + getHttpErrorMessage(error), 'error')
       selectedLogoGame.value = null
@@ -567,6 +584,11 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
 
   watch(showScreenshotSelector, (isOpen) => {
     if (!isOpen) return
+    const remembered = rememberedSteamGame.value
+    if (remembered) {
+      void selectScreenshotGame(remembered)
+      return
+    }
     const query = pickSteamSearchQuery()
     if (!query) return
     screenshotSearchQuery.value = query
@@ -582,6 +604,11 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
 
   watch(showLogoSelector, (isOpen) => {
     if (!isOpen) return
+    const remembered = rememberedSteamGame.value
+    if (remembered) {
+      void selectLogoGame(remembered)
+      return
+    }
     const query = pickSteamSearchQuery()
     if (!query) return
     logoSearchQuery.value = query

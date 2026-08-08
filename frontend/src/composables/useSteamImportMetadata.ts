@@ -21,6 +21,8 @@ interface UseSteamImportMetadataOptions {
   ensureDeveloperNames: (names: string[]) => Promise<number[]>
   ensurePublisherNames: (names: string[]) => Promise<number[]>
   addAlert: (message: string, type: AlertType) => void
+  rememberedSteamGame?: Ref<SteamGameSearchResult | null>
+  onGameSelected?: (game: SteamGameSearchResult) => void
 }
 
 const splitTitleAltValues = (value: string) => {
@@ -280,6 +282,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
       const details = await steamService.getGameDetails(game.id)
       steamSummaryDetails.value = details
       steamSummaryPreview.value = stripHtmlToText(details.description || '')
+      options.onGameSelected?.(game)
       return details
     },
     onError: (message) => {
@@ -346,6 +349,11 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
 
   watch(showSummarySelector, (isOpen) => {
     if (!isOpen) return
+    const remembered = options.rememberedSteamGame?.value
+    if (remembered) {
+      void selectSteamSummaryGame(remembered)
+      return
+    }
     const query = pickSteamSearchQuery()
     if (!query) return
     steamSummarySearchQuery.value = query
