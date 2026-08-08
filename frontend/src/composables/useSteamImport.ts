@@ -1,4 +1,4 @@
-import { computed, ref, watch, type Ref } from 'vue'
+import { computed, reactive, ref, watch, type Ref } from 'vue'
 import type {
   EditGameEditableBanner,
   EditGameEditableCover,
@@ -59,12 +59,53 @@ interface UseSteamImportOptions {
   onAssetPersisted?: () => Promise<void> | void
 }
 
-export const useSteamImport = (options: UseSteamImportOptions) => {
-  const rememberedSteamGame = ref<SteamGameSearchResult | null>(null)
+// 模块级共享 + 按 gameId 隔离：编辑弹窗与媒体页各自实例化
+// useSteamImport，组件级 ref 会导致摘要选中后素材侧无法复用。
+// 必须用 reactive Map：普通 Map 的 set 不触发响应，computed 会缓存旧值。
+// Steam 与 SGDB 各自维护记忆——Steam AppID 与 SGDB game id 不是同一套
+// 编号体系，SGDB 源首次必须走自己的搜索，不能硬复用 AppID。
+const steamGameMemoryByGame = reactive(new Map<number, SteamGameSearchResult>())
+const steamGameMemoryForNewGame = ref<SteamGameSearchResult | null>(null)
+const sgdbGameMemoryByGame = reactive(new Map<number, SteamGameSearchResult>())
+const sgdbGameMemoryForNewGame = ref<SteamGameSearchResult | null>(null)
 
-  watch(options.gameId, () => {
-    rememberedSteamGame.value = null
+export const resetSteamGameMemory = () => {
+  steamGameMemoryByGame.clear()
+  steamGameMemoryForNewGame.value = null
+  sgdbGameMemoryByGame.clear()
+  sgdbGameMemoryForNewGame.value = null
+}
+
+export const useSteamImport = (options: UseSteamImportOptions) => {
+  const rememberedSteamGame = computed<SteamGameSearchResult | null>(() => {
+    const gameId = options.gameId.value
+    if (gameId == null) return steamGameMemoryForNewGame.value
+    return steamGameMemoryByGame.get(gameId) ?? null
   })
+
+  const rememberedSgdbGame = computed<SteamGameSearchResult | null>(() => {
+    const gameId = options.gameId.value
+    if (gameId == null) return sgdbGameMemoryForNewGame.value
+    return sgdbGameMemoryByGame.get(gameId) ?? null
+  })
+
+  const rememberSteamGame = (game: SteamGameSearchResult) => {
+    const gameId = options.gameId.value
+    if (gameId == null) {
+      steamGameMemoryForNewGame.value = game
+    } else {
+      steamGameMemoryByGame.set(gameId, game)
+    }
+  }
+
+  const rememberSgdbGame = (game: SteamGameSearchResult) => {
+    const gameId = options.gameId.value
+    if (gameId == null) {
+      sgdbGameMemoryForNewGame.value = game
+    } else {
+      sgdbGameMemoryByGame.set(gameId, game)
+    }
+  }
 
   const showScreenshotSelector = ref(false)
   const screenshotSearchUrl = ref('')
@@ -147,9 +188,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     ensurePublisherNames: options.ensurePublisherNames,
     addAlert: options.addAlert,
     rememberedSteamGame,
-    onGameSelected: (game) => {
-      rememberedSteamGame.value = game
-    },
+    onGameSelected: rememberSteamGame,
   })
 
   // Cover & Banner download logic (extracted)
@@ -212,9 +251,9 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     addAlert: options.addAlert,
     onAssetPersisted: options.onAssetPersisted,
     rememberedSteamGame,
-    onGameSelected: (game) => {
-      rememberedSteamGame.value = game
-    },
+    rememberedSgdbGame,
+    onSteamGameSelected: rememberSteamGame,
+    onSgdbGameSelected: rememberSgdbGame,
   })
 
   const screenshotSteamPicker = useSteamPicker<ScreenshotCandidatesData>({
@@ -238,10 +277,9 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       }
       screenshotCandidatesData.value = data
       selectedRemoteScreenshots.value.clear()
-      rememberedSteamGame.value = game
+      rememberSteamGame(game)
       return data
-    },
-    onError: (message) => {
+    },    onError: (message) => {
       options.addAlert('Steam 截图处理失败：' + message, 'error')
     },
   })
@@ -362,7 +400,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
           usedFallbackAssets: false,
         }
         selectedRemoteScreenshots.value = new Set()
-        rememberedSteamGame.value = game
+        rememberSgdbGame(game)
       } catch (error) {
         options.addAlert('SteamGridDB 获取横幅失败：' + getHttpErrorMessage(error), 'error')
         screenshotSteamPicker.back()
@@ -495,7 +533,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       const logos = await steamGridDBService.getLogosByGameId(Number(game.id))
       logoImages.value = logos.map((logo) => logo.url)
       selectedLogos.value = new Set()
-      rememberedSteamGame.value = game
+      rememberSgdbGame(game)
     } catch (error) {
       options.addAlert('SteamGridDB 获取 Logo 失败：' + getHttpErrorMessage(error), 'error')
       selectedLogoGame.value = null
@@ -584,8 +622,11 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
 
   watch(showScreenshotSelector, (isOpen) => {
     if (!isOpen) return
-    const remembered = rememberedSteamGame.value
+    const remembered = screenshotSource.value === 'steamgriddb'
+      ? rememberedSgdbGame.value
+      : rememberedSteamGame.value
     if (remembered) {
+      screenshotSearchQuery.value = remembered.id
       void selectScreenshotGame(remembered)
       return
     }
@@ -597,6 +638,14 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
 
   watch(screenshotSource, () => {
     if (!showScreenshotSelector.value) return
+    const remembered = screenshotSource.value === 'steamgriddb'
+      ? rememberedSgdbGame.value
+      : rememberedSteamGame.value
+    if (remembered) {
+      screenshotSearchQuery.value = remembered.id
+      void selectScreenshotGame(remembered)
+      return
+    }
     const query = screenshotSearchQuery.value.trim()
     if (!query) return
     void searchScreenshots()
@@ -604,8 +653,9 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
 
   watch(showLogoSelector, (isOpen) => {
     if (!isOpen) return
-    const remembered = rememberedSteamGame.value
+    const remembered = rememberedSgdbGame.value
     if (remembered) {
+      logoSearchQuery.value = remembered.id
       void selectLogoGame(remembered)
       return
     }

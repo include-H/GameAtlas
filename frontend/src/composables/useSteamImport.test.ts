@@ -1,12 +1,13 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EditGameForm } from '@/utils/edit-game-form'
-import { useSteamImport } from './useSteamImport'
+import { resetSteamGameMemory, useSteamImport } from './useSteamImport'
 
 const {
   searchGamesMock,
   getGameDetailsMock,
   searchSteamGridDBMock,
+  getGridsByGameIdMock,
   getHeroesByGameIdMock,
   getLogosByGameIdMock,
   isSteamGridDBAvailableMock,
@@ -14,6 +15,7 @@ const {
   searchGamesMock: vi.fn(),
   getGameDetailsMock: vi.fn(),
   searchSteamGridDBMock: vi.fn(),
+  getGridsByGameIdMock: vi.fn(),
   getHeroesByGameIdMock: vi.fn(),
   getLogosByGameIdMock: vi.fn(),
   isSteamGridDBAvailableMock: vi.fn(),
@@ -31,7 +33,7 @@ vi.mock('@/services/steamgriddb.service', () => ({
   default: {
     isAvailable: isSteamGridDBAvailableMock,
     search: searchSteamGridDBMock,
-    getGridsByGameId: vi.fn(),
+    getGridsByGameId: getGridsByGameIdMock,
     getHeroesByGameId: getHeroesByGameIdMock,
     getLogosByGameId: getLogosByGameIdMock,
   },
@@ -60,6 +62,7 @@ const buildForm = () => ref<EditGameForm>({
 
 describe('useSteamImport', () => {
   beforeEach(() => {
+    resetSteamGameMemory()
     searchGamesMock.mockReset()
     getGameDetailsMock.mockReset()
     isSteamGridDBAvailableMock.mockReset()
@@ -355,9 +358,103 @@ describe('useSteamImport', () => {
     await flushPromises()
     expect(searchGamesMock).toHaveBeenCalledTimes(1)
     expect(getGameDetailsMock).toHaveBeenCalledTimes(2)
+    expect(steamImport.steamBannerSearchQuery.value).toBe('2285650')
   })
 
-  it('clears the remembered Steam game when switching edited game', async () => {
+  it('does not reuse the Steam appid in SGDB source; SGDB keeps its own memory', async () => {
+    searchGamesMock.mockResolvedValue([{ id: '1543030', name: '仙剑奇侠传七' }])
+    getGameDetailsMock.mockResolvedValue({
+      name: '仙剑奇侠传七',
+      description: '',
+      releaseDate: '2021',
+      developers: [],
+      publishers: [],
+      screenshots: [],
+      coverImage: 'https://cdn.example.com/cover.jpg',
+      bannerImage: 'https://cdn.example.com/banner.jpg',
+    })
+    searchSteamGridDBMock.mockResolvedValue([{ id: 1543030, name: '仙剑奇侠传七' }])
+    getGridsByGameIdMock.mockResolvedValue([{ url: 'https://cdn.example.com/grid-1.jpg' }])
+
+    const steamImport = useSteamImport({
+      form: buildForm(),
+      gameId: ref(42),
+      getWikiContent: () => '',
+      uploadAssetFromUrl: vi.fn(),
+      createEditableCover: vi.fn(),
+      createEditableBanner: vi.fn(),
+      createEditableLogo: vi.fn(),
+      createEditableScreenshot: vi.fn(),
+      ensureDeveloperNames: vi.fn().mockResolvedValue([]),
+      ensurePublisherNames: vi.fn().mockResolvedValue([]),
+      addAlert: vi.fn(),
+    })
+
+    steamImport.showCoverSelector.value = true
+    await flushPromises()
+    await steamImport.selectSteamCoverGame(steamImport.coverSearchResults.value[0]!)
+    expect(getGameDetailsMock).toHaveBeenCalledTimes(1)
+
+    steamImport.coverSource.value = 'steamgriddb'
+    await flushPromises()
+    expect(searchSteamGridDBMock).toHaveBeenCalled()
+    expect(steamImport.steamCoverImages.value).toEqual([])
+
+    await steamImport.selectSteamCoverGame(steamImport.coverSearchResults.value[0]!)
+    expect(steamImport.steamCoverImages.value).toEqual(['https://cdn.example.com/grid-1.jpg'])
+
+    steamImport.coverSource.value = 'steam'
+    await flushPromises()
+    expect(getGameDetailsMock).toHaveBeenCalledTimes(2)
+
+    steamImport.coverSource.value = 'steamgriddb'
+    await flushPromises()
+    expect(searchSteamGridDBMock).toHaveBeenCalledTimes(1)
+    expect(steamImport.steamCoverImages.value).toEqual(['https://cdn.example.com/grid-1.jpg'])
+  })
+
+  it('remembers the game selected via summary import and reuses it for cover picker', async () => {
+    searchGamesMock.mockResolvedValue([{ id: '1543030', name: '仙剑奇侠传七' }])
+    getGameDetailsMock.mockResolvedValue({
+      name: '仙剑奇侠传七',
+      description: '测试简介',
+      releaseDate: '2021',
+      developers: ['软星科技'],
+      publishers: ['方块游戏'],
+      screenshots: [],
+      coverImage: 'https://cdn.example.com/cover.jpg',
+      bannerImage: 'https://cdn.example.com/banner.jpg',
+    })
+
+    const steamImport = useSteamImport({
+      form: buildForm(),
+      gameId: ref(42),
+      getWikiContent: () => '',
+      uploadAssetFromUrl: vi.fn(),
+      createEditableCover: vi.fn(),
+      createEditableBanner: vi.fn(),
+      createEditableLogo: vi.fn(),
+      createEditableScreenshot: vi.fn(),
+      ensureDeveloperNames: vi.fn().mockResolvedValue([]),
+      ensurePublisherNames: vi.fn().mockResolvedValue([]),
+      addAlert: vi.fn(),
+    })
+
+    steamImport.showSummarySelector.value = true
+    await flushPromises()
+    expect(searchGamesMock).toHaveBeenCalledTimes(1)
+
+    await steamImport.selectSteamSummaryGame(steamImport.steamSummarySearchResults.value[0]!)
+    await steamImport.confirmSummaryImport()
+    expect(getGameDetailsMock).toHaveBeenCalledTimes(1)
+
+    steamImport.showCoverSelector.value = true
+    await flushPromises()
+    expect(searchGamesMock).toHaveBeenCalledTimes(1)
+    expect(getGameDetailsMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not reuse the remembered game when editing another game', async () => {
     searchGamesMock.mockResolvedValue([{ id: '2285650', name: 'Picked Game' }])
     getGameDetailsMock.mockResolvedValue({
       name: 'Picked Game',
@@ -397,5 +494,74 @@ describe('useSteamImport', () => {
     await flushPromises()
     expect(searchGamesMock).toHaveBeenCalledTimes(2)
     expect(getGameDetailsMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('shares the remembered game across instances and keeps it when returning to the same game', async () => {
+    searchGamesMock.mockResolvedValue([{ id: '1543030', name: '仙剑奇侠传七' }])
+    getGameDetailsMock.mockResolvedValue({
+      name: '仙剑奇侠传七',
+      description: '',
+      releaseDate: '2021',
+      developers: [],
+      publishers: [],
+      screenshots: [],
+      coverImage: 'https://cdn.example.com/cover.jpg',
+      bannerImage: 'https://cdn.example.com/banner.jpg',
+    })
+
+    const gameId = ref(42)
+    const summaryImport = useSteamImport({
+      form: buildForm(),
+      gameId,
+      getWikiContent: () => '',
+      uploadAssetFromUrl: vi.fn(),
+      createEditableCover: vi.fn(),
+      createEditableBanner: vi.fn(),
+      createEditableLogo: vi.fn(),
+      createEditableScreenshot: vi.fn(),
+      ensureDeveloperNames: vi.fn().mockResolvedValue([]),
+      ensurePublisherNames: vi.fn().mockResolvedValue([]),
+      addAlert: vi.fn(),
+    })
+
+    summaryImport.showSummarySelector.value = true
+    await flushPromises()
+    await summaryImport.selectSteamSummaryGame(summaryImport.steamSummarySearchResults.value[0]!)
+    expect(getGameDetailsMock).toHaveBeenCalledTimes(1)
+
+    const mediaPage = useSteamImport({
+      form: buildForm(),
+      gameId,
+      getWikiContent: () => '',
+      uploadAssetFromUrl: vi.fn(),
+      createEditableCover: vi.fn(),
+      createEditableBanner: vi.fn(),
+      createEditableLogo: vi.fn(),
+      createEditableScreenshot: vi.fn(),
+      ensureDeveloperNames: vi.fn().mockResolvedValue([]),
+      ensurePublisherNames: vi.fn().mockResolvedValue([]),
+      addAlert: vi.fn(),
+    })
+
+    mediaPage.showCoverSelector.value = true
+    await flushPromises()
+    expect(searchGamesMock).toHaveBeenCalledTimes(1)
+    expect(getGameDetailsMock).toHaveBeenCalledTimes(2)
+
+    gameId.value = 99
+    await flushPromises()
+    mediaPage.showBannerSelector.value = true
+    await flushPromises()
+    expect(searchGamesMock).toHaveBeenCalledTimes(2)
+    expect(getGameDetailsMock).toHaveBeenCalledTimes(2)
+
+    gameId.value = 42
+    await flushPromises()
+    mediaPage.showBannerSelector.value = false
+    await flushPromises()
+    mediaPage.showBannerSelector.value = true
+    await flushPromises()
+    expect(searchGamesMock).toHaveBeenCalledTimes(2)
+    expect(getGameDetailsMock).toHaveBeenCalledTimes(3)
   })
 })

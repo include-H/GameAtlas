@@ -351,6 +351,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
     if (!isOpen) return
     const remembered = options.rememberedSteamGame?.value
     if (remembered) {
+      steamSummarySearchQuery.value = remembered.id
       void selectSteamSummaryGame(remembered)
       return
     }
