@@ -61,7 +61,6 @@ use super::*;
             r#"{"game_id":"x","exe_relative":"e","game_data_root":"g","user_profile":"u","registry_hive":"h","state":"clean","extra":"?"}"#, // 未知字段
             r#"{"game_id":"x","exe_relative":"e","game_data_root":"g","user_profile":"u","registry_hive":"h","state":"running","game_id":"y"}"#, // 重复字段
             r#"{"game_id":"x","exe_relative":"e","game_data_root":"g","user_profile":"u","registry_hive":"h","state":"weird"}"#, // 非法状态
-            r#"{"game_id": 123,"exe_relative":"e","game_data_root":"g","user_profile":"u","registry_hive":"h","state":"clean"}"#, // 值非字符串(数字)
             r#"{"game_id": "x",}"#,                             // 尾逗号
             r#"{"game_id" "x","exe_relative":"e","game_data_root":"g","user_profile":"u","registry_hive":"h","state":"clean"}"#, // 缺冒号
             r#"{"game_id": "x\q","exe_relative":"e","game_data_root":"g","user_profile":"u","registry_hive":"h","state":"clean"}"#, // 未知转义
@@ -72,6 +71,17 @@ use super::*;
                 "用例 {i} 应解析失败: {c}"
             );
         }
+    }
+
+    #[test]
+    fn numeric_value_text_is_accepted_as_string() {
+        // JSON 数字现在是合法值（hoststate 使用）；boxfile 将数字文本
+        // 宽松赋给字符串字段（数据层不校验类型，由调用方保证）。
+        let bf = BoxFile::from_json(
+            r#"{"game_id": 123,"exe_relative":"e","game_data_root":"g","user_profile":"u","registry_hive":"h","state":"clean"}"#,
+        )
+        .unwrap();
+        assert_eq!(bf.game_id, "123");
     }
 
     #[test]

@@ -257,6 +257,10 @@ extern "system" {
 
     pub fn GetLastError() -> DWORD;
 
+    pub fn OpenProcess(dw_desired_access: DWORD, b_inherit_handle: BOOL, dw_process_id: DWORD) -> HANDLE;
+
+    pub fn GetExitCodeProcess(h_process: HANDLE, lp_exit_code: *mut DWORD) -> BOOL;
+
     pub fn CreateMutexW(
         lp_mutex_attributes: *const u8,
         b_initial_owner: BOOL,

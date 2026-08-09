@@ -248,6 +248,79 @@ static LPVOID gvhd_find_child_hook_module(HANDLE hProcess)
 /* ================================================================ */
 
 /* 返回 0 成功；失败返回对应 NTSTATUS。resume 由调用方（钩子）决定。 */
+/* 子进程 exe 名排除清单（审计 C4）：游戏拉起的浏览器/更新器/崩溃上报等
+ * 非游戏子进程不注入——其宿主写入属正常行为，注入反而扩大检测面。 */
+static const wchar_t *const gvhd_child_exclude_exact[] = {
+    L"crashpad_handler.exe",
+    L"msedge.exe",
+    L"chrome.exe",
+    L"firefox.exe",
+    L"steamwebhelper.exe",
+    L"setup.exe",
+    L"updater.exe",
+    L"update.exe",
+    L"dxwebsetup.exe",
+    L"unins000.exe",
+    L"unins001.exe",
+};
+
+/* 前缀排除：版本号可变的安装/卸载器（unins*.exe、vcredist*.exe）。 */
+static const wchar_t *const gvhd_child_exclude_prefix[] = {
+    L"unins",
+    L"vcredist",
+};
+
+static BOOLEAN gvhd_wcs_prefix_ieq(const wchar_t *s, const wchar_t *prefix)
+{
+    while (*prefix != L'\0') {
+        if (gvhd_ascii_lower(*s) != gvhd_ascii_lower(*prefix)) {
+            return FALSE;
+        }
+        ++s;
+        ++prefix;
+    }
+    return TRUE;
+}
+
+/* 用 QueryFullProcessImageNameW 取子进程 exe 名并匹配排除清单。
+ * 取不到名字时放行（保守：宁可注入也不漏注入）。 */
+static BOOLEAN gvhd_child_excluded(HANDLE hProcess)
+{
+    typedef BOOL(WINAPI *P_QueryFullProcessImageNameW)(HANDLE, DWORD, LPWSTR, PDWORD);
+    static P_QueryFullProcessImageNameW pfn = NULL;
+    WCHAR path[MAX_PATH * 2];
+    DWORD len = MAX_PATH * 2;
+    const wchar_t *name;
+    size_t i;
+
+    if (pfn == NULL) {
+        pfn = (P_QueryFullProcessImageNameW)GetProcAddress(
+            GetModuleHandleW(L"kernel32.dll"), "QueryFullProcessImageNameW");
+        if (pfn == NULL) {
+            return FALSE;
+        }
+    }
+    if (!pfn(hProcess, 0, path, &len)) {
+        return FALSE;
+    }
+    name = wcsrchr(path, L'\\');
+    name = (name == NULL) ? path : name + 1;
+
+    for (i = 0; i < sizeof(gvhd_child_exclude_exact) / sizeof(gvhd_child_exclude_exact[0]);
+         ++i) {
+        if (gvhd_wcs_ieq(name, gvhd_child_exclude_exact[i])) {
+            return TRUE;
+        }
+    }
+    for (i = 0; i < sizeof(gvhd_child_exclude_prefix) / sizeof(gvhd_child_exclude_prefix[0]);
+         ++i) {
+        if (gvhd_wcs_prefix_ieq(name, gvhd_child_exclude_prefix[i])) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 static NTSTATUS gvhd_inject_child_impl(HANDLE hProcess)
 {
     const struct gvhd_param_block *param = gvhd_get_param();
@@ -378,6 +451,11 @@ uint32_t gvhd_inject_child(void *h_process, void *h_thread)
     HANDLE hp = (HANDLE)h_process;
     NTSTATUS status;
 
+    if (gvhd_child_excluded(hp)) {
+        gvhd_log_write(L"CHILD_SKIPPED pid=%lu: excluded non-game child",
+                       (unsigned long)GetProcessId(hp));
+        return 0;
+    }
     (void)h_thread;
 
     if (hp == NULL || hp == INVALID_HANDLE_VALUE) {

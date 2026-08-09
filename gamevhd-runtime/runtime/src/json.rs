@@ -80,7 +80,22 @@ fn parse_json_value(s: &str) -> Result<(String, &str), String> {
             }
         }
     }
-    Err("期望字符串或布尔值".into())
+    // 整数（可选负号）：hoststate 的 generation/pid/started_at 使用。
+    // 返回原样文本，由调用方 parse 成数值。
+    let rest = s.trim_start();
+    let mut idx = 0usize;
+    if rest.starts_with('-') {
+        idx = 1;
+    }
+    let digits_start = idx;
+    let bytes = rest.as_bytes();
+    while idx < bytes.len() && bytes[idx].is_ascii_digit() {
+        idx += 1;
+    }
+    if idx > digits_start {
+        return Ok((rest[..idx].to_string(), &rest[idx..]));
+    }
+    Err("期望字符串、布尔或整数".into())
 }
 
 /// 解析一个 JSON 字符串字面量，返回 (解码值, 剩余输入)。
@@ -200,6 +215,22 @@ mod tests {
     }
 
     #[test]
+    fn parses_integer_values() {
+        let (v, rest) = parse_json_value("42,").unwrap();
+        assert_eq!(v, "42");
+        assert_eq!(rest, ",");
+        let (v, _) = parse_json_value("-7").unwrap();
+        assert_eq!(v, "-7");
+        let (v, _) = parse_json_value("true").unwrap();
+        assert_eq!(v, "true");
+        // 混合对象：字符串+整数。
+        let fields = parse_json_object(r#"{"generation": 3, "pid": 1234, "state": "running"}"#).unwrap();
+        assert_eq!(fields[0], ("generation".into(), "3".into()));
+        assert_eq!(fields[1], ("pid".into(), "1234".into()));
+        assert_eq!(fields[2], ("state".into(), "running".into()));
+    }
+
+    #[test]
     fn rejects_bad_strings() {
         let cases = [
             r#""unterminated"#,
@@ -241,13 +272,14 @@ mod tests {
     fn object_parse_rejects_malformed() {
         let cases = [
             r#"not json"#,
-            r#"{"a": 1}"#,     // 值非字符串
-            r#"{"a": "1",}"#,  // 尾逗号
-            r#"{"a" "1"}"#,    // 缺冒号
+            r#"{"a": }"#,     // 缺值
+            r#"{"a": "1",}"#, // 尾逗号
+            r#"{"a" "1"}"#,   // 缺冒号
             r#"{"a": "1" "b": "2"}"#, // 缺逗号
             r#"{"a": "1", "a": "2"}"#, // 重复键（解析层放行，语义层决定）
         ];
         // 注意：重复键在解析层放行（返回两对），由上层（boxfile）拒绝。
+        // 数字是合法 JSON 值（hoststate 使用），不再作为非法用例。
         for c in cases.iter().take(5) {
             assert!(parse_json_object(c).is_err(), "应失败: {c}");
         }

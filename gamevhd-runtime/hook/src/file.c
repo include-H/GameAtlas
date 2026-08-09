@@ -196,6 +196,95 @@ static size_t gvhd_file_native_prefix_len(const WCHAR *path)
     return 0;
 }
 
+/* ================================================================ */
+/* 卷 GUID → 盘符映射表（P1-6，审计 B：\\?\Volume{GUID}\ 形态绕过   */
+/* 盘符前缀匹配；短名 8.3 绕过；SUBST 盘符检测）。                    */
+/* ================================================================ */
+
+#define GVHD_VOLMAP_MAX 32u
+
+static WCHAR g_vol_guid[GVHD_VOLMAP_MAX][64];
+static WCHAR g_vol_drive[GVHD_VOLMAP_MAX];
+static size_t g_vol_count = 0;
+static BOOLEAN g_vol_map_ready = FALSE;
+
+/* init 时构建一次：FindFirstVolumeW 枚举卷 → GetVolumePathNamesForVolumeNameW
+ * 取首个盘符挂载点。卷路径形态 `\\?\Volume{GUID}\`，映射表只存 GUID 段。 */
+static void gvhd_file_build_volume_map(void)
+{
+    HANDLE hFind;
+    WCHAR vol[64];
+    BOOL more;
+
+    hFind = FindFirstVolumeW(vol, 64);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        g_vol_map_ready = TRUE;
+        return;
+    }
+    do {
+        WCHAR paths[1024];
+        DWORD len = 1024;
+        if (g_vol_count < GVHD_VOLMAP_MAX &&
+            GetVolumePathNamesForVolumeNameW(vol, paths, len, &len) &&
+            len >= 3 && paths[1] == L':') {
+            const WCHAR *guid = vol + 4; /* 跳过 \\?\ */
+            WCHAR *end = wcschr(guid, L'\\');
+            size_t n = (end != NULL) ? (size_t)(end - guid) : wcslen(guid);
+            if (n > 0 && n < 64) {
+                wcsncpy(g_vol_guid[g_vol_count], guid, n);
+                g_vol_guid[g_vol_count][n] = L'\0';
+                g_vol_drive[g_vol_count] = (WCHAR)towlower(paths[0]);
+                ++g_vol_count;
+            }
+        }
+        more = FindNextVolumeW(hFind, vol, 64);
+    } while (more);
+    FindVolumeClose(hFind);
+    g_vol_map_ready = TRUE;
+}
+
+/* 查表：把 DOS 形态的 `Volume{GUID}\...` 转成 `X:\...`。返回是否转换。 */
+static BOOLEAN gvhd_file_volume_to_drive(WCHAR *path, size_t cap)
+{
+    size_t i;
+
+    if (!g_vol_map_ready) {
+        return FALSE;
+    }
+    for (i = 0; i < g_vol_count; ++i) {
+        size_t n = wcslen(g_vol_guid[i]);
+        if (wcsncmp(path, g_vol_guid[i], n) == 0 && path[n] == L'\\') {
+            WCHAR tmp[GVHD_FILE_PATH_MAX];
+            size_t rest = wcslen(path + n + 1);
+            if (3 + rest >= cap) {
+                return FALSE;
+            }
+            tmp[0] = g_vol_drive[i];
+            tmp[1] = L':';
+            tmp[2] = L'\\';
+            wcscpy(tmp + 3, path + n + 1);
+            wcscpy(path, tmp);
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+/* init 时检测 SUBST / 网络盘符（QueryDosDeviceW 返回 \??\ 前缀即非设备盘）。
+ * 不自动展开（SUBST 目标可能仍在宿主），只记警告供排错。 */
+static void gvhd_file_warn_subst_drives(void)
+{
+    WCHAR device[256];
+    WCHAR drive[] = L"A:";
+    for (WCHAR c = L'A'; c <= L'Z'; ++c) {
+        drive[0] = c;
+        if (QueryDosDeviceW(drive, device, 256) > 0 &&
+            wcsncmp(device, L"\\??\\", 4) == 0) {
+            gvhd_log_write(L"FILE_SUBST_DRIVE drive=%c target=%s", c, device);
+        }
+    }
+}
+
 static BOOLEAN gvhd_file_system_passthrough(const WCHAR *path)
 {
     static const WCHAR *const prefixes[] = {
@@ -345,6 +434,24 @@ static void gvhd_file_eval_oa(const OBJECT_ATTRIBUTES *input,
     /* The second copy above is intentionally replaced with the DOS suffix. */
     memmove(rw->source_dos, rw->source_native + native_prefix,
             (wcslen(rw->source_native + native_prefix) + 1) * sizeof(WCHAR));
+
+    /* P1-6：卷 GUID 形态（\\?\Volume{GUID}\...）经映射表转盘符形态；
+     * 转换后 target 直接用 DOS 形态（卷 GUID 前缀不适用于 GameData 目标）。 */
+    if (native_prefix > 0 &&
+        gvhd_file_volume_to_drive(rw->source_dos, GVHD_FILE_PATH_MAX)) {
+        native_prefix = 0;
+    }
+    /* P1-6：8.3 短名展开（仅含 '~' 的路径段触发；GetLongPathNameW 走
+     * NtQueryDirectoryFile，不在本钩子拦截面内，无重入风险）。 */
+    if (wcschr(rw->source_dos, L'~') != NULL) {
+        WCHAR long_path[GVHD_FILE_PATH_MAX];
+        DWORD n = GetLongPathNameW(rw->source_dos, long_path,
+                                   GVHD_FILE_PATH_MAX);
+        if (n > 0 && n < GVHD_FILE_PATH_MAX) {
+            wcscpy(rw->source_dos, long_path);
+        }
+    }
+
     if (!gvhd_file_build_target(rw->source_dos, rw->target_dos,
                                 GVHD_FILE_PATH_MAX)) {
         return;
@@ -1142,6 +1249,11 @@ uint32_t gvhd_install_file_hooks(void)
         InitializeCriticalSection(&g_directory_map_lock);
         g_directory_map_lock_ready = TRUE;
     }
+
+    /* P1-6：卷 GUID 映射表与 SUBST 检测（无递归风险：此时规则已装，
+     * 卷 GUID/盘符路径不匹配重写规则，FindFirstVolumeW 等原样执行）。 */
+    gvhd_file_build_volume_map();
+    gvhd_file_warn_subst_drives();
 
     GVHD_FILE_CREATE_REQUIRED(NtCreateFile);
     GVHD_FILE_CREATE_REQUIRED(NtOpenFile);

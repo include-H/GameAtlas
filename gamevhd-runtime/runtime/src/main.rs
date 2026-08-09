@@ -13,6 +13,7 @@ mod boxfile;
 mod cleanup;
 mod disk;
 mod hive;
+mod hoststate;
 mod inject;
 mod json;
 mod log;
@@ -62,7 +63,11 @@ enum Command {
         game_id: String,
     },
     Run { drive: char, box_path: String },
-    Cleanup { box_path: String, vhd: Option<String> },
+    Cleanup {
+        box_path: String,
+        vhd: Option<String>,
+        state: Option<String>,
+    },
     Selftest,
     Help,
     Version,
@@ -117,7 +122,9 @@ fn run_cli(args: &[String]) -> u8 {
             )
         }
         Ok(Command::Run { drive, box_path }) => cmd_run(drive, &box_path),
-        Ok(Command::Cleanup { box_path, vhd }) => cmd_cleanup(&box_path, vhd.as_deref()),
+        Ok(Command::Cleanup { box_path, vhd, state }) => {
+            cmd_cleanup(&box_path, vhd.as_deref(), state.as_deref())
+        }
         Ok(Command::Selftest) => cmd_selftest(),
         Err(msg) => {
             crate::log_error!("{msg}");
@@ -146,12 +153,13 @@ fn parse_args(args: &[String]) -> Result<Command, String> {
         "inject-poc" => parse_inject_poc(&rest[1..]),
         "run" => parse_run(&rest[1..]),
         "cleanup" => {
-            let opts = parse_kv_opts(&rest[1..], "cleanup", &["--box", "--vhd"])?;
+            let opts = parse_kv_opts(&rest[1..], "cleanup", &["--box", "--vhd", "--state"])?;
             let box_path = opt_value(&opts, "--box")
                 .ok_or_else(|| "cleanup 需要 --box <path>".to_string())?
                 .clone();
             let vhd = opt_value(&opts, "--vhd").cloned();
-            Ok(Command::Cleanup { box_path, vhd })
+            let state = opt_value(&opts, "--state").cloned();
+            Ok(Command::Cleanup { box_path, vhd, state })
         }
         other => Err(format!("未知子命令 '{other}'")),
     }
@@ -540,10 +548,19 @@ fn cmd_run(drive: char, box_path: &str) -> u8 {
 
 /// 仅 Windows：清理残留沙箱状态。Linux：不支持（退出码 3）。
 #[cfg_attr(not(target_os = "windows"), allow(unused_variables))]
-fn cmd_cleanup(box_path: &str, vhd_path: Option<&str>) -> u8 {
+fn cmd_cleanup(box_path: &str, vhd_path: Option<&str>, host_state: Option<&str>) -> u8 {
     #[cfg(target_os = "windows")]
     {
-        match cleanup::cleanup_box(box_path, vhd_path) {
+        // 宿主权威状态路径缺省为 %LOCALAPPDATA%\GameAtlas\state.json。
+        let state_path = match host_state {
+            Some(p) => Some(std::path::PathBuf::from(p)),
+            None => std::env::var("LOCALAPPDATA").ok().map(|la| {
+                std::path::Path::new(la.trim_end_matches(['\\', '/']))
+                    .join("GameAtlas")
+                    .join(crate::hoststate::HOST_STATE_FILE_NAME)
+            }),
+        };
+        match cleanup::cleanup_box(box_path, vhd_path, state_path.as_deref()) {
             Ok(()) => {
                 crate::log_info!("cleanup: 残留已清理: {box_path}");
                 0

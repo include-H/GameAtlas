@@ -175,14 +175,16 @@ fn parse_cleanup() {
         parse_args(&args(&["gv", "cleanup", "--box", "b.json"])),
         Ok(Command::Cleanup {
             box_path: "b.json".into(),
-            vhd: None
+            vhd: None,
+            state: None,
         })
     );
     assert_eq!(
-        parse_args(&args(&["gv", "cleanup", "--box", "b.json", "--vhd", "C:\\diff.vhd"])),
+        parse_args(&args(&["gv", "cleanup", "--box", "b.json", "--vhd", "C:\\diff.vhd", "--state", "C:\\s.json"])),
         Ok(Command::Cleanup {
             box_path: "b.json".into(),
-            vhd: Some("C:\\diff.vhd".into())
+            vhd: Some("C:\\diff.vhd".into()),
+            state: Some("C:\\s.json".into()),
         })
     );
     assert!(parse_args(&args(&["gv", "cleanup"])).is_err());

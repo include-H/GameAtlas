@@ -199,6 +199,8 @@ mod win {
     struct RunGuard {
         box_path: PathBuf,
         hive: Option<hive::Hive>,
+        /// 宿主权威状态记录（begin_run 写入），drop 时按代数清除。
+        host_state: Option<(std::path::PathBuf, u64, String)>,
     }
 
     impl RunGuard {
@@ -220,6 +222,13 @@ mod win {
                 bf.state = BoxState::Clean;
                 if let Err(e) = bf.save(&self.box_path) {
                     crate::log_warn!("run 清理：box.json 状态回滚失败: {e}");
+                }
+            }
+            // 宿主权威状态按代数清除（generation 不匹配时静默跳过，避免
+            // 旧实例清理覆盖新运行记录）。
+            if let Some((path, generation, game_id)) = self.host_state.take() {
+                if let Err(e) = crate::hoststate::mark_clean(&path, generation, &game_id) {
+                    crate::log_warn!("run 清理：宿主状态清除失败: {e}");
                 }
             }
         }
@@ -253,6 +262,15 @@ mod win {
         let _run_lock = crate::process::acquire_run_mutex(&game_id)
             .map_err(|e| format!("并发互斥锁获取失败: {e}"))?;
 
+        // 3.5 宿主权威状态（审计 E / P1-4）：写 running + 新 generation；
+        //     崩溃残留的 running 记录（PID 已死）在此被接管。
+        let local_app_data = std::env::var("LOCALAPPDATA")
+            .map_err(|_| "缺少 LOCALAPPDATA 环境变量（无法定位宿主状态目录）".to_string())?;
+        let host_state_path = std::path::Path::new(local_app_data.trim_end_matches(['\\', '/']))
+            .join("GameAtlas")
+            .join(crate::hoststate::HOST_STATE_FILE_NAME);
+        let host_state = crate::hoststate::begin_run(&host_state_path, &game_id, box_path)?;
+
         // 4. 状态机 clean → running（先行落盘：run 中断后 cleanup 可识别）。
         bf.transition(BoxState::Running).map_err(|e| e.to_string())?;
         bf.save(&box_path_buf).map_err(|e| format!("box.json 写 running 失败: {e}"))?;
@@ -281,6 +299,11 @@ mod win {
         let mut guard = RunGuard {
             box_path: box_path_buf.clone(),
             hive: None,
+            host_state: Some((
+                host_state_path,
+                host_state.generation,
+                host_state.game_id,
+            )),
         };
 
         // 4. 挂载隔离 hive（RegLoadKeyW；损坏自动 .bak 恢复）。

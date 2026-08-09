@@ -18,11 +18,30 @@ use crate::boxfile::{BoxFile, BoxState};
 
 /// 清理指定 box 的残留沙箱状态（幂等，可重复执行）。
 /// `vhd_path` 为可选差分盘路径：提供时先清理残留 VHD 挂载。
-pub fn cleanup_box(box_path: &str, vhd_path: Option<&str>) -> Result<(), String> {
+/// `host_state_path` 为可选宿主权威状态路径：提供时检查游戏进程是否
+/// 仍在运行（拒绝清理），完成后按代数清除。
+pub fn cleanup_box(
+    box_path: &str,
+    vhd_path: Option<&str>,
+    host_state_path: Option<&Path>,
+) -> Result<(), String> {
     let path = Path::new(box_path);
     if !path.is_file() {
         crate::log_info!("cleanup: box.json 不存在，无需清理: {box_path}");
         return Ok(());
+    }
+
+    // 0. 宿主权威状态检查（审计 E / P1-4）：running 且进程存活 → 拒绝清理，
+    //    防止误清正在运行的游戏；崩溃残留（PID 已死）继续清理。
+    if let Some(state_path) = host_state_path {
+        if let Some(st) = crate::hoststate::load(state_path) {
+            if st.running() && crate::hoststate::pid_alive(st.pid) {
+                return Err(format!(
+                    "宿主状态显示游戏 '{}' 正在运行（pid={}），拒绝清理",
+                    st.game_id, st.pid
+                ));
+            }
+        }
     }
 
     let mut bf = BoxFile::load(path).map_err(|e| format!("读取 box.json 失败: {e}"))?;
@@ -49,6 +68,18 @@ pub fn cleanup_box(box_path: &str, vhd_path: Option<&str>) -> Result<(), String>
         bf.save(path).map_err(|e| format!("box.json 状态回滚失败: {e}"))?;
     }
 
+    // 3. 宿主权威状态清除：仅当记录已被本 cleanup 之前的运行遗弃时才需要
+    //    清除（mark_clean 内部校验 game_id，残留 running 记录无 PID 存活）。
+    if let Some(state_path) = host_state_path {
+        if let Some(st) = crate::hoststate::load(state_path) {
+            if st.running() && !crate::hoststate::pid_alive(st.pid) {
+                crate::hoststate::mark_clean(state_path, st.generation, &st.game_id)
+                    .map_err(|e| format!("宿主状态清除失败: {e}"))?;
+                crate::log_info!("cleanup: 宿主状态已清除（generation={}）", st.generation);
+            }
+        }
+    }
+
     crate::log_info!("cleanup: 残留已清理: {box_path}");
     Ok(())
 }
@@ -71,7 +102,7 @@ mod tests {
             "gamevhd_cleanup_nonexistent_{}.json",
             std::process::id()
         ));
-        assert!(cleanup_box(missing.to_str().unwrap(), None).is_ok());
+        assert!(cleanup_box(missing.to_str().unwrap(), None, None).is_ok());
     }
 
     #[test]
@@ -93,7 +124,7 @@ mod tests {
         // Linux 上 hive cleanup 返回 UnsupportedPlatform —— 只验证逻辑不 panic，
         // Windows 上才真正跑 hive 卸载。此测试断言「状态不变」由下面的
         // state_machine_rollback 覆盖逻辑路径。
-        let _ = cleanup_box(path.to_str().unwrap(), Some("C:\\diff.vhd"));
+        let _ = cleanup_box(path.to_str().unwrap(), Some("C:\\diff.vhd"), None);
     }
 
     #[test]
@@ -111,7 +142,7 @@ mod tests {
             game_data_name: String::new(),
         };
         bf.save(&path).unwrap();
-        let result = cleanup_box(path.to_str().unwrap(), Some("C:\\nonexistent-diff.vhd"));
+        let result = cleanup_box(path.to_str().unwrap(), Some("C:\\nonexistent-diff.vhd"), None);
         #[cfg(not(target_os = "windows"))]
         {
             // Linux：VHD 桩 UnsupportedPlatform 被跳过（不抢先失败），

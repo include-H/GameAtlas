@@ -325,7 +325,8 @@ mod tests {
     #[test]
     fn invalid_json_rejected() {
         assert!(matches!(manifest_from_json("not json"), Err(ManifestError::BadJson(_))));
-        assert!(matches!(manifest_from_json(r#"{"a": 1}"#), Err(ManifestError::BadJson(_))));
+        // 缺值 → 解析层拒绝（数字值是合法的，未知字段被语义层忽略）。
+        assert!(matches!(manifest_from_json(r#"{"a": }"#), Err(ManifestError::BadJson(_))));
     }
 
     #[test]
