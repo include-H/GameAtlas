@@ -1,0 +1,9 @@
+{
+  "files.exclude": {
+    "**/.gameatlas-wine-runtime*": true
+  },
+  "search.exclude": {
+    "**/.gameatlas-wine-runtime*": true
+  },
+  "search.followSymlinks": false
+}

@@ -37,6 +37,9 @@ Game_Wiki/
 Sandboxie/
 gamevhd-runtime/runtime/target/
 
+# Wine 运行时目录（大体积 + 符号链接，禁止入库）
+.gameatlas-wine-runtime*/
+
 # Root level package files (from opencode)
 /package.json
 /package-lock.json
