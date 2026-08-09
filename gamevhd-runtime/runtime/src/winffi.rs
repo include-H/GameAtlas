@@ -66,6 +66,9 @@ pub const TOKEN_ADJUST_PRIVILEGES: u32 = 0x0000_0020;
 /// 特权列表有项未被启用（AdjustTokenPrivileges 返回 TRUE 但仍需检查）。
 pub const ERROR_NOT_ALL_ASSIGNED: u32 = 1300;
 
+/// 对象已存在（CreateMutexW 检测双开：已有同名互斥体）。
+pub const ERROR_ALREADY_EXISTS: u32 = 183;
+
 /// ASCII 字节串 → 等长 UTF-16 数组（const 上下文用；`array::map` 尚未 const 稳定）。
 const fn utf16_of<const N: usize>(s: &[u8]) -> [u16; N] {
     let mut out = [0u16; N];
@@ -254,6 +257,12 @@ extern "system" {
 
     pub fn GetLastError() -> DWORD;
 
+    pub fn CreateMutexW(
+        lp_mutex_attributes: *const u8,
+        b_initial_owner: BOOL,
+        lp_name: *const u16,
+    ) -> HANDLE;
+
     pub fn TerminateProcess(h_process: HANDLE, u_exit_code: u32) -> BOOL;
 
     pub fn TerminateJobObject(h_job: HANDLE, u_exit_code: u32) -> BOOL;
@@ -335,7 +344,44 @@ extern "system" {
     ) -> BOOL;
 
     pub fn GetCurrentProcess() -> HANDLE;
+
+    pub fn CredReadW(
+        target_name: *const u16,
+        type_: DWORD,
+        flags: DWORD,
+        credential: *mut *mut CredentialW,
+    ) -> BOOL;
+
+    pub fn CredWriteW(credential: *const CredentialW, flags: DWORD) -> BOOL;
+
+    pub fn CredDeleteW(target_name: *const u16, type_: DWORD, flags: DWORD) -> BOOL;
+
+    pub fn CredFree(buffer: *mut u8);
 }
+
+/// Windows 凭据管理器条目（CREDENTIALW 最小子集：读/写 SMB 密码所需字段）。
+#[repr(C)]
+pub struct CredentialW {
+    pub flags: DWORD,
+    pub type_: DWORD,
+    pub target_name: *mut u16,
+    pub comment: *mut u16,
+    pub last_written: u64,
+    pub credential_blob_size: DWORD,
+    pub credential_blob: *mut u8,
+    pub persist: DWORD,
+    pub attribute_count: DWORD,
+    pub attributes: *mut u8,
+    pub target_alias: *mut u16,
+    pub user_name: *mut u16,
+}
+
+/// 凭据类型：通用凭据。
+pub const CRED_TYPE_GENERIC: DWORD = 1;
+/// 持久化：本机（下次登录仍可用）。
+pub const CRED_PERSIST_LOCAL_MACHINE: DWORD = 2;
+/// 凭据不存在（CredReadW 失败码）。
+pub const ERROR_NOT_FOUND: DWORD = 1168;
 
 // ---- diskpart 桩（main.rs 的 mount/unmount 在 Windows 分支调用）。 ----
 

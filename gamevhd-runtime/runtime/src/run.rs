@@ -248,7 +248,12 @@ mod win {
             ));
         }
 
-        // 3. 状态机 clean → running（先行落盘：run 中断后 cleanup 可识别）。
+        // 3. 并发互斥锁：同 game_id 已有实例运行则拒绝双开（审计 C1）。
+        let game_id = bf.game_id.clone();
+        let _run_lock = crate::process::acquire_run_mutex(&game_id)
+            .map_err(|e| format!("并发互斥锁获取失败: {e}"))?;
+
+        // 4. 状态机 clean → running（先行落盘：run 中断后 cleanup 可识别）。
         bf.transition(BoxState::Running).map_err(|e| e.to_string())?;
         bf.save(&box_path_buf).map_err(|e| format!("box.json 写 running 失败: {e}"))?;
 

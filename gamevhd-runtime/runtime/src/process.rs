@@ -17,6 +17,8 @@ use std::fmt;
 pub enum ProcError {
     /// 当前平台不支持（非 Windows 桩）。
     UnsupportedPlatform,
+    /// 同一游戏已有实例在运行（并发互斥锁拒绝）。
+    AlreadyRunning,
     /// Win32 调用失败。
     Win32 { op: &'static str, code: u32 },
 }
@@ -25,6 +27,7 @@ impl fmt::Display for ProcError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ProcError::UnsupportedPlatform => write!(f, "进程树管理仅支持 Windows"),
+            ProcError::AlreadyRunning => write!(f, "同一游戏已有实例在运行（并发互斥锁拒绝双开）"),
             ProcError::Win32 { op, code } => write!(f, "{op} 失败 (Win32 错误 {code})"),
         }
     }
@@ -35,6 +38,93 @@ impl std::error::Error for ProcError {}
 /// 生成 job 名称 `GameVHD_<game_id>`（无 game_id 时为 `GameVHD_`）。
 pub fn job_name(game_id: &str) -> String {
     format!("GameVHD_{game_id}")
+}
+
+/// 生成运行互斥体名称 `Local\GameVHD_<game_id>_run`（会话级命名空间，同账号同会话防双开）。
+pub fn run_mutex_name(game_id: &str) -> String {
+    format!("Local\\GameVHD_{game_id}_run")
+}
+
+/// 运行互斥锁守卫：持有期间阻止同一游戏的第二个实例启动。
+/// Drop 时释放（Windows CloseHandle / Linux 删除锁文件）。
+pub struct RunMutex {
+    #[cfg(target_os = "windows")]
+    handle: crate::winffi::HANDLE,
+    #[cfg(not(target_os = "windows"))]
+    lock_path: std::path::PathBuf,
+}
+
+/// 获取运行互斥锁；已被另一实例持有时返回 [`ProcError::AlreadyRunning`]。
+#[cfg(target_os = "windows")]
+pub fn acquire_run_mutex(game_id: &str) -> Result<RunMutex, ProcError> {
+    use crate::winffi;
+
+    let name = utf16_nul(&run_mutex_name(game_id));
+    let handle = unsafe { winffi::CreateMutexW(std::ptr::null(), 0, name.as_ptr()) };
+    if handle == 0 {
+        return Err(ProcError::Win32 {
+            op: "CreateMutexW",
+            code: last_error(),
+        });
+    }
+    if last_error() == winffi::ERROR_ALREADY_EXISTS {
+        unsafe { winffi::CloseHandle(handle) };
+        return Err(ProcError::AlreadyRunning);
+    }
+    Ok(RunMutex { handle })
+}
+
+impl Drop for RunMutex {
+    #[cfg(target_os = "windows")]
+    fn drop(&mut self) {
+        unsafe { crate::winffi::CloseHandle(self.handle) };
+    }
+    #[cfg(not(target_os = "windows"))]
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.lock_path);
+    }
+}
+
+/// 获取运行互斥锁（Linux 文件锁实现：`create_new` 原子创建 + PID 存活检查，
+/// 崩溃残留的锁文件可被新实例接管）。
+#[cfg(not(target_os = "windows"))]
+pub fn acquire_run_mutex(game_id: &str) -> Result<RunMutex, ProcError> {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    let lock_path = std::env::temp_dir().join(format!("gamevhd_{game_id}_run.lock"));
+    match OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&lock_path)
+    {
+        Ok(mut f) => {
+            let _ = write!(f, "{}", std::process::id());
+            Ok(RunMutex { lock_path })
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            if lock_is_stale(&lock_path) {
+                let _ = std::fs::remove_file(&lock_path);
+                return acquire_run_mutex(game_id);
+            }
+            Err(ProcError::AlreadyRunning)
+        }
+        Err(e) => Err(ProcError::Win32 {
+            op: "open lock file",
+            code: e.raw_os_error().unwrap_or(0) as u32,
+        }),
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn lock_is_stale(lock_path: &std::path::Path) -> bool {
+    let pid = std::fs::read_to_string(lock_path)
+        .ok()
+        .and_then(|s| s.trim().parse::<i32>().ok());
+    match pid {
+        Some(pid) if pid > 0 => !std::path::Path::new(&format!("/proc/{pid}")).exists(),
+        _ => true,
+    }
 }
 
 /// 创建带 KILL_ON_JOB_CLOSE 的命名 Job Object；返回 job 句柄。
@@ -198,6 +288,55 @@ mod tests {
         assert_eq!(job_name("abc"), "GameVHD_abc");
         assert_eq!(job_name(""), "GameVHD_");
         assert_eq!(job_name("horizon-zero-dawn"), "GameVHD_horizon-zero-dawn");
+    }
+
+    #[test]
+    fn mutex_name_format() {
+        assert_eq!(run_mutex_name("abc"), r"Local\GameVHD_abc_run");
+        assert_eq!(
+            run_mutex_name("horizon-zero-dawn"),
+            r"Local\GameVHD_horizon-zero-dawn_run"
+        );
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn second_acquire_is_rejected_and_drop_releases() {
+        let gid = format!("test-{}", std::process::id());
+        let first = acquire_run_mutex(&gid).expect("first acquire ok");
+        assert!(matches!(
+            acquire_run_mutex(&gid),
+            Err(ProcError::AlreadyRunning)
+        ));
+        drop(first);
+        // 释放后再次获取成功（锁文件已删除）。
+        let again = acquire_run_mutex(&gid).expect("reacquire after drop ok");
+        drop(again);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn stale_lock_file_is_reclaimed() {
+        let gid = format!("stale-{}", std::process::id());
+        let path = std::env::temp_dir().join(format!("gamevhd_{gid}_run.lock"));
+        // 写入一个不存在的 PID（999999），模拟崩溃残留。
+        std::fs::write(&path, "999999").unwrap();
+        let guard = acquire_run_mutex(&gid).expect("stale lock reclaimed");
+        drop(guard);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_mutex_rejects_second_instance() {
+        let gid = format!("winmutex-{}", std::process::id());
+        let first = acquire_run_mutex(&gid).expect("first acquire ok");
+        assert!(matches!(
+            acquire_run_mutex(&gid),
+            Err(ProcError::AlreadyRunning)
+        ));
+        drop(first);
+        let again = acquire_run_mutex(&gid).expect("reacquire after drop ok");
+        drop(again);
     }
 
     #[test]

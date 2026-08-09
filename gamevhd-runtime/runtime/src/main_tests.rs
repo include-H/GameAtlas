@@ -28,7 +28,6 @@ fn parse_positional_subcommands() {
         parent: None,
         smb: None,
         user: None,
-        pass: None,
         letter: None,
         retries: 3,
     };
@@ -56,7 +55,6 @@ fn parse_mount_full_options() {
         parent: Some(r"\\192.168.1.4\Game\base.vhdx".into()),
         smb: Some(r"\\192.168.1.4\Game".into()),
         user: Some("rom".into()),
-        pass: Some("secret".into()),
         letter: Some('G'),
         retries: 5,
     };
@@ -65,10 +63,15 @@ fn parse_mount_full_options() {
             "gv", "mount", r"C:\diff\g.vhdx",
             "--parent", r"\\192.168.1.4\Game\base.vhdx",
             "--smb", r"\\192.168.1.4\Game",
-            "--user", "rom", "--pass", "secret",
+            "--user", "rom",
             "--letter", "g", "--retries", "5",
         ])),
         Ok(want)
+    );
+    // --pass 已移除：明文密码不再被命令行接受。
+    assert!(
+        parse_args(&args(&["gv", "mount", "a.vhdx", "--pass", "secret"])).is_err(),
+        "--pass 已废弃"
     );
 }
 
@@ -80,7 +83,6 @@ fn parse_mount_partial_options() {
         parent: None,
         smb: None,
         user: None,
-        pass: None,
         letter: Some('D'),
         retries: 3,
     };
@@ -88,6 +90,24 @@ fn parse_mount_partial_options() {
         parse_args(&args(&["gv", "mount", "a.vhdx", "--letter", "D"])),
         Ok(want)
     );
+}
+
+#[test]
+fn parse_store_and_delete_cred() {
+    assert_eq!(
+        parse_args(&args(&["gv", "store-cred", r"\\192.168.1.4\Game1", "--user", "read"])),
+        Ok(Command::StoreCred {
+            server: r"\\192.168.1.4\Game1".into(),
+            user: Some("read".into())
+        })
+    );
+    assert_eq!(
+        parse_args(&args(&["gv", "delete-cred", r"\\192.168.1.4\Game1"])),
+        Ok(Command::DeleteCred {
+            server: r"\\192.168.1.4\Game1".into()
+        })
+    );
+    assert!(parse_args(&args(&["gv", "store-cred"])).is_err(), "store-cred 缺 server");
 }
 
 #[test]
@@ -153,7 +173,17 @@ fn parse_run_flags_in_any_order() {
 fn parse_cleanup() {
     assert_eq!(
         parse_args(&args(&["gv", "cleanup", "--box", "b.json"])),
-        Ok(Command::Cleanup { box_path: "b.json".into() })
+        Ok(Command::Cleanup {
+            box_path: "b.json".into(),
+            vhd: None
+        })
+    );
+    assert_eq!(
+        parse_args(&args(&["gv", "cleanup", "--box", "b.json", "--vhd", "C:\\diff.vhd"])),
+        Ok(Command::Cleanup {
+            box_path: "b.json".into(),
+            vhd: Some("C:\\diff.vhd".into())
+        })
     );
     assert!(parse_args(&args(&["gv", "cleanup"])).is_err());
 }

@@ -58,6 +58,8 @@ pub enum DiskErrorKind {
     DiffAlreadyExists,
     /// 盘符分配失败或系统无空闲盘符。
     NoFreeDriveLetter,
+    /// 当前平台不支持（非 Windows 桩）。
+    UnsupportedPlatform,
     /// 卷枚举后未匹配到目标物理盘的卷。
     VolumeNotFound,
     /// `GetVirtualDiskPhysicalPath` 输出无法解析出盘号。
@@ -677,6 +679,89 @@ mod imp {
         }
     }
 
+    /// 读取 SMB 凭据（Windows 凭据管理器，target `GameVHD_<server>`）。
+    /// 返回 (用户名, 密码)；未存储返回 None。
+    pub fn read_smb_cred(server: &str) -> Option<(String, String)> {
+        use crate::winffi::{CredReadW, CRED_TYPE_GENERIC};
+
+        let target = cred_target(server);
+        let target_wide = to_wide(&target);
+        let mut cred_ptr: *mut crate::winffi::CredentialW = std::ptr::null_mut();
+        let ok = unsafe { CredReadW(target_wide.as_ptr(), CRED_TYPE_GENERIC, 0, &mut cred_ptr) };
+        if ok == 0 {
+            return None;
+        }
+        let cred = unsafe { &*cred_ptr };
+        let user = unsafe { from_wide(cred.user_name) };
+        let pass = if cred.credential_blob_size > 0 && !cred.credential_blob.is_null() {
+            let bytes = unsafe { std::slice::from_raw_parts(cred.credential_blob, cred.credential_blob_size as usize) };
+            String::from_utf8_lossy(bytes).into_owned()
+        } else {
+            String::new()
+        };
+        unsafe { crate::winffi::CredFree(cred_ptr as *mut u8) };
+        Some((user, pass))
+    }
+
+    /// 写入 SMB 凭据（Windows 凭据管理器，target `GameVHD_<server>`）。
+    pub fn store_smb_cred(server: &str, user: &str, pass: &str) -> Result<(), DiskError> {
+        use crate::winffi::{CredWriteW, CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC, CredentialW};
+
+        let target = cred_target(server);
+        let target_wide = to_wide(&target);
+        let user_wide = to_wide(user);
+        let mut blob: Vec<u8> = pass.as_bytes().to_vec();
+        let cred = CredentialW {
+            flags: 0,
+            type_: CRED_TYPE_GENERIC,
+            target_name: target_wide.as_ptr() as *mut u16,
+            comment: std::ptr::null_mut(),
+            last_written: 0,
+            credential_blob_size: blob.len() as u32,
+            credential_blob: blob.as_mut_ptr(),
+            persist: CRED_PERSIST_LOCAL_MACHINE,
+            attribute_count: 0,
+            attributes: std::ptr::null_mut(),
+            target_alias: std::ptr::null_mut(),
+            user_name: user_wide.as_ptr() as *mut u16,
+        };
+        let code = unsafe { CredWriteW(&cred as *const CredentialW, 0) };
+        // blob 在 CredWriteW 返回后由本函数栈持有至函数退出，无需提前清零。
+        if code == 0 {
+            return Err(DiskError::new(
+                classify_win32_error(unsafe { crate::winffi::GetLastError() }),
+                format!("CredWriteW({target}) 失败"),
+            ));
+        }
+        Ok(())
+    }
+
+    /// 删除 SMB 凭据（幂等：不存在视为成功）。
+    pub fn delete_smb_cred(server: &str) -> Result<(), DiskError> {
+        use crate::winffi::{CredDeleteW, CRED_TYPE_GENERIC};
+
+        let target = cred_target(server);
+        let target_wide = to_wide(&target);
+        let ok = unsafe { CredDeleteW(target_wide.as_ptr(), CRED_TYPE_GENERIC, 0) };
+        if ok == 0 {
+            let code = unsafe { crate::winffi::GetLastError() };
+            if code == crate::winffi::ERROR_NOT_FOUND {
+                return Ok(());
+            }
+            return Err(DiskError::new(
+                classify_win32_error(code),
+                format!("CredDeleteW({target}) 失败: {code}"),
+            ));
+        }
+        Ok(())
+    }
+
+    /// 凭据 target 名：`GameVHD_<server>`，server 去尾部反斜杠（`\\srv\share\` → `\\srv\share`）。
+    pub fn cred_target(server: &str) -> String {
+        let trimmed = server.trim_end_matches('\\');
+        format!("GameVHD_{trimmed}")
+    }
+
     /// 创建差分盘（parent = UNC，格式按 parent 扩展名 VHD/VHDX 自适应）。
     /// diff 已存在 → Err(DiffAlreadyExists) 由调用方幂等跳过。
     pub fn create_diff_vhd(diff_path: &str, parent_unc: &str) -> Result<(), DiskError> {
@@ -834,6 +919,31 @@ mod imp {
             ));
         }
         Ok(())
+    }
+
+    /// 若指定 VHD 已挂载则 detach（幂等，供 cleanup 清理崩溃残留挂载）。
+    /// 返回是否实际执行了 detach；VHD 无法打开视为未挂载（Ok(false)）。
+    pub fn detach_if_attached(vhd_path: &str) -> Result<bool, DiskError> {
+        let handle = match open_vhd(vhd_path) {
+            Ok(h) => h,
+            Err(_) => return Ok(false),
+        };
+        let mut buf = [0u16; 260];
+        let mut size: DWORD = (buf.len() * 2) as DWORD;
+        let rc = unsafe { GetVirtualDiskPhysicalPath(handle, &mut size, buf.as_mut_ptr()) };
+        if rc == 0 {
+            let code = unsafe { DetachVirtualDisk(handle, DETACH_VIRTUAL_DISK_FLAG_NONE, 0) };
+            unsafe { CloseHandle(handle) };
+            if code != 0 && code != 0xC03A_001C {
+                return Err(DiskError::new(
+                    classify_win32_error(code),
+                    format!("DetachVirtualDisk({vhd_path}) 失败: {code:#x}"),
+                ));
+            }
+            return Ok(true);
+        }
+        unsafe { CloseHandle(handle) };
+        Ok(false)
     }
 
     /// 查询 attach 后 VHD 的物理盘路径（`\\?\PhysicalDriveN`）。
@@ -1141,10 +1251,45 @@ mod imp {
 #[cfg(target_os = "windows")]
 #[allow(unused_imports)]
 pub use imp::{
-    assign_drive_letter, attach_vhd, create_diff_vhd, detach_vhd, find_volume_for_disk,
-    mount_vhd, open_vhd, physical_path, remove_drive_letter, smb_connect, smb_disconnect,
-    unmount_vhd, used_drive_letters, MountParams, MountResult, UnmountParams,
+    assign_drive_letter, attach_vhd, create_diff_vhd, cred_target, delete_smb_cred,
+    detach_if_attached, detach_vhd, find_volume_for_disk, mount_vhd, open_vhd, physical_path,
+    read_smb_cred, remove_drive_letter, smb_connect, smb_disconnect, store_smb_cred, unmount_vhd,
+    used_drive_letters, MountParams, MountResult, UnmountParams,
 };
+
+#[cfg(not(target_os = "windows"))]
+pub fn detach_if_attached(_vhd_path: &str) -> Result<bool, DiskError> {
+    Err(DiskError::new(
+        DiskErrorKind::UnsupportedPlatform,
+        "VHD detach 仅支持 Windows",
+    ))
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn read_smb_cred(_server: &str) -> Option<(String, String)> {
+    None
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn store_smb_cred(_server: &str, _user: &str, _pass: &str) -> Result<(), DiskError> {
+    Err(DiskError::new(
+        DiskErrorKind::UnsupportedPlatform,
+        "凭据管理器仅支持 Windows",
+    ))
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn delete_smb_cred(_server: &str) -> Result<(), DiskError> {
+    Err(DiskError::new(
+        DiskErrorKind::UnsupportedPlatform,
+        "凭据管理器仅支持 Windows",
+    ))
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn cred_target(server: &str) -> String {
+    format!("GameVHD_{}", server.trim_end_matches('\\'))
+}
 
 // ---- 单测（跨平台纯逻辑；Windows 专属布局断言双 target 编译时同样生效） ----
 

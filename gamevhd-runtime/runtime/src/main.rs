@@ -36,10 +36,13 @@ enum Command {
         parent: Option<String>,
         smb: Option<String>,
         user: Option<String>,
-        pass: Option<String>,
         letter: Option<char>,
         retries: u32,
     },
+    /// 写入 SMB 凭据到 Windows 凭据管理器（密码从 stdin 读入，不进命令行）。
+    StoreCred { server: String, user: Option<String> },
+    /// 删除 SMB 凭据。
+    DeleteCred { server: String },
     Unmount {
         vhd: String,
         letter: Option<char>,
@@ -59,7 +62,7 @@ enum Command {
         game_id: String,
     },
     Run { drive: char, box_path: String },
-    Cleanup { box_path: String },
+    Cleanup { box_path: String, vhd: Option<String> },
     Selftest,
     Help,
     Version,
@@ -82,9 +85,11 @@ fn run_cli(args: &[String]) -> u8 {
             println!("gamevhd-runtime {}", env!("CARGO_PKG_VERSION"));
             0
         }
-        Ok(Command::Mount { vhd, parent, smb, user, pass, letter, retries }) => {
-            cmd_mount(&vhd, parent.as_deref(), smb.as_deref(), user.as_deref(), pass.as_deref(), letter, retries)
+        Ok(Command::Mount { vhd, parent, smb, user, letter, retries }) => {
+            cmd_mount(&vhd, parent.as_deref(), smb.as_deref(), user.as_deref(), letter, retries)
         }
+        Ok(Command::StoreCred { server, user }) => cmd_store_cred(&server, user.as_deref()),
+        Ok(Command::DeleteCred { server }) => cmd_delete_cred(&server),
         Ok(Command::Unmount { vhd, letter, smb }) => cmd_unmount(&vhd, letter, smb.as_deref()),
         Ok(Command::Scan(drive)) => scan::cmd_scan(&drive),
         Ok(Command::Probe(exe)) => cmd_probe(&exe),
@@ -112,7 +117,7 @@ fn run_cli(args: &[String]) -> u8 {
             )
         }
         Ok(Command::Run { drive, box_path }) => cmd_run(drive, &box_path),
-        Ok(Command::Cleanup { box_path }) => cmd_cleanup(&box_path),
+        Ok(Command::Cleanup { box_path, vhd }) => cmd_cleanup(&box_path, vhd.as_deref()),
         Ok(Command::Selftest) => cmd_selftest(),
         Err(msg) => {
             crate::log_error!("{msg}");
@@ -133,17 +138,20 @@ fn parse_args(args: &[String]) -> Result<Command, String> {
         "--version" | "-V" => Ok(Command::Version),
         "--selftest" | "selftest" => Ok(Command::Selftest),
         "mount" => parse_mount(&rest[1..]),
+        "store-cred" => parse_store_cred(&rest[1..]),
+        "delete-cred" => parse_delete_cred(&rest[1..]),
         "unmount" => parse_unmount(&rest[1..]),
         "scan" => positional(rest, "scan", "<drive>").map(Command::Scan),
         "probe" => positional(rest, "probe", "<exe>").map(Command::Probe),
         "inject-poc" => parse_inject_poc(&rest[1..]),
         "run" => parse_run(&rest[1..]),
         "cleanup" => {
-            let opts = parse_kv_opts(&rest[1..], "cleanup", &["--box"])?;
+            let opts = parse_kv_opts(&rest[1..], "cleanup", &["--box", "--vhd"])?;
             let box_path = opt_value(&opts, "--box")
                 .ok_or_else(|| "cleanup 需要 --box <path>".to_string())?
                 .clone();
-            Ok(Command::Cleanup { box_path })
+            let vhd = opt_value(&opts, "--vhd").cloned();
+            Ok(Command::Cleanup { box_path, vhd })
         }
         other => Err(format!("未知子命令 '{other}'")),
     }
@@ -170,23 +178,24 @@ fn parse_letter(s: &str, what: &str) -> Result<char, String> {
     }
 }
 
-/// `mount <vhd> [--parent <UNC>] [--smb <UNC>] [--user <U>] [--pass <P>]
+/// `mount <vhd> [--parent <UNC>] [--smb <UNC>] [--user <U>]
 ///       [--letter <L>] [--retries <N>]`
 ///
 /// `<vhd>` 为本地差分盘路径（`%LOCALAPPDATA%\GameAtlas\diff\*.vhdx`）。
 /// `--parent` 提供时若差分盘不存在则基于该 UNC 基础盘创建（已存在幂等跳过）。
-/// `--smb` 提供时先连接只读共享（`--user`/`--pass` 可缺省走当前会话）。
+/// `--smb` 提供时先连接只读共享（`--user` 可缺省走当前会话；密码取自
+/// Windows 凭据管理器（`store-cred` 写入）或环境变量 `GAMEVHD_SMB_PASS`，
+/// 不接收命令行明文）。
 /// `--letter` 指定首选盘符，缺省取第一个空闲。`--retries` 为 SMB 重试次数。
 fn parse_mount(rest: &[String]) -> Result<Command, String> {
     let vhd = rest
         .first()
         .ok_or_else(|| "mount 需要 <vhd>（本地差分盘路径）".to_string())?
         .clone();
-    let opts = parse_kv_opts(&rest[1..], "mount", &["--parent", "--smb", "--user", "--pass", "--letter", "--retries"])?;
+    let opts = parse_kv_opts(&rest[1..], "mount", &["--parent", "--smb", "--user", "--letter", "--retries"])?;
     let parent = opt_value(&opts, "--parent").cloned();
     let smb = opt_value(&opts, "--smb").cloned();
     let user = opt_value(&opts, "--user").cloned();
-    let pass = opt_value(&opts, "--pass").cloned();
     let letter = opt_value(&opts, "--letter")
         .map(|v| parse_letter(v, "盘符"))
         .transpose()?;
@@ -204,10 +213,30 @@ fn parse_mount(rest: &[String]) -> Result<Command, String> {
         parent,
         smb,
         user,
-        pass,
         letter,
         retries,
     })
+}
+
+/// `store-cred <server> [--user <U>]`：把 SMB 密码写入 Windows 凭据管理器。
+/// 密码从 stdin 第一行读取（不回显、不进命令行参数与 shell 历史）。
+fn parse_store_cred(rest: &[String]) -> Result<Command, String> {
+    let server = rest
+        .first()
+        .ok_or_else(|| "store-cred 需要 <server>（如 \\\\192.168.1.4\\Game1）".to_string())?
+        .clone();
+    let opts = parse_kv_opts(&rest[1..], "store-cred", &["--user"])?;
+    let user = opt_value(&opts, "--user").cloned();
+    Ok(Command::StoreCred { server, user })
+}
+
+/// `delete-cred <server>`：删除已存储的 SMB 凭据（幂等）。
+fn parse_delete_cred(rest: &[String]) -> Result<Command, String> {
+    let server = rest
+        .first()
+        .ok_or_else(|| "delete-cred 需要 <server>".to_string())?
+        .clone();
+    Ok(Command::DeleteCred { server })
 }
 
 /// `unmount <vhd> [--letter <L>] [--smb <UNC>]`
@@ -339,18 +368,36 @@ fn cmd_mount(
     parent: Option<&str>,
     smb: Option<&str>,
     user: Option<&str>,
-    pass: Option<&str>,
     letter: Option<char>,
     retries: u32,
 ) -> u8 {
     #[cfg(target_os = "windows")]
     {
+        // 密码解析顺序：凭据管理器（store-cred 写入）→ 环境变量
+        // GAMEVHD_SMB_PASS → None（复用现有 SMB 会话）。命令行永不明文传密。
+        let (smb_user, smb_pass) = smb
+            .map(|remote| {
+                let cred = disk::read_smb_cred(remote);
+                let env_pass = std::env::var("GAMEVHD_SMB_PASS").ok();
+                let resolved_user = user
+                    .map(str::to_string)
+                    .or_else(|| cred.as_ref().map(|(u, _)| u.clone()))
+                    .or_else(|| std::env::var("GAMEVHD_SMB_USER").ok());
+                let resolved_pass = cred
+                    .and_then(|(_, p)| if p.is_empty() { None } else { Some(p) })
+                    .or(env_pass);
+                if resolved_pass.is_some() && resolved_user.is_none() {
+                    crate::log_warn!("mount: 有密码但缺用户名（--user / 凭据 / GAMEVHD_SMB_USER）");
+                }
+                (resolved_user, resolved_pass)
+            })
+            .unwrap_or((user.map(str::to_string), None));
         let params = disk::MountParams {
             diff_path: vhd.to_string(),
             parent_unc: parent.map(str::to_string),
             smb_remote: smb.map(str::to_string),
-            smb_user: user.map(str::to_string),
-            smb_pass: pass.map(str::to_string),
+            smb_user,
+            smb_pass,
             preferred_letter: letter,
             smb_retries: retries,
         };
@@ -376,6 +423,65 @@ fn cmd_mount(
     #[cfg(not(target_os = "windows"))]
     {
         unsupported("mount", "Windows + virtdisk API")
+    }
+}
+
+/// 仅 Windows：写入 SMB 凭据（stdin 读密码，不进命令行）。
+/// Linux：不支持（退出码 3）。
+fn cmd_store_cred(server: &str, user: Option<&str>) -> u8 {
+    #[cfg(target_os = "windows")]
+    {
+        let mut pass = String::new();
+        if std::io::stdin().read_line(&mut pass).is_err() || pass.trim().is_empty() {
+            crate::log_error!("store-cred: 请在 stdin 第一行输入密码");
+            return 1;
+        }
+        let pass = pass.trim();
+        let resolved_user = user
+            .map(str::to_string)
+            .or_else(|| std::env::var("GAMEVHD_SMB_USER").ok());
+        let Some(resolved_user) = resolved_user else {
+            crate::log_error!("store-cred: 需要 --user <U> 或环境变量 GAMEVHD_SMB_USER");
+            return 1;
+        };
+        match disk::store_smb_cred(server, &resolved_user, pass) {
+            Ok(()) => {
+                crate::log_info!("store-cred: 凭据已保存（target GameVHD_{server}）");
+                0
+            }
+            Err(e) => {
+                crate::log_error!("store-cred 失败: {e}");
+                1
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = server;
+        let _ = user;
+        unsupported("store-cred", "Windows 凭据管理器")
+    }
+}
+
+/// 删除 SMB 凭据（幂等）。Linux：不支持（退出码 3）。
+fn cmd_delete_cred(server: &str) -> u8 {
+    #[cfg(target_os = "windows")]
+    {
+        match disk::delete_smb_cred(server) {
+            Ok(()) => {
+                crate::log_info!("delete-cred: 凭据已删除（target GameVHD_{server}）");
+                0
+            }
+            Err(e) => {
+                crate::log_error!("delete-cred 失败: {e}");
+                1
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = server;
+        unsupported("delete-cred", "Windows 凭据管理器")
     }
 }
 
@@ -434,10 +540,10 @@ fn cmd_run(drive: char, box_path: &str) -> u8 {
 
 /// 仅 Windows：清理残留沙箱状态。Linux：不支持（退出码 3）。
 #[cfg_attr(not(target_os = "windows"), allow(unused_variables))]
-fn cmd_cleanup(box_path: &str) -> u8 {
+fn cmd_cleanup(box_path: &str, vhd_path: Option<&str>) -> u8 {
     #[cfg(target_os = "windows")]
     {
-        match cleanup::cleanup_box(box_path) {
+        match cleanup::cleanup_box(box_path, vhd_path) {
             Ok(()) => {
                 crate::log_info!("cleanup: 残留已清理: {box_path}");
                 0
@@ -628,8 +734,11 @@ fn print_usage() {
     println!("用法: gamevhd-runtime <子命令> [参数]");
     println!();
     println!("子命令:");
-    println!("  mount <vhd> [--parent <UNC>] [--smb <UNC>] [--user <U>] [--pass <P>] [--letter <L>] [--retries <N>]");
+    println!("  mount <vhd> [--parent <UNC>] [--smb <UNC>] [--user <U>] [--letter <L>] [--retries <N>]");
     println!("                挂载 VHD（Windows；SMB→建差分→attach→定盘符）");
+    println!("                密码来源：store-cred 凭据管理器 > 环境变量 GAMEVHD_SMB_PASS，命令行不明文");
+    println!("  store-cred <server> [--user <U>]  保存 SMB 凭据到 Windows 凭据管理器（密码从 stdin 读入）");
+    println!("  delete-cred <server>              删除已保存的 SMB 凭据（幂等）");
     println!("  unmount <vhd> [--letter <L>] [--smb <UNC>]   卸载 VHD（Windows）");
     println!("  scan <drive>              扫描盘符下的 exe 候选并标注位数（如 scan E）");
     println!("  probe <exe>               探测 exe 位数（x64 / x86 / not-pe）");
@@ -637,7 +746,7 @@ fn print_usage() {
     println!("             [--args <raw-args>] [--game-data-root <dir> --user-profile <dir> --game-id <id>]");
     println!("                Wine 联调专用：对照测试远程线程与 Early-Bird APC 注入");
     println!("  run --drive <letter> --box <path>   沙箱启动游戏（Windows）");
-    println!("  cleanup --box <path>      清理残留沙箱状态（Windows）");
+    println!("  cleanup --box <path> [--vhd <diff>]   清理残留沙箱状态与残留 VHD 挂载（Windows）");
     println!("  --help, -h                显示本帮助");
     println!("  --version, -V             显示版本");
     println!("  --selftest                自检（footer/规则/PE 探测）");
