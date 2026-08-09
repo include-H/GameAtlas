@@ -282,29 +282,85 @@ static BOOLEAN gvhd_wcs_prefix_ieq(const wchar_t *s, const wchar_t *prefix)
     return TRUE;
 }
 
+/* 反作弊组件名单（审计 P2-8）：检测到即明确"不保证隔离"并跳过注入——
+ * 注入反作弊属对抗行为，EAC/BattlEye/Vanguard 等有内核驱动与完整性自检。 */
+static const wchar_t *const gvhd_child_anticheat_exact[] = {
+    L"EasyAntiCheat.exe",
+    L"EasyAntiCheatService.exe",
+    L"BEService.exe",
+    L"BE.exe",
+    L"vgc.exe",
+    L"VanguardService.exe",
+    L"anticheat.exe",
+    L"anticheatlauncher.exe",
+    L"steamservice.exe",
+};
+
+static const wchar_t *const gvhd_child_anticheat_prefix[] = {
+    L"easyanticheat",
+    L"battleye",
+    L"epicgameslauncher",
+    L"vgk",
+};
+
+static BOOLEAN gvhd_child_anticheat(const wchar_t *name)
+{
+    size_t i;
+
+    for (i = 0; i < sizeof(gvhd_child_anticheat_exact) / sizeof(gvhd_child_anticheat_exact[0]);
+         ++i) {
+        if (gvhd_wcs_ieq(name, gvhd_child_anticheat_exact[i])) {
+            return TRUE;
+        }
+    }
+    for (i = 0; i < sizeof(gvhd_child_anticheat_prefix) / sizeof(gvhd_child_anticheat_prefix[0]);
+         ++i) {
+        if (gvhd_wcs_prefix_ieq(name, gvhd_child_anticheat_prefix[i])) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+/* 取子进程 exe 文件名（不含路径）；失败返回 NULL（保守：调用方放行）。 */
+static const wchar_t *gvhd_child_image_name(HANDLE hProcess, WCHAR *buf, size_t cap)
+{
+    typedef BOOL(WINAPI *P_QueryFullProcessImageNameW)(HANDLE, DWORD, LPWSTR, PDWORD);
+    static P_QueryFullProcessImageNameW pfn = NULL;
+    DWORD len;
+    const wchar_t *name;
+
+    if (cap < 1) {
+        return NULL;
+    }
+    if (pfn == NULL) {
+        pfn = (P_QueryFullProcessImageNameW)(LPVOID)GetProcAddress(
+            GetModuleHandleW(L"kernel32.dll"), "QueryFullProcessImageNameW");
+        if (pfn == NULL) {
+            return NULL;
+        }
+    }
+    len = (DWORD)(cap - 1);
+    if (!pfn(hProcess, 0, buf, &len)) {
+        return NULL;
+    }
+    buf[len] = L'\0';
+    name = wcsrchr(buf, L'\\');
+    return (name == NULL) ? buf : name + 1;
+}
+
 /* 用 QueryFullProcessImageNameW 取子进程 exe 名并匹配排除清单。
  * 取不到名字时放行（保守：宁可注入也不漏注入）。 */
 static BOOLEAN gvhd_child_excluded(HANDLE hProcess)
 {
-    typedef BOOL(WINAPI *P_QueryFullProcessImageNameW)(HANDLE, DWORD, LPWSTR, PDWORD);
-    static P_QueryFullProcessImageNameW pfn = NULL;
     WCHAR path[MAX_PATH * 2];
-    DWORD len = MAX_PATH * 2;
     const wchar_t *name;
     size_t i;
 
-    if (pfn == NULL) {
-        pfn = (P_QueryFullProcessImageNameW)GetProcAddress(
-            GetModuleHandleW(L"kernel32.dll"), "QueryFullProcessImageNameW");
-        if (pfn == NULL) {
-            return FALSE;
-        }
-    }
-    if (!pfn(hProcess, 0, path, &len)) {
+    name = gvhd_child_image_name(hProcess, path, MAX_PATH * 2);
+    if (name == NULL) {
         return FALSE;
     }
-    name = wcsrchr(path, L'\\');
-    name = (name == NULL) ? path : name + 1;
 
     for (i = 0; i < sizeof(gvhd_child_exclude_exact) / sizeof(gvhd_child_exclude_exact[0]);
          ++i) {
@@ -455,6 +511,15 @@ uint32_t gvhd_inject_child(void *h_process, void *h_thread)
         gvhd_log_write(L"CHILD_SKIPPED pid=%lu: excluded non-game child",
                        (unsigned long)GetProcessId(hp));
         return 0;
+    }
+    {
+        WCHAR path[MAX_PATH * 2];
+        const wchar_t *name = gvhd_child_image_name(hp, path, MAX_PATH * 2);
+        if (name != NULL && gvhd_child_anticheat(name)) {
+            gvhd_log_write(L"AC_DETECTED pid=%lu name=%ls: anti-cheat, isolation NOT guaranteed",
+                           (unsigned long)GetProcessId(hp), name);
+            return 0;
+        }
     }
     (void)h_thread;
 

@@ -60,6 +60,8 @@ pub enum ManifestError {
     MissingField(&'static str),
     /// 未知字段。
     UnknownField(String),
+    /// 签名不匹配（消息；带 sig 的 manifest 被篡改或损坏）。
+    BadSignature(String),
     /// 读取文件失败。
     Io(String),
 }
@@ -72,12 +74,17 @@ impl std::fmt::Display for ManifestError {
             ManifestError::BadJson(m) => write!(f, "配置 JSON 非法: {m}"),
             ManifestError::MissingField(k) => write!(f, "配置缺少必填字段 '{k}'"),
             ManifestError::UnknownField(k) => write!(f, "配置含未知字段 '{k}'"),
+            ManifestError::BadSignature(m) => write!(f, "配置签名校验失败（可能被篡改）: {m}"),
             ManifestError::Io(m) => write!(f, "读取失败: {m}"),
         }
     }
 }
 
 impl std::error::Error for ManifestError {}
+
+/// manifest 签名密钥（审计 P2-10）：内置密钥防意外篡改/损坏；
+/// 防恶意篡改需外部分发密钥（部署层决策，见已知局限文档）。
+pub const MANIFEST_SIGN_KEY: &[u8] = b"gamevhd-atlas-v1";
 
 impl Manifest {
     /// 序列化为配置 JSON（2 空格缩进，风格与 box.json 一致）。
@@ -113,6 +120,51 @@ impl Manifest {
         out.extend_from_slice(&(json_bytes.len() as u32).to_le_bytes());
         out
     }
+
+    /// 序列化为带签名配置块（审计 P2-10）：JSON 尾部追加 `,"sig":"<hmac>"`。
+    pub fn to_signed_footer_bytes(&self) -> Vec<u8> {
+        let json = self.to_json();
+        let signed = sign_json(&json);
+        let json_bytes = signed.as_bytes();
+        let mut out = Vec::with_capacity(json_bytes.len() + FOOTER_OVERHEAD);
+        out.extend_from_slice(json_bytes);
+        out.extend_from_slice(&FOOTER_MAGIC);
+        out.extend_from_slice(&(json_bytes.len() as u32).to_le_bytes());
+        out
+    }
+}
+
+/// 对配置 JSON 计算签名并追加 `,"sig":"<hex>"`（在结尾 `}` 之前插入）。
+fn sign_json(json: &str) -> String {
+    let sig = crate::sha256::hmac_hex(MANIFEST_SIGN_KEY, json.as_bytes());
+    let body = json
+        .strip_suffix('}')
+        .unwrap_or(json);
+    format!("{body},\"sig\":\"{sig}\"}}")
+}
+
+/// 校验带签名 JSON：提取并校验 `sig` 字段，返回裁剪后的原始 JSON。
+/// 无 sig 字段 → Ok（旧格式兼容，不强制签名）；sig 不匹配 → Err。
+fn verify_signed_json(signed: &str) -> Result<String, ManifestError> {
+    let Some(tail) = signed.strip_suffix('}') else {
+        return Err(ManifestError::BadJson("对象未闭合".into()));
+    };
+    let Some((body, sig)) = tail.rsplit_once(",\"sig\":\"") else {
+        return Ok(signed.to_string());
+    };
+    let Some(sig) = sig.strip_suffix('"') else {
+        return Err(ManifestError::BadSignature("sig 字段格式非法".into()));
+    };
+    if sig.len() != 64 || !sig.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(ManifestError::BadSignature("sig 字段格式非法".into()));
+    }
+    let expected = crate::sha256::hmac_hex(MANIFEST_SIGN_KEY, body.as_bytes());
+    if sig != expected {
+        return Err(ManifestError::BadSignature(format!(
+            "期望 {expected}，实际 {sig}"
+        )));
+    }
+    Ok(body.to_string())
 }
 
 /// 在字节切片中定位配置 JSON 的边界 `(start, end)`（end = magic 起始，即 JSON 结束）。
@@ -156,7 +208,7 @@ pub fn locate_config(data: &[u8]) -> Result<(usize, usize), ManifestError> {
     Ok((json_end - len, json_end))
 }
 
-/// 从字节切片解析 manifest（定位 + JSON 解析 + 字段校验）。
+/// 从字节切片解析 manifest（定位 + 签名校验 + JSON 解析 + 字段校验）。
 pub fn parse_manifest(data: &[u8]) -> Result<Manifest, ManifestError> {
     let (start, end) = locate_config(data)?;
     if start >= end {
@@ -164,7 +216,8 @@ pub fn parse_manifest(data: &[u8]) -> Result<Manifest, ManifestError> {
     }
     let json = std::str::from_utf8(&data[start..end])
         .map_err(|e| ManifestError::BadJson(format!("非 UTF-8: {e}")))?;
-    manifest_from_json(json)
+    let unsigned = verify_signed_json(json)?;
+    manifest_from_json(&unsigned)
 }
 
 /// 从配置 JSON 文本解析（字段严格校验：必填 4 项，未知字段报错）。

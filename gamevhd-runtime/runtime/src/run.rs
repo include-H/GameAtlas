@@ -24,14 +24,18 @@ use std::path::{Path, PathBuf};
 use crate::scan;
 
 /// 执行完整沙箱运行生命周期；返回时游戏已退出且清理完毕。
-pub fn run_game(drive_letter: char, box_path: &str) -> Result<(), String> {
+pub fn run_game(
+    drive_letter: char,
+    box_path: &str,
+    hklm_write_passthrough: bool,
+) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        win::run_game_impl(drive_letter, box_path)
+        win::run_game_impl(drive_letter, box_path, hklm_write_passthrough)
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (drive_letter, box_path);
+        let _ = (drive_letter, box_path, hklm_write_passthrough);
         Err("run 需要 Windows（本二进制在 Linux 上仅用于测试）".into())
     }
 }
@@ -106,12 +110,15 @@ fn validate_game_data_name(name: &str) -> Result<String, String> {
 }
 
 /// 解析最终 GameData 根：显式 root > 外部父目录/游戏名 > VHD 内默认目录。
+/// `user_namespace` 为真且使用外部状态库时，游戏目录名附带用户标识
+/// （审计 P2-9 多用户隔离：同机不同 Windows 用户互不串扰）。
 fn resolve_game_data_root(
     volume_root: &str,
     configured_root: &str,
     external_base: &str,
     configured_name: &str,
     fallback_name: &str,
+    user_namespace: bool,
 ) -> Result<String, String> {
     if !configured_root.trim().is_empty() {
         return Ok(abs_path(volume_root, configured_root));
@@ -126,7 +133,26 @@ fn resolve_game_data_root(
         configured_name
     };
     let name = validate_game_data_name(name)?;
+    let name = if user_namespace {
+        format!("{name}_{}", user_tag())
+    } else {
+        name
+    };
     Ok(join_windows_path(&abs_path(volume_root, external_base), &name))
+}
+
+/// 用户标识（FNV-1a 64 位哈希，小写 hex 8 位）：Windows 用户名的稳定短摘要。
+/// 不用明文用户名（目录名可含非法字符且泄露身份）；同机同用户哈希稳定。
+fn user_tag() -> String {
+    let user = std::env::var("USERNAME")
+        .or_else(|_| std::env::var("USER"))
+        .unwrap_or_default();
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for b in user.to_lowercase().bytes() {
+        hash ^= u64::from(b);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("{hash:08x}")
 }
 
 /// hive 未单独指定时，跟随最终 GameData 根，确保外部状态库完整可同步。
@@ -234,7 +260,11 @@ mod win {
         }
     }
 
-    pub(super) fn run_game_impl(drive_letter: char, box_path: &str) -> Result<(), String> {
+    pub(super) fn run_game_impl(
+        drive_letter: char,
+        box_path: &str,
+        hklm_write_passthrough: bool,
+    ) -> Result<(), String> {
         // 1. 读取自身 footer manifest（卡带配置）。
         let launcher = std::env::current_exe().map_err(|e| format!("无法定位启动器自身路径: {e}"))?;
         let manifest: Manifest = load_manifest_file(&launcher)
@@ -283,6 +313,7 @@ mod win {
             &bf.game_data_base,
             &bf.game_data_name,
             &fallback_data_name,
+            bf.user_namespace,
         )?;
         let registry_hive_path = resolve_registry_hive(
             &volume_root,
@@ -344,7 +375,7 @@ mod win {
 
         // 8. 重写规则表 + 注入参数块（5280 + n×4104 字节）。
         let rule_table = rules::generate_rules(&bf.user_profile, &game_data_root, bf.skip_cache_dirs);
-        let param_block = rules::param_block_with_drive(
+        let mut param_block = rules::param_block_with_drive(
             &hook_dll,
             &game_data_root,
             &bf.user_profile,
@@ -354,6 +385,11 @@ mod win {
             &rule_table,
             drive_letter,
         );
+        // P2-7：--hklm-write passthrough 时清 HKLM 写拒绝位（默认拒绝）。
+        if hklm_write_passthrough {
+            let f = u32::from_le_bytes(param_block[8..12].try_into().unwrap());
+            param_block[8..12].copy_from_slice(&(f & !rules::GVHD_PARAM_FLAG_HKLM_WRITE_DENY).to_le_bytes());
+        }
 
         // 9. 命名 Job Object（KILL_ON_JOB_CLOSE：句柄关闭强杀整树）。
         let job = process::create_kill_on_close_job(&bf.game_id)
@@ -450,7 +486,7 @@ mod tests {
     #[test]
     fn external_data_root_appends_vhd_stem() {
         assert_eq!(
-            resolve_game_data_root(r"G:\", "", r"D:\GameAtlas", "", "地平线").unwrap(),
+            resolve_game_data_root(r"G:\", "", r"D:\GameAtlas", "", "地平线", false).unwrap(),
             r"D:\GameAtlas\地平线"
         );
         assert_eq!(
@@ -459,16 +495,37 @@ mod tests {
                 "",
                 r"D:\GameAtlas",
                 "Horizon",
-                "地平线"
+                "地平线",
+                false
             )
             .unwrap(),
             r"D:\GameAtlas\Horizon"
         );
         assert_eq!(
-            resolve_game_data_root(r"G:\", r"G:\GameData", r"D:\GameAtlas", "地平线", "x")
+            resolve_game_data_root(r"G:\", r"G:\GameData", r"D:\GameAtlas", "地平线", "x", true)
                 .unwrap(),
             r"G:\GameData"
         );
+    }
+
+    #[test]
+    fn user_namespace_appends_stable_tag() {
+        let with_user = resolve_game_data_root(
+            r"G:\", "", r"D:\GameAtlas", "Horizon", "地平线", true
+        )
+        .unwrap();
+        let without = resolve_game_data_root(
+            r"G:\", "", r"D:\GameAtlas", "Horizon", "地平线", false
+        )
+        .unwrap();
+        assert_ne!(with_user, without);
+        assert!(with_user.starts_with(r"D:\GameAtlas\Horizon_"), "{with_user}");
+        // 稳定性：同进程内两次调用结果一致。
+        let again = resolve_game_data_root(
+            r"G:\", "", r"D:\GameAtlas", "Horizon", "地平线", true
+        )
+        .unwrap();
+        assert_eq!(with_user, again);
     }
 
     #[test]

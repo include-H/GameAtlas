@@ -24,6 +24,7 @@ mod regpath;
 mod rules;
 mod run;
 mod scan;
+mod sha256;
 mod winffi;
 
 use std::path::Path;
@@ -62,7 +63,11 @@ enum Command {
         user_profile: String,
         game_id: String,
     },
-    Run { drive: char, box_path: String },
+    Run {
+        drive: char,
+        box_path: String,
+        hklm_write_passthrough: bool,
+    },
     Cleanup {
         box_path: String,
         vhd: Option<String>,
@@ -121,7 +126,11 @@ fn run_cli(args: &[String]) -> u8 {
                 &game_id,
             )
         }
-        Ok(Command::Run { drive, box_path }) => cmd_run(drive, &box_path),
+        Ok(Command::Run {
+            drive,
+            box_path,
+            hklm_write_passthrough,
+        }) => cmd_run(drive, &box_path, hklm_write_passthrough),
         Ok(Command::Cleanup { box_path, vhd, state }) => {
             cmd_cleanup(&box_path, vhd.as_deref(), state.as_deref())
         }
@@ -261,9 +270,11 @@ fn parse_unmount(rest: &[String]) -> Result<Command, String> {
     Ok(Command::Unmount { vhd, letter, smb })
 }
 
-/// `run --drive <letter> --box <path>`：选项乱序均可，未知 `--x` 告警后忽略。
+/// `run --drive <letter> --box <path> [--hklm-write passthrough|deny]`：
+/// 选项乱序均可，未知 `--x` 告警后忽略。HKLM 写默认拒绝（P2-7），
+/// passthrough 切回透传（兼容需要写 HKLM 的游戏）。
 fn parse_run(rest: &[String]) -> Result<Command, String> {
-    let opts = parse_kv_opts(rest, "run", &["--drive", "--box"])?;
+    let opts = parse_kv_opts(rest, "run", &["--drive", "--box", "--hklm-write"])?;
     let letter = opt_value(&opts, "--drive")
         .ok_or_else(|| "run 需要 --drive <letter>".to_string())?;
     let box_path = opt_value(&opts, "--box")
@@ -274,9 +285,18 @@ fn parse_run(rest: &[String]) -> Result<Command, String> {
         (Some(c), None) if c.is_ascii_alphabetic() => c.to_ascii_uppercase(),
         _ => return Err(format!("非法的盘符 '{letter}'（需单个字母，如 E）")),
     };
+    let hklm_write_passthrough = match opt_value(&opts, "--hklm-write") {
+        None => false,
+        Some(v) if v == "passthrough" => true,
+        Some(v) if v == "deny" => false,
+        Some(v) => {
+            return Err(format!("run: --hklm-write 仅接受 passthrough|deny，收到 '{v}'"))
+        }
+    };
     Ok(Command::Run {
         drive,
         box_path: box_path.clone(),
+        hklm_write_passthrough,
     })
 }
 
@@ -524,10 +544,10 @@ fn cmd_unmount(vhd: &str, letter: Option<char>, smb: Option<&str>) -> u8 {
 
 /// 仅 Windows：沙箱运行游戏。Linux：不支持（退出码 3）。
 #[cfg_attr(not(target_os = "windows"), allow(unused_variables))]
-fn cmd_run(drive: char, box_path: &str) -> u8 {
+fn cmd_run(drive: char, box_path: &str, hklm_write_passthrough: bool) -> u8 {
     #[cfg(target_os = "windows")]
     {
-        match run::run_game(drive, box_path) {
+        match run::run_game(drive, box_path, hklm_write_passthrough) {
             Ok(()) => {
                 crate::log_info!("run: 游戏已退出，清理完毕");
                 // ASCII marker：断言脚本/自动化依赖此格式（同 [MOUNT-OK]）。
@@ -762,7 +782,7 @@ fn print_usage() {
     println!("  inject-poc --exe <path> --hook <dll> --log <log> [--work-dir <dir>] [--mode remote|early-bird]");
     println!("             [--args <raw-args>] [--game-data-root <dir> --user-profile <dir> --game-id <id>]");
     println!("                Wine 联调专用：对照测试远程线程与 Early-Bird APC 注入");
-    println!("  run --drive <letter> --box <path>   沙箱启动游戏（Windows）");
+    println!("  run --drive <letter> --box <path> [--hklm-write passthrough|deny]   沙箱启动游戏（Windows；HKLM 写默认拒绝）");
     println!("  cleanup --box <path> [--vhd <diff>]   清理残留沙箱状态与残留 VHD 挂载（Windows）");
     println!("  --help, -h                显示本帮助");
     println!("  --version, -V             显示版本");

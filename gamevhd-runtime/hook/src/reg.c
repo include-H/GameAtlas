@@ -222,6 +222,7 @@ static P_NtNotifyChangeKey       pfnOrig_NtNotifyChangeKey = NULL;
 /* ================================================================ */
 
 static volatile LONG gvhd_reg_hklm_count = 0;
+static volatile LONG gvhd_reg_hklm_deny_count = 0;
 static volatile LONG gvhd_reg_readthru_count = 0;
 
 static void gvhd_reg_warn_hklm(const wchar_t *path)
@@ -231,6 +232,23 @@ static void gvhd_reg_warn_hklm(const wchar_t *path)
     if (n % (LONG)GVHD_REG_HKLM_WARN_EVERY == 1) {
         gvhd_log_write(L"REG_HKLM_ACCESS %ls", path);
     }
+}
+
+/* P2-7：HKLM 写策略。返回 0 = 透传（flag 关闭），否则返回拒绝状态码。 */
+static NTSTATUS gvhd_reg_hklm_write_deny(const wchar_t *path)
+{
+    const struct gvhd_param_block *param = gvhd_get_param();
+
+    if (!(param->flags & GVHD_PARAM_FLAG_HKLM_WRITE_DENY)) {
+        return 0;
+    }
+    {
+        LONG n = InterlockedIncrement(&gvhd_reg_hklm_deny_count);
+        if (n % (LONG)GVHD_REG_HKLM_WARN_EVERY == 1) {
+            gvhd_log_write(L"REG_HKLM_WRITE_DENIED %ls", path);
+        }
+    }
+    return GVHD_STATUS_ACCESS_DENIED;
 }
 
 static void gvhd_reg_log_readthrough(const wchar_t *path)
@@ -725,6 +743,17 @@ static NTSTATUS NTAPI Hook_NtCreateKey(
 
     gvhd_reg_eval_oa(ObjectAttributes, &rw);
     if (!rw.active) {
+        /* HKLM 写策略（P2-7）：路径级创建目标为 HKLM 时按 flag 拒绝。 */
+        if (ObjectAttributes != NULL && ObjectAttributes->ObjectName != NULL &&
+            ObjectAttributes->ObjectName->Buffer != NULL &&
+            gvhd_reg_ieq_prefix(ObjectAttributes->ObjectName->Buffer,
+                                GVHD_REG_PREFIX_MACHINE)) {
+            NTSTATUS deny = gvhd_reg_hklm_write_deny(
+                ObjectAttributes->ObjectName->Buffer);
+            if (deny != 0) {
+                return deny;
+            }
+        }
         return pfnOrig_NtCreateKey(KeyHandle, DesiredAccess, ObjectAttributes,
                                    TitleIndex, Class, CreateOptions, Disposition);
     }
@@ -749,6 +778,17 @@ static NTSTATUS NTAPI Hook_NtCreateKeyEx(
 
     gvhd_reg_eval_oa(ObjectAttributes, &rw);
     if (!rw.active) {
+        /* HKLM 写策略（P2-7）：创建目标为 HKLM 时按 flag 拒绝。 */
+        if (ObjectAttributes != NULL && ObjectAttributes->ObjectName != NULL &&
+            ObjectAttributes->ObjectName->Buffer != NULL &&
+            gvhd_reg_ieq_prefix(ObjectAttributes->ObjectName->Buffer,
+                                GVHD_REG_PREFIX_MACHINE)) {
+            NTSTATUS deny = gvhd_reg_hklm_write_deny(
+                ObjectAttributes->ObjectName->Buffer);
+            if (deny != 0) {
+                return deny;
+            }
+        }
         return pfnOrig_NtCreateKeyEx(KeyHandle, DesiredAccess, ObjectAttributes,
                                      TitleIndex, Class, CreateOptions,
                                      Disposition, ExtendedDisposition);
@@ -776,6 +816,17 @@ static NTSTATUS NTAPI Hook_NtCreateKeyTransacted(
 
     gvhd_reg_eval_oa(ObjectAttributes, &rw);
     if (!rw.active) {
+        /* HKLM 写策略（P2-7）：创建目标为 HKLM 时按 flag 拒绝。 */
+        if (ObjectAttributes != NULL && ObjectAttributes->ObjectName != NULL &&
+            ObjectAttributes->ObjectName->Buffer != NULL &&
+            gvhd_reg_ieq_prefix(ObjectAttributes->ObjectName->Buffer,
+                                GVHD_REG_PREFIX_MACHINE)) {
+            NTSTATUS deny = gvhd_reg_hklm_write_deny(
+                ObjectAttributes->ObjectName->Buffer);
+            if (deny != 0) {
+                return deny;
+            }
+        }
         return pfnOrig_NtCreateKeyTransacted(KeyHandle, DesiredAccess, ObjectAttributes,
                                              TitleIndex, Class, CreateOptions,
                                              TransactionHandle, Disposition);
@@ -803,6 +854,17 @@ static NTSTATUS NTAPI Hook_NtCreateKeyTransactedEx(
 
     gvhd_reg_eval_oa(ObjectAttributes, &rw);
     if (!rw.active) {
+        /* HKLM 写策略（P2-7）：创建目标为 HKLM 时按 flag 拒绝。 */
+        if (ObjectAttributes != NULL && ObjectAttributes->ObjectName != NULL &&
+            ObjectAttributes->ObjectName->Buffer != NULL &&
+            gvhd_reg_ieq_prefix(ObjectAttributes->ObjectName->Buffer,
+                                GVHD_REG_PREFIX_MACHINE)) {
+            NTSTATUS deny = gvhd_reg_hklm_write_deny(
+                ObjectAttributes->ObjectName->Buffer);
+            if (deny != 0) {
+                return deny;
+            }
+        }
         return pfnOrig_NtCreateKeyTransactedEx(KeyHandle, DesiredAccess, ObjectAttributes,
                                                TitleIndex, Class, CreateOptions,
                                                TransactionHandle, Disposition,
@@ -837,6 +899,12 @@ static NTSTATUS NTAPI Hook_NtDeleteKey(HANDLE KeyHandle)
     status = gvhd_reg_handle_path(KeyHandle, path, GVHD_REG_PATH_MAX);
     if (status != GVHD_STATUS_SUCCESS) {
         return pfnOrig_NtDeleteKey(KeyHandle);   /* 无法识别：放行原行为 */
+    }
+    if (gvhd_reg_ieq_prefix(path, GVHD_REG_PREFIX_MACHINE)) {
+        NTSTATUS deny = gvhd_reg_hklm_write_deny(path);
+        if (deny != 0) {
+            return deny;
+        }
     }
     if (gvhd_reg_is_hive_path(path)) {
         return pfnOrig_NtDeleteKey(KeyHandle);
@@ -884,6 +952,12 @@ static NTSTATUS NTAPI Hook_NtDeleteValueKey(HANDLE KeyHandle, PUNICODE_STRING Va
     if (status != GVHD_STATUS_SUCCESS) {
         return pfnOrig_NtDeleteValueKey(KeyHandle, ValueName);
     }
+    if (gvhd_reg_ieq_prefix(path, GVHD_REG_PREFIX_MACHINE)) {
+        NTSTATUS deny = gvhd_reg_hklm_write_deny(path);
+        if (deny != 0) {
+            return deny;
+        }
+    }
     if (gvhd_reg_is_hive_path(path)) {
         return pfnOrig_NtDeleteValueKey(KeyHandle, ValueName);
     }
@@ -905,6 +979,17 @@ static NTSTATUS NTAPI Hook_NtSetValueKey(
     HANDLE KeyHandle, PUNICODE_STRING ValueName, ULONG TitleIndex, ULONG Type,
     PVOID Data, ULONG DataSize)
 {
+    wchar_t path[GVHD_REG_PATH_MAX];
+    NTSTATUS status;
+
+    status = gvhd_reg_handle_path(KeyHandle, path, GVHD_REG_PATH_MAX);
+    if (status == GVHD_STATUS_SUCCESS &&
+        gvhd_reg_ieq_prefix(path, GVHD_REG_PREFIX_MACHINE)) {
+        NTSTATUS deny = gvhd_reg_hklm_write_deny(path);
+        if (deny != 0) {
+            return deny;
+        }
+    }
     return pfnOrig_NtSetValueKey(KeyHandle, ValueName, TitleIndex, Type, Data, DataSize);
 }
 

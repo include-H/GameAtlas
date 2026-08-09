@@ -35,6 +35,8 @@ pub const GVHD_RULE_FLAG_REWRITE: u32 = 0x0000_0001;
 pub const GVHD_PARAM_FLAG_GAME_DRIVE_SHIFT: u32 = 8;
 /// 参数 flags 中实际游戏 VHD 盘符的掩码。
 pub const GVHD_PARAM_FLAG_GAME_DRIVE_MASK: u32 = 0x1f << GVHD_PARAM_FLAG_GAME_DRIVE_SHIFT;
+/// 参数 flags：HKLM 写拒绝（P2-7，runtime 默认置位；清位=透传）。
+pub const GVHD_PARAM_FLAG_HKLM_WRITE_DENY: u32 = 0x0000_0004;
 /// 规则动作标志：命中 → 不重写（直通宿主/原路径）。
 pub const GVHD_RULE_FLAG_PASSTHROUGH: u32 = 0x0000_0002;
 /// 参数块大小（字节）。
@@ -243,7 +245,7 @@ pub fn param_block_with_drive(
     // 标量头部。
     buf[0..4].copy_from_slice(&GVHD_PARAM_MAGIC.to_le_bytes());
     buf[4..8].copy_from_slice(&GVHD_PROTOCOL_VERSION.to_le_bytes());
-    let flags = encode_game_drive_flag(game_drive);
+    let flags = encode_game_drive_flag(game_drive) | GVHD_PARAM_FLAG_HKLM_WRITE_DENY;
     buf[8..12].copy_from_slice(&flags.to_le_bytes());
     buf[12..16].copy_from_slice(&(rule_count as u32).to_le_bytes());
     buf[16..20].copy_from_slice(&(PARAM_BLOCK_SIZE as u32).to_le_bytes());
@@ -444,7 +446,7 @@ mod tests {
         assert_eq!(&block[0..4], b"GVHD");
         assert_eq!(u32at(&block, 0), 0x4448_5647);
         assert_eq!(u32at(&block, 4), GVHD_PROTOCOL_VERSION);
-        assert_eq!(u32at(&block, 8), 0, "flags 恒为 0");
+        assert_eq!(u32at(&block, 8), GVHD_PARAM_FLAG_HKLM_WRITE_DENY, "flags = HKLM_WRITE_DENY");
         assert_eq!(u32at(&block, 12), n as u32, "rule_count");
         assert_eq!(u32at(&block, 16), PARAM_BLOCK_SIZE as u32, "rule_table_offset");
         assert_eq!(u32at(&block, 20), 17, "game_id_len = 'horizon-zero-dawn' 17 码元");
@@ -502,8 +504,14 @@ mod tests {
             &[],
             'g',
         );
-        assert_eq!(u32at(&block, 8), 7 << GVHD_PARAM_FLAG_GAME_DRIVE_SHIFT);
-        assert_eq!(u32at(&block, 8) & !GVHD_PARAM_FLAG_GAME_DRIVE_MASK, 0);
+        assert_eq!(
+            u32at(&block, 8),
+            (7 << GVHD_PARAM_FLAG_GAME_DRIVE_SHIFT) | GVHD_PARAM_FLAG_HKLM_WRITE_DENY
+        );
+        assert_eq!(
+            u32at(&block, 8) & !(GVHD_PARAM_FLAG_GAME_DRIVE_MASK | GVHD_PARAM_FLAG_HKLM_WRITE_DENY),
+            0
+        );
         assert_eq!(block.len(), PARAM_BLOCK_SIZE);
     }
 }

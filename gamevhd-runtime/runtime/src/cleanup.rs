@@ -118,6 +118,7 @@ mod tests {
             state: BoxState::Clean,
             game_data_base: String::new(),
             game_data_name: String::new(),
+            user_namespace: false,
         };
         bf.save(&path).unwrap();
 
@@ -140,6 +141,7 @@ mod tests {
             state: BoxState::Running,
             game_data_base: String::new(),
             game_data_name: String::new(),
+            user_namespace: false,
         };
         bf.save(&path).unwrap();
         let result = cleanup_box(path.to_str().unwrap(), Some("C:\\nonexistent-diff.vhd"), None);
@@ -171,6 +173,7 @@ mod tests {
             state: BoxState::Clean,
             game_data_base: String::new(),
             game_data_name: String::new(),
+            user_namespace: false,
         };
         assert!(bf.transition(BoxState::Running).is_ok());
         assert!(bf.transition(BoxState::Cleaning).is_ok());

@@ -73,6 +73,8 @@ pub struct BoxFile {
     pub game_data_base: String,
     /// 外部状态库的游戏目录名（如 `地平线`）；为空时由启动器配置推导。
     pub game_data_name: String,
+    /// 外部状态库目录名附带用户标识（审计 P2-9 多用户隔离）；缺省 false 兼容旧布局。
+    pub user_namespace: bool,
 }
 
 /// box.json 相关错误。
@@ -135,7 +137,7 @@ impl BoxFile {
     /// 序列化为 box.json 文本（2 空格缩进，与 §3.6 示例一致）。
     pub fn to_json(&self) -> String {
         format!(
-            "{{\n  \"game_id\": \"{}\",\n  \"exe_relative\": \"{}\",\n  \"game_data_root\": \"{}\",\n  \"user_profile\": \"{}\",\n  \"registry_hive\": \"{}\",\n  \"skip_cache_dirs\": {},\n  \"state\": \"{}\",\n  \"game_data_base\": \"{}\",\n  \"game_data_name\": \"{}\"\n}}",
+            "{{\n  \"game_id\": \"{}\",\n  \"exe_relative\": \"{}\",\n  \"game_data_root\": \"{}\",\n  \"user_profile\": \"{}\",\n  \"registry_hive\": \"{}\",\n  \"skip_cache_dirs\": {},\n  \"state\": \"{}\",\n  \"game_data_base\": \"{}\",\n  \"game_data_name\": \"{}\",\n  \"user_namespace\": {}\n}}",
             escape_json(&self.game_id),
             escape_json(&self.exe_relative),
             escape_json(&self.game_data_root),
@@ -145,6 +147,7 @@ impl BoxFile {
             escape_json(self.state.as_str()),
             escape_json(&self.game_data_base),
             escape_json(&self.game_data_name),
+            if self.user_namespace { "true" } else { "false" },
         )
     }
 
@@ -161,8 +164,9 @@ impl BoxFile {
             state: BoxState::Clean,
             game_data_base: String::new(),
             game_data_name: String::new(),
+            user_namespace: false,
         };
-        let mut seen = [false; 9];
+        let mut seen = [false; 10];
         for (key, value) in parse_json_object(s).map_err(BoxError::InvalidJson)? {
             let idx = match key.as_str() {
                 "game_id" => 0,
@@ -174,6 +178,7 @@ impl BoxFile {
                 "state" => 6,
                 "game_data_base" => 7,
                 "game_data_name" => 8,
+                "user_namespace" => 9,
                 other => return Err(BoxError::InvalidJson(format!("未知字段 '{other}'"))),
             };
             if seen[idx] {
@@ -204,6 +209,17 @@ impl BoxFile {
                 }
                 7 => bf.game_data_base = value,
                 8 => bf.game_data_name = value,
+                9 => {
+                    bf.user_namespace = match value.as_str() {
+                        "true" => true,
+                        "false" => false,
+                        other => {
+                            return Err(BoxError::InvalidJson(format!(
+                                "非法 user_namespace 值 '{other}'"
+                            )))
+                        }
+                    }
+                }
                 _ => unreachable!("box.json 字段索引超出范围"),
             }
         }

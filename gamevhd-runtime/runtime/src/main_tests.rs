@@ -152,6 +152,7 @@ fn parse_run_flags_in_any_order() {
     let want = Command::Run {
         drive: 'E',
         box_path: r"C:\box.json".into(),
+        hklm_write_passthrough: false,
     };
     assert_eq!(
         parse_args(&args(&["gv", "run", "--drive", "E", "--box", r"C:\box.json"])),
@@ -161,6 +162,26 @@ fn parse_run_flags_in_any_order() {
         parse_args(&args(&["gv", "run", "--box", r"C:\box.json", "--drive", "e"])),
         Ok(want.clone()),
         "选项乱序 + 小写盘符应归一化"
+    );
+    // P2-7：--hklm-write passthrough 切透传。
+    assert_eq!(
+        parse_args(&args(&[
+            "gv", "run", "--drive", "E", "--box", r"C:\box.json",
+            "--hklm-write", "passthrough",
+        ])),
+        Ok(Command::Run {
+            drive: 'E',
+            box_path: r"C:\box.json".into(),
+            hklm_write_passthrough: true,
+        })
+    );
+    assert!(
+        parse_args(&args(&[
+            "gv", "run", "--drive", "E", "--box", r"C:\box.json",
+            "--hklm-write", "bogus",
+        ]))
+        .is_err(),
+        "--hklm-write 非法值"
     );
     // 未知裸标志告警忽略，不影响解析。
     assert_eq!(

@@ -15,6 +15,7 @@ use super::*;
             state: BoxState::Clean,
             game_data_base: String::new(),
             game_data_name: String::new(),
+            user_namespace: false,
         }
     }
 
