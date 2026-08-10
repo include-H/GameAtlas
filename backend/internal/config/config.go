@@ -162,11 +162,35 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.AdminPassword) == "" {
 		return fmt.Errorf("ADMIN_PASSWORD must be configured")
 	}
+	if c.Port < 0 || c.Port > 65535 {
+		return fmt.Errorf("PORT must be between 0 and 65535")
+	}
 	if c.DBBackupInterval < 0 {
 		return fmt.Errorf("DB_BACKUP_INTERVAL must be zero or positive")
 	}
 	if c.DBBackupRetentionCount < 0 {
 		return fmt.Errorf("DB_BACKUP_RETENTION_COUNT must be zero or positive")
+	}
+	if c.WikiHistoryLimit < 0 {
+		return fmt.Errorf("WIKI_HISTORY_LIMIT must be zero or positive")
+	}
+	if c.AuthMaxFails < 0 {
+		return fmt.Errorf("AUTH_MAX_FAILS must be zero or positive")
+	}
+	if c.AuthCooldown < 0 {
+		return fmt.Errorf("AUTH_COOLDOWN must be zero or positive")
+	}
+	if c.AuthFailWindow < 0 {
+		return fmt.Errorf("AUTH_FAIL_WINDOW must be zero or positive")
+	}
+	if c.AuthStateTTL < 0 {
+		return fmt.Errorf("AUTH_STATE_TTL must be zero or positive")
+	}
+	if c.ReadHeaderTimeout <= 0 {
+		return fmt.Errorf("READ_HEADER_TIMEOUT must be positive")
+	}
+	if c.ShutdownTimeout <= 0 {
+		return fmt.Errorf("SHUTDOWN_TIMEOUT must be positive")
 	}
 	if _, err := parseProxyURL(c.Proxy); err != nil {
 		return err

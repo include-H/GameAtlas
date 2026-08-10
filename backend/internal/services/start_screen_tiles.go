@@ -1,7 +1,9 @@
 package services
 
 import (
+	"errors"
 	"mime/multipart"
+	"os"
 	"strings"
 
 	"github.com/hao/game/internal/domain"
@@ -55,34 +57,48 @@ func (s *StartScreenTilesService) Update(
 		return nil, err
 	}
 	normalizedColumns = ensureStartScreenColumns(normalizedColumns, normalized)
+	movedPaths := make([]string, 0)
 	for i := range normalized {
-		if err := s.moveTileImagesToPermanent(&normalized[i]); err != nil {
-			return nil, err
+		moved, err := s.moveTileImagesToPermanent(&normalized[i])
+		movedPaths = append(movedPaths, moved...)
+		if err != nil {
+			return nil, errors.Join(err, s.cleanupMovedTileImages(movedPaths))
 		}
 	}
-	if err := s.columnsRepo.Replace(normalizedColumns); err != nil {
-		return nil, err
-	}
-	if err := s.tilesRepo.Replace(normalized); err != nil {
-		return nil, err
+	if err := s.tilesRepo.ReplaceLayout(normalizedColumns, normalized); err != nil {
+		return nil, errors.Join(err, s.cleanupMovedTileImages(movedPaths))
 	}
 	return s.List(true)
 }
 
 // moveTileImagesToPermanent 与游戏素材编辑一致：上传只进 staging，保存布局时才把
 // 本次引用的裁剪图转正到 assets/start-screen/，未保存的裁剪图留在 staging 由启动清理兜底。
-func (s *StartScreenTilesService) moveTileImagesToPermanent(tile *domain.StartScreenTileWrite) error {
+func (s *StartScreenTilesService) moveTileImagesToPermanent(tile *domain.StartScreenTileWrite) ([]string, error) {
+	movedPaths := make([]string, 0, 3)
 	for _, path := range []*string{tile.ImageSmallPath, tile.ImageWidePath, tile.ImageLargePath} {
 		if path == nil || strings.TrimSpace(*path) == "" {
 			continue
 		}
-		moved, err := s.store.MoveToPermanent(*path, "start-screen")
+		permanentPath, moved, err := s.store.MoveToPermanentWithStatus(*path, "start-screen")
 		if err != nil {
-			return err
+			return movedPaths, err
 		}
-		*path = moved
+		*path = permanentPath
+		if moved {
+			movedPaths = append(movedPaths, permanentPath)
+		}
 	}
-	return nil
+	return movedPaths, nil
+}
+
+func (s *StartScreenTilesService) cleanupMovedTileImages(paths []string) error {
+	var cleanupErr error
+	for _, path := range paths {
+		if err := s.store.DeleteAsset(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			cleanupErr = errors.Join(cleanupErr, err)
+		}
+	}
+	return cleanupErr
 }
 
 // AddTile 从游戏库卡片入口追加一个磁贴到当前布局的第一个空位；已在开始屏幕时幂等返回当前布局。

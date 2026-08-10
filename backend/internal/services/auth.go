@@ -25,7 +25,6 @@ import (
 // handler and route packages.
 const AuthCookieName = "gameatlas_admin"
 
-
 type sessionCacheEntry struct {
 	valid         bool
 	checkedAtUnix int64
@@ -68,6 +67,7 @@ type AuthService struct {
 	stateTTL     time.Duration
 	sessionTTL   time.Duration
 	trackBy      string
+	loginMu      sync.Mutex
 
 	// Session validation cache
 	sessionCache    sync.Map
@@ -141,6 +141,12 @@ func (s *AuthService) SourceKey(clientIP, userAgent string) string {
 }
 
 func (s *AuthService) Login(password, sourceKey string) (string, error) {
+	// Load-and-update of a failed-login record must be serialized within the
+	// process; otherwise concurrent wrong-password requests can overwrite one
+	// another and delay the configured lockout.
+	s.loginMu.Lock()
+	defer s.loginMu.Unlock()
+
 	if s.adminPassword == "" {
 		return "", domain.ErrAuthDisabled
 	}

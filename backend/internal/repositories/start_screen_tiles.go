@@ -69,25 +69,37 @@ func (r *StartScreenTilesRepository) Replace(tiles []domain.StartScreenTileWrite
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec(`DELETE FROM start_screen_tiles`); err != nil {
-		return fmt.Errorf("clear start screen tiles: %w", err)
-	}
-
-	for index, tile := range tiles {
-		if _, err := tx.Exec(`
-			INSERT INTO start_screen_tiles (
-				game_id, tile_size, image_small_path, image_wide_path, image_large_path,
-				sort_order, column_index, grid_row, grid_col
-			)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, tile.GameID, tile.TileSize, tile.ImageSmallPath, tile.ImageWidePath, tile.ImageLargePath,
-			index, tile.ColumnIndex, tile.GridRow, tile.GridCol); err != nil {
-			return fmt.Errorf("insert start screen tile: %w", err)
-		}
+	if err := replaceStartScreenTiles(tx, tiles); err != nil {
+		return fmt.Errorf("replace start screen tiles: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit start screen tiles replace: %w", err)
+	}
+	return nil
+}
+
+// ReplaceLayout atomically replaces columns and tiles because they form one
+// persisted start-screen layout.
+func (r *StartScreenTilesRepository) ReplaceLayout(
+	columns []domain.StartScreenColumnWrite,
+	tiles []domain.StartScreenTileWrite,
+) error {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return fmt.Errorf("begin start screen layout replace: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := replaceStartScreenColumns(tx, columns); err != nil {
+		return fmt.Errorf("replace start screen layout columns: %w", err)
+	}
+	if err := replaceStartScreenTiles(tx, tiles); err != nil {
+		return fmt.Errorf("replace start screen layout tiles: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit start screen layout replace: %w", err)
 	}
 	return nil
 }

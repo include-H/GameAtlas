@@ -2,6 +2,7 @@ package services
 
 import (
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -112,6 +113,38 @@ func TestAuthServiceStateTTLLimitUsesLongestWindow(t *testing.T) {
 
 	if got := service.stateTTLLimit(); got != 40*time.Minute {
 		t.Fatalf("stateTTLLimit() = %s, want 40m0s", got)
+	}
+}
+
+func TestAuthServiceConcurrentFailuresReachLockout(t *testing.T) {
+	db := openAuthTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	service := NewAuthService(config.Config{
+		AdminPassword:  "secret",
+		AuthMaxFails:   3,
+		AuthCooldown:   time.Minute,
+		AuthFailWindow: time.Hour,
+		AuthStateTTL:   time.Hour,
+	}, repositories.NewAuthAttemptRepository(db), repositories.NewAuthSessionRepository(db))
+
+	sourceKey := service.SourceKey("127.0.0.1", "")
+	var waitGroup sync.WaitGroup
+	for index := 0; index < 6; index++ {
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			_, _ = service.Login("wrong", sourceKey)
+		}()
+	}
+	waitGroup.Wait()
+
+	attempt, err := service.loadAttempt(sourceKey)
+	if err != nil {
+		t.Fatalf("loadAttempt returned error: %v", err)
+	}
+	if attempt == nil || attempt.FailCount < 3 || attempt.LockedUntilUnix <= time.Now().Unix() {
+		t.Fatalf("attempt state = %+v, want at least three failures and active lock", attempt)
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/hao/game/internal/domain"
+	"github.com/hao/game/internal/files"
 	"github.com/hao/game/internal/services"
 )
 
@@ -146,10 +147,15 @@ func (h *StartScreenTilesHandler) UploadImage(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
 	}
+	limitMultipartBody(c, files.MaxImageUploadBytes)
+	if err := parseMultipartForm(c); err != nil {
+		writeMultipartParseError(c, err, "需要上传图片文件")
+		return
+	}
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		writeJSONError(c, http.StatusBadRequest, "需要上传图片文件")
+		writeMultipartParseError(c, err, "需要上传图片文件")
 		return
 	}
 

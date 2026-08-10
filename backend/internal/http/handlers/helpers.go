@@ -16,6 +16,8 @@ import (
 // Transport helpers only write the shared HTTP envelope.
 // They must not assemble business payload fields. Handler-specific response
 // shapes belong to explicit DTO structs so transport contracts stay reviewable.
+const maxJSONBodyBytes int64 = 10 << 20
+
 func writeJSONSuccess[T any](c *gin.Context, status int, data T) {
 	c.JSON(status, successEnvelope[T]{
 		Success: true,
@@ -106,6 +108,11 @@ func writeServiceError(c *gin.Context, err error, validationMessage string) {
 }
 
 func decodeJSONStrict(c *gin.Context, target any) error {
+	if c == nil || c.Request == nil || c.Request.Body == nil {
+		return errors.New("missing json request body")
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxJSONBodyBytes)
+
 	decoder := json.NewDecoder(c.Request.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {

@@ -249,6 +249,69 @@ func TestStartScreenTilesUpdateMovesStagedImagesToPermanent(t *testing.T) {
 	}
 }
 
+func TestStartScreenTilesUpdateRollsBackColumnsWhenTileWriteFails(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	firstID := insertServicesTestGame(t, db, "tile-atomic-a", "Tile Atomic A", domain.GameVisibilityPublic)
+	secondID := insertServicesTestGame(t, db, "tile-atomic-b", "Tile Atomic B", domain.GameVisibilityPublic)
+	assetsDir := t.TempDir()
+	service := NewStartScreenTilesService(
+		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewStartScreenColumnsRepository(db),
+		repositories.NewGamesRepository(db),
+		files.NewAssetStore(assetsDir),
+	)
+
+	if _, err := service.Update(
+		[]domain.StartScreenColumnWrite{{Name: "旧列"}},
+		[]domain.StartScreenTileWrite{{GameID: firstID, TileSize: "small"}},
+	); err != nil {
+		t.Fatalf("initial Update returned error: %v", err)
+	}
+	if _, err := db.Exec(`
+		CREATE TRIGGER fail_start_screen_tile_insert
+		BEFORE INSERT ON start_screen_tiles
+		BEGIN
+			SELECT RAISE(ABORT, 'test tile insert failure');
+		END
+	`); err != nil {
+		t.Fatalf("create failure trigger: %v", err)
+	}
+	defer func() { _, _ = db.Exec(`DROP TRIGGER fail_start_screen_tile_insert`) }()
+
+	filename := "33333333-3333-4333-8333-333333333333.png"
+	stagingFile := filepath.Join(assetsDir, "_staging", "start-screen", filename)
+	if err := os.MkdirAll(filepath.Dir(stagingFile), 0o755); err != nil {
+		t.Fatalf("create staging directory: %v", err)
+	}
+	if err := os.WriteFile(stagingFile, []byte("staged-image"), 0o644); err != nil {
+		t.Fatalf("write staged image: %v", err)
+	}
+	imagePath := "/assets/start-screen/" + filename
+
+	if _, err := service.Update(
+		[]domain.StartScreenColumnWrite{{Name: "新列"}},
+		[]domain.StartScreenTileWrite{{GameID: secondID, TileSize: "wide", ImageSmallPath: &imagePath}},
+	); err == nil {
+		t.Fatal("Update returned nil error with forced tile insert failure")
+	}
+	if _, err := os.Stat(filepath.Join(assetsDir, "start-screen", filename)); !os.IsNotExist(err) {
+		t.Fatalf("permanent image after failed update has err=%v, want it removed", err)
+	}
+
+	layout, err := service.List(true)
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if len(layout.Columns) != 1 || layout.Columns[0].Name != "旧列" {
+		t.Fatalf("columns after failed update = %+v, want old layout", layout.Columns)
+	}
+	if len(layout.Tiles) != 1 || layout.Tiles[0].GameID != firstID {
+		t.Fatalf("tiles after failed update = %+v, want old layout", layout.Tiles)
+	}
+}
+
 func TestStartScreenTilesUploadTileImageStagesOnly(t *testing.T) {
 	assetsDir := t.TempDir()
 	service := NewStartScreenTilesService(

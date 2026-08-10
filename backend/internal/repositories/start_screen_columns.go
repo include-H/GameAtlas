@@ -40,17 +40,8 @@ func (r *StartScreenColumnsRepository) Replace(columns []domain.StartScreenColum
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec(`DELETE FROM start_screen_columns`); err != nil {
-		return fmt.Errorf("clear start screen columns: %w", err)
-	}
-
-	for index, column := range columns {
-		if _, err := tx.Exec(`
-			INSERT INTO start_screen_columns (name, sort_order)
-			VALUES (?, ?)
-		`, column.Name, index); err != nil {
-			return fmt.Errorf("insert start screen column: %w", err)
-		}
+	if err := replaceStartScreenColumns(tx, columns); err != nil {
+		return fmt.Errorf("replace start screen columns: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {

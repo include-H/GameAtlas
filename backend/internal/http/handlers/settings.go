@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/hao/game/internal/files"
 	"github.com/hao/game/internal/services"
 )
 
@@ -59,10 +60,15 @@ func (h *SettingsHandler) UploadBackground(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
 	}
+	limitMultipartBody(c, files.MaxImageUploadBytes)
+	if err := parseMultipartForm(c); err != nil {
+		writeMultipartParseError(c, err, "请选择图片文件")
+		return
+	}
 
 	file, header, err := c.Request.FormFile("bg")
 	if err != nil {
-		writeJSONError(c, http.StatusBadRequest, "请选择图片文件")
+		writeMultipartParseError(c, err, "请选择图片文件")
 		return
 	}
 	defer file.Close()
