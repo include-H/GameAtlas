@@ -1,6 +1,8 @@
 package files
 
 import (
+	"bytes"
+	"errors"
 	"image"
 	"image/color"
 	"image/gif"
@@ -68,6 +70,84 @@ func TestAssetStoreEnsureVariantGeneratesWebP(t *testing.T) {
 	}
 	if variantInfo.Size() >= srcInfo.Size() {
 		t.Fatalf("variant size %d not smaller than original %d", variantInfo.Size(), srcInfo.Size())
+	}
+}
+
+func TestAssetStoreSaveToStagingRejectsInvalidImageContent(t *testing.T) {
+	store := NewAssetStore(t.TempDir())
+
+	_, err := store.SaveToStaging(
+		"game-a",
+		"cover",
+		"11111111-1111-4111-8111-111111111111",
+		bytes.NewReader([]byte("not-an-image")),
+		"image/png",
+	)
+	if !errors.Is(err, ErrInvalidImageContent) {
+		t.Fatalf("SaveToStaging error = %v, want ErrInvalidImageContent", err)
+	}
+}
+
+func TestAssetStoreSaveToStagingRejectsOversizedImage(t *testing.T) {
+	store := NewAssetStore(t.TempDir())
+
+	_, err := store.SaveToStaging(
+		"game-a",
+		"cover",
+		"55555555-5555-4555-8555-555555555555",
+		bytes.NewReader(bytes.Repeat([]byte{'x'}, int(MaxImageUploadBytes+1))),
+		"image/png",
+	)
+	if !errors.Is(err, ErrUploadTooLarge) {
+		t.Fatalf("SaveToStaging error = %v, want ErrUploadTooLarge", err)
+	}
+}
+
+func TestAssetStoreSaveToStagingScopesFilesByGame(t *testing.T) {
+	baseDir := t.TempDir()
+	store := NewAssetStore(baseDir)
+	var encoded bytes.Buffer
+	img := image.NewRGBA(image.Rect(0, 0, 32, 32))
+	if err := png.Encode(&encoded, img); err != nil {
+		t.Fatalf("encode test image: %v", err)
+	}
+	assetPath, err := store.SaveToStaging(
+		"game-a",
+		"cover",
+		"33333333-3333-4333-8333-333333333333",
+		bytes.NewReader(encoded.Bytes()),
+		"image/png",
+	)
+	if err != nil {
+		t.Fatalf("SaveToStaging returned error: %v", err)
+	}
+	if assetPath != "/assets/game-a/33333333-3333-4333-8333-333333333333.png" {
+		t.Fatalf("assetPath = %q, want game-scoped asset path", assetPath)
+	}
+	if !store.AssetExists(assetPath) {
+		t.Fatalf("AssetExists(%q) = false, want true for matching staged game", assetPath)
+	}
+	if store.AssetExists("/assets/game-b/33333333-3333-4333-8333-333333333333.png") {
+		t.Fatalf("AssetExists for another game = true, want false")
+	}
+}
+
+func TestAssetStoreMoveToPermanentRejectsOtherGamePath(t *testing.T) {
+	baseDir := t.TempDir()
+	store := NewAssetStore(baseDir)
+	stagingFile := filepath.Join(baseDir, "_staging", "game-a", "44444444-4444-4444-8444-444444444444.png")
+	if err := os.MkdirAll(filepath.Dir(stagingFile), 0o755); err != nil {
+		t.Fatalf("create staging directory: %v", err)
+	}
+	writeTestImage(t, stagingFile, 16, 16, func(w io.Writer, m image.Image) error {
+		return png.Encode(w, m)
+	})
+
+	if _, err := store.MoveToPermanent(
+		"/assets/game-b/44444444-4444-4444-8444-444444444444.png",
+		"game-a",
+	); !errors.Is(err, ErrInvalidAssetPath) {
+		t.Fatalf("MoveToPermanent error = %v, want ErrInvalidAssetPath", err)
 	}
 }
 

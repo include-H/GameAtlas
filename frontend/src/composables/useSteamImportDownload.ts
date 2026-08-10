@@ -6,7 +6,7 @@ import type {
 } from '@/utils/edit-game-form'
 import steamService, { proxySteamAssetUrl } from '@/services/steam.service'
 import steamGridDBService from '@/services/steamgriddb.service'
-import { useSteamPicker } from '@/composables/useSteamPicker'
+import { useSteamPicker, type SteamPickerRequest } from '@/composables/useSteamPicker'
 import type { SteamGameSearchResult } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
 
@@ -40,6 +40,7 @@ interface UseSteamImportDownloadOptions {
   rememberedSgdbGame?: Ref<SteamGameSearchResult | null>
   onSteamGameSelected?: (game: SteamGameSearchResult) => void
   onSgdbGameSelected?: (game: SteamGameSearchResult) => void
+  forgetGame?: (source: ImportSource) => void
 }
 
 export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) => {
@@ -68,11 +69,12 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
   steamGridDBService.isAvailable().then((v) => { sgdbAvailable.value = v })
 
   const coverSteamPicker = useSteamPicker<string[]>({
-    onSelect: async (game) => {
+    onSelect: async (game, request) => {
       const details = await steamService.getGameDetails(game.id)
       const images = [details.coverImage, details.bannerImage].filter(
         (value): value is string => !!value,
       )
+      if (!request.isCurrent()) return images
       steamCoverImages.value = images
       selectedCoverImage.value = ''
       selectedCovers.value = new Set()
@@ -85,9 +87,10 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
   })
 
   const bannerSteamPicker = useSteamPicker<string[]>({
-    onSelect: async (game) => {
+    onSelect: async (game, request) => {
       const details = await steamService.getGameDetails(game.id)
       const images = Array.from(new Set([details.bannerImage, details.coverImage].filter(Boolean) as string[]))
+      if (!request.isCurrent()) return images
       steamBannerImages.value = images
       selectedBanners.value = new Set()
       options.onSteamGameSelected?.(game)
@@ -108,25 +111,60 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
   const selectedSteamBannerGame = bannerSteamPicker.selectedGame
   const isSearchingSteamBanner = bannerSteamPicker.isSearching
 
-  // SteamGridDB search helpers
-  const sgdbSearchResults = ref<SteamGameSearchResult[]>([])
-  const sgdbSearching = ref(false)
-  const sgdbThumbs = ref<Record<string, string>>({})
+  // Keep cover and banner searches independent: both modals can be mounted at once.
+  const sgdbCoverSearchResults = ref<SteamGameSearchResult[]>([])
+  const sgdbCoverSearching = ref(false)
+  const sgdbCoverThumbs = ref<Record<string, string>>({})
+  const sgdbBannerSearchResults = ref<SteamGameSearchResult[]>([])
+  const sgdbBannerSearching = ref(false)
+  const sgdbBannerThumbs = ref<Record<string, string>>({})
+  let coverSgdbRequestGeneration = 0
+  let bannerSgdbRequestGeneration = 0
 
-  const searchSGDB = async (query: string): Promise<SteamGameSearchResult[]> => {
+  const beginSgdbRequest = (source: 'cover' | 'banner') => {
+    const generation = source === 'cover'
+      ? ++coverSgdbRequestGeneration
+      : ++bannerSgdbRequestGeneration
+    return {
+      isCurrent: () => (source === 'cover'
+        ? generation === coverSgdbRequestGeneration
+        : generation === bannerSgdbRequestGeneration),
+    }
+  }
+
+  const invalidateSgdbRequest = (source: 'cover' | 'banner') => {
+    if (source === 'cover') {
+      coverSgdbRequestGeneration += 1
+      sgdbCoverSearching.value = false
+    } else {
+      bannerSgdbRequestGeneration += 1
+      sgdbBannerSearching.value = false
+    }
+  }
+
+  const mapSgdbSearchResults = (games: Awaited<ReturnType<typeof steamGridDBService.search>>) => games.map((g) => ({
+    id: String(g.id),
+    name: g.name,
+    releaseDate: g.release_date ? new Date(g.release_date * 1000).getFullYear().toString() : undefined,
+  }))
+
+  const searchSGDB = async (
+    query: string,
+    source: 'cover' | 'banner',
+    request: ReturnType<typeof beginSgdbRequest>,
+  ): Promise<SteamGameSearchResult[]> => {
     const games = await steamGridDBService.search(query)
-    const results: SteamGameSearchResult[] = games.map((g) => ({
-      id: String(g.id),
-      name: g.name,
-      releaseDate: g.release_date ? new Date(g.release_date * 1000).getFullYear().toString() : undefined,
-    }))
-    sgdbThumbs.value = {}
+    const results = mapSgdbSearchResults(games)
+    if (!request.isCurrent()) return results
+
+    const thumbs = source === 'cover' ? sgdbCoverThumbs : sgdbBannerThumbs
+    thumbs.value = {}
     void Promise.allSettled(
       results.map(async (r) => {
         try {
           const grids = await steamGridDBService.getGridsByGameId(Number(r.id))
-          if (grids.length > 0) {
-            sgdbThumbs.value = { ...sgdbThumbs.value, [r.id]: grids[0].thumb }
+          if (request.isCurrent() && grids.length > 0) {
+            thumbs.value = { ...thumbs.value, [r.id]: grids[0].thumb }
           }
         } catch {
           // thumbnail is cosmetic — ignore failures
@@ -137,31 +175,39 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
   }
 
   const handleCoverSearchClear = () => {
+    forgetRememberedGame(coverSource.value)
+    invalidateSgdbRequest('cover')
     coverSteamPicker.clear()
-    sgdbSearchResults.value = []
-    sgdbThumbs.value = {}
+    sgdbCoverSearchResults.value = []
+    sgdbCoverThumbs.value = {}
     steamCoverImages.value = []
     selectedCoverImage.value = ''
     selectedCovers.value = new Set()
   }
 
   const searchSteamForCover = async () => {
+    const request = beginSgdbRequest('cover')
     steamCoverImages.value = []
     selectedCoverImage.value = ''
     selectedCovers.value = new Set()
     if (coverSource.value === 'steamgriddb') {
-      sgdbSearching.value = true
+      sgdbCoverSearching.value = true
       try {
-        sgdbSearchResults.value = await searchSGDB(coverSteamPicker.query.value)
+        const results = await searchSGDB(coverSteamPicker.query.value, 'cover', request)
+        if (!request.isCurrent()) return
+        sgdbCoverSearchResults.value = results
         coverSteamPicker.clearResults()
         coverSteamPicker.back()
       } catch (e) {
-        options.addAlert('SteamGridDB 搜索失败：' + getHttpErrorMessage(e), 'error')
+        if (request.isCurrent()) {
+          options.addAlert('SteamGridDB 搜索失败：' + getHttpErrorMessage(e), 'error')
+        }
       } finally {
-        sgdbSearching.value = false
+        if (request.isCurrent()) sgdbCoverSearching.value = false
       }
     } else {
-      sgdbSearchResults.value = []
+      sgdbCoverSearchResults.value = []
+      sgdbCoverThumbs.value = {}
       await coverSteamPicker.search()
     }
   }
@@ -169,14 +215,15 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
   const selectSteamCoverGame = async (game: SteamGameSearchResult) => {
     if (coverSource.value === 'steamgriddb') {
       try {
-        await coverSteamPicker.selectExternal(game, async () => {
+        await coverSteamPicker.selectExternal(game, async (request: SteamPickerRequest) => {
           const grids = await steamGridDBService.getGridsByGameId(Number(game.id))
           const images = grids.map((g) => g.url)
+          if (!request.isCurrent()) return
           steamCoverImages.value = images
           selectedCoverImage.value = ''
           selectedCovers.value = new Set()
+          options.onSgdbGameSelected?.(game)
         })
-        options.onSgdbGameSelected?.(game)
       } catch (e) {
         options.addAlert('SteamGridDB 获取封面失败：' + getHttpErrorMessage(e), 'error')
       }
@@ -186,7 +233,18 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
   }
 
   const backToCoverGameSearch = () => {
+    forgetRememberedGame(coverSource.value)
+    clearCoverSelectionState()
+    coverSteamPicker.clearResults()
+    const query = options.pickSteamSearchQuery()
+    coverSteamPicker.setQuery(query)
+    if (query) void searchSteamForCover()
+  }
+
+  const resetCoverAfterDownload = () => {
     coverSteamPicker.back()
+    coverSteamPicker.setQuery('')
+    coverSteamPicker.clearResults()
     steamCoverImages.value = []
     selectedCoverImage.value = ''
     selectedCovers.value = new Set()
@@ -225,9 +283,7 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
       options.form.value.covers.push(options.createEditableCover(uploaded))
       await options.onAssetPersisted?.()
       showCoverSelector.value = false
-      backToCoverGameSearch()
-      coverSteamPicker.setQuery('')
-      coverSteamPicker.clearResults()
+      resetCoverAfterDownload()
       options.addAlert('封面下载成功', 'success')
     } catch (error) {
       options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
@@ -263,9 +319,7 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
       }
       if (failedIndices.length === 0) {
         showCoverSelector.value = false
-        backToCoverGameSearch()
-        coverSteamPicker.setQuery('')
-        coverSteamPicker.clearResults()
+        resetCoverAfterDownload()
         options.addAlert(`成功添加 ${succeeded} 张封面`, 'success')
       } else if (succeeded > 0) {
         selectedCovers.value = new Set(failedIndices)
@@ -281,29 +335,37 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
   }
 
   const handleBannerSearchClear = () => {
+    forgetRememberedGame(bannerSource.value)
+    invalidateSgdbRequest('banner')
     bannerSteamPicker.clear()
-    sgdbSearchResults.value = []
-    sgdbThumbs.value = {}
+    sgdbBannerSearchResults.value = []
+    sgdbBannerThumbs.value = {}
     steamBannerImages.value = []
     selectedBanners.value = new Set()
   }
 
   const searchSteamForBanner = async () => {
+    const request = beginSgdbRequest('banner')
     steamBannerImages.value = []
     selectedBanners.value = new Set()
     if (bannerSource.value === 'steamgriddb') {
-      sgdbSearching.value = true
+      sgdbBannerSearching.value = true
       try {
-        sgdbSearchResults.value = await searchSGDB(bannerSteamPicker.query.value)
+        const results = await searchSGDB(bannerSteamPicker.query.value, 'banner', request)
+        if (!request.isCurrent()) return
+        sgdbBannerSearchResults.value = results
         bannerSteamPicker.clearResults()
         bannerSteamPicker.back()
       } catch (e) {
-        options.addAlert('SteamGridDB 搜索失败：' + getHttpErrorMessage(e), 'error')
+        if (request.isCurrent()) {
+          options.addAlert('SteamGridDB 搜索失败：' + getHttpErrorMessage(e), 'error')
+        }
       } finally {
-        sgdbSearching.value = false
+        if (request.isCurrent()) sgdbBannerSearching.value = false
       }
     } else {
-      sgdbSearchResults.value = []
+      sgdbBannerSearchResults.value = []
+      sgdbBannerThumbs.value = {}
       await bannerSteamPicker.search()
     }
   }
@@ -311,13 +373,14 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
   const selectSteamBannerGame = async (game: SteamGameSearchResult) => {
     if (bannerSource.value === 'steamgriddb') {
       try {
-        await bannerSteamPicker.selectExternal(game, async () => {
+        await bannerSteamPicker.selectExternal(game, async (request: SteamPickerRequest) => {
           const heroes = await steamGridDBService.getHeroesByGameId(Number(game.id))
           const images = heroes.map((g) => g.url)
+          if (!request.isCurrent()) return
           steamBannerImages.value = images
           selectedBanners.value = new Set()
+          options.onSgdbGameSelected?.(game)
         })
-        options.onSgdbGameSelected?.(game)
       } catch (e) {
         options.addAlert('SteamGridDB 获取横幅失败：' + getHttpErrorMessage(e), 'error')
       }
@@ -327,7 +390,18 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
   }
 
   const backToBannerGameSearch = () => {
+    forgetRememberedGame(bannerSource.value)
+    clearBannerSelectionState()
+    bannerSteamPicker.clearResults()
+    const query = options.pickSteamSearchQuery()
+    bannerSteamPicker.setQuery(query)
+    if (query) void searchSteamForBanner()
+  }
+
+  const resetBannerAfterDownload = () => {
     bannerSteamPicker.back()
+    bannerSteamPicker.setQuery('')
+    bannerSteamPicker.clearResults()
     steamBannerImages.value = []
     selectedBanners.value = new Set()
   }
@@ -384,9 +458,7 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
       }
       if (failedIndices.length === 0) {
         showBannerSelector.value = false
-        backToBannerGameSearch()
-        bannerSteamPicker.setQuery('')
-        bannerSteamPicker.clearResults()
+        resetBannerAfterDownload()
         bannerSearchUrl.value = ''
         bannerPreviewUrl.value = ''
         options.addAlert(`成功添加 ${succeeded} 张横幅`, 'success')
@@ -447,9 +519,30 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
     selectedBanners.value = next
   }
 
-  // Watch selectors opening — auto-populate search query or reuse remembered game
-  watch(showCoverSelector, (isOpen) => {
-    if (!isOpen) return
+  const forgetRememberedGame = (source: ImportSource) => {
+    options.forgetGame?.(source)
+  }
+
+  const clearCoverSelectionState = () => {
+    coverSteamPicker.back()
+    steamCoverImages.value = []
+    selectedCoverImage.value = ''
+    selectedCovers.value = new Set()
+  }
+
+  const clearBannerSelectionState = () => {
+    bannerSteamPicker.back()
+    steamBannerImages.value = []
+    selectedBanners.value = new Set()
+  }
+
+  const prepareCoverSource = () => {
+    invalidateSgdbRequest('cover')
+    coverSteamPicker.clear()
+    sgdbCoverSearchResults.value = []
+    sgdbCoverThumbs.value = {}
+    clearCoverSelectionState()
+
     const remembered = coverSource.value === 'steamgriddb'
       ? options.rememberedSgdbGame?.value
       : options.rememberedSteamGame?.value
@@ -458,88 +551,92 @@ export const useSteamImportDownload = (options: UseSteamImportDownloadOptions) =
       void selectSteamCoverGame(remembered)
       return
     }
+
     const query = options.pickSteamSearchQuery()
     if (!query) return
     coverSteamPicker.setQuery(query)
-    searchSteamForCover()
+    void searchSteamForCover()
+  }
+
+  const prepareBannerSource = () => {
+    invalidateSgdbRequest('banner')
+    bannerSteamPicker.clear()
+    sgdbBannerSearchResults.value = []
+    sgdbBannerThumbs.value = {}
+    clearBannerSelectionState()
+
+    const remembered = bannerSource.value === 'steamgriddb'
+      ? options.rememberedSgdbGame?.value
+      : options.rememberedSteamGame?.value
+    if (remembered) {
+      bannerSteamPicker.setQuery(remembered.id)
+      void selectSteamBannerGame(remembered)
+      return
+    }
+
+    const query = options.pickSteamSearchQuery()
+    if (!query) return
+    bannerSteamPicker.setQuery(query)
+    void searchSteamForBanner()
+  }
+
+  // Watch selectors opening — auto-populate search query or reuse remembered game
+  watch(showCoverSelector, (isOpen) => {
+    if (!isOpen) return
+    prepareCoverSource()
   })
 
   watch(showBannerSelector, (isOpen) => {
     if (!isOpen) return
-    const remembered = bannerSource.value === 'steamgriddb'
-      ? options.rememberedSgdbGame?.value
-      : options.rememberedSteamGame?.value
-    if (remembered) {
-      bannerSteamPicker.setQuery(remembered.id)
-      void selectSteamBannerGame(remembered)
-      return
-    }
-    const query = options.pickSteamSearchQuery()
-    if (!query) return
-    bannerSteamPicker.setQuery(query)
-    searchSteamForBanner()
+    prepareBannerSource()
   })
 
   watch(coverSource, () => {
     if (!showCoverSelector.value) return
-    const remembered = coverSource.value === 'steamgriddb'
-      ? options.rememberedSgdbGame?.value
-      : options.rememberedSteamGame?.value
-    if (remembered) {
-      coverSteamPicker.setQuery(remembered.id)
-      void selectSteamCoverGame(remembered)
-      return
-    }
-    const query = steamCoverSearchQuery.value.trim()
-    if (!query) return
-    searchSteamForCover()
+    prepareCoverSource()
   })
 
   watch(bannerSource, () => {
     if (!showBannerSelector.value) return
-    const remembered = bannerSource.value === 'steamgriddb'
-      ? options.rememberedSgdbGame?.value
-      : options.rememberedSteamGame?.value
-    if (remembered) {
-      bannerSteamPicker.setQuery(remembered.id)
-      void selectSteamBannerGame(remembered)
-      return
-    }
-    const query = steamBannerSearchQuery.value.trim()
-    if (!query) return
-    searchSteamForBanner()
+    prepareBannerSource()
   })
 
   // Merge SGDB thumbnails into search results reactively
-  const mergeSGDBThumbs = (results: SteamGameSearchResult[]): SteamGameSearchResult[] => {
-    const thumbs = sgdbThumbs.value
+  const mergeSGDBThumbs = (
+    results: SteamGameSearchResult[],
+    thumbs: Record<string, string>,
+  ): SteamGameSearchResult[] => {
     return results.map((r) => (thumbs[r.id] ? { ...r, tinyImage: thumbs[r.id] } : r))
   }
 
   // Computed search results/loading — switches between Steam and SteamGridDB based on source
   const coverSearchResults = computed(() =>
     coverSource.value === 'steamgriddb'
-      ? mergeSGDBThumbs(sgdbSearchResults.value)
+      ? mergeSGDBThumbs(sgdbCoverSearchResults.value, sgdbCoverThumbs.value)
       : [...steamCoverSearchResults.value],
   )
   const isSearchingCover = computed(() =>
-    coverSource.value === 'steamgriddb' ? sgdbSearching.value : isSearchingSteamCover.value,
+    coverSource.value === 'steamgriddb' ? sgdbCoverSearching.value : isSearchingSteamCover.value,
   )
   const bannerSearchResults = computed(() =>
     bannerSource.value === 'steamgriddb'
-      ? mergeSGDBThumbs(sgdbSearchResults.value)
+      ? mergeSGDBThumbs(sgdbBannerSearchResults.value, sgdbBannerThumbs.value)
       : [...steamBannerSearchResults.value],
   )
   const isSearchingBanner = computed(() =>
-    bannerSource.value === 'steamgriddb' ? sgdbSearching.value : isSearchingSteamBanner.value,
+    bannerSource.value === 'steamgriddb' ? sgdbBannerSearching.value : isSearchingSteamBanner.value,
   )
 
   const resetDownloadState = () => {
     showCoverSelector.value = false
     showBannerSelector.value = false
 
-    sgdbSearchResults.value = []
-    sgdbThumbs.value = {}
+    invalidateSgdbRequest('cover')
+    invalidateSgdbRequest('banner')
+    sgdbCoverSearchResults.value = []
+    sgdbCoverThumbs.value = {}
+    sgdbBannerSearchResults.value = []
+    sgdbBannerThumbs.value = {}
 
     coverSteamPicker.clear()
     steamCoverImages.value = []

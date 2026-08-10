@@ -161,6 +161,7 @@ import { getHttpErrorMessage } from '@/utils/http-error'
 import { useAuthStore } from '@/stores/auth'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 defineOptions({
   name: 'DashboardView',
@@ -180,6 +181,7 @@ const lastLoadedAt = ref(0)
 
 const showAddGameModal = ref(false)
 const addGameSubmitting = ref(false)
+const dashboardRequests = createRequestGeneration()
 
 const totalGames = computed(() => gamesStore.stats?.total_games ?? 0)
 const totalDownloads = computed(() => gamesStore.stats?.total_downloads ?? 0)
@@ -242,15 +244,18 @@ const toggleFavorite = async (gameRef: string) => {
 }
 
 const loadDashboardData = async () => {
+  const request = dashboardRequests.begin()
   isLoading.value = true
   isDashboardReady.value = false
   loadFailed.value = false
   refreshFailedWithStaleData.value = false
   try {
     await gamesStore.fetchStats()
+    if (!request.isCurrent()) return
     isDashboardReady.value = true
     lastLoadedAt.value = Date.now()
   } catch {
+    if (!request.isCurrent()) return
     uiStore.addAlert('加载数据失败', 'error')
     // 2026-04-08: dashboard refresh failures keep last good stats visible, but must not
     // pretend the current refresh succeeded. Distinguish stale-data rendering from both
@@ -259,7 +264,9 @@ const loadDashboardData = async () => {
     loadFailed.value = gamesStore.stats === null
     isDashboardReady.value = true
   } finally {
-    isLoading.value = false
+    if (request.isCurrent()) {
+      isLoading.value = false
+    }
   }
 }
 

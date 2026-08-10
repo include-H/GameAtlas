@@ -23,7 +23,7 @@
             </div>
             <div class="bg-actions">
               <a-upload :auto-upload="false" accept="image/*" :show-file-list="false" @change="handleBgUpload">
-                <a-button type="primary" :loading="bgUploading">
+                <a-button type="primary" :loading="bgUploading" :disabled="bgUploading || bgRemoving">
                   <template #icon><icon-upload /></template>
                   上传背景图片
                 </a-button>
@@ -34,6 +34,7 @@
                 type="text"
                 status="danger"
                 :loading="bgRemoving"
+                :disabled="bgUploading || bgRemoving"
                 @click="handleBgRemove"
               >
                 <template #icon><icon-delete /></template>
@@ -220,11 +221,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { settingsService, type EnvEntry } from '@/services/settings.service'
 import gamesService from '@/services/games.service'
 import { buildApiUrl } from '@/services/api-url'
 import { useUiStore } from '@/stores/ui'
+import { createRequestGeneration } from '@/utils/request-generation'
 import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
 import {
   IconImage,
@@ -245,6 +247,7 @@ const backupEntries = computed(() => configEntries.value.filter((e) => e.group =
 const smbEntries = computed(() => configEntries.value.filter((e) => e.group === 'smb'))
 const configForm = ref<Record<string, string>>({})
 const configSaving = ref(false)
+const configLoadRequests = createRequestGeneration()
 
 const databaseBackupEnabled = computed({
   get: () => configForm.value['DB_BACKUP_ENABLED'] === 'true',
@@ -264,6 +267,8 @@ const bgPreviewUrl = ref<string | null>(null)
 const bgExists = ref(false)
 const bgUploading = ref(false)
 const bgRemoving = ref(false)
+const bgCheckRequests = createRequestGeneration()
+const bgMutationRequests = createRequestGeneration()
 
 const CUSTOM_BG_PATH = buildApiUrl('/data/bg.jpg')
 
@@ -272,8 +277,10 @@ const resetBgPreview = () => {
 }
 
 const loadConfig = async () => {
+  const request = configLoadRequests.begin()
   try {
     const entries = await settingsService.getConfig()
+    if (!request.isCurrent()) return
     configEntries.value = entries
     const form: Record<string, string> = {}
     for (const e of entries) {
@@ -281,56 +288,76 @@ const loadConfig = async () => {
     }
     configForm.value = form
   } catch {
-    uiStore.addAlert('加载配置失败', 'error')
+    if (request.isCurrent()) {
+      uiStore.addAlert('加载配置失败', 'error')
+    }
   }
 }
 
 const checkBgExists = async () => {
+  const request = bgCheckRequests.begin()
   try {
     const resp = await fetch(CUSTOM_BG_PATH, { method: 'HEAD' })
+    if (!request.isCurrent()) return
     bgExists.value = resp.ok
     if (resp.ok) {
       resetBgPreview()
     }
   } catch {
-    bgExists.value = false
+    if (request.isCurrent()) {
+      bgExists.value = false
+    }
   }
 }
 
 const handleBgUpload = async (_list: FileItem[], fileItem: FileItem) => {
   const file = fileItem?.file
-  if (!file) return
+  if (!file || bgUploading.value || bgRemoving.value) return
 
+  const request = bgMutationRequests.begin()
   bgUploading.value = true
   try {
     await settingsService.uploadBackground(file)
+    if (!request.isCurrent()) return
     uiStore.addAlert('背景图片已上传', 'success')
     bgExists.value = true
     resetBgPreview()
     await uiStore.refreshSharedBackgroundAvailability()
   } catch {
-    uiStore.addAlert('上传背景图片失败', 'error')
+    if (request.isCurrent()) {
+      uiStore.addAlert('上传背景图片失败', 'error')
+    }
   } finally {
-    bgUploading.value = false
+    if (request.isCurrent()) {
+      bgUploading.value = false
+    }
   }
 }
 
 const handleBgRemove = async () => {
+  if (bgUploading.value || bgRemoving.value) return
+  const request = bgMutationRequests.begin()
   bgRemoving.value = true
   try {
     await settingsService.removeBackground()
+    if (!request.isCurrent()) return
     uiStore.addAlert('背景图片已删除', 'success')
     bgExists.value = false
     bgPreviewUrl.value = null
     await uiStore.refreshSharedBackgroundAvailability()
   } catch {
-    uiStore.addAlert('删除背景图片失败', 'error')
+    if (request.isCurrent()) {
+      uiStore.addAlert('删除背景图片失败', 'error')
+    }
   } finally {
-    bgRemoving.value = false
+    if (request.isCurrent()) {
+      bgRemoving.value = false
+    }
   }
 }
 
 const handleSaveConfig = async () => {
+  if (configSaving.value) return
   configSaving.value = true
   try {
     const result = await settingsService.updateConfig(configForm.value)
@@ -378,6 +405,12 @@ const handleRestart = async () => {
 onMounted(() => {
   loadConfig()
   checkBgExists()
+})
+
+onUnmounted(() => {
+  configLoadRequests.invalidate()
+  bgCheckRequests.invalidate()
+  bgMutationRequests.invalidate()
 })
 </script>
 

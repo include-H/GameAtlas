@@ -12,6 +12,7 @@ import { uploadAsset, type UploadedAssetResult } from '@/services/assets'
 import type { FileItem } from '@arco-design/web-vue/es/upload/interfaces'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import { extractVideoPoster } from '@/utils/video-poster'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 type AlertType = 'success' | 'warning' | 'error'
 
@@ -44,6 +45,7 @@ const readUploadError = (response?: UploadResponseLike) => {
 }
 
 export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
+  const videoUploadRequests = createRequestGeneration()
   const appendPreviewVideo = (video: EditGameEditableVideo) => {
     options.form.value.preview_videos.push(video)
   }
@@ -121,8 +123,9 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     const input = event.target as HTMLInputElement
     const files = input.files
     const gameId = options.gameId.value
-    if (!files || files.length === 0 || !gameId) return
+    if (!files || files.length === 0 || !gameId || options.isUploadingVideo.value) return
 
+    const request = videoUploadRequests.begin()
     options.isUploadingVideo.value = true
 
     try {
@@ -132,8 +135,11 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
         options.videoUploadFileName.value = file.name
 
         const uploaded = await uploadAsset('video', gameId, file, (percent) => {
-          options.videoUploadProgress.value = percent
+          if (request.isCurrent() && options.gameId.value === gameId) {
+            options.videoUploadProgress.value = percent
+          }
         })
+        if (!request.isCurrent() || options.gameId.value !== gameId) return
         const video = options.createEditableVideo(uploaded)
         if (file.type.startsWith('video/')) {
           try {
@@ -142,11 +148,13 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
               type: 'image/jpeg',
             })
             const poster = await uploadAsset('poster', gameId, posterFile)
+            if (!request.isCurrent() || options.gameId.value !== gameId) return
             video.poster_path = poster.path
           } catch {
             // 封面帧抽取是增强能力，失败时预告片仍可正常使用。
           }
         }
+        if (!request.isCurrent() || options.gameId.value !== gameId) return
         appendPreviewVideo(video)
         await options.onAssetPersisted?.()
       }
@@ -156,7 +164,9 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
       options.videoUploadProgress.value = 0
       options.addAlert('预告片上传失败：' + getHttpErrorMessage(error), 'error')
     } finally {
-      options.isUploadingVideo.value = false
+      if (request.isCurrent()) {
+        options.isUploadingVideo.value = false
+      }
       input.value = ''
     }
   }
@@ -207,6 +217,7 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
   }
 
   const resetVideoUploadState = () => {
+    videoUploadRequests.invalidate()
     options.videoUploadProgress.value = 0
     options.videoUploadFileName.value = ''
     options.isUploadingVideo.value = false

@@ -85,7 +85,7 @@ func TestAssetsHandlerUploadVideoPersistsAsset(t *testing.T) {
 	}
 
 	// Upload writes to staging, not permanent location.
-	if _, err := os.Stat(filepath.Join(assetsDir, "_staging", response.Data.AssetUID+".mp4")); err != nil {
+	if _, err := os.Stat(filepath.Join(assetsDir, "_staging", "upload-game", response.Data.AssetUID+".mp4")); err != nil {
 		t.Fatalf("expected uploaded file in staging directory, got err=%v", err)
 	}
 }

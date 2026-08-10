@@ -29,7 +29,7 @@ declare global {
 
 const WAIFU_TARGET_ZOOM = 1.35
 
-export interface UseStoreWaifuOptions {
+interface UseStoreWaifuOptions {
   /** 看板娘挂进店内场景用的 stage 容器 ref（对应 .store-stage 元素） */
   stageRef: Ref<HTMLElement | null>
 }
@@ -45,6 +45,7 @@ export const useStoreWaifu = ({ stageRef }: UseStoreWaifuOptions) => {
   let waifuStyleTag: HTMLLinkElement | null = null
   let waifuScriptTag: HTMLScriptElement | null = null
   let waifuZoomTimer: number | null = null
+  let initGeneration = 0
 
   const loadWaifuResource = (url: string, type: 'css' | 'js'): Promise<void> => {
     return new Promise((resolve, reject) => {
@@ -68,14 +69,18 @@ export const useStoreWaifu = ({ stageRef }: UseStoreWaifuOptions) => {
     })
   }
 
-  const waitForElement = (selector: string, timeoutMs = 8000): Promise<HTMLElement | null> => {
-    if (disposed.value) return Promise.resolve(null)
+  const waitForElement = (
+    selector: string,
+    timeoutMs = 8000,
+    isCurrent: () => boolean = () => !disposed.value,
+  ): Promise<HTMLElement | null> => {
+    if (!isCurrent()) return Promise.resolve(null)
     const existing = document.querySelector<HTMLElement>(selector)
     if (existing) return Promise.resolve(existing)
     return new Promise((resolve) => {
       const startedAt = Date.now()
       const timer = window.setInterval(() => {
-        if (disposed.value) {
+        if (!isCurrent()) {
           window.clearInterval(timer)
           resolve(null)
           return
@@ -95,22 +100,23 @@ export const useStoreWaifu = ({ stageRef }: UseStoreWaifuOptions) => {
   }
 
   const init = async () => {
-    if (disposed.value) return
+    const generation = ++initGeneration
+    const isCurrent = () => generation === initGeneration && !disposed.value
+    if (!isCurrent()) return
     // 热更新或重复挂载时先清掉旧的看板娘节点
-    document.getElementById('waifu')?.remove()
-    document.getElementById('waifu-toggle')?.remove()
+    cleanupResources()
 
     await loadWaifuResource('/live2d-widget/waifu.css', 'css')
-    if (disposed.value) return
+    if (!isCurrent()) return
     if (!window.initWidget) {
       await loadWaifuResource('/live2d-widget/waifu-tips.js', 'js')
-      if (disposed.value) return
+      if (!isCurrent()) return
     }
 
     // 清掉旧 manager，避免上一次会话的缩放状态被误判为“已生效”
     window.__waifuManager = undefined
 
-    if (disposed.value) return
+    if (!isCurrent()) return
     window.initWidget?.({
       waifuPath: '/live2d-config/waifu-tips.json',
       cdnPath: '/live2d-models/',
@@ -125,8 +131,8 @@ export const useStoreWaifu = ({ stageRef }: UseStoreWaifuOptions) => {
 
     // 把看板娘挂到场景内部，跟随 1280×720 设计稿一起缩放定位
     const stageElement = stageRef.value ?? document.querySelector<HTMLElement>('.store-stage')
-    const waifuElement = await waitForElement('#waifu')
-    if (disposed.value) return
+    const waifuElement = await waitForElement('#waifu', 8000, isCurrent)
+    if (!isCurrent()) return
     if (stageElement && waifuElement) {
       stageElement.appendChild(waifuElement)
     }
@@ -142,11 +148,11 @@ export const useStoreWaifu = ({ stageRef }: UseStoreWaifuOptions) => {
       }
       return true
     }
-    if (disposed.value) return
+    if (!isCurrent()) return
     if (!applyTargetZoom()) {
       const startedAt = Date.now()
       waifuZoomTimer = window.setInterval(() => {
-        if (applyTargetZoom() || Date.now() - startedAt > 15000) {
+        if (!isCurrent() || applyTargetZoom() || Date.now() - startedAt > 15000) {
           if (waifuZoomTimer !== null) {
             window.clearInterval(waifuZoomTimer)
             waifuZoomTimer = null
@@ -156,7 +162,7 @@ export const useStoreWaifu = ({ stageRef }: UseStoreWaifuOptions) => {
     }
   }
 
-  const cleanup = () => {
+  const cleanupResources = () => {
     if (waifuZoomTimer !== null) {
       window.clearInterval(waifuZoomTimer)
       waifuZoomTimer = null
@@ -169,12 +175,19 @@ export const useStoreWaifu = ({ stageRef }: UseStoreWaifuOptions) => {
     waifuStyleTag = null
   }
 
+  const cleanup = () => {
+    initGeneration += 1
+    cleanupResources()
+  }
+
   const dispose = () => {
     disposed.value = true
+    initGeneration += 1
   }
 
   const reset = () => {
     disposed.value = false
+    initGeneration += 1
   }
 
   return {

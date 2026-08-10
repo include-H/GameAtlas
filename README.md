@@ -151,7 +151,7 @@ python3 scripts/sync_wiki_to_prod.py --list     # 列出全部游戏与本地文
 python3 scripts/sync_wiki_to_prod.py --unmatched  # 显示无法匹配的游戏
 ```
 
-- 默认目标地址 `http://192.168.1.4:3000`，管理员密码 `0114`，可用环境变量 `GA_URL` / `GA_PASSWORD` 覆盖；
+- 生产同步必须显式提供 `GA_URL` / `GA_PASSWORD`，避免脚本误连生产库或使用仓库内默认凭据；
 - 通过 `GET /api/games` 分页拉取生产库全部游戏（含无发售日期的条目），按标题自动匹配 + 手工映射表（`MANUAL_MAP`）解析到本地 `Game_Wiki` 文件，重复标题按 `public_id` 消歧；
 - 写入走管理员会话 + `PUT /api/games/:publicId/wiki`，每次写入附带"同步本地重构后的 Wiki"变更摘要，可在历史版本中回溯。
 

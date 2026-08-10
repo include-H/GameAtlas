@@ -5,6 +5,7 @@ import {
   normalizeCreatableOptionName,
   searchCreatableOptions,
 } from '@/utils/creatable-select'
+import { createRequestGeneration, type RequestGenerationGuard } from '@/utils/request-generation'
 
 interface MetadataOption {
   id: number
@@ -37,6 +38,7 @@ export const useRemoteMetadataPicker = <T extends MetadataOption>(
   const isSearching = ref(false)
   const isCreating = ref(false)
   let searchRequestID = 0
+  const creationRequests = createRequestGeneration()
 
   const canCreate = computed(() => {
     return canCreateRemoteSearchedOption(query.value, resolvedQuery.value, options.value)
@@ -45,6 +47,8 @@ export const useRemoteMetadataPicker = <T extends MetadataOption>(
   const search = async (value: string) => {
     query.value = value
     resolvedQuery.value = ''
+    creationRequests.invalidate()
+    isCreating.value = false
     const requestID = ++searchRequestID
     const normalizedQuery = normalizeCreatableOptionName(value)
     if (!normalizedQuery) {
@@ -74,7 +78,7 @@ export const useRemoteMetadataPicker = <T extends MetadataOption>(
     }
   }
 
-  const ensureNames = async (names: string[]) => {
+  const ensureNamesForRequest = async (names: string[], request: RequestGenerationGuard) => {
     const uniqueNames = new Map<string, string>()
     for (const rawName of names) {
       const name = rawName.trim()
@@ -86,10 +90,12 @@ export const useRemoteMetadataPicker = <T extends MetadataOption>(
 
     const ids: number[] = []
     for (const [normalizedName, name] of uniqueNames) {
+      if (!request.isCurrent()) return []
       const existing = options.value.find(
         (item) => normalizeCreatableOptionName(item.name) === normalizedName,
       )
       const item = existing || await pickerOptions.create(name)
+      if (!request.isCurrent()) return []
       if (!existing) {
         options.value = dedupeCreatableOptionsByName([item, ...options.value])
       }
@@ -99,18 +105,26 @@ export const useRemoteMetadataPicker = <T extends MetadataOption>(
     return ids
   }
 
+  const ensureNames = async (names: string[]) => {
+    return ensureNamesForRequest(names, creationRequests.begin())
+  }
+
   const createFromQuery = async () => {
     if (!canCreate.value || isCreating.value) return null
 
+    const request = creationRequests.begin()
     searchRequestID += 1
     resolvedQuery.value = ''
     isSearching.value = false
     isCreating.value = true
     try {
-      const [id] = await ensureNames([query.value])
+      const [id] = await ensureNamesForRequest([query.value], request)
+      if (!request.isCurrent()) return null
       return options.value.find((item) => item.id === id) || null
     } finally {
-      isCreating.value = false
+      if (request.isCurrent()) {
+        isCreating.value = false
+      }
     }
   }
 
@@ -132,7 +146,9 @@ export const useRemoteMetadataPicker = <T extends MetadataOption>(
     query.value = ''
     resolvedQuery.value = ''
     searchRequestID += 1
+    creationRequests.invalidate()
     isSearching.value = false
+    isCreating.value = false
   }
 
   const reset = () => {

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { get, post } from '@/services/api'
 import type { ApiEnvelope } from '@/services/types'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 export const useAuthStore = defineStore('auth', () => {
   const isAdmin = ref(false)
@@ -9,6 +10,7 @@ export const useAuthStore = defineStore('auth', () => {
   const initialized = ref(false)
   const authLoadFailed = ref(false)
   const adminDisplayName = ref('')
+  const authRequests = createRequestGeneration()
 
   const user = computed(() => ({
     username: isAdmin.value ? adminDisplayName.value : 'Guest',
@@ -16,8 +18,12 @@ export const useAuthStore = defineStore('auth', () => {
   }))
 
   const fetchMe = async () => {
+    const request = authRequests.begin()
     try {
       const response = await get<ApiEnvelope<{ is_admin: boolean; role: string; admin_display_name?: string }>>('/auth/me')
+      if (!request.isCurrent()) {
+        return { user: user.value, isAdmin: isAdmin.value, authLoadFailed: authLoadFailed.value }
+      }
       // 2026-04-08: /auth/me already has a native guest/admin response contract.
       // Impact: transport failures stay distinguishable from guest mode instead of being
       // collapsed into the same unauthenticated frontend state.
@@ -28,12 +34,17 @@ export const useAuthStore = defineStore('auth', () => {
       adminDisplayName.value = response.data.admin_display_name?.trim() || ''
       authLoadFailed.value = false
     } catch {
+      if (!request.isCurrent()) {
+        return { user: user.value, isAdmin: isAdmin.value, authLoadFailed: authLoadFailed.value }
+      }
       isAdmin.value = false
       role.value = 'guest'
       adminDisplayName.value = ''
       authLoadFailed.value = true
     } finally {
-      initialized.value = true
+      if (request.isCurrent()) {
+        initialized.value = true
+      }
     }
     return { user: user.value, isAdmin: isAdmin.value, authLoadFailed: authLoadFailed.value }
   }
@@ -44,6 +55,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const logout = async () => {
+    authRequests.invalidate()
     await post<ApiEnvelope<{ logged_out: boolean }>>('/auth/logout')
     isAdmin.value = false
     role.value = 'guest'

@@ -2,7 +2,7 @@
 """预热 WebP 变体：登录管理员后对全部游戏素材触发 ?w= 懒生成。
 
 用法：
-    python3 scripts/warmup-webp-variants.py                     # 默认 http://192.168.1.4:3000
+    python3 scripts/warmup-webp-variants.py --url http://127.0.0.1:3000 --password xxxx
     python3 scripts/warmup-webp-variants.py --url https://x --password xxxx
     python3 scripts/warmup-webp-variants.py --dry-run           # 只统计不请求
 环境变量 GA_URL / GA_PASSWORD 可替代 --url / --password。
@@ -76,11 +76,13 @@ def warm(opener, base_url: str, asset, width: int):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url", default=os.environ.get("GA_URL", "http://192.168.1.4:3000"))
+    parser.add_argument("--url", default=os.environ.get("GA_URL", ""))
     parser.add_argument("--password", default=os.environ.get("GA_PASSWORD", ""))
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
+    if not args.url:
+        sys.exit("缺少目标地址：--url 或环境变量 GA_URL")
     if not args.password:
         sys.exit("缺少管理员密码：--password 或环境变量 GA_PASSWORD")
 
@@ -90,7 +92,7 @@ def main():
     games = []
     page = 1
     while True:
-        data = fetch_json(opener, f"{base}/api/games?page={page}&page_size=50")
+        data = fetch_json(opener, f"{base}/api/games?page={page}&limit=50")
         batch = data.get("data") or []
         games.extend(batch)
         pagination = data.get("pagination") or {}

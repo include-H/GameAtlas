@@ -12,7 +12,9 @@ services:
       - /mnt:/mnt:ro
     environment:
       APP_ENV: production
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
+      # Do not ship a shared deployment password. Compose refuses to start
+      # until the operator provides a site-specific administrator password.
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD before starting}
       PRIMARY_ROM_ROOT: /mnt
       SMB_PATH_MAPPINGS: /mnt/Game=\\192.168.1.4\Game;/mnt/Gal=\\192.168.1.4\Gal
       SMB_USERNAME: ${SMB_USERNAME:-}

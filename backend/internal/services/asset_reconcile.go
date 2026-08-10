@@ -285,6 +285,9 @@ func (s *AssetReconcileService) deleteUnreferencedFiles(referenced map[string]st
 			return err
 		}
 		if d.IsDir() {
+			if filepath.Clean(path) == filepath.Join(baseDir, "_staging") {
+				return filepath.SkipDir
+			}
 			if path != baseDir {
 				dirs = append(dirs, path)
 			}

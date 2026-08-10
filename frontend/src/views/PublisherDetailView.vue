@@ -91,7 +91,9 @@ const {
   loadPage: async ({ page, limit }) => {
     const id = Number(route.params.id)
     const detail = await publishersService.getPublisherDetail(id, { page, limit })
-    publisherName.value = detail.publisher.name || `发行商 ${id}`
+    if (Number(route.params.id) === id) {
+      publisherName.value = detail.publisher.name || `发行商 ${id}`
+    }
     return {
       data: detail.games,
       pagination: detail.pagination,
@@ -121,10 +123,12 @@ const handleGoBack = () => {
 const loadPublisherDetail = () => {
   const id = Number(route.params.id)
   if (Number.isNaN(id) || id <= 0) {
+    publisherName.value = '发行商'
     uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
     router.replace({ name: 'publisher-library' })
     return
   }
+  publisherName.value = '发行商'
   uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
   void loadFirstPage()
 }

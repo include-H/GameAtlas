@@ -13,7 +13,6 @@ import (
 	"github.com/hao/game/internal/domain"
 )
 
-
 type cachedPreview struct {
 	preview  *domain.SteamAssetsPreview
 	cachedAt time.Time
@@ -77,10 +76,7 @@ func NewSteamService(cfg config.Config, assetsService *AssetsService) *SteamServ
 	}
 
 	return &SteamService{
-		client: &http.Client{
-			Timeout:   30 * time.Second,
-			Transport: transport,
-		},
+		client: newSteamHTTPClient(transport, 30*time.Second),
 		proxy:  proxy,
 		assets: assetsService,
 	}

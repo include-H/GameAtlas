@@ -2,11 +2,17 @@ import { readonly, ref } from 'vue'
 import steamService from '@/services/steam.service'
 import type { SteamGameSearchResult } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
+import { createRequestGeneration, type RequestGenerationGuard } from '@/utils/request-generation'
 
 interface UseSteamPickerOptions<TSelection> {
-  onSelect: (game: SteamGameSearchResult) => Promise<TSelection> | TSelection
+  onSelect: (
+    game: SteamGameSearchResult,
+    request: SteamPickerRequest,
+  ) => Promise<TSelection> | TSelection
   onError?: (message: string) => void
 }
+
+export type SteamPickerRequest = RequestGenerationGuard
 
 export const useSteamPicker = <TSelection>(options: UseSteamPickerOptions<TSelection>) => {
   const query = ref('')
@@ -14,8 +20,17 @@ export const useSteamPicker = <TSelection>(options: UseSteamPickerOptions<TSelec
   const selectedGame = ref<SteamGameSearchResult | null>(null)
   const selectedData = ref<TSelection | null>(null)
   const isSearching = ref(false)
+  const requests = createRequestGeneration()
+
+  const invalidateRequest = () => {
+    requests.invalidate()
+    isSearching.value = false
+  }
+
+  const beginRequest = (): SteamPickerRequest => requests.begin()
 
   const clear = () => {
+    invalidateRequest()
     query.value = ''
     results.value = []
     selectedGame.value = null
@@ -28,34 +43,57 @@ export const useSteamPicker = <TSelection>(options: UseSteamPickerOptions<TSelec
   }
 
   const search = async () => {
-    if (!query.value.trim()) return
+    const searchQuery = query.value.trim()
+    if (!searchQuery) {
+      invalidateRequest()
+      results.value = []
+      resetSelection()
+      return
+    }
 
+    const request = beginRequest()
     resetSelection()
     isSearching.value = true
     try {
-      results.value = await steamService.searchGames(query.value.trim())
+      const nextResults = await steamService.searchGames(searchQuery)
+      if (request.isCurrent()) {
+        results.value = nextResults
+      }
     } catch (error) {
-      options.onError?.(getHttpErrorMessage(error))
+      if (request.isCurrent()) {
+        options.onError?.(getHttpErrorMessage(error))
+      }
     } finally {
-      isSearching.value = false
+      if (request.isCurrent()) {
+        isSearching.value = false
+      }
     }
   }
 
   const select = async (game: SteamGameSearchResult) => {
+    const request = beginRequest()
     selectedGame.value = game
     selectedData.value = null
     isSearching.value = true
     try {
-      selectedData.value = await options.onSelect(game)
+      const data = await options.onSelect(game, request)
+      if (request.isCurrent()) {
+        selectedData.value = data
+      }
     } catch (error) {
-      options.onError?.(getHttpErrorMessage(error))
-      resetSelection()
+      if (request.isCurrent()) {
+        options.onError?.(getHttpErrorMessage(error))
+        resetSelection()
+      }
     } finally {
-      isSearching.value = false
+      if (request.isCurrent()) {
+        isSearching.value = false
+      }
     }
   }
 
   const back = () => {
+    invalidateRequest()
     resetSelection()
   }
 
@@ -64,6 +102,7 @@ export const useSteamPicker = <TSelection>(options: UseSteamPickerOptions<TSelec
   }
 
   const setSelectedGame = (game: SteamGameSearchResult | null) => {
+    invalidateRequest()
     selectedData.value = null
     selectedGame.value = game
   }
@@ -73,23 +112,30 @@ export const useSteamPicker = <TSelection>(options: UseSteamPickerOptions<TSelec
   }
 
   const clearResults = () => {
+    invalidateRequest()
     results.value = []
   }
 
   const selectExternal = async (
     game: SteamGameSearchResult,
-    load: () => Promise<void> | void,
+    load: (request: SteamPickerRequest) => Promise<void> | void,
   ) => {
+    const request = beginRequest()
     resetSelection()
     selectedGame.value = game
     isSearching.value = true
     try {
-      await load()
+      await load(request)
     } catch (error) {
-      resetSelection()
-      throw error
+      if (request.isCurrent()) {
+        resetSelection()
+        throw error
+      }
+      return
     } finally {
-      isSearching.value = false
+      if (request.isCurrent()) {
+        isSearching.value = false
+      }
     }
   }
 

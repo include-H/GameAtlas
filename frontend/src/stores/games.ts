@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import gamesService, { mapGameVersions } from '@/services/games.service'
 import type { GameDetail, GameListItem, GameListQuery, GameSortQuery, GameStats, GameVersion } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 export const useGamesStore = defineStore('games', () => {
   // State
@@ -27,6 +28,10 @@ export const useGamesStore = defineStore('games', () => {
   const detailError = ref<string | null>(null)
   const statsError = ref<string | null>(null)
   const favoriteError = ref<string | null>(null)
+
+  const listRequests = createRequestGeneration()
+  const detailRequests = createRequestGeneration()
+  const statsRequests = createRequestGeneration()
 
   // Computed
   const hasMorePages = computed(() => pagination.value.page < pagination.value.totalPages)
@@ -131,6 +136,7 @@ export const useGamesStore = defineStore('games', () => {
       append?: boolean
     } = {}
   ) => {
+    const request = listRequests.begin()
     listLoading.value = true
     listError.value = null
 
@@ -148,6 +154,10 @@ export const useGamesStore = defineStore('games', () => {
         sort: params.sort,
       })
 
+      if (!request.isCurrent()) {
+        return response
+      }
+
       if (append) {
         games.value.push(...response.data)
       } else {
@@ -161,41 +171,60 @@ export const useGamesStore = defineStore('games', () => {
 
       return response
     } catch (err) {
-      listError.value = getHttpErrorMessage(err, '加载游戏列表失败')
+      if (request.isCurrent()) {
+        listError.value = getHttpErrorMessage(err, '加载游戏列表失败')
+      }
       throw err
     } finally {
-      listLoading.value = false
+      if (request.isCurrent()) {
+        listLoading.value = false
+      }
     }
   }
 
   const fetchGame = async (id: string, signal?: AbortSignal) => {
+    const request = detailRequests.begin()
     detailLoading.value = true
     detailError.value = null
 
     try {
       const game = await gamesService.getGameDetail(id, signal)
-      currentGame.value = game
-      currentVersions.value = mapGameVersions(game)
+      if (request.isCurrent()) {
+        currentGame.value = game
+        currentVersions.value = mapGameVersions(game)
+      }
       return game
     } catch (err) {
-      detailError.value = getHttpErrorMessage(err, '加载游戏详情失败')
+      if (request.isCurrent()) {
+        detailError.value = getHttpErrorMessage(err, '加载游戏详情失败')
+      }
       throw err
     } finally {
-      detailLoading.value = false
+      if (request.isCurrent()) {
+        detailLoading.value = false
+      }
     }
   }
 
   const fetchStats = async () => {
+    const request = statsRequests.begin()
     statsLoading.value = true
     statsError.value = null
     try {
-      stats.value = await gamesService.getStats()
+      const nextStats = await gamesService.getStats()
+      if (request.isCurrent()) {
+        stats.value = nextStats
+      }
       return stats.value
     } catch (err) {
-      statsError.value = getHttpErrorMessage(err, '加载统计数据失败')
+      if (request.isCurrent()) {
+        statsError.value = getHttpErrorMessage(err, '加载统计数据失败')
+      }
       throw err
     } finally {
-      statsLoading.value = false
+      if (request.isCurrent()) {
+        statsLoading.value = false
+      }
     }
   }
 

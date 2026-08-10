@@ -240,6 +240,7 @@ export const useEditGameModal = ({
 
   const {
     handleSubmit,
+    invalidateSave,
   } = useEditGameWorkflow({
     game: currentGame,
     form,
@@ -431,6 +432,7 @@ export const useEditGameModal = ({
   })
 
   const resetTransientState = () => {
+    invalidateSave()
     seriesPicker.reset()
     developerPicker.reset()
     publisherPicker.reset()
@@ -440,7 +442,11 @@ export const useEditGameModal = ({
   }
 
   watch(() => props.game, async (game, previousGame) => {
-    await initializeOptions(game)
+    if ((game?.id ?? null) !== (previousGame?.id ?? null)) {
+      invalidateSave()
+    }
+    const initialized = await initializeOptions(game)
+    if (!initialized) return
     const isSameGame = game?.id && previousGame?.id && game.id === previousGame.id
     if (props.visible && isSameGame) {
       // Keep in-progress form edits intact while background asset sync refreshes the source game payload.
@@ -452,10 +458,13 @@ export const useEditGameModal = ({
   watch(visible, async (value) => {
     resetTransientState()
     if (value) {
-      await initializeOptions(props.game)
+      const initialized = await initializeOptions(props.game)
+      if (!initialized) return
       hydrateFormFromGame(props.game)
     }
   })
+
+  onUnmounted(invalidateSave)
 
   const handleCancel = () => {
     visible.value = false

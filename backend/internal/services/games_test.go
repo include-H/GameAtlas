@@ -979,7 +979,7 @@ func TestGamesServiceUpdateAggregatePersistsVideoPosterPath(t *testing.T) {
 	gameID := insertServicesTestGame(t, db, "aggregate-video-poster", "Video Poster", domain.GameVisibilityPublic)
 	writeServicesAssetFile(t, assetsDir, "aggregate-video-poster", "video.mp4", []byte("video"))
 	posterPath := "/assets/aggregate-video-poster/poster.jpg"
-	stagingPoster := filepath.Join(assetsDir, "_staging", "poster.jpg")
+	stagingPoster := filepath.Join(assetsDir, "_staging", "aggregate-video-poster", "poster.jpg")
 	if err := os.MkdirAll(filepath.Dir(stagingPoster), 0o755); err != nil {
 		t.Fatalf("MkdirAll staging returned error: %v", err)
 	}
@@ -1044,5 +1044,45 @@ func TestGamesServiceUpdateAggregatePersistsVideoPosterPath(t *testing.T) {
 	videos = listServicesVideos(t, db, gameID)
 	if len(videos) != 1 || videos[0].PosterPath == nil || *videos[0].PosterPath != posterPath {
 		t.Fatalf("PosterPath after second update = %v, want %q unchanged", videos[0].PosterPath, posterPath)
+	}
+}
+
+func TestGamesServiceUpdateAggregateCleansMovedAssetsWhenDatabaseUpdateFails(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	assetsDir := filepath.Join(t.TempDir(), "assets")
+	gameID := insertServicesTestGame(t, db, "aggregate-rollback", "Aggregate Rollback", domain.GameVisibilityPublic)
+	assetPath := "/assets/aggregate-rollback/rollback.png"
+	stagingPath := filepath.Join(assetsDir, "_staging", "aggregate-rollback", "rollback.png")
+	if err := os.MkdirAll(filepath.Dir(stagingPath), 0o755); err != nil {
+		t.Fatalf("create staging directory: %v", err)
+	}
+	if err := os.WriteFile(stagingPath, []byte("staged-image"), 0o644); err != nil {
+		t.Fatalf("write staged asset: %v", err)
+	}
+
+	service := newServicesAggregateService(db, config.Config{AssetsDir: assetsDir})
+	_, _, err := service.Update(gameID, domain.GameAggregateUpdateInput{
+		Game: domain.GameAggregateCoreUpdateInput{
+			GameCoreInput: domain.GameCoreInput{Title: "Aggregate Rollback", Visibility: domain.GameVisibilityPublic},
+		},
+		Assets: domain.GameAggregateAssetsInput{
+			CoverOrderAssetUIDs: []string{"missing-cover"},
+			NewAssets: []domain.NewAssetEntry{{
+				AssetUID:  "rollback-cover",
+				AssetType: "cover",
+				Path:      assetPath,
+			}},
+		},
+	})
+	if err == nil {
+		t.Fatalf("Update returned nil error, want database update failure")
+	}
+	if _, statErr := os.Stat(filepath.Join(assetsDir, "aggregate-rollback", "rollback.png")); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("moved asset still exists after rollback, stat error = %v", statErr)
+	}
+	if _, statErr := os.Stat(stagingPath); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("staging asset still exists after rollback cleanup, stat error = %v", statErr)
 	}
 }

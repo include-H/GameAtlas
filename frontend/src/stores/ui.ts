@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { safeLocalStorageGetItem, safeLocalStorageSetItem } from '@/utils/safe-local-storage'
 import { buildApiUrl } from '@/services/api-url'
 import type { AmbientBackgroundPool } from '@/utils/ambient-background'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 type ViewMode = 'grid' | 'list'
 type AmbientBackgroundSource = {
@@ -23,6 +24,7 @@ export const useUiStore = defineStore('ui', () => {
   const sidebarCollapsed = ref(false)
   const ambientBackgroundSource = ref<AmbientBackgroundSource>(null)
   const sharedBackgroundAvailability = ref<SharedBackgroundAvailability>('unknown')
+  const backgroundAvailabilityRequests = createRequestGeneration()
 
   // Alerts
   const alerts = ref<Array<{
@@ -64,14 +66,19 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   const checkBackgroundAvailability = async () => {
+    const request = backgroundAvailabilityRequests.begin()
     try {
       const response = await fetch(CUSTOM_BACKGROUND_PATH, {
         method: 'HEAD',
         cache: 'no-store',
       })
-      sharedBackgroundAvailability.value = response.ok ? 'available' : 'missing'
+      if (request.isCurrent()) {
+        sharedBackgroundAvailability.value = response.ok ? 'available' : 'missing'
+      }
     } catch {
-      sharedBackgroundAvailability.value = 'missing'
+      if (request.isCurrent()) {
+        sharedBackgroundAvailability.value = 'missing'
+      }
     }
   }
 

@@ -8,13 +8,14 @@ import type {
 } from '@/utils/edit-game-form'
 import steamService, { proxySteamAssetUrl } from '@/services/steam.service'
 import steamGridDBService from '@/services/steamgriddb.service'
-import { useSteamPicker } from '@/composables/useSteamPicker'
+import { useSteamPicker, type SteamPickerRequest } from '@/composables/useSteamPicker'
 import type { SteamGameSearchResult } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import { getAssetFileExtension } from '@/utils/asset-file-extension'
 import { uploadAsset } from '@/services/assets'
 import { useSteamImportMetadata } from '@/composables/useSteamImportMetadata'
 import { useSteamImportDownload, type ImportSource } from '@/composables/useSteamImportDownload'
+import { createRequestGeneration } from '@/utils/request-generation'
 export type { WikiMetadataCandidateSelection } from '@/composables/useSteamImportMetadata'
 export type { ImportSource } from '@/composables/useSteamImportDownload'
 
@@ -107,6 +108,32 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     }
   }
 
+  const forgetSteamGame = () => {
+    const gameId = options.gameId.value
+    if (gameId == null) {
+      steamGameMemoryForNewGame.value = null
+    } else {
+      steamGameMemoryByGame.delete(gameId)
+    }
+  }
+
+  const forgetSgdbGame = () => {
+    const gameId = options.gameId.value
+    if (gameId == null) {
+      sgdbGameMemoryForNewGame.value = null
+    } else {
+      sgdbGameMemoryByGame.delete(gameId)
+    }
+  }
+
+  const forgetGameForSource = (source: ImportSource) => {
+    if (source === 'steamgriddb') {
+      forgetSgdbGame()
+    } else {
+      forgetSteamGame()
+    }
+  }
+
   const showScreenshotSelector = ref(false)
   const screenshotSearchUrl = ref('')
   const screenshotPreviewUrl = ref('')
@@ -129,6 +156,8 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   const sgdbLogoSearchResults = ref<SteamGameSearchResult[]>([])
   const sgdbLogoThumbs = ref<Record<string, string>>({})
   const isSearchingSgdbLogos = ref(false)
+  const screenshotRequests = createRequestGeneration()
+  const logoRequests = createRequestGeneration()
 
   const pickSteamSearchQuery = () => {
     const preferred = options.form.value.title_alt?.trim()
@@ -254,10 +283,11 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     rememberedSgdbGame,
     onSteamGameSelected: rememberSteamGame,
     onSgdbGameSelected: rememberSgdbGame,
+    forgetGame: forgetGameForSource,
   })
 
   const screenshotSteamPicker = useSteamPicker<ScreenshotCandidatesData>({
-    onSelect: async (game) => {
+    onSelect: async (game, request) => {
       const details = await steamService.getGameDetails(game.id)
       const screenshotCandidates = (details.screenshots || []).filter(Boolean)
       // 2026-04-06: Steam import falls back only to backend-native asset classes.
@@ -275,6 +305,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
         screenshots: finalAssets,
         usedFallbackAssets: screenshotCandidates.length === 0 && finalAssets.length > 0,
       }
+      if (!request.isCurrent()) return data
       screenshotCandidatesData.value = data
       selectedRemoteScreenshots.value.clear()
       rememberSteamGame(game)
@@ -306,15 +337,18 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     ))
   }
 
-  const searchSteamGridDBForLogos = async () => {
-    const games = await steamGridDBService.search(logoSearchQuery.value)
-    const results = games.map((game) => ({
+  const mapSgdbSearchResults = (games: Awaited<ReturnType<typeof steamGridDBService.search>>) => games.map((game) => ({
       id: String(game.id),
       name: game.name,
       releaseDate: game.release_date
         ? new Date(game.release_date * 1000).getFullYear().toString()
         : undefined,
     }))
+
+  const searchSteamGridDBForLogos = async (query: string, request: ReturnType<typeof logoRequests.begin>) => {
+    const games = await steamGridDBService.search(query)
+    const results = mapSgdbSearchResults(games)
+    if (!request.isCurrent()) return results
     sgdbLogoSearchResults.value = results
     sgdbLogoThumbs.value = {}
 
@@ -322,7 +356,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       results.map(async (game) => {
         const logos = await steamGridDBService.getLogosByGameId(Number(game.id))
         const thumbnail = logos[0]?.thumb
-        if (thumbnail) {
+        if (request.isCurrent() && thumbnail) {
           sgdbLogoThumbs.value = {
             ...sgdbLogoThumbs.value,
             [game.id]: thumbnail,
@@ -332,15 +366,13 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     )
   }
 
-  const searchSteamGridDBForScreenshots = async () => {
-    const games = await steamGridDBService.search(screenshotSearchQuery.value)
-    const results = games.map((game) => ({
-      id: String(game.id),
-      name: game.name,
-      releaseDate: game.release_date
-        ? new Date(game.release_date * 1000).getFullYear().toString()
-        : undefined,
-    }))
+  const searchSteamGridDBForScreenshots = async (
+    query: string,
+    request: ReturnType<typeof screenshotRequests.begin>,
+  ) => {
+    const games = await steamGridDBService.search(query)
+    const results = mapSgdbSearchResults(games)
+    if (!request.isCurrent()) return results
     sgdbScreenshotSearchResults.value = results
     sgdbScreenshotThumbs.value = {}
 
@@ -348,7 +380,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       results.map(async (game) => {
         const heroes = await steamGridDBService.getHeroesByGameId(Number(game.id))
         const thumbnail = heroes[0]?.thumb
-        if (thumbnail) {
+        if (request.isCurrent() && thumbnail) {
           sgdbScreenshotThumbs.value = {
             ...sgdbScreenshotThumbs.value,
             [game.id]: thumbnail,
@@ -358,27 +390,43 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     )
   }
 
-  const handleScreenshotSearchClear = () => {
-    screenshotSteamPicker.clear()
+  const clearScreenshotSelectionState = () => {
+    screenshotRequests.invalidate()
+    isSearchingSgdbScreenshots.value = false
+    screenshotSteamPicker.back()
     screenshotCandidatesData.value = null
-    selectedRemoteScreenshots.value.clear()
+    selectedRemoteScreenshots.value = new Set()
+  }
+
+  const clearScreenshotSearchState = () => {
+    screenshotSteamPicker.clear()
+    clearScreenshotSelectionState()
     sgdbScreenshotSearchResults.value = []
     sgdbScreenshotThumbs.value = {}
   }
 
+  const handleScreenshotSearchClear = () => {
+    forgetGameForSource(screenshotSource.value)
+    clearScreenshotSearchState()
+  }
+
   const searchScreenshots = async () => {
+    const request = screenshotRequests.begin()
     screenshotCandidatesData.value = null
     selectedRemoteScreenshots.value.clear()
     if (screenshotSource.value === 'steamgriddb') {
       isSearchingSgdbScreenshots.value = true
       try {
-        await searchSteamGridDBForScreenshots()
+        await searchSteamGridDBForScreenshots(screenshotSearchQuery.value, request)
+        if (!request.isCurrent()) return
         screenshotSteamPicker.clearResults()
         screenshotSteamPicker.back()
       } catch (error) {
-        options.addAlert('SteamGridDB 搜索失败：' + getHttpErrorMessage(error), 'error')
+        if (request.isCurrent()) {
+          options.addAlert('SteamGridDB 搜索失败：' + getHttpErrorMessage(error), 'error')
+        }
       } finally {
-        isSearchingSgdbScreenshots.value = false
+        if (request.isCurrent()) isSearchingSgdbScreenshots.value = false
       }
       return
     }
@@ -390,22 +438,27 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
 
   const selectScreenshotGame = async (game: SteamGameSearchResult) => {
     if (screenshotSource.value === 'steamgriddb') {
-      screenshotSteamPicker.setSelectedGame(game)
+      const request = screenshotRequests.begin()
       isSearchingSgdbScreenshots.value = true
       try {
-        const heroes = await steamGridDBService.getHeroesByGameId(Number(game.id))
-        screenshotCandidatesData.value = {
-          name: game.name,
-          screenshots: heroes.map((hero) => hero.url),
-          usedFallbackAssets: false,
-        }
-        selectedRemoteScreenshots.value = new Set()
-        rememberSgdbGame(game)
+        await screenshotSteamPicker.selectExternal(game, async (pickerRequest: SteamPickerRequest) => {
+          const heroes = await steamGridDBService.getHeroesByGameId(Number(game.id))
+          const data = {
+            name: game.name,
+            screenshots: heroes.map((hero) => hero.url),
+            usedFallbackAssets: false,
+          }
+          if (!request.isCurrent() || !pickerRequest.isCurrent()) return
+          screenshotCandidatesData.value = data
+          selectedRemoteScreenshots.value = new Set()
+          rememberSgdbGame(game)
+        })
       } catch (error) {
-        options.addAlert('SteamGridDB 获取横幅失败：' + getHttpErrorMessage(error), 'error')
-        screenshotSteamPicker.back()
+        if (request.isCurrent()) {
+          options.addAlert('SteamGridDB 获取横幅失败：' + getHttpErrorMessage(error), 'error')
+        }
       } finally {
-        isSearchingSgdbScreenshots.value = false
+        if (request.isCurrent()) isSearchingSgdbScreenshots.value = false
       }
       return
     }
@@ -414,9 +467,17 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
   }
 
   const backToScreenshotGameSearch = () => {
-    screenshotSteamPicker.back()
-    screenshotCandidatesData.value = null
-    selectedRemoteScreenshots.value.clear()
+    forgetGameForSource(screenshotSource.value)
+    clearScreenshotSearchState()
+    const query = pickSteamSearchQuery()
+    screenshotSearchQuery.value = query
+    if (query) void searchScreenshots()
+  }
+
+  const resetScreenshotAfterDownload = () => {
+    clearScreenshotSelectionState()
+    screenshotSearchQuery.value = ''
+    screenshotSteamPicker.clearResults()
   }
 
   const toggleScreenshot = (index: number) => {
@@ -492,9 +553,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
 
       await options.onAssetPersisted?.()
       showScreenshotSelector.value = false
-      backToScreenshotGameSearch()
-      screenshotSearchQuery.value = ''
-      screenshotSteamPicker.clearResults()
+      resetScreenshotAfterDownload()
       options.addAlert(`成功添加 ${indices.length} 张截图`, 'success')
     } catch (error) {
       options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
@@ -503,49 +562,73 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     }
   }
 
-  const handleLogoSearchClear = () => {
-    logoSearchQuery.value = ''
+  const clearLogoSelectionState = () => {
+    logoRequests.invalidate()
+    isSearchingSgdbLogos.value = false
+    selectedLogoGame.value = null
     logoImages.value = []
     selectedLogos.value = new Set()
-    selectedLogoGame.value = null
+  }
+
+  const handleLogoSearchClear = () => {
+    forgetGameForSource('steamgriddb')
+    logoSearchQuery.value = ''
+    clearLogoSelectionState()
     sgdbLogoSearchResults.value = []
     sgdbLogoThumbs.value = {}
   }
 
   const searchLogos = async () => {
+    const request = logoRequests.begin()
     logoImages.value = []
     selectedLogos.value = new Set()
     isSearchingSgdbLogos.value = true
     try {
-      await searchSteamGridDBForLogos()
-      selectedLogoGame.value = null
+      await searchSteamGridDBForLogos(logoSearchQuery.value, request)
+      if (request.isCurrent()) selectedLogoGame.value = null
     } catch (error) {
-      options.addAlert('SteamGridDB 搜索失败：' + getHttpErrorMessage(error), 'error')
+      if (request.isCurrent()) {
+        options.addAlert('SteamGridDB 搜索失败：' + getHttpErrorMessage(error), 'error')
+      }
     } finally {
-      isSearchingSgdbLogos.value = false
+      if (request.isCurrent()) isSearchingSgdbLogos.value = false
     }
   }
 
   const selectLogoGame = async (game: SteamGameSearchResult) => {
+    const request = logoRequests.begin()
     selectedLogoGame.value = game
     isSearchingSgdbLogos.value = true
     try {
       const logos = await steamGridDBService.getLogosByGameId(Number(game.id))
+      if (!request.isCurrent()) return
       logoImages.value = logos.map((logo) => logo.url)
       selectedLogos.value = new Set()
       rememberSgdbGame(game)
     } catch (error) {
-      options.addAlert('SteamGridDB 获取 Logo 失败：' + getHttpErrorMessage(error), 'error')
-      selectedLogoGame.value = null
+      if (request.isCurrent()) {
+        options.addAlert('SteamGridDB 获取 Logo 失败：' + getHttpErrorMessage(error), 'error')
+        selectedLogoGame.value = null
+      }
     } finally {
-      isSearchingSgdbLogos.value = false
+      if (request.isCurrent()) isSearchingSgdbLogos.value = false
     }
   }
 
   const backToLogoGameSearch = () => {
-    selectedLogoGame.value = null
-    logoImages.value = []
-    selectedLogos.value = new Set()
+    forgetGameForSource('steamgriddb')
+    clearLogoSelectionState()
+    sgdbLogoSearchResults.value = []
+    sgdbLogoThumbs.value = {}
+    const query = pickSteamSearchQuery()
+    logoSearchQuery.value = query
+    if (query) void searchLogos()
+  }
+
+  const resetLogoAfterDownload = () => {
+    clearLogoSelectionState()
+    logoSearchQuery.value = ''
+    sgdbLogoSearchResults.value = []
   }
 
   const toggleLogoSelection = (index: number) => {
@@ -584,9 +667,7 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       }
       await options.onAssetPersisted?.()
       showLogoSelector.value = false
-      backToLogoGameSearch()
-      logoSearchQuery.value = ''
-      sgdbLogoSearchResults.value = []
+      resetLogoAfterDownload()
       options.addAlert(`成功添加 ${indices.length} 张 Logo`, 'success')
     } catch (error) {
       options.addAlert('下载失败：' + getHttpErrorMessage(error), 'error')
@@ -620,8 +701,9 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
     }
   }
 
-  watch(showScreenshotSelector, (isOpen) => {
-    if (!isOpen) return
+  const prepareScreenshotSource = () => {
+    clearScreenshotSearchState()
+
     const remembered = screenshotSource.value === 'steamgriddb'
       ? rememberedSgdbGame.value
       : rememberedSteamGame.value
@@ -630,39 +712,44 @@ export const useSteamImport = (options: UseSteamImportOptions) => {
       void selectScreenshotGame(remembered)
       return
     }
+
     const query = pickSteamSearchQuery()
     if (!query) return
     screenshotSearchQuery.value = query
-    searchScreenshots()
+    void searchScreenshots()
+  }
+
+  watch(showScreenshotSelector, (isOpen) => {
+    if (!isOpen) return
+    prepareScreenshotSource()
   })
 
   watch(screenshotSource, () => {
     if (!showScreenshotSelector.value) return
-    const remembered = screenshotSource.value === 'steamgriddb'
-      ? rememberedSgdbGame.value
-      : rememberedSteamGame.value
-    if (remembered) {
-      screenshotSearchQuery.value = remembered.id
-      void selectScreenshotGame(remembered)
-      return
-    }
-    const query = screenshotSearchQuery.value.trim()
-    if (!query) return
-    void searchScreenshots()
+    prepareScreenshotSource()
   })
 
-  watch(showLogoSelector, (isOpen) => {
-    if (!isOpen) return
+  const prepareLogoSearch = () => {
+    clearLogoSelectionState()
+    sgdbLogoSearchResults.value = []
+    sgdbLogoThumbs.value = {}
+
     const remembered = rememberedSgdbGame.value
     if (remembered) {
       logoSearchQuery.value = remembered.id
       void selectLogoGame(remembered)
       return
     }
+
     const query = pickSteamSearchQuery()
     if (!query) return
     logoSearchQuery.value = query
     void searchLogos()
+  }
+
+  watch(showLogoSelector, (isOpen) => {
+    if (!isOpen) return
+    prepareLogoSearch()
   })
 
   const screenshotSearchResults = computed(() => (

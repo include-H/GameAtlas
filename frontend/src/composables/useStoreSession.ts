@@ -6,6 +6,7 @@ import {
   mergeAmbientBackgroundPools,
   type AmbientBackgroundPool,
 } from '@/utils/ambient-background'
+import { createRequestGeneration, type RequestGenerationGuard } from '@/utils/request-generation'
 
 export interface StoreShelfGame {
   publicId: string
@@ -29,6 +30,7 @@ export const useStoreSession = () => {
 
   let isStoreDisposed = false
   let storeAbortController: AbortController | null = null
+  const sessionRequests = createRequestGeneration()
 
   const pickPosterImages = (pool: AmbientBackgroundPool): string[] => {
     const picks: string[] = []
@@ -46,7 +48,7 @@ export const useStoreSession = () => {
     return picks
   }
 
-  const loadStorePosters = async (signal?: AbortSignal) => {
+  const loadStorePosters = async (signal: AbortSignal, request: RequestGenerationGuard) => {
     try {
       // 与全局抽卡池同一数据源：遍历游戏列表收集 banner 与截图
       const pools: AmbientBackgroundPool[] = []
@@ -57,22 +59,22 @@ export const useStoreSession = () => {
           sort: { field: 'created_at', order: 'desc' },
           signal,
         })
-        if (isStoreDisposed) return
+        if (isStoreDisposed || !request.isCurrent()) return
         pools.push(getAmbientBackgroundPoolFromGames(result.data))
         const totalPages = Math.max(1, result.pagination.totalPages || 1)
         if (page >= totalPages) break
         page += 1
       }
-      if (isStoreDisposed) return
+      if (isStoreDisposed || !request.isCurrent()) return
       storePosters.value = pickPosterImages(mergeAmbientBackgroundPools(pools))
     } catch {
-      if (isStoreDisposed) return
+      if (isStoreDisposed || !request.isCurrent()) return
       // 拉取失败时保留纯色海报兜底
       uiStore.addAlert('游戏店海报加载失败，已显示兜底样式', 'warning')
     }
   }
 
-  const loadStoreSession = async (signal?: AbortSignal) => {
+  const loadStoreSession = async (signal: AbortSignal, request: RequestGenerationGuard) => {
     try {
       // 每次进入生成一个随机种子，后端直接按 random 排序返回 20 个游戏
       const seed = Math.floor(Math.random() * 2_147_483_647) + 1
@@ -81,7 +83,7 @@ export const useStoreSession = () => {
         sort: { field: 'random', order: 'desc', seed },
         signal,
       })
-      if (isStoreDisposed) return
+      if (isStoreDisposed || !request.isCurrent()) return
       // 货架固定 4 行 × 5 盒
       const picked = result.data.filter((game) => game.cover_image)
       gameStoreSessionGames.value = picked.map((game) => ({
@@ -97,25 +99,29 @@ export const useStoreSession = () => {
         picked.map((game) => game.public_id),
         signal,
       )
-      if (isStoreDisposed) return
+      if (isStoreDisposed || !request.isCurrent()) return
       crtPlaylist.value = videoBundles.flatMap((bundle) => bundle.preview_videos.map((video) => video.path))
     } catch {
-      if (isStoreDisposed) return
+      if (isStoreDisposed || !request.isCurrent()) return
       // 拉取失败时保留空货架，避免展示 mock 数据
       uiStore.addAlert('游戏店数据加载失败，货架暂时为空', 'warning')
     }
   }
 
   const start = () => {
+    sessionRequests.invalidate()
+    storeAbortController?.abort()
     isStoreDisposed = false
+    const request = sessionRequests.begin()
     storeAbortController = new AbortController()
     const storeSignal = storeAbortController.signal
-    void loadStorePosters(storeSignal)
-    void loadStoreSession(storeSignal)
+    void loadStorePosters(storeSignal, request)
+    void loadStoreSession(storeSignal, request)
   }
 
   const dispose = () => {
     isStoreDisposed = true
+    sessionRequests.invalidate()
     storeAbortController?.abort()
     storeAbortController = null
   }

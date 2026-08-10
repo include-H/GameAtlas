@@ -204,11 +204,17 @@ func registerAssetRoutes(
 
 		permanentFile := true
 		if _, err := os.Stat(targetPath); err != nil {
-			// Fallback: check staging directory for files not yet moved to permanent.
-			stagingPath := filepath.Join(assetsDir, "_staging", filepath.Base(rawPath))
-			if _, statErr := os.Stat(stagingPath); statErr == nil {
-				targetPath = stagingPath
-				permanentFile = false
+			// Fallback: check the exact game-scoped staging path for files not yet
+			// moved to permanent storage.
+			stagingPath, stagingErr := assetStore.StagingPath("/assets/" + rawPath)
+			if stagingErr == nil {
+				if _, statErr := os.Stat(stagingPath); statErr == nil {
+					targetPath = stagingPath
+					permanentFile = false
+				} else {
+					c.Status(http.StatusNotFound)
+					return
+				}
 			} else {
 				c.Status(http.StatusNotFound)
 				return

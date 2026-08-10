@@ -5,10 +5,10 @@
     cd backend && go run ./cmd/server &            # 本地 :3000
     python3 scripts/import-prod-games.py --count 60
 环境变量：
-    GA_URL            生产库地址（默认 http://192.168.1.4:3000）
-    GA_PASSWORD       生产库管理员密码（默认 0114）
+    GA_URL            生产库地址（必填）
+    GA_PASSWORD       生产库管理员密码（必填）
     LOCAL_URL         本地库地址（默认 http://127.0.0.1:3000）
-    LOCAL_PASSWORD    本地库管理员密码（默认 1234）
+    LOCAL_PASSWORD    本地库管理员密码（必填）
 """
 import argparse
 import json
@@ -17,10 +17,10 @@ import sys
 import urllib.parse
 import urllib.request
 
-PROD_URL = os.environ.get("GA_URL", "http://192.168.1.4:3000")
-PROD_PASSWORD = os.environ.get("GA_PASSWORD", "0114")
+PROD_URL = os.environ.get("GA_URL", "")
+PROD_PASSWORD = os.environ.get("GA_PASSWORD", "")
 LOCAL_URL = os.environ.get("LOCAL_URL", "http://127.0.0.1:3000")
-LOCAL_PASSWORD = os.environ.get("LOCAL_PASSWORD", "1234")
+LOCAL_PASSWORD = os.environ.get("LOCAL_PASSWORD", "")
 
 
 def login(base_url: str, password: str):
@@ -57,11 +57,11 @@ def post_json(opener, url: str, payload: dict, method="POST"):
         return exc.code, {"error": body}
 
 
-def fetch_all_games(opener):
+def fetch_all_games(opener, base_url):
     games = []
     page = 1
     while True:
-        data = get_json(opener, f"{PROD_URL}/api/games?page={page}&page_size=50")
+        data = get_json(opener, f"{base_url.rstrip('/')}/api/games?page={page}&limit=50")
         batch = data.get("data") or []
         games.extend(batch)
         pagination = data.get("pagination") or {}
@@ -73,9 +73,6 @@ def fetch_all_games(opener):
 
 def build_aggregate_payload(detail: dict) -> dict:
     game = detail
-    def paths(items, key):
-        return [item["path"] for item in (items or []) if item.get("path")]
-
     logos = game.get("logos") or []
     # 本地库没有生产库的系列/开发商/发行商 ID，置空避免 FK 违反（本地仅做数量级测试）
     return {
@@ -115,16 +112,27 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--count", type=int, default=60, help="导入数量（默认 60）")
     parser.add_argument("--start", type=int, default=0, help="跳过前 N 款")
+    parser.add_argument("--prod-url", default=PROD_URL, help="生产库地址")
+    parser.add_argument("--prod-password", default=PROD_PASSWORD, help="生产库管理员密码")
+    parser.add_argument("--local-url", default=LOCAL_URL, help="本地库地址")
+    parser.add_argument("--local-password", default=LOCAL_PASSWORD, help="本地库管理员密码")
     args = parser.parse_args()
 
-    prod = login(PROD_URL, PROD_PASSWORD)
-    local = login(LOCAL_URL, LOCAL_PASSWORD)
+    if not args.prod_url:
+        parser.error("缺少生产库地址：--prod-url 或环境变量 GA_URL")
+    if not args.prod_password:
+        parser.error("缺少生产库密码：--prod-password 或环境变量 GA_PASSWORD")
+    if not args.local_password:
+        parser.error("缺少本地库密码：--local-password 或环境变量 LOCAL_PASSWORD")
 
-    games = fetch_all_games(prod)
+    prod = login(args.prod_url, args.prod_password)
+    local = login(args.local_url, args.local_password)
+
+    games = fetch_all_games(prod, args.prod_url)
     print(f"生产库共 {len(games)} 款，本次导入 {min(args.count, len(games) - args.start)} 款")
 
     # 幂等保护：导入前拉取本地全部标题，已存在则跳过创建（脚本可重复执行）
-    local_games = fetch_all_games(local)
+    local_games = fetch_all_games(local, args.local_url)
     local_titles = {g.get("title", "").strip().lower() for g in local_games if g.get("title")}
     print(f"本地库共 {len(local_games)} 款，其中 {len(local_titles)} 个不重复标题")
 
@@ -136,9 +144,9 @@ def main():
             print(f"[跳过] {title}：本地已存在同名游戏")
             skipped += 1
             continue
-        detail = get_json(prod, f"{PROD_URL}/api/games/{pid}").get("data") or {}
+        detail = get_json(prod, f"{args.prod_url.rstrip('/')}/api/games/{pid}").get("data") or {}
 
-        status, resp = post_json(local, f"{LOCAL_URL}/api/games", {"title": title, "visibility": item.get("visibility") or "public"})
+        status, resp = post_json(local, f"{args.local_url.rstrip('/')}/api/games", {"title": title, "visibility": item.get("visibility") or "public"})
         if status not in (200, 201):
             print(f"[创建失败 {status}] {title}: {resp}")
             failed += 1
@@ -146,7 +154,7 @@ def main():
         new_pid = (resp.get("data") or {}).get("public_id") or pid
 
         payload = build_aggregate_payload(detail)
-        status, resp = post_json(local, f"{LOCAL_URL}/api/games/{new_pid}/aggregate", payload, method="PUT")
+        status, resp = post_json(local, f"{args.local_url.rstrip('/')}/api/games/{new_pid}/aggregate", payload, method="PUT")
         if status not in (200, 201):
             print(f"[写入失败 {status}] {title}: {resp}")
             failed += 1

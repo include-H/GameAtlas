@@ -6,6 +6,7 @@ import type { AdminGameDetail, GameListItem, PendingIssueCatalog, PendingIssueDe
 import { formatDisplayDate } from '@/utils/date'
 import { usePendingWorkbench } from '@/composables/usePendingWorkbench'
 import { useUiStore } from '@/stores/ui'
+import { createRequestGeneration } from '@/utils/request-generation'
 const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23424242" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/%3E%3C/svg%3E'
 
 interface UsePendingCenterViewOptions {
@@ -39,6 +40,8 @@ export const usePendingCenterView = ({
   const detailHeroFit = ref<'cover' | 'contain'>('cover')
   const detailHeroSrc = ref('')
   const detailHeroRequestId = ref(0)
+  const editDetailRequests = createRequestGeneration()
+  let suppressNextEditCloseInvalidation = false
 
   const {
     activeGame,
@@ -185,10 +188,17 @@ export const usePendingCenterView = ({
 
   const openEdit = async (game: GameListItem) => {
     if (!game.public_id) return
+    suppressNextEditCloseInvalidation = showEditModal.value
+    editingGame.value = null
+    showEditModal.value = false
+    const request = editDetailRequests.begin()
     try {
-      editingGame.value = await gamesService.getAdminGameDetail(game.public_id)
+      const detail = await gamesService.getAdminGameDetail(game.public_id)
+      if (!request.isCurrent()) return
+      editingGame.value = detail
       showEditModal.value = true
     } catch {
+      if (!request.isCurrent()) return
       uiStore.addAlert('加载游戏详情失败', 'error')
     }
   }
@@ -214,6 +224,7 @@ export const usePendingCenterView = ({
   }
 
   const handleEditSuccess = async () => {
+    editDetailRequests.invalidate()
     showEditModal.value = false
     await loadWorkbenchGames()
   }
@@ -221,14 +232,30 @@ export const usePendingCenterView = ({
   const handleEditSync = async () => {
     const currentPublicId = editingGame.value?.public_id
     if (currentPublicId) {
+      const request = editDetailRequests.begin()
       try {
-        editingGame.value = await gamesService.getAdminGameDetail(currentPublicId)
+        const detail = await gamesService.getAdminGameDetail(currentPublicId)
+        if (request.isCurrent()) {
+          editingGame.value = detail
+        }
       } catch {
-        uiStore.addAlert('保存已生效，但编辑器未刷新到最新数据，请稍后重试', 'warning')
+        if (request.isCurrent()) {
+          uiStore.addAlert('保存已生效，但编辑器未刷新到最新数据，请稍后重试', 'warning')
+        }
       }
     }
     await loadWorkbenchGames()
   }
+
+  watch(showEditModal, (visible) => {
+    if (!visible) {
+      if (suppressNextEditCloseInvalidation) {
+        suppressNextEditCloseInvalidation = false
+        return
+      }
+      editDetailRequests.invalidate()
+    }
+  })
 
   onMounted(async () => {
     try {

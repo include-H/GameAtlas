@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -105,20 +106,41 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 		})
 	}
 
-	// Move staging files to permanent storage before DB write.
+	// Move staging files to permanent storage before DB write. Keep track of
+	// files that actually crossed the boundary so a rolled-back DB write can
+	// remove them without touching pre-existing permanent assets.
 	game, gameErr := s.gamesRepo.GetByID(id)
 	if gameErr != nil {
 		return nil, nil, normalizeRepoError(gameErr)
 	}
-	for _, asset := range input.Assets.NewAssets {
-		if _, err := s.assetStore.MoveToPermanent(asset.Path, game.PublicID); err != nil {
+
+	newAssets, err := normalizeNewAssets(input.Assets.NewAssets, s.assetStore, game.PublicID)
+	if err != nil {
+		return nil, nil, err
+	}
+	movedAssetPaths := make([]string, 0, len(newAssets)*2)
+	cleanupMovedAssets := func() {
+		for _, path := range uniqueNonEmptyStrings(movedAssetPaths) {
+			if _, cleanupErr := cleanupAssetPath(s.assetStore, s.assetCleanupTasksRepo, path, "games.update_aggregate.rollback"); cleanupErr != nil {
+				log.Printf("games.update_aggregate.rollback: failed to clean %s: %v", path, cleanupErr)
+			}
+		}
+	}
+	for _, asset := range newAssets {
+		if _, moved, err := s.assetStore.MoveToPermanentWithStatus(asset.Path, game.PublicID); err != nil {
+			cleanupMovedAssets()
 			return nil, nil, fmt.Errorf("move staging asset to permanent: %w", err)
+		} else if moved {
+			movedAssetPaths = append(movedAssetPaths, asset.Path)
 		}
 		// 预告片封面帧同样从 staging 移入正式目录；否则会被启动时的
 		// CleanStaging（1 小时过期）清理掉。
 		if asset.PosterPath != nil && strings.TrimSpace(*asset.PosterPath) != "" {
-			if _, err := s.assetStore.MoveToPermanent(*asset.PosterPath, game.PublicID); err != nil {
+			if _, moved, err := s.assetStore.MoveToPermanentWithStatus(*asset.PosterPath, game.PublicID); err != nil {
+				cleanupMovedAssets()
 				return nil, nil, fmt.Errorf("move staging poster to permanent: %w", err)
+			} else if moved {
+				movedAssetPaths = append(movedAssetPaths, *asset.PosterPath)
 			}
 		}
 	}
@@ -133,10 +155,11 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 			LogoOrderAssetUIDs:       input.Assets.LogoOrderAssetUIDs,
 			BannerOrderAssetUIDs:     input.Assets.BannerOrderAssetUIDs,
 			LogoPositions:            input.Assets.LogoPositions,
-			NewAssets:                input.Assets.NewAssets,
+			NewAssets:                newAssets,
 		},
 	})
 	if err != nil {
+		cleanupMovedAssets()
 		return nil, nil, normalizeRepoError(err)
 	}
 
@@ -174,6 +197,66 @@ func (s *GameAggregateService) Update(id int64, input domain.GameAggregateUpdate
 	}
 
 	return game, assetDeleteWarnings, nil
+}
+
+func normalizeNewAssets(
+	assets []domain.NewAssetEntry,
+	store *files.AssetStore,
+	gamePublicID string,
+) ([]domain.NewAssetEntry, error) {
+	if len(assets) == 0 {
+		return []domain.NewAssetEntry{}, nil
+	}
+
+	allowedTypes := map[string]struct{}{
+		"cover": {}, "banner": {}, "screenshot": {}, "logo": {}, "video": {},
+	}
+	seenUIDs := make(map[string]struct{}, len(assets))
+	result := make([]domain.NewAssetEntry, 0, len(assets))
+	for _, asset := range assets {
+		asset.AssetUID = strings.TrimSpace(asset.AssetUID)
+		asset.AssetType = strings.TrimSpace(asset.AssetType)
+		asset.Path = strings.TrimSpace(asset.Path)
+		if asset.AssetUID == "" || asset.Path == "" {
+			return nil, domain.ErrValidation
+		}
+		if _, exists := seenUIDs[asset.AssetUID]; exists {
+			return nil, domain.ErrValidation
+		}
+		seenUIDs[asset.AssetUID] = struct{}{}
+		if _, ok := allowedTypes[asset.AssetType]; !ok || store.ValidatePermanentPath(asset.Path, gamePublicID) != nil {
+			return nil, domain.ErrValidation
+		}
+		if asset.PosterPath != nil {
+			posterPath := strings.TrimSpace(*asset.PosterPath)
+			if posterPath == "" {
+				asset.PosterPath = nil
+			} else if asset.AssetType != "video" || store.ValidatePermanentPath(posterPath, gamePublicID) != nil {
+				return nil, domain.ErrValidation
+			} else {
+				asset.PosterPath = &posterPath
+			}
+		}
+		result = append(result, asset)
+	}
+	return result, nil
+}
+
+func uniqueNonEmptyStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
 }
 
 // Delete removes the game aggregate and then tries to clean up orphaned asset files and metadata rows.

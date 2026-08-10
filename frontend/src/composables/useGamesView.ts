@@ -400,7 +400,9 @@ export const useGamesView = ({
     try {
       await gamesStore.fetchGames(request)
     } catch {
-      uiStore.addAlert('加载游戏失败', 'error')
+      if (requestId === listRequestId) {
+        uiStore.addAlert('加载游戏失败', 'error')
+      }
     } finally {
       if (requestId === listRequestId) {
         isLoading.value = false
@@ -431,7 +433,9 @@ export const useGamesView = ({
         await loadGames()
       }
     } catch {
-      uiStore.addAlert('加载更多游戏失败', 'error')
+      if (requestId === listRequestId) {
+        uiStore.addAlert('加载更多游戏失败', 'error')
+      }
     } finally {
       isLoadingMore.value = false
     }

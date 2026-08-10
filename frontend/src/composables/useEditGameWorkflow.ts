@@ -8,6 +8,7 @@ import type {
   GameAggregateNewAsset,
   GameListItem,
 } from '@/services/types'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 interface UseEditGameWorkflowOptions {
   game: Ref<AdminGameDetail | null>
@@ -50,13 +51,26 @@ const createUpdatePayload = (params: {
 }
 
 export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
+  const saveRequests = createRequestGeneration()
+
+  const invalidateSave = () => {
+    saveRequests.invalidate()
+    options.isSubmitting.value = false
+  }
+
   const handleSubmit = async (): Promise<boolean> => {
     const game = options.game.value
     if (!game) return false
     if (options.isSubmitting.value) return false
 
+    const gameKey = game.public_id || String(game.id)
+    const request = saveRequests.begin()
+
     const isValid = await options.validateForm()
-    if (!isValid) return false
+    if (!isValid || !request.isCurrent()) return false
+    if (!options.game.value || (options.game.value.public_id || String(options.game.value.id)) !== gameKey) {
+      return false
+    }
 
     options.isSubmitting.value = true
 
@@ -151,23 +165,31 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
           logo_positions: logoPositions,
         },
       })
+      // The write may have succeeded after the modal moved to another game. Keep the
+      // shared list cache correct, but do not let the stale request close or re-label
+      // the newly active editor.
+      options.onGameSaved?.(aggregateResult.game)
+      if (!request.isCurrent()) return false
       if (aggregateResult.warnings.length > 0) {
         options.addAlert('部分素材文件未能物理删除，系统稍后可重试', 'warning')
       }
-      options.onGameSaved?.(aggregateResult.game)
       options.addAlert('保存成功', 'success')
       options.emitSuccess()
       options.closeModal()
       return true
     } catch (error) {
+      if (!request.isCurrent()) return false
       options.addAlert(getHttpErrorMessage(error, '保存失败'), 'error')
       return false
     } finally {
-      options.isSubmitting.value = false
+      if (request.isCurrent()) {
+        options.isSubmitting.value = false
+      }
     }
   }
 
   return {
     handleSubmit,
+    invalidateSave,
   }
 }

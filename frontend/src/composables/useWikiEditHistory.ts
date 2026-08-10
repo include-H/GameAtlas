@@ -1,5 +1,6 @@
 import { ref, type Ref } from 'vue'
 import wikiService, { type WikiHistoryEntry } from '@/services/wiki.service'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 interface UseWikiEditHistoryOptions {
   wikiData: Ref<{
@@ -21,8 +22,10 @@ export const useWikiEditHistory = ({
   const hasHistoryLoadFailure = ref(false)
   const previewHistoryContent = ref(true)
   const historyPreviewVisible = ref(false)
+  const historyRequests = createRequestGeneration()
 
   const resetHistoryState = () => {
+    historyRequests.invalidate()
     historyEntries.value = []
     selectedHistory.value = null
     hasHistoryLoadFailure.value = false
@@ -31,19 +34,25 @@ export const useWikiEditHistory = ({
   }
 
   const loadHistory = async (gameId: string) => {
+    const request = historyRequests.begin()
     isHistoryLoading.value = true
     hasHistoryLoadFailure.value = false
     try {
-      historyEntries.value = await wikiService.getWikiHistory(gameId)
+      const entries = await wikiService.getWikiHistory(gameId)
+      if (!request.isCurrent()) return
+      historyEntries.value = entries
       selectedHistory.value = historyEntries.value[0] || null
     } catch {
+      if (!request.isCurrent()) return
       historyEntries.value = []
       selectedHistory.value = null
       hasHistoryLoadFailure.value = true
       // History requests either return entries or an empty list; failures should stay visible to the editor.
       addAlert('加载 Wiki 历史失败', 'error')
     } finally {
-      isHistoryLoading.value = false
+      if (request.isCurrent()) {
+        isHistoryLoading.value = false
+      }
     }
   }
 

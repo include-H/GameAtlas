@@ -1,6 +1,7 @@
 package files
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"image"
@@ -46,6 +47,7 @@ var allowedVideoContentTypes = map[string]string{
 
 var ErrInvalidImageType = errors.New("invalid image type")
 var ErrInvalidAssetName = errors.New("invalid asset name")
+var ErrInvalidAssetPath = errors.New("invalid asset path")
 var ErrInvalidRemoteURL = errors.New("invalid remote image url")
 
 var uuidAssetNamePattern = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$`)
@@ -73,6 +75,9 @@ func (s *AssetStore) SaveToStaging(
 	file io.Reader,
 	contentType string,
 ) (string, error) {
+	if !isAllowedAssetType(assetType) {
+		return "", ErrInvalidAssetPath
+	}
 	extension, err := validateAssetContentType(assetType, contentType)
 	if err != nil {
 		return "", err
@@ -81,49 +86,72 @@ func (s *AssetStore) SaveToStaging(
 		return "", ErrInvalidAssetName
 	}
 
-	stagingDir := filepath.Join(s.baseDir, "_staging")
+	dir, err := normalizeAssetDirectory(gamePublicID)
+	if err != nil {
+		return "", err
+	}
+
+	var source io.Reader = file
+	if assetType != "video" {
+		data, err := ReadValidatedImage(file, -1, contentType)
+		if err != nil {
+			return "", err
+		}
+		source = bytes.NewReader(data)
+	}
+
+	stagingDir := filepath.Join(s.baseDir, "_staging", dir)
 	if err := os.MkdirAll(stagingDir, 0o755); err != nil {
 		return "", fmt.Errorf("create staging directory: %w", err)
 	}
 
 	filename := strings.ToLower(strings.TrimSpace(assetName)) + extension
 	targetPath := filepath.Join(stagingDir, filename)
-	output, err := os.Create(targetPath)
+	temporary, err := os.CreateTemp(stagingDir, ".upload-*")
 	if err != nil {
-		return "", fmt.Errorf("create staging file: %w", err)
+		return "", fmt.Errorf("create temporary staging file: %w", err)
 	}
-	defer output.Close()
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
 
-	if _, err := io.Copy(output, file); err != nil {
+	if _, err := copyWithinLimit(temporary, source, uploadLimit(assetType)); err != nil {
+		_ = temporary.Close()
 		return "", fmt.Errorf("write staging file: %w", err)
 	}
-
-	dir := strings.ToLower(strings.TrimSpace(gamePublicID))
-	if dir == "" {
-		dir = "unknown-game"
+	if err := temporary.Close(); err != nil {
+		return "", fmt.Errorf("close staging file: %w", err)
 	}
+	if err := os.Rename(temporaryPath, targetPath); err != nil {
+		return "", fmt.Errorf("commit staging file: %w", err)
+	}
+
 	return "/" + filepath.ToSlash(filepath.Join("assets", dir, filename)), nil
 }
 
 // MoveToPermanent moves a file from the staging directory to the permanent
 // game-specific directory. permanentPath is the /assets/{gamePublicID}/{filename} format.
 func (s *AssetStore) MoveToPermanent(permanentPath string, gamePublicID string) (string, error) {
-	cleaned := strings.TrimSpace(permanentPath)
-	cleaned = strings.TrimPrefix(cleaned, "/")
-	if cleaned == "" || !strings.HasPrefix(cleaned, "assets/") {
-		return "", fmt.Errorf("invalid permanent path: %s", permanentPath)
+	path, _, err := s.MoveToPermanentWithStatus(permanentPath, gamePublicID)
+	return path, err
+}
+
+// MoveToPermanentWithStatus is the same operation as MoveToPermanent, but also
+// reports whether a staging file was actually moved. Callers can use that bit
+// to compensate if a later database operation fails.
+func (s *AssetStore) MoveToPermanentWithStatus(permanentPath string, gamePublicID string) (string, bool, error) {
+	dir, filename, err := parsePermanentAssetPath(permanentPath)
+	if err != nil {
+		return "", false, err
+	}
+	expectedDir, err := normalizeAssetDirectory(gamePublicID)
+	if err != nil || dir != expectedDir {
+		return "", false, ErrInvalidAssetPath
 	}
 
-	filename := filepath.Base(cleaned)
-	stagingFile := filepath.Join(s.baseDir, "_staging", filename)
-
-	dir := strings.ToLower(strings.TrimSpace(gamePublicID))
-	if dir == "" {
-		dir = "unknown-game"
-	}
+	stagingFile := filepath.Join(s.baseDir, "_staging", dir, filename)
 	permDir := filepath.Join(s.baseDir, dir)
 	if err := os.MkdirAll(permDir, 0o755); err != nil {
-		return "", fmt.Errorf("create permanent directory: %w", err)
+		return "", false, fmt.Errorf("create permanent directory: %w", err)
 	}
 
 	permFile := filepath.Join(permDir, filename)
@@ -132,15 +160,15 @@ func (s *AssetStore) MoveToPermanent(permanentPath string, gamePublicID string) 
 	if _, err := os.Stat(permFile); err == nil {
 		// Clean up staging file if it exists.
 		_ = os.Remove(stagingFile)
-		return "/" + filepath.ToSlash(filepath.Join("assets", dir, filename)), nil
+		return "/" + filepath.ToSlash(filepath.Join("assets", dir, filename)), false, nil
 	}
 
 	// Move from staging to permanent.
 	if err := os.Rename(stagingFile, permFile); err != nil {
-		return "", fmt.Errorf("move staging to permanent: %w", err)
+		return "", false, fmt.Errorf("move staging to permanent: %w", err)
 	}
 
-	return "/" + filepath.ToSlash(filepath.Join("assets", dir, filename)), nil
+	return "/" + filepath.ToSlash(filepath.Join("assets", dir, filename)), true, nil
 }
 
 // BaseDir returns the root directory for asset storage.
@@ -155,27 +183,29 @@ func (s *AssetStore) CleanStaging(maxAge time.Duration) (int, error) {
 		return 0, nil
 	}
 
-	entries, err := os.ReadDir(stagingDir)
-	if err != nil {
-		return 0, fmt.Errorf("read staging directory: %w", err)
-	}
-
 	cutoff := time.Now().Add(-maxAge)
 	deleted := 0
-	for _, entry := range entries {
+	if err := filepath.WalkDir(stagingDir, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
 		if entry.IsDir() {
-			continue
+			return nil
 		}
 		info, err := entry.Info()
 		if err != nil {
-			continue
+			return nil
 		}
 		if info.ModTime().Before(cutoff) {
-			if err := os.Remove(filepath.Join(stagingDir, entry.Name())); err == nil {
+			if err := os.Remove(path); err == nil {
 				deleted++
 			}
 		}
+		return nil
+	}); err != nil {
+		return deleted, fmt.Errorf("walk staging directory: %w", err)
 	}
+	removeEmptyDirectories(stagingDir)
 	return deleted, nil
 }
 
@@ -198,13 +228,39 @@ func (s *AssetStore) AssetExists(assetPath string) bool {
 	if _, err := os.Stat(targetPath); err == nil {
 		return true
 	}
-	// Fallback: check staging directory.
-	filename := filepath.Base(targetPath)
-	stagingPath := filepath.Join(s.baseDir, "_staging", filename)
+	stagingPath, err := s.StagingPath(assetPath)
+	if err == nil {
+		if _, err := os.Stat(stagingPath); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// StagedAssetExists reports whether the exact game-scoped staging path exists.
+func (s *AssetStore) StagedAssetExists(assetPath string) bool {
+	stagingPath, err := s.StagingPath(assetPath)
+	if err != nil {
+		return false
+	}
 	if _, err := os.Stat(stagingPath); err == nil {
 		return true
 	}
 	return false
+}
+
+// ValidatePermanentPath verifies that an asset path belongs to the supplied
+// game directory and contains exactly one filename component.
+func (s *AssetStore) ValidatePermanentPath(assetPath string, gamePublicID string) error {
+	dir, _, err := parsePermanentAssetPath(assetPath)
+	if err != nil {
+		return err
+	}
+	expectedDir, err := normalizeAssetDirectory(gamePublicID)
+	if err != nil || dir != expectedDir {
+		return ErrInvalidAssetPath
+	}
+	return nil
 }
 
 // EnsureVariant returns the disk path to serve for assetPath at the given width.
@@ -297,6 +353,80 @@ func (s *AssetStore) resolveAssetPath(assetPath string) (string, error) {
 		return "", ErrInvalidRemoteURL
 	}
 	return targetPath, nil
+}
+
+func (s *AssetStore) StagingPath(assetPath string) (string, error) {
+	dir, filename, err := parsePermanentAssetPath(assetPath)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(s.baseDir, "_staging", dir, filename), nil
+}
+
+func parsePermanentAssetPath(assetPath string) (string, string, error) {
+	cleaned := strings.TrimPrefix(strings.TrimSpace(assetPath), "/")
+	parts := strings.Split(cleaned, "/")
+	if len(parts) != 3 || parts[0] != "assets" {
+		return "", "", ErrInvalidAssetPath
+	}
+	if _, err := normalizeAssetDirectory(parts[1]); err != nil || parts[1] != strings.ToLower(parts[1]) {
+		return "", "", ErrInvalidAssetPath
+	}
+	if parts[2] == "" || parts[2] == "." || parts[2] == ".." || strings.ContainsAny(parts[2], `/\\`) {
+		return "", "", ErrInvalidAssetPath
+	}
+	return parts[1], parts[2], nil
+}
+
+func normalizeAssetDirectory(value string) (string, error) {
+	trimmed := strings.ToLower(strings.TrimSpace(value))
+	if trimmed == "" || trimmed == "." || trimmed == ".." || strings.ContainsAny(trimmed, `/\\`) {
+		return "", ErrInvalidAssetPath
+	}
+	return trimmed, nil
+}
+
+func isAllowedAssetType(assetType string) bool {
+	switch assetType {
+	case "cover", "banner", "screenshot", "logo", "poster", "video":
+		return true
+	default:
+		return false
+	}
+}
+
+func uploadLimit(assetType string) int64 {
+	if assetType == "video" {
+		return MaxVideoUploadBytes
+	}
+	return MaxImageUploadBytes
+}
+
+func copyWithinLimit(destination io.Writer, source io.Reader, limit int64) (int64, error) {
+	written, err := io.Copy(destination, io.LimitReader(source, limit+1))
+	if err != nil {
+		return written, err
+	}
+	if written > limit {
+		return written, ErrUploadTooLarge
+	}
+	return written, nil
+}
+
+func removeEmptyDirectories(root string) {
+	var directories []string
+	_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err == nil && entry.IsDir() && path != root {
+			directories = append(directories, path)
+		}
+		return nil
+	})
+	for index := len(directories) - 1; index >= 0; index-- {
+		entries, err := os.ReadDir(directories[index])
+		if err == nil && len(entries) == 0 {
+			_ = os.Remove(directories[index])
+		}
+	}
 }
 
 func validateAssetContentType(assetType string, contentType string) (string, error) {

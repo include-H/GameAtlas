@@ -9,8 +9,6 @@ export interface ShelfCell {
   z: number
 }
 
-export type ShelfRow = ShelfCell[]
-
 export const boxStyle = (cell: ShelfCell) => ({
   '--dx': `${cell.dx}px`,
   '--dy': `${cell.dy}px`,

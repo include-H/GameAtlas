@@ -198,6 +198,7 @@ import { ref, computed, watch } from 'vue'
 import { IconFolder, IconFile, IconArrowUp, IconArrowLeft, IconSearch } from '@arco-design/web-vue/es/icon'
 import { directoryService, type DirectoryItem, type SearchResult } from '@/services/directory.service'
 import { useUiStore } from '@/stores/ui'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 const uiStore = useUiStore()
 
@@ -234,6 +235,7 @@ const lastSearchQuery = ref('')
 const searchResults = ref<SearchResult[]>([])
 const isSearching = ref(false)
 const isSearchMode = ref(false)
+const directoryRequests = createRequestGeneration()
 
 const canGoUp = computed(() => parentPath.value !== null)
 
@@ -245,16 +247,19 @@ const currentDirName = computed(() => {
 
 // Load directory content
 const loadDirectory = async (path?: string) => {
+  const request = directoryRequests.begin()
   hasLoadFailure.value = false
   loadFailedWithStaleData.value = false
   try {
     const data = await directoryService.listDirectory(path)
+    if (!request.isCurrent()) return
     currentPath.value = data.currentPath
     parentPath.value = data.parentPath
     directoryItems.value = data.items
     directoryListIncomplete.value = data.incomplete
     skippedCount.value = data.skippedCount
   } catch {
+    if (!request.isCurrent()) return
     if (currentPath.value || directoryItems.value.length > 0) {
       loadFailedWithStaleData.value = true
       uiStore.addAlert('目录刷新失败，当前显示的是上次成功加载的内容', 'warning')
@@ -297,22 +302,29 @@ const handleSearch = async () => {
   const query = searchQuery.value.trim()
   if (!query) return
 
+  const request = directoryRequests.begin()
   isSearching.value = true
   isSearchMode.value = true
   lastSearchQuery.value = query
 
   try {
-    searchResults.value = (await directoryService.searchDirectory(query, currentPath.value)) ?? []
+    const results = await directoryService.searchDirectory(query, currentPath.value)
+    if (!request.isCurrent()) return
+    searchResults.value = results ?? []
   } catch {
+    if (!request.isCurrent()) return
     searchResults.value = []
     uiStore.addAlert('搜索失败，请稍后重试', 'error')
   } finally {
-    isSearching.value = false
+    if (request.isCurrent()) {
+      isSearching.value = false
+    }
   }
 }
 
 // Clear search and return to browse mode
 const clearSearch = () => {
+  directoryRequests.invalidate()
   isSearchMode.value = false
   searchQuery.value = ''
   searchResults.value = []
@@ -344,6 +356,7 @@ const navigateToDirectory = async (path: string) => {
 
 // Cancel
 const handleCancel = () => {
+  directoryRequests.invalidate()
   visible.value = false
 }
 
@@ -374,6 +387,8 @@ watch(visible, async (newVal) => {
   if (newVal) {
     clearSearch()
     await loadDirectory(props.initialPath || undefined)
+  } else {
+    directoryRequests.invalidate()
   }
 }, { immediate: true })
 </script>

@@ -128,6 +128,7 @@ const loginQuoteSource = ref('')
 
 let errorAnimationTimer: number | null = null
 let cooldownTimer: number | null = null
+let isDisposed = false
 
 const isCooldownActive = computed(() => cooldownLeftSeconds.value > 0)
 const isLoginDisabled = computed(() => isCooldownActive.value)
@@ -151,9 +152,11 @@ const loadLoginQuote = async () => {
       min_length: 10,
       max_length: 34,
     })
+    if (isDisposed) return
     loginQuoteText.value = sentence.hitokoto || fallbackLoginQuote
     loginQuoteSource.value = sentence.from ? `《${sentence.from}》` : ''
   } catch {
+    if (isDisposed) return
     // 2026-04-09: keep this display-only fallback because login remains usable without the quote service.
     // Impact: hitokoto fetch failure only degrades decorative copy and must not block the password flow.
     loginQuoteText.value = fallbackLoginQuote
@@ -204,13 +207,10 @@ const clearSceneStatusTimers = () => {
 }
 
 const triggerErrorAnimation = () => {
+  clearSceneStatusTimers()
   isErrorAnimating.value = false
 
-  if (errorAnimationTimer) {
-    window.clearTimeout(errorAnimationTimer)
-  }
-
-  window.setTimeout(() => {
+  errorAnimationTimer = window.setTimeout(() => {
     isErrorAnimating.value = true
     errorAnimationTimer = window.setTimeout(() => {
       isErrorAnimating.value = false
@@ -260,12 +260,14 @@ const handleLogin = async () => {
 
   try {
     await authStore.login(password.value)
+    if (isDisposed) return
     remainingAttempts.value = null
     cooldownLeftSeconds.value = 0
     clearCooldownTimer()
     const redirect = resolveRedirect()
     router.push(redirect)
   } catch (error) {
+    if (isDisposed) return
     triggerErrorAnimation()
     const status = getHttpStatus(error)
     const data = getHttpErrorData<LoginErrorData>(error) || {}
@@ -291,10 +293,12 @@ const handleLogin = async () => {
 }
 
 onMounted(() => {
+  isDisposed = false
   void loadLoginQuote()
 })
 
 onBeforeUnmount(() => {
+  isDisposed = true
   clearCooldownTimer()
   clearSceneStatusTimers()
 })

@@ -209,4 +209,25 @@ describe('useEditGameWorkflow', () => {
     expect(closeModal).toHaveBeenCalledTimes(1)
   })
 
+  it('does not close the editor when the save is invalidated during a game switch', async () => {
+    let resolveSave: (result: { game: { id: number; public_id: string }; warnings: string[] }) => void = () => {}
+    updateGameAggregateMock.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveSave = resolve
+    }))
+    const { options, addAlert, emitSuccess, closeModal } = buildOptions()
+    const workflow = useEditGameWorkflow(options)
+
+    const submitPromise = workflow.handleSubmit()
+    await vi.waitFor(() => expect(updateGameAggregateMock).toHaveBeenCalledTimes(1))
+
+    workflow.invalidateSave()
+    resolveSave({ game: { id: 1, public_id: 'game-1' }, warnings: [] })
+    await submitPromise
+
+    expect(addAlert).not.toHaveBeenCalledWith('保存成功', 'success')
+    expect(emitSuccess).not.toHaveBeenCalled()
+    expect(closeModal).not.toHaveBeenCalled()
+    expect(options.isSubmitting.value).toBe(false)
+  })
+
 })

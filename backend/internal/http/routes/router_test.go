@@ -146,7 +146,7 @@ func TestRegisterAssetRoutesHidesUnknownStartScreenImagesFromPublicCallers(t *te
 	t.Setenv("GIN_MODE", gin.TestMode)
 
 	assetsDir := t.TempDir()
-	stagingDir := filepath.Join(assetsDir, "_staging")
+	stagingDir := filepath.Join(assetsDir, "_staging", "start-screen")
 	if err := os.MkdirAll(stagingDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestRegisterAssetRoutesAllowsAdminToPreviewUnregisteredStartScreenImages(t 
 	t.Setenv("GIN_MODE", gin.TestMode)
 
 	assetsDir := t.TempDir()
-	stagingDir := filepath.Join(assetsDir, "_staging")
+	stagingDir := filepath.Join(assetsDir, "_staging", "start-screen")
 	if err := os.MkdirAll(stagingDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}

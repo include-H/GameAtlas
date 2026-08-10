@@ -87,6 +87,7 @@ import GameCard from '@/components/GameCard.vue'
 import gamesService from '@/services/games.service'
 import type { TimelineGame } from '@/services/types'
 import { useUiStore } from '@/stores/ui'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 defineOptions({
   name: 'GamesTimelineView',
@@ -123,6 +124,7 @@ const nextCursor = ref<string | null>(null)
 const loadMoreSentinel = ref<HTMLElement | null>(null)
 const hasLoadedTimeline = ref(false)
 let loadMoreObserver: IntersectionObserver | null = null
+const timelineRequests = createRequestGeneration()
 
 const parseDateParts = (value?: string | null) => {
   const raw = (value || '').trim()
@@ -212,24 +214,32 @@ const appendTimelineChunk = (games: TimelineGame[]) => {
 
 const loadMoreTimeline = async () => {
   if (!hasMore.value || isLoadingMore.value || !nextCursor.value) return
+  const request = timelineRequests.begin()
+  const cursor = nextCursor.value
   isLoadingMore.value = true
   try {
     const response = await gamesService.getTimelineGames({
       limit: TIMELINE_PAGE_SIZE,
-      cursor: nextCursor.value,
+      cursor,
     })
+    if (!request.isCurrent()) return
     appendTimelineChunk(response.data)
     hasMore.value = response.hasMore
     nextCursor.value = response.nextCursor
   } catch {
-    uiStore.addAlert('加载更多时间线失败', 'error')
+    if (request.isCurrent()) {
+      uiStore.addAlert('加载更多时间线失败', 'error')
+    }
   } finally {
-    isLoadingMore.value = false
+    if (request.isCurrent()) {
+      isLoadingMore.value = false
+    }
   }
 }
 
 const loadTimeline = async () => {
   if (isLoading.value || hasLoadedTimeline.value) return
+  const request = timelineRequests.begin()
   isLoading.value = true
   hasLoadFailure.value = false
 
@@ -237,6 +247,7 @@ const loadTimeline = async () => {
     const response = await gamesService.getTimelineGames({
       limit: TIMELINE_PAGE_SIZE,
     })
+    if (!request.isCurrent()) return
     allGames.value = []
     appendTimelineChunk(response.data)
     hasMore.value = response.hasMore
@@ -244,13 +255,16 @@ const loadTimeline = async () => {
     hasLoadedTimeline.value = true
     hasLoadFailure.value = false
   } catch {
+    if (!request.isCurrent()) return
     hasLoadFailure.value = true
     allGames.value = []
     hasMore.value = false
     nextCursor.value = null
     uiStore.addAlert('加载时间线失败', 'error')
   } finally {
-    isLoading.value = false
+    if (request.isCurrent()) {
+      isLoading.value = false
+    }
   }
 }
 
@@ -290,6 +304,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  timelineRequests.invalidate()
   if (loadMoreObserver) {
     loadMoreObserver.disconnect()
     loadMoreObserver = null

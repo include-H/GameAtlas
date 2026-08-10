@@ -2,7 +2,6 @@ package services
 
 import (
 	"fmt"
-	"io"
 	"mime/multipart"
 	"os"
 	"path/filepath"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/domain"
+	"github.com/hao/game/internal/files"
 	"github.com/hao/game/internal/repositories"
 )
 
@@ -108,29 +108,40 @@ func (s *SettingsService) UpdateConfig(updates map[string]string) error {
 }
 
 func (s *SettingsService) SaveBackgroundImage(file multipart.File, header *multipart.FileHeader) error {
-	ext := strings.ToLower(filepath.Ext(header.Filename))
-	allowed := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true, ".gif": true}
-	if !allowed[ext] {
-		return fmt.Errorf("%w: 不支持的图片格式: %s", domain.ErrValidation, ext)
+	if header == nil {
+		return domain.ErrValidation
+	}
+	data, err := files.ReadValidatedImage(file, header.Size, header.Header.Get("Content-Type"))
+	if err != nil {
+		return fmt.Errorf("%w: %v", domain.ErrValidation, err)
+	}
+	jpegData, err := files.NormalizeImageToJPEG(data)
+	if err != nil {
+		return fmt.Errorf("%w: %v", domain.ErrValidation, err)
 	}
 
 	dstPath := filepath.Join(s.dataDir, "bg.jpg")
-	fmt.Printf("[settings] saving background to: %s\n", dstPath)
 	if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
 		return fmt.Errorf("创建目录失败: %w", err)
 	}
 
-	dst, err := os.Create(dstPath)
+	temporary, err := os.CreateTemp(filepath.Dir(dstPath), ".bg-*")
 	if err != nil {
-		return fmt.Errorf("创建文件失败: %w", err)
+		return fmt.Errorf("创建临时文件失败: %w", err)
 	}
-	defer dst.Close()
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
 
-	written, err := io.Copy(dst, file)
-	if err != nil {
+	if _, err := temporary.Write(jpegData); err != nil {
+		_ = temporary.Close()
 		return fmt.Errorf("保存文件失败: %w", err)
 	}
-	fmt.Printf("[settings] background saved: %s (%d bytes)\n", dstPath, written)
+	if err := temporary.Close(); err != nil {
+		return fmt.Errorf("关闭临时文件失败: %w", err)
+	}
+	if err := os.Rename(temporaryPath, dstPath); err != nil {
+		return fmt.Errorf("替换背景图片失败: %w", err)
+	}
 
 	return nil
 }

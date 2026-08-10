@@ -1,8 +1,9 @@
-import { computed, ref, type Ref } from 'vue'
+import { computed, getCurrentInstance, onUnmounted, ref, type Ref } from 'vue'
 import wikiService, { type WikiDocumentResponse } from '@/services/wiki.service'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 interface UseWikiEditDocumentOptions {
   gamesStore: ReturnType<typeof useGamesStore>
@@ -19,6 +20,7 @@ export const useWikiEditDocument = ({
   onLoadGameFailed,
   onSaveSuccess,
 }: UseWikiEditDocumentOptions) => {
+  const documentRequests = createRequestGeneration()
   const game = computed(() => {
     // 2026-04-08: wiki edit reads the route-targeted game only.
     // Impact: route changes or failed loads must not leave the editor rendering a stale
@@ -45,18 +47,27 @@ export const useWikiEditDocument = ({
   }
 
   const loadWikiEditorData = async (gameId: string): Promise<boolean> => {
+    const request = documentRequests.begin()
+    resetWikiEditorState()
     try {
       await gamesStore.fetchGame(gameId)
+      if (!request.isCurrent() || requestedGameId.value !== gameId || !game.value) {
+        return false
+      }
     } catch {
+      if (!request.isCurrent() || requestedGameId.value !== gameId) {
+        return false
+      }
       uiStore.addAlert('加载游戏失败', 'error')
       await onLoadGameFailed()
       return false
     }
 
-    resetWikiEditorState()
-
     try {
       const wikiContent = await wikiService.getWikiPage(gameId)
+      if (!request.isCurrent() || requestedGameId.value !== gameId) {
+        return false
+      }
       // 2026-04-06: the wiki endpoint returns a document envelope for existing games
       // even when content is empty, so the editor must not treat empty text as "no wiki".
       // A 404 here is a broken cross-endpoint contract, not a valid "missing document" state.
@@ -66,6 +77,9 @@ export const useWikiEditDocument = ({
         change_summary: wikiContent.content === null ? '首次添加' : '',
       }
     } catch (error) {
+      if (!request.isCurrent() || requestedGameId.value !== gameId) {
+        return false
+      }
       uiStore.addAlert(getHttpErrorMessage(error, '加载 Wiki 失败'), 'error')
       await onLoadGameFailed()
       return false
@@ -75,27 +89,39 @@ export const useWikiEditDocument = ({
   }
 
   const handleSave = async () => {
-    if (!requestedGameId.value || !game.value?.public_id) return
+    const gameId = requestedGameId.value
+    if (!gameId || !game.value?.public_id || game.value.public_id !== gameId) return
+    const request = documentRequests.begin()
 
     isSaving.value = true
 
     try {
       const wasExisting = isExisting.value
-      const document = await wikiService.updateWikiPage(requestedGameId.value, {
+      const document = await wikiService.updateWikiPage(gameId, {
         content: wikiData.value.content,
         change_summary: wikiData.value.change_summary.trim() || undefined,
       })
+      if (!request.isCurrent() || requestedGameId.value !== gameId) return
       wiki.value = document
 
       uiStore.addAlert(wasExisting ? 'Wiki 已更新' : 'Wiki 已创建', 'success')
       wikiData.value.change_summary = ''
-      await onSaveSuccess?.(requestedGameId.value)
+      await onSaveSuccess?.(gameId)
     } catch (error) {
+      if (!request.isCurrent() || requestedGameId.value !== gameId) return
       const errorMessage = getHttpErrorMessage(error, '保存 Wiki 失败')
       uiStore.addAlert(errorMessage, 'error')
     } finally {
-      isSaving.value = false
+      if (request.isCurrent()) {
+        isSaving.value = false
+      }
     }
+  }
+
+  if (getCurrentInstance()) {
+    onUnmounted(() => {
+      documentRequests.invalidate()
+    })
   }
 
   return {

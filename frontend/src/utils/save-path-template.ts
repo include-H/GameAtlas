@@ -2,7 +2,7 @@
 // 存库值始终是模板字符串（如 `%USERPROFILE%\Documents\My Games\GT4\SaveGame`），
 // 由后端启动脚本在运行时替换 %VAR% 占位符，因此这里只做字符串层面处理。
 
-export interface SavePathBaseOption {
+interface SavePathBaseOption {
   /** 稳定标识，用于下拉框内部状态（v-model 用），不随文案变化。 */
   key: string
   label: string
@@ -21,7 +21,7 @@ export const SAVE_PATH_BASE_OPTIONS: SavePathBaseOption[] = [
 
 export type SavePathTemplateMode = 'base' | 'custom'
 
-export interface SavePathTemplateParts {
+interface SavePathTemplateParts {
   mode: SavePathTemplateMode
   baseKey: string
   subpath: string

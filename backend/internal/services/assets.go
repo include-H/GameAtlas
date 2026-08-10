@@ -28,8 +28,8 @@ type UploadResult struct {
 }
 
 const (
-	maxImageUploadBytes int64 = 20 << 20  // 20 MiB
-	maxVideoUploadBytes int64 = 500 << 20 // 500 MiB
+	maxImageUploadBytes = files.MaxImageUploadBytes
+	maxVideoUploadBytes = files.MaxVideoUploadBytes
 )
 
 var errAssetTooLarge = errors.New("asset too large")
@@ -47,6 +47,13 @@ func NewAssetsService(cfg config.Config, gamesRepo assetGameRepository) *AssetsS
 // one upload entrypoint, extracting an io.Reader interface adds indirection
 // without practical testability gain.
 func (s *AssetsService) Upload(gameID int64, assetType string, header *multipart.FileHeader) (*UploadResult, error) {
+	if header == nil {
+		return nil, domain.ErrValidation
+	}
+	if assetType != "cover" && assetType != "banner" && assetType != "screenshot" &&
+		assetType != "logo" && assetType != "video" && assetType != "poster" {
+		return nil, domain.ErrValidation
+	}
 	limit := maxImageUploadBytes
 	if assetType == "video" {
 		limit = maxVideoUploadBytes
@@ -117,6 +124,10 @@ func normalizeAssetError(err error) error {
 	case errors.Is(err, files.ErrInvalidAssetName):
 		return domain.ErrValidation
 	case errors.Is(err, errAssetTooLarge):
+		return domain.ErrValidation
+	case errors.Is(err, files.ErrUploadTooLarge), errors.Is(err, files.ErrInvalidImageContent):
+		return domain.ErrValidation
+	case errors.Is(err, files.ErrInvalidAssetPath):
 		return domain.ErrValidation
 	default:
 		return err

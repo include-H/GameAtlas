@@ -220,10 +220,10 @@ const {
   onLoadGameFailed: () => {
     router.push({ name: 'games' })
   },
-  onSaveSuccess: async () => {
-    if (game.value?.public_id) {
-      await loadHistory(game.value.public_id)
-    }
+  onSaveSuccess: async (gameId) => {
+    if (requestedGameId.value !== gameId) return
+    await loadHistory(gameId)
+    if (requestedGameId.value !== gameId) return
     navigateBackOrFallback(router, getGameDetailRoute())
   },
 })
@@ -254,12 +254,12 @@ watch(
       return
     }
     uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
+    resetHistoryState()
     const loaded = await loadWikiEditorData(gameId)
-    if (!loaded) {
+    if (!loaded || requestedGameId.value !== gameId) {
       return
     }
     syncAmbientBackground()
-    resetHistoryState()
     await loadHistory(gameId)
   },
   { immediate: true },

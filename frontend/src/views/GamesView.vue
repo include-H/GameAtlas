@@ -227,6 +227,7 @@ import { useGamesView } from '@/composables/useGamesView'
 import startScreenService from '@/services/start-screen.service'
 import type { GameListItem, StartScreenLayout } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
+import { createRequestGeneration } from '@/utils/request-generation'
 import { IconApps, IconHeart, IconHeartFill, IconList, IconLock, IconPlus, IconSearch, IconSort, IconTrophy } from '@arco-design/web-vue/es/icon'
 
 defineOptions({
@@ -250,6 +251,7 @@ let virtualResizeObserver: ResizeObserver | null = null
 let virtualScrollFrame = 0
 let virtualScrollBound = false
 let virtualScrollRoot: HTMLElement | null = null
+const startScreenRequests = createRequestGeneration()
 
 const {
   clearFilters,
@@ -396,29 +398,50 @@ const syncStartScreenLayout = (layout: StartScreenLayout) => {
 }
 
 const refreshStartScreenTiles = async () => {
-  if (!isAdmin.value) return
+  if (!isAdmin.value) {
+    startScreenRequests.invalidate()
+    return
+  }
+  const request = startScreenRequests.begin()
   try {
-    syncStartScreenLayout(await startScreenService.getTiles())
+    const layout = await startScreenService.getTiles()
+    if (request.isCurrent() && isAdmin.value) {
+      syncStartScreenLayout(layout)
+    }
   } catch {
     // 开始屏幕状态加载失败时保持当前状态，不打断游戏库浏览
   }
 }
 
 const handleAddToStartScreen = async (gameId: number) => {
+  if (!isAdmin.value) return
+  const request = startScreenRequests.begin()
   try {
-    syncStartScreenLayout(await startScreenService.addTile(gameId, 'small'))
-    uiStore.addAlert('已添加到开始屏幕', 'success')
+    const layout = await startScreenService.addTile(gameId, 'small')
+    if (request.isCurrent() && isAdmin.value) {
+      syncStartScreenLayout(layout)
+      uiStore.addAlert('已添加到开始屏幕', 'success')
+    }
   } catch (error) {
-    uiStore.addAlert(`添加到开始屏幕失败：${getHttpErrorMessage(error, '未知错误')}`, 'error')
+    if (request.isCurrent()) {
+      uiStore.addAlert(`添加到开始屏幕失败：${getHttpErrorMessage(error, '未知错误')}`, 'error')
+    }
   }
 }
 
 const handleRemoveFromStartScreen = async (gameId: number) => {
+  if (!isAdmin.value) return
+  const request = startScreenRequests.begin()
   try {
-    syncStartScreenLayout(await startScreenService.removeTile(gameId))
-    uiStore.addAlert('已从开始菜单移除', 'success')
+    const layout = await startScreenService.removeTile(gameId)
+    if (request.isCurrent() && isAdmin.value) {
+      syncStartScreenLayout(layout)
+      uiStore.addAlert('已从开始菜单移除', 'success')
+    }
   } catch (error) {
-    uiStore.addAlert(`从开始菜单移除失败：${getHttpErrorMessage(error, '未知错误')}`, 'error')
+    if (request.isCurrent()) {
+      uiStore.addAlert(`从开始菜单移除失败：${getHttpErrorMessage(error, '未知错误')}`, 'error')
+    }
   }
 }
 
@@ -531,6 +554,9 @@ watch(virtualScrollRef, (element) => {
 })
 
 onBeforeUnmount(teardownVirtualScroll)
+onBeforeUnmount(() => {
+  startScreenRequests.invalidate()
+})
 </script>
 
 <style scoped src="./GamesView.css"></style>

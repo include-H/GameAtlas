@@ -1,8 +1,11 @@
 package services
 
 import (
+	"bytes"
 	"errors"
 	"mime/multipart"
+	"net/textproto"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -147,5 +150,44 @@ func TestSettingsServiceRejectsUnsupportedBackgroundImageFormat(t *testing.T) {
 	err := service.SaveBackgroundImage(nil, &multipart.FileHeader{Filename: "background.svg"})
 	if err == nil || !errors.Is(err, domain.ErrValidation) {
 		t.Fatalf("unsupported background format error = %v, want domain.ErrValidation", err)
+	}
+}
+
+func TestSettingsServiceRejectsInvalidBackgroundImageWithoutReplacingExistingFile(t *testing.T) {
+	dataDir := t.TempDir()
+	assetsDir := filepath.Join(dataDir, "assets")
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+	service := NewSettingsService(config.Config{AssetsDir: assetsDir}, repositories.NewAppSettingsRepository(db))
+	backgroundPath := filepath.Join(dataDir, "bg.jpg")
+	if err := os.WriteFile(backgroundPath, []byte("existing-background"), 0o644); err != nil {
+		t.Fatalf("write existing background: %v", err)
+	}
+
+	invalidPath := filepath.Join(t.TempDir(), "invalid.png")
+	if err := os.WriteFile(invalidPath, []byte("not-an-image"), 0o644); err != nil {
+		t.Fatalf("write invalid image: %v", err)
+	}
+	file, err := os.Open(invalidPath)
+	if err != nil {
+		t.Fatalf("open invalid image: %v", err)
+	}
+	defer file.Close()
+	header := &multipart.FileHeader{
+		Filename: "invalid.png",
+		Size:     int64(len("not-an-image")),
+		Header:   textproto.MIMEHeader{"Content-Type": []string{"image/png"}},
+	}
+
+	err = service.SaveBackgroundImage(file, header)
+	if err == nil || !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("SaveBackgroundImage error = %v, want domain.ErrValidation", err)
+	}
+	content, readErr := os.ReadFile(backgroundPath)
+	if readErr != nil {
+		t.Fatalf("read existing background: %v", readErr)
+	}
+	if !bytes.Equal(content, []byte("existing-background")) {
+		t.Fatalf("existing background changed to %q after rejected upload", content)
 	}
 }

@@ -10,7 +10,7 @@ Wiki + 开发商 + 发行商加权分最高，并列取 id 最小），其余走
     python3 scripts/dedupe-games.py --apply         # 真正执行删除
 环境变量：
     LOCAL_URL         目标库地址（默认 http://127.0.0.1:3000）
-    LOCAL_PASSWORD    目标库管理员密码（默认 1234）
+    LOCAL_PASSWORD    目标库管理员密码（必填）
 """
 import argparse
 import json
@@ -19,7 +19,7 @@ import sys
 import urllib.request
 
 LOCAL_URL = os.environ.get("LOCAL_URL", "http://127.0.0.1:3000")
-LOCAL_PASSWORD = os.environ.get("LOCAL_PASSWORD", "1234")
+LOCAL_PASSWORD = os.environ.get("LOCAL_PASSWORD", "")
 
 
 def login(base_url: str, password: str):
@@ -49,7 +49,7 @@ def fetch_all_games(opener, base_url: str):
     games = []
     page = 1
     while True:
-        data = get_json(opener, f"{base_url}/api/games?page={page}&page_size=100&include_all=true")
+        data = get_json(opener, f"{base_url}/api/games?page={page}&limit=100&include_all=true")
         batch = data.get("data") or []
         games.extend(batch)
         pagination = data.get("pagination") or {}
@@ -81,10 +81,15 @@ def completeness_score(item: dict) -> tuple:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply", action="store_true", help="真正执行删除（默认只打印计划）")
+    parser.add_argument("--url", default=LOCAL_URL, help="目标库地址")
+    parser.add_argument("--password", default=LOCAL_PASSWORD, help="目标库管理员密码")
     args = parser.parse_args()
 
-    base = LOCAL_URL.rstrip("/")
-    opener = login(base, LOCAL_PASSWORD)
+    if not args.password:
+        parser.error("缺少管理员密码：--password 或环境变量 LOCAL_PASSWORD")
+
+    base = args.url.rstrip("/")
+    opener = login(base, args.password)
 
     games = fetch_all_games(opener, base)
     items = games

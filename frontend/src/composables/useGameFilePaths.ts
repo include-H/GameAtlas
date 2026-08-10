@@ -1,6 +1,7 @@
 import { ref, type Ref } from 'vue'
 import type { EditGameForm } from '@/utils/edit-game-form'
 import { getHttpErrorMessage } from '@/utils/http-error'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 export interface FilePathItem {
   id?: number
@@ -25,6 +26,7 @@ export const useGameFilePaths = (options: UseGameFilePathsOptions) => {
   const showFileBrowser = ref(false)
   const initialPath = ref('')
   const currentFileIndex = ref(-1)
+  const defaultDirectoryRequests = createRequestGeneration()
 
   const addFilePath = () => {
     options.form.value.file_paths.push({ path: '', label: '' })
@@ -35,9 +37,11 @@ export const useGameFilePaths = (options: UseGameFilePathsOptions) => {
   }
 
   const openFileBrowser = async (index: number) => {
+    const request = defaultDirectoryRequests.begin()
     currentFileIndex.value = index
     try {
       const defaultPath = await options.getDefaultDirectory()
+      if (!request.isCurrent() || currentFileIndex.value !== index) return
       const existingPath = (options.form.value.file_paths[index]?.path || '').trim()
       if (!existingPath) {
         initialPath.value = defaultPath
@@ -65,6 +69,7 @@ export const useGameFilePaths = (options: UseGameFilePathsOptions) => {
   }
 
   const resetFileBrowserState = () => {
+    defaultDirectoryRequests.invalidate()
     showFileBrowser.value = false
     initialPath.value = ''
     currentFileIndex.value = -1

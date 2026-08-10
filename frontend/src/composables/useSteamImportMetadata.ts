@@ -4,6 +4,7 @@ import steamService from '@/services/steam.service'
 import { useSteamPicker } from '@/composables/useSteamPicker'
 import type { SteamGameDetails, SteamGameSearchResult } from '@/services/types'
 import { extractWikiMetadata, type WikiMetadataExtraction } from '@/utils/wiki-metadata-parser'
+import { createRequestGeneration, type RequestGenerationGuard } from '@/utils/request-generation'
 
 type AlertType = 'success' | 'warning' | 'error'
 
@@ -62,6 +63,8 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
   const wikiMetadataPickerVisible = ref(false)
   const wikiMetadataCandidates = ref<WikiMetadataCandidateSelection[]>([])
   const wikiMetadataSnapshot = ref<WikiMetadataExtraction | null>(null)
+  const summaryApplyRequests = createRequestGeneration()
+  const wikiApplyRequests = createRequestGeneration()
 
   const pickSteamSearchQuery = () => {
     const preferred = options.form.value.title_alt?.trim()
@@ -69,12 +72,17 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
     return options.form.value.title?.trim() || ''
   }
 
-  const applySteamMetadataToForm = async (details: SteamGameDetails) => {
+  const applySteamMetadataToForm = async (
+    details: SteamGameDetails,
+    request: RequestGenerationGuard,
+  ) => {
+    if (!request.isCurrent()) return false
     if (details.releaseDate) {
       options.form.value.release_date = details.releaseDate
     }
     if (details.developers && details.developers.length > 0) {
       const ids = await options.ensureDeveloperNames(details.developers)
+      if (!request.isCurrent()) return false
       options.form.value.developer_ids = Array.from(new Set([
         ...options.form.value.developer_ids,
         ...ids,
@@ -82,11 +90,13 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
     }
     if (details.publishers && details.publishers.length > 0) {
       const ids = await options.ensurePublisherNames(details.publishers)
+      if (!request.isCurrent()) return false
       options.form.value.publisher_ids = Array.from(new Set([
         ...options.form.value.publisher_ids,
         ...ids,
       ]))
     }
+    return request.isCurrent()
   }
 
   const prepareWikiMetadataCandidates = () => {
@@ -200,8 +210,10 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
     }
 
     isApplyingWikiMetadata.value = true
+    const request = wikiApplyRequests.begin()
 
     try {
+      if (!request.isCurrent()) return
       const metadata = wikiMetadataSnapshot.value
       if (!metadata) {
         options.addAlert('当前没有可应用的 Wiki 提取结果', 'warning')
@@ -210,6 +222,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
       const appliedLabels: string[] = []
 
       for (const item of selected) {
+        if (!request.isCurrent()) return
         if (item.key.startsWith('title_alt_en:')) {
           if (item.value) {
             options.form.value.title_alt = item.value
@@ -242,6 +255,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
           case 'developers':
             if (metadata.developers.length > 0) {
               const ids = await options.ensureDeveloperNames(metadata.developers)
+              if (!request.isCurrent()) return
               options.form.value.developer_ids = Array.from(new Set([
                 ...options.form.value.developer_ids,
                 ...ids,
@@ -252,6 +266,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
           case 'publishers':
             if (metadata.publishers.length > 0) {
               const ids = await options.ensurePublisherNames(metadata.publishers)
+              if (!request.isCurrent()) return
               options.form.value.publisher_ids = Array.from(new Set([
                 ...options.form.value.publisher_ids,
                 ...ids,
@@ -261,6 +276,8 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
             break
         }
       }
+
+      if (!request.isCurrent()) return
 
       wikiMetadataPickerVisible.value = false
 
@@ -273,13 +290,16 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
     } catch {
       options.addAlert('应用 Wiki 元数据失败', 'error')
     } finally {
-      isApplyingWikiMetadata.value = false
+      if (request.isCurrent()) {
+        isApplyingWikiMetadata.value = false
+      }
     }
   }
 
   const summarySteamPicker = useSteamPicker<SteamGameDetails>({
-    onSelect: async (game) => {
+    onSelect: async (game, request) => {
       const details = await steamService.getGameDetails(game.id)
+      if (!request.isCurrent()) return details
       steamSummaryDetails.value = details
       steamSummaryPreview.value = stripHtmlToText(details.description || '')
       options.onGameSelected?.(game)
@@ -296,6 +316,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
   const isSearchingSteamSummary = summarySteamPicker.isSearching
 
   const handleSummarySearchClear = () => {
+    summaryApplyRequests.invalidate()
     summarySteamPicker.clear()
     steamSummaryPreview.value = ''
     steamSummaryDetails.value = null
@@ -316,6 +337,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
   }
 
   const backToSummarySearch = () => {
+    summaryApplyRequests.invalidate()
     summarySteamPicker.back()
     steamSummaryPreview.value = ''
     steamSummaryDetails.value = null
@@ -329,13 +351,17 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
       return
     }
 
+    const request = summaryApplyRequests.begin()
+
     if (steamSummaryPreview.value) {
       options.form.value.summary = steamSummaryPreview.value
     }
     try {
       if (details) {
-        await applySteamMetadataToForm(details)
+        const applied = await applySteamMetadataToForm(details, request)
+        if (!applied) return
       }
+      if (!request.isCurrent()) return
     } catch {
       options.addAlert('导入 Steam 元数据失败', 'error')
       return
@@ -362,6 +388,8 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
   })
 
   const resetMetadataImportState = () => {
+    summaryApplyRequests.invalidate()
+    wikiApplyRequests.invalidate()
     showSummarySelector.value = false
     summarySteamPicker.clear()
     steamSummaryPreview.value = ''
@@ -369,6 +397,7 @@ export const useSteamImportMetadata = (options: UseSteamImportMetadataOptions) =
     wikiMetadataPickerVisible.value = false
     wikiMetadataCandidates.value = []
     wikiMetadataSnapshot.value = null
+    isApplyingWikiMetadata.value = false
   }
 
   return {

@@ -235,6 +235,7 @@ import {
   START_SCREEN_COLUMN_ROWS,
 } from '@/utils/start-screen-layout'
 import gamesService, { mapGameVersions } from '@/services/games.service'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 const props = defineProps<{
   visible: boolean
@@ -273,6 +274,8 @@ const cropBanners = ref<string[]>([])
 const launchModalVisible = ref(false)
 const launchTitle = ref('')
 const launchOptions = ref<Array<{ id: string; version: string; url: string }>>([])
+const tileDetailRequests = createRequestGeneration()
+const cropDetailRequests = createRequestGeneration()
 
 interface TileDragState {
   gameId: number
@@ -363,9 +366,11 @@ const handleClose = () => {
 
 // 点击磁贴 = 开始游戏：单个可启动版本直接下载启动脚本，多个弹窗选择，无则回退详情页。
 const handleTileSelect = async (publicId: string) => {
+  const request = tileDetailRequests.begin()
   emit('close')
   try {
     const detail = await gamesService.getGameDetail(publicId)
+    if (!request.isCurrent()) return
     const launchable = mapGameVersions(detail).filter((version) => version.canLaunch && version.launchScriptUrl)
     if (launchable.length === 0) {
       router.push({ name: 'game-detail', params: { publicId } })
@@ -383,6 +388,7 @@ const handleTileSelect = async (publicId: string) => {
     }))
     launchModalVisible.value = true
   } catch {
+    if (!request.isCurrent()) return
     // 拉取失败时回退到详情页，不阻塞用户。
     router.push({ name: 'game-detail', params: { publicId } })
   }
@@ -399,17 +405,20 @@ const handleBrowseGames = () => {
 }
 
 const handleCrop = async (gameId: number) => {
+  const request = cropDetailRequests.begin()
   cropGameId.value = gameId
   cropBanners.value = []
   const tile = props.tiles.find((item) => item.game_id === gameId)
   if (tile?.public_id) {
     try {
       const detail = await gamesService.getGameDetail(tile.public_id)
+      if (!request.isCurrent()) return
       cropBanners.value = detail.banners.map((banner) => banner.path).filter((path): path is string => Boolean(path))
     } catch {
       // 拉取 banner 列表失败时仍可用磁贴默认 banner / 封面裁剪。
     }
   }
+  if (!request.isCurrent()) return
   cropVisible.value = true
 }
 
@@ -573,6 +582,8 @@ watch(
 )
 
 onUnmounted(() => {
+  tileDetailRequests.invalidate()
+  cropDetailRequests.invalidate()
   endDrag()
   if (typeof document !== 'undefined') {
     document.body.style.overflow = ''

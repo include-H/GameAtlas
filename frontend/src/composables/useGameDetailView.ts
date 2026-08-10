@@ -8,6 +8,7 @@ import { navigateBackOrFallback } from '@/utils/navigation'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
 import { getAmbientBackgroundPoolFromGameDetail, hasAmbientBackgroundPoolImages } from '@/utils/ambient-background'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 interface UseGameDetailViewOptions {
   route: RouteLocationNormalizedLoaded
@@ -89,6 +90,7 @@ export const useGameDetailView = ({
   isAdmin,
 }: UseGameDetailViewOptions) => {
   let currentAbortController: AbortController | null = null
+  const detailViewRequests = createRequestGeneration()
   const requestedGameId = computed(() => {
     const rawValue = route.params.publicId
     return typeof rawValue === 'string' ? rawValue.trim() : Array.isArray(rawValue) ? String(rawValue[0] || '').trim() : ''
@@ -158,16 +160,20 @@ export const useGameDetailView = ({
   }
 
   const refreshDetailAfterEdit = async () => {
-    if (!requestedGameId.value) {
+    const gameId = requestedGameId.value
+    if (!gameId) {
       return
     }
+    const request = detailViewRequests.begin()
 
     try {
       // 2026-04-07: edit saves can succeed even if the follow-up detail refresh fails.
       // Impact: surface that sync failure explicitly instead of silently leaving stale detail data on screen.
-      await gamesStore.fetchGame(requestedGameId.value)
+      await gamesStore.fetchGame(gameId)
+      if (!request.isCurrent() || requestedGameId.value !== gameId) return
       hasLoadFailure.value = false
     } catch {
+      if (!request.isCurrent() || requestedGameId.value !== gameId) return
       uiStore.addAlert('保存已生效，但详情刷新失败，请稍后重试', 'warning')
     }
   }
@@ -229,6 +235,7 @@ export const useGameDetailView = ({
   }
 
   const loadGameDetail = async (gameId: string) => {
+    const request = detailViewRequests.begin()
     // Abort previous request if still in flight
     if (currentAbortController) {
       currentAbortController.abort()
@@ -239,9 +246,10 @@ export const useGameDetailView = ({
     hasLoadFailure.value = false
     try {
       await gamesStore.fetchGame(gameId, signal)
+      if (!request.isCurrent() || requestedGameId.value !== gameId) return
     } catch {
       // Ignore aborted requests
-      if (signal.aborted) return
+      if (signal.aborted || !request.isCurrent() || requestedGameId.value !== gameId) return
       // 2026-04-07: detail routing must never keep rendering the previous game when
       // the current publicId fails to load. A failed read is not the same as "show stale detail".
       hasLoadFailure.value = true
@@ -254,12 +262,14 @@ export const useGameDetailView = ({
     requestedGameId,
     async (gameId) => {
       if (!gameId) {
+        detailViewRequests.invalidate()
         uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
         return
       }
       showEditModal.value = false
       uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
       await loadGameDetail(gameId)
+      if (requestedGameId.value !== gameId) return
       syncAmbientBackground()
       void setupTopSectionObserver()
     },
@@ -322,6 +332,7 @@ export const useGameDetailView = ({
   )
 
   onUnmounted(() => {
+    detailViewRequests.invalidate()
     if (currentAbortController) {
       currentAbortController.abort()
       currentAbortController = null

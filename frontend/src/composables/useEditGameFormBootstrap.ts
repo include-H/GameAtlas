@@ -22,6 +22,7 @@ import type {
   Series,
   VideoAssetItem,
 } from '@/services/types'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 interface UseEditGameFormBootstrapOptions {
   form: Ref<EditGameForm>
@@ -37,6 +38,8 @@ interface UseEditGameFormBootstrapOptions {
 }
 
 export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOptions) => {
+  const optionRequests = createRequestGeneration()
+
   const handleInitializeOptionsError = (context: string, _error: unknown) => {
     options.addAlert(`加载编辑元数据失败：${context}`, 'error')
   }
@@ -102,9 +105,15 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
     options.publisherOptions.value = game?.publishers ? [...game.publishers] : []
   }
 
-  const initializeOptions = async (currentGame?: AdminGameDetail | null) => {
+  const initializeOptions = async (currentGame?: AdminGameDetail | null): Promise<boolean> => {
+    const request = optionRequests.begin()
+    resetSeriesOptionsForGame(currentGame)
+    resetDeveloperOptionsForGame(currentGame)
+    resetPublisherOptionsForGame(currentGame)
+
     try {
       const popularSeries = await seriesService.getPopularSeries(50)
+      if (!request.isCurrent()) return false
       options.seriesOptions.value = popularSeries
       const currentSeries = currentGame?.series
       if (currentSeries) {
@@ -114,6 +123,7 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
         }
       }
     } catch (error) {
+      if (!request.isCurrent()) return false
       // 2026-04-08: failed edit metadata requests must not leave stale options from another game.
       // Impact: the modal falls back to the current game's native relations instead of old lookup data.
       resetSeriesOptionsForGame(currentGame)
@@ -122,6 +132,7 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
 
     try {
       const initialDevelopers = await developersService.listDevelopers({ limit: 50 })
+      if (!request.isCurrent()) return false
       options.developerOptions.value = initialDevelopers
       if (currentGame?.developers.length) {
         for (const developer of currentGame.developers) {
@@ -132,12 +143,14 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
         }
       }
     } catch (error) {
+      if (!request.isCurrent()) return false
       resetDeveloperOptionsForGame(currentGame)
       handleInitializeOptionsError('开发商', error)
     }
 
     try {
       const initialPublishers = await publishersService.listPublishers({ limit: 50 })
+      if (!request.isCurrent()) return false
       options.publisherOptions.value = initialPublishers
       if (currentGame?.publishers.length) {
         for (const publisher of currentGame.publishers) {
@@ -148,9 +161,12 @@ export const useEditGameFormBootstrap = (options: UseEditGameFormBootstrapOption
         }
       }
     } catch (error) {
+      if (!request.isCurrent()) return false
       resetPublisherOptionsForGame(currentGame)
       handleInitializeOptionsError('发行商', error)
     }
+
+    return request.isCurrent()
   }
 
   return {

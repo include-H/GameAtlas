@@ -9,7 +9,7 @@ export interface LaunchOption {
   url: string
 }
 
-export interface UseLaunchGameOptions {
+interface UseLaunchGameOptions {
   /** 开盒动画进行中标记（父组件持有），用于防重复开盒与放回时立即收场的判断 */
   isOpening: Ref<boolean>
   /** 无可启动版本 / 详情拉取失败时回调，触发 GameInspect.putBack() */

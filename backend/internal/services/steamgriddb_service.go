@@ -70,7 +70,7 @@ func NewSteamGridDBService(apiKey string, proxy string) *SteamGridDBService {
 	return &SteamGridDBService{
 		apiKey:  apiKey,
 		baseURL: "https://www.steamgriddb.com/api/v2",
-		client:  &http.Client{Timeout: 15 * time.Second, Transport: transport},
+		client:  newSteamGridDBHTTPClient(transport, 15*time.Second),
 	}
 }
 

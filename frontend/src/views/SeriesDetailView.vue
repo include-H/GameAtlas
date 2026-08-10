@@ -91,7 +91,9 @@ const {
   loadPage: async ({ page, limit }) => {
     const id = Number(route.params.id)
     const detail = await seriesService.getSeriesDetail(id, { page, limit })
-    seriesName.value = detail.series.name || `系列 ${id}`
+    if (Number(route.params.id) === id) {
+      seriesName.value = detail.series.name || `系列 ${id}`
+    }
     return {
       data: detail.games,
       pagination: detail.pagination,
@@ -121,10 +123,12 @@ const handleGoBack = () => {
 const loadSeriesDetail = () => {
   const id = Number(route.params.id)
   if (Number.isNaN(id) || id <= 0) {
+    seriesName.value = '系列'
     uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
     router.replace({ name: 'series-library' })
     return
   }
+  seriesName.value = '系列'
   uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
   void loadFirstPage()
 }

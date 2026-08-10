@@ -248,7 +248,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, reactive, ref } from 'vue'
+import { nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { IconLeft, IconSave } from '@arco-design/web-vue/es/icon'
 import gamesService from '@/services/games.service'
@@ -262,6 +262,7 @@ import {
   hasAmbientBackgroundPoolImages,
 } from '@/utils/ambient-background'
 import { navigateBackOrFallback } from '@/utils/navigation'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 const route = useRoute()
 const router = useRouter()
@@ -273,6 +274,7 @@ const game = ref<AdminGameDetail | null>(null)
 const loading = ref(true)
 const loadError = ref(false)
 const AMBIENT_BACKGROUND_OWNER = 'game-media'
+const gameRequests = createRequestGeneration()
 
 const formRef = ref()
 const isSubmitting = ref(false)
@@ -501,24 +503,44 @@ const syncAmbientBackground = () => {
 }
 
 const loadGame = async () => {
-  if (!publicId.value) return
+  const requestedPublicId = publicId.value
+  if (!requestedPublicId) return
+  const request = gameRequests.begin()
   loading.value = true
   loadError.value = false
   try {
-    const detail = await gamesService.getAdminGameDetail(publicId.value)
+    const detail = await gamesService.getAdminGameDetail(requestedPublicId)
+    if (!request.isCurrent() || publicId.value !== requestedPublicId) return
     game.value = detail
     syncAmbientBackground()
     await nextTick()
   } catch {
+    if (!request.isCurrent() || publicId.value !== requestedPublicId) return
     loadError.value = true
     uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
     uiStore.addAlert('加载素材失败', 'error')
   } finally {
-    loading.value = false
+    if (request.isCurrent()) {
+      loading.value = false
+    }
   }
 }
 
+watch(
+  () => String(route.params.publicId || ''),
+  (nextPublicId) => {
+    if (nextPublicId === publicId.value) return
+    gameRequests.invalidate()
+    publicId.value = nextPublicId
+    game.value = null
+    form.value.title = ''
+    loadError.value = false
+    void loadGame()
+  },
+)
+
 onBeforeUnmount(() => {
+  gameRequests.invalidate()
   uiStore.clearAmbientBackgroundSource(AMBIENT_BACKGROUND_OWNER)
 })
 

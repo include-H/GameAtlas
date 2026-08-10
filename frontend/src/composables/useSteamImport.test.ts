@@ -397,7 +397,9 @@ describe('useSteamImport', () => {
 
     steamImport.coverSource.value = 'steamgriddb'
     await flushPromises()
-    expect(searchSteamGridDBMock).toHaveBeenCalled()
+    expect(searchSteamGridDBMock).toHaveBeenLastCalledWith('Example Game')
+    expect(steamImport.steamCoverSearchQuery.value).toBe('Example Game')
+    expect(steamImport.selectedSteamGame.value).toBeNull()
     expect(steamImport.steamCoverImages.value).toEqual([])
 
     await steamImport.selectSteamCoverGame(steamImport.coverSearchResults.value[0]!)
@@ -411,6 +413,96 @@ describe('useSteamImport', () => {
     await flushPromises()
     expect(searchSteamGridDBMock).toHaveBeenCalledTimes(1)
     expect(steamImport.steamCoverImages.value).toEqual(['https://cdn.example.com/grid-1.jpg'])
+  })
+
+  it('uses the title when switching screenshot source without SGDB memory', async () => {
+    searchGamesMock.mockResolvedValue([{ id: '5310669', name: 'Steam Game' }])
+    getGameDetailsMock.mockResolvedValue({
+      name: 'Steam Game',
+      description: '',
+      releaseDate: '2024',
+      developers: [],
+      publishers: [],
+      screenshots: ['https://cdn.example.com/steam-shot.jpg'],
+      coverImage: 'https://cdn.example.com/cover.jpg',
+      bannerImage: 'https://cdn.example.com/banner.jpg',
+    })
+    searchSteamGridDBMock.mockResolvedValue([{ id: 88, name: 'Grid Game' }])
+    getHeroesByGameIdMock.mockResolvedValue([])
+
+    const steamImport = useSteamImport({
+      form: buildForm(),
+      gameId: ref(42),
+      getWikiContent: () => '',
+      uploadAssetFromUrl: vi.fn(),
+      createEditableCover: vi.fn(),
+      createEditableBanner: vi.fn(),
+      createEditableLogo: vi.fn(),
+      createEditableScreenshot: vi.fn(),
+      ensureDeveloperNames: vi.fn().mockResolvedValue([]),
+      ensurePublisherNames: vi.fn().mockResolvedValue([]),
+      addAlert: vi.fn(),
+    })
+
+    steamImport.showScreenshotSelector.value = true
+    await flushPromises()
+    await steamImport.selectScreenshotGame(steamImport.screenshotSearchResults.value[0]!)
+
+    steamImport.screenshotSource.value = 'steamgriddb'
+    await flushPromises()
+
+    expect(searchSteamGridDBMock).toHaveBeenLastCalledWith('Example Game')
+    expect(steamImport.screenshotSearchQuery.value).toBe('Example Game')
+    expect(steamImport.selectedScreenshotGame.value).toBeNull()
+    expect(steamImport.screenshotCandidatesData.value).toBeNull()
+  })
+
+  it('forgets SGDB memory and restores the title after returning to search', async () => {
+    const form = buildForm()
+    form.value.title = 'Final Fantasy VII Remake Intergrade'
+    searchSteamGridDBMock.mockResolvedValue([{ id: 5310669, name: form.value.title }])
+    getGridsByGameIdMock.mockResolvedValue([
+      { url: 'https://cdn.example.com/grid-cover.jpg' },
+    ])
+
+    const steamImport = useSteamImport({
+      form,
+      gameId: ref(42),
+      getWikiContent: () => '',
+      uploadAssetFromUrl: vi.fn(),
+      createEditableCover: vi.fn(),
+      createEditableBanner: vi.fn(),
+      createEditableLogo: vi.fn(),
+      createEditableScreenshot: vi.fn(),
+      ensureDeveloperNames: vi.fn().mockResolvedValue([]),
+      ensurePublisherNames: vi.fn().mockResolvedValue([]),
+      addAlert: vi.fn(),
+    })
+
+    steamImport.coverSource.value = 'steamgriddb'
+    steamImport.showCoverSelector.value = true
+    await flushPromises()
+    await steamImport.selectSteamCoverGame(steamImport.coverSearchResults.value[0]!)
+
+    steamImport.showCoverSelector.value = false
+    await flushPromises()
+    steamImport.showCoverSelector.value = true
+    await flushPromises()
+    expect(steamImport.steamCoverSearchQuery.value).toBe('5310669')
+
+    steamImport.backToCoverGameSearch()
+    await flushPromises()
+    expect(steamImport.steamCoverSearchQuery.value).toBe(form.value.title)
+    expect(steamImport.selectedSteamGame.value).toBeNull()
+    expect(searchSteamGridDBMock).toHaveBeenLastCalledWith(form.value.title)
+
+    steamImport.showCoverSelector.value = false
+    await flushPromises()
+    steamImport.showCoverSelector.value = true
+    await flushPromises()
+
+    expect(steamImport.steamCoverSearchQuery.value).toBe(form.value.title)
+    expect(searchSteamGridDBMock).toHaveBeenLastCalledWith(form.value.title)
   })
 
   it('remembers the game selected via summary import and reuses it for cover picker', async () => {

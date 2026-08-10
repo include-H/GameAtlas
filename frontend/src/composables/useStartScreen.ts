@@ -9,6 +9,7 @@ import type {
   StartScreenTile,
   StartScreenTileSize,
 } from '@/services/types'
+import { createRequestGeneration } from '@/utils/request-generation'
 
 interface UseStartScreenOptions {
   fetchTiles: () => Promise<StartScreenLayout>
@@ -42,6 +43,7 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
   const saveError = ref<string | null>(null)
   const originalTiles = ref<StartScreenTile[]>([])
   const originalColumns = ref<StartScreenColumn[]>([])
+  const refreshRequests = createRequestGeneration()
 
   const applyLayout = (layout: StartScreenLayout) => {
     tiles.value = normalizeStartScreenTiles(layout.tiles)
@@ -49,16 +51,19 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
   }
 
   const refresh = async () => {
+    const request = refreshRequests.begin()
     isLoading.value = true
     hasLoadFailure.value = false
     try {
       const saved = await options.fetchTiles()
+      if (!request.isCurrent()) return
       if (saved.tiles.length > 0) {
         applyLayout(saved)
         return
       }
       // 没有保存过自定义磁贴时，先用收藏游戏作为默认磁贴；列名留空，展示时按"列 N"兜底。
       const favorites = await options.fetchFavorites()
+      if (!request.isCurrent()) return
       tiles.value = normalizeStartScreenTiles(
         favorites.map((game, index) => ({
           game_id: game.id,
@@ -78,10 +83,13 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
       )
       columns.value = []
     } catch {
+      if (!request.isCurrent()) return
       hasLoadFailure.value = true
       options.addAlert('开始屏幕加载失败，请稍后重试', 'error')
     } finally {
-      isLoading.value = false
+      if (request.isCurrent()) {
+        isLoading.value = false
+      }
     }
   }
 

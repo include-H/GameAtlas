@@ -96,6 +96,27 @@ describe('useRemoteMetadataPicker', () => {
     expect(picker.options.value).toEqual([{ id: 3, name: '新系列' }])
   })
 
+  it('does not commit a creation that finishes after the picker is cleared', async () => {
+    let resolveCreate: (item: { id: number; name: string }) => void = () => {}
+    const create = vi.fn().mockImplementation(() => new Promise<{ id: number; name: string }>((resolve) => {
+      resolveCreate = resolve
+    }))
+    const picker = useRemoteMetadataPicker({
+      selectedIds: () => [],
+      search: vi.fn().mockResolvedValue([]),
+      create,
+    })
+
+    await picker.search('待创建')
+    const createPromise = picker.createFromQuery()
+    picker.clearSearch()
+    resolveCreate({ id: 4, name: '待创建' })
+
+    await expect(createPromise).resolves.toBeNull()
+    expect(picker.options.value).toEqual([])
+    expect(picker.isCreating.value).toBe(false)
+  })
+
   it('resolves an exact query match instead of selecting the first search result', async () => {
     const create = vi.fn()
     const picker = useRemoteMetadataPicker({

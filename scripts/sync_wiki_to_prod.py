@@ -11,8 +11,8 @@ GameAtlas Wiki 批量同步脚本
     python3 sync_wiki_to_prod.py --list              # 列出映射关系
 
 环境变量:
-    GA_URL       生产环境地址，默认 http://192.168.1.4:3000
-    GA_PASSWORD  管理员密码，默认 0114
+    GA_URL       目标环境地址（必填）
+    GA_PASSWORD  管理员密码（写入模式必填）
 
 匹配策略:
     1. 先尝试按标题自动匹配（精确/子串，归一化全半角）
@@ -31,8 +31,8 @@ import urllib.request
 
 DEFAULT_WIKI_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Game_Wiki")
 
-GA_URL = os.environ.get("GA_URL", "http://192.168.1.4:3000")
-GA_PASSWORD = os.environ.get("GA_PASSWORD", "0114")
+GA_URL = os.environ.get("GA_URL", "")
+GA_PASSWORD = os.environ.get("GA_PASSWORD", "")
 
 _jar = http.cookiejar.CookieJar()
 _opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(_jar))
@@ -296,13 +296,20 @@ def update_wiki(public_id, content, summary):
 
 
 def main():
+    global GA_URL, GA_PASSWORD
     ap = argparse.ArgumentParser(description="同步本地 Game_Wiki 到生产 GameAtlas")
     ap.add_argument("--force", action="store_true", help="强制覆盖，跳过内容比对")
     ap.add_argument("--dry-run", action="store_true", help="仅打印计划不写入")
     ap.add_argument("--game", help="只同步标题包含该关键词的游戏")
     ap.add_argument("--list", action="store_true", help="列出映射关系")
     ap.add_argument("--unmatched", action="store_true", help="只显示无法匹配的游戏")
+    ap.add_argument("--url", default=GA_URL, help="目标环境地址")
+    ap.add_argument("--password", default=GA_PASSWORD, help="管理员密码")
     args = ap.parse_args()
+    GA_URL = args.url.rstrip("/")
+    GA_PASSWORD = args.password
+    if not GA_URL:
+        ap.error("缺少目标地址：--url 或环境变量 GA_URL")
 
     wiki_root = DEFAULT_WIKI_ROOT
     if not os.path.isdir(wiki_root):
@@ -312,6 +319,8 @@ def main():
     local_idx = build_local_index(wiki_root)
 
     if not args.dry_run and not args.list and not args.unmatched:
+        if not GA_PASSWORD:
+            ap.error("缺少管理员密码：--password 或环境变量 GA_PASSWORD")
         login()
 
     games = fetch_all_games()

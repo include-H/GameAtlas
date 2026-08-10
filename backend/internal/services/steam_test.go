@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hao/game/internal/domain"
 )
@@ -263,6 +264,60 @@ func TestSteamServiceProxyAssetRejectsNonSteamHosts(t *testing.T) {
 	_, _, _, err := service.ProxyAssetStream("https://cdn.example.com/demo.jpg", "")
 	if err != domain.ErrValidation {
 		t.Fatalf("error = %v, want domain.ErrValidation", err)
+	}
+}
+
+func TestSteamHTTPClientRejectsRedirectToDisallowedHost(t *testing.T) {
+	client := newSteamHTTPClient(steamRoundTripper(func(req *http.Request) (*http.Response, error) {
+		response := steamTextResponse(http.StatusFound, "")
+		response.Header.Set("Location", "http://127.0.0.1/private")
+		return response, nil
+	}), 5*time.Second)
+
+	_, err := client.Get("https://cdn.cloudflare.steamstatic.com/demo.jpg")
+	if err == nil {
+		t.Fatalf("client.Get error = nil, want redirect rejection")
+	}
+	if !strings.Contains(err.Error(), "redirect target is not allowed") {
+		t.Fatalf("client.Get error = %q, want disallowed redirect message", err)
+	}
+}
+
+func TestSteamHTTPClientAllowsRedirectWithinSteamAssetHosts(t *testing.T) {
+	requests := 0
+	client := newSteamHTTPClient(steamRoundTripper(func(req *http.Request) (*http.Response, error) {
+		requests++
+		if requests == 1 {
+			response := steamTextResponse(http.StatusFound, "")
+			response.Header.Set("Location", "https://cdn.cloudflare.steamstatic.com/demo-final.jpg")
+			return response, nil
+		}
+		return steamTextResponse(http.StatusOK, "asset"), nil
+	}), 5*time.Second)
+
+	response, err := client.Get("https://cdn.cloudflare.steamstatic.com/demo.jpg")
+	if err != nil {
+		t.Fatalf("client.Get returned error: %v", err)
+	}
+	defer response.Body.Close()
+	if requests != 2 {
+		t.Fatalf("round trips = %d, want 2", requests)
+	}
+}
+
+func TestSteamGridDBHTTPClientRejectsRedirectToDisallowedHost(t *testing.T) {
+	client := newSteamGridDBHTTPClient(steamRoundTripper(func(req *http.Request) (*http.Response, error) {
+		response := steamTextResponse(http.StatusFound, "")
+		response.Header.Set("Location", "https://cdn.cloudflare.steamstatic.com/private")
+		return response, nil
+	}), 5*time.Second)
+
+	_, err := client.Get("https://www.steamgriddb.com/api/v2/search/autocomplete/game")
+	if err == nil {
+		t.Fatalf("client.Get error = nil, want redirect rejection")
+	}
+	if !strings.Contains(err.Error(), "redirect target is not allowed") {
+		t.Fatalf("client.Get error = %q, want disallowed redirect message", err)
 	}
 }
 

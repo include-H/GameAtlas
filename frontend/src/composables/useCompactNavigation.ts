@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 /**
  * Viewport width below which the sidebar collapses into a mobile drawer.
  */
-export const COMPACT_NAVIGATION_BREAKPOINT = 992
+const COMPACT_NAVIGATION_BREAKPOINT = 992
 
 interface UseCompactNavigationOptions {
   breakpoint?: number

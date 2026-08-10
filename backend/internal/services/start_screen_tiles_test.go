@@ -3,6 +3,8 @@ package services
 import (
 	"bytes"
 	"errors"
+	"image"
+	"image/png"
 	"mime/multipart"
 	"net/textproto"
 	"os"
@@ -212,7 +214,7 @@ func TestStartScreenTilesUpdateMovesStagedImagesToPermanent(t *testing.T) {
 	gameID := insertServicesTestGame(t, db, "tile-stage-move", "Tile Stage Move", domain.GameVisibilityPublic)
 
 	filename := "22222222-2222-4222-8222-222222222222.jpg"
-	stagingFile := filepath.Join(assetsDir, "_staging", filename)
+	stagingFile := filepath.Join(assetsDir, "_staging", "start-screen", filename)
 	if err := os.MkdirAll(filepath.Dir(stagingFile), 0o755); err != nil {
 		t.Fatalf("create staging dir: %v", err)
 	}
@@ -265,7 +267,7 @@ func TestStartScreenTilesUploadTileImageStagesOnly(t *testing.T) {
 	}
 
 	filename := filepath.Base(path)
-	if _, err := os.Stat(filepath.Join(assetsDir, "_staging", filename)); err != nil {
+	if _, err := os.Stat(filepath.Join(assetsDir, "_staging", "start-screen", filename)); err != nil {
 		t.Fatalf("staged image missing after upload: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(assetsDir, "start-screen", filename)); !os.IsNotExist(err) {
@@ -276,6 +278,10 @@ func TestStartScreenTilesUploadTileImageStagesOnly(t *testing.T) {
 func buildTileImageUploadHeader(t *testing.T, filename string) *multipart.FileHeader {
 	t.Helper()
 
+	imageData := &bytes.Buffer{}
+	if err := png.Encode(imageData, image.NewRGBA(image.Rect(0, 0, 8, 8))); err != nil {
+		t.Fatalf("encode image: %v", err)
+	}
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	partHeader := textproto.MIMEHeader{}
@@ -285,7 +291,7 @@ func buildTileImageUploadHeader(t *testing.T, filename string) *multipart.FileHe
 	if err != nil {
 		t.Fatalf("CreatePart returned error: %v", err)
 	}
-	if _, err := part.Write([]byte("fake-image")); err != nil {
+	if _, err := part.Write(imageData.Bytes()); err != nil {
 		t.Fatalf("Write file part returned error: %v", err)
 	}
 	if err := writer.Close(); err != nil {
