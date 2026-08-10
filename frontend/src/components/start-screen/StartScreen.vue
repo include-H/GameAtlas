@@ -115,7 +115,7 @@
                     @leave="onTileLeave"
                   >
                     <div
-                      v-for="slot in column.slots"
+                      v-for="(slot, slotIndex) in column.slots"
                       :key="slot.tile.game_id"
                       :class="[
                         'start-screen__tile-slot',
@@ -123,7 +123,11 @@
                         { 'start-screen__tile-slot--dragging': isDraggedTile(slot.tile) },
                         { 'start-screen__tile-slot--target': isDropTarget(columnIndex, slot.row, slot.col) },
                       ]"
-                      :style="{ gridColumnStart: slot.col + 1, gridRowStart: slot.row + 1 }"
+                      :style="{
+                        gridColumnStart: slot.col + 1,
+                        gridRowStart: slot.row + 1,
+                        '--start-tile-enter-delay': tileEnterDelay(columnIndex, slotIndex),
+                      }"
                       :data-tile-index="slot.globalIndex"
                       :data-start-screen-cell="true"
                       :data-column-index="columnIndex"
@@ -311,6 +315,15 @@ const visibleColumns = computed(() => {
   if (props.tiles.length === 0 && props.columns.length === 0) return []
   return columns
 })
+// EntranceThemeTransition 的 IsStaggeringEnabled 等价物：按磁贴在容器中的顺序错开，
+// 而不是按行或按屏幕两侧硬切。首个磁贴立即进入，后续项目以短间隔跟随。
+const tileEnterDelay = (columnIndex: number, slotIndex: number) => {
+  const previousTileCount = visibleColumns.value
+    .slice(0, columnIndex)
+    .reduce((count, column) => count + column.slots.length, 0)
+  const sequenceIndex = previousTileCount + slotIndex
+  return `${Math.min(sequenceIndex, 14) * 32}ms`
+}
 const gridCells = Array.from({ length: START_SCREEN_COLUMN_ROWS * START_SCREEN_COLUMN_COLS }, (_, index) => ({
   row: Math.floor(index / START_SCREEN_COLUMN_COLS),
   col: index % START_SCREEN_COLUMN_COLS,
@@ -559,10 +572,8 @@ const endDrag = () => {
 
 const onTileEnter = (el: Element) => {
   const element = el as HTMLElement
-  const index = Number(element.dataset.tileIndex)
-  if (Number.isNaN(index)) return
-  // Win8.1 磁贴层：延迟 50ms 起按序淡入，轻微上浮弹入由 CSS 过渡完成。
-  element.style.transitionDelay = `${50 + Math.min(index, 24) * 30}ms`
+  // 初次打开由父级入场动画驱动；异步插入或编辑新增的磁贴复用同一组间节奏。
+  element.style.transitionDelay = element.style.getPropertyValue('--start-tile-enter-delay').trim() || '0ms'
 }
 
 const onTileLeave = (el: Element) => {
@@ -799,10 +810,10 @@ onUnmounted(() => {
   z-index: 1;
   min-width: 0;
   min-height: 0;
-  /* Win8.1 磁贴层：上浮 10px 弹入（back-out 轻微过冲）+ 淡入 */
+  /* EntranceThemeTransition：统一水平偏移 + 淡入，布局位置本身不参与动画。 */
   transition:
-    opacity 280ms ease,
-    transform 340ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    opacity 250ms cubic-bezier(0, 0, 0.2, 1),
+    transform 250ms cubic-bezier(0, 0, 0.2, 1);
 }
 
 .start-screen__tile-slot--small {
@@ -923,19 +934,17 @@ onUnmounted(() => {
 .metro-tile-enter-from,
 .metro-tile-leave-to {
   opacity: 0;
-  transform: translateY(10px) scale(0.96);
+  transform: translate3d(48px, 0, 0);
 }
 
 .metro-tile-enter-to {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translate3d(0, 0, 0);
 }
 
 .metro-tile-leave-active {
-  /* 退出时磁贴先快速淡出并下压 */
-  transition:
-    opacity 140ms ease,
-    transform 160ms cubic-bezier(0.4, 0, 1, 1);
+  /* ContentThemeTransition 的退出语义：旧内容淡出，位置不再做反向飞出。 */
+  transition: opacity 167ms cubic-bezier(0.4, 0, 1, 1);
 }
 
 .metro-tile-leave-active {
@@ -944,7 +953,6 @@ onUnmounted(() => {
 
 .metro-tile-leave-to {
   opacity: 0;
-  transform: translateY(6px) scale(0.97);
 }
 
 .start-screen__state {
@@ -986,29 +994,21 @@ onUnmounted(() => {
 }
 
 .start-screen-overlay-enter-active {
-  /* Win8.1：从"中心偏下约 1/3"的锚点由 88% 放大到 100%，ease-out 先快后慢 */
-  transition:
-    opacity 350ms ease,
-    transform 350ms cubic-bezier(0.22, 1, 0.36, 1);
-  transform-origin: 50% 66%;
+  /* 微软文档明确没有 enterPage；外层只负责桌面遮罩的淡入。 */
+  transition: opacity 250ms cubic-bezier(0, 0, 0.2, 1);
 }
 
 .start-screen-overlay-enter-from {
   opacity: 0;
-  transform: scale(0.88);
 }
 
 .start-screen-overlay-leave-active {
-  /* 退出：整屏向锚点"吸回" */
-  transition:
-    opacity 260ms ease,
-    transform 260ms cubic-bezier(0.4, 0, 0.6, 1);
-  transform-origin: 50% 66%;
+  /* 退出与 ContentThemeTransition 一致，只淡出内容层，不反向缩放整屏。 */
+  transition: opacity 167ms cubic-bezier(0.4, 0, 1, 1);
 }
 
 .start-screen-overlay-leave-to {
   opacity: 0;
-  transform: scale(0.94);
 }
 
 .start-screen-scrim {
@@ -1025,27 +1025,35 @@ onUnmounted(() => {
 }
 
 .start-screen-overlay-enter-active .start-screen__header {
-  animation: start-screen-header-in 420ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
+  animation: start-screen-entrance-in 250ms cubic-bezier(0, 0, 0.2, 1) both;
 }
 
-@keyframes start-screen-header-in {
+.start-screen-overlay-enter-active .start-screen__tile-slot {
+  animation:
+    start-screen-entrance-in 250ms cubic-bezier(0, 0, 0.2, 1)
+    var(--start-tile-enter-delay, 0ms)
+    both;
+}
+
+@keyframes start-screen-entrance-in {
   from {
     opacity: 0;
-    transform: translateY(-14px);
+    transform: translate3d(48px, 0, 0);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
-/* 性能/偏好容错：系统要求减少动效时直接瞬显，保留缩放节奏兜底 */
+/* 性能/偏好容错：系统要求减少动效时直接瞬显。 */
 @media (prefers-reduced-motion: reduce) {
   .start-screen-overlay-enter-active,
   .start-screen-overlay-leave-active,
   .start-screen__tile-slot,
   .start-screen-scrim,
-  .start-screen__header {
+  .start-screen__header,
+  .start-screen-overlay-enter-active .start-screen__tile-slot {
     transition: none !important;
     animation: none !important;
   }
