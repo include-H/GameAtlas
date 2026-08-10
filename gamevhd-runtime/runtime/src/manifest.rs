@@ -62,6 +62,8 @@ pub enum ManifestError {
     UnknownField(String),
     /// 签名不匹配（消息；带 sig 的 manifest 被篡改或损坏）。
     BadSignature(String),
+    /// 启动器 manifest 缺少签名。旧格式只允许通过显式 legacy API 读取。
+    MissingSignature,
     /// 读取文件失败。
     Io(String),
 }
@@ -75,6 +77,7 @@ impl std::fmt::Display for ManifestError {
             ManifestError::MissingField(k) => write!(f, "配置缺少必填字段 '{k}'"),
             ManifestError::UnknownField(k) => write!(f, "配置含未知字段 '{k}'"),
             ManifestError::BadSignature(m) => write!(f, "配置签名校验失败（可能被篡改）: {m}"),
+            ManifestError::MissingSignature => write!(f, "配置缺少签名（仅兼容旧格式解析入口允许）"),
             ManifestError::Io(m) => write!(f, "读取失败: {m}"),
         }
     }
@@ -139,32 +142,8 @@ fn sign_json(json: &str) -> String {
     let sig = crate::sha256::hmac_hex(MANIFEST_SIGN_KEY, json.as_bytes());
     let body = json
         .strip_suffix('}')
-        .unwrap_or(json);
-    format!("{body},\"sig\":\"{sig}\"}}")
-}
-
-/// 校验带签名 JSON：提取并校验 `sig` 字段，返回裁剪后的原始 JSON。
-/// 无 sig 字段 → Ok（旧格式兼容，不强制签名）；sig 不匹配 → Err。
-fn verify_signed_json(signed: &str) -> Result<String, ManifestError> {
-    let Some(tail) = signed.strip_suffix('}') else {
-        return Err(ManifestError::BadJson("对象未闭合".into()));
-    };
-    let Some((body, sig)) = tail.rsplit_once(",\"sig\":\"") else {
-        return Ok(signed.to_string());
-    };
-    let Some(sig) = sig.strip_suffix('"') else {
-        return Err(ManifestError::BadSignature("sig 字段格式非法".into()));
-    };
-    if sig.len() != 64 || !sig.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err(ManifestError::BadSignature("sig 字段格式非法".into()));
-    }
-    let expected = crate::sha256::hmac_hex(MANIFEST_SIGN_KEY, body.as_bytes());
-    if sig != expected {
-        return Err(ManifestError::BadSignature(format!(
-            "期望 {expected}，实际 {sig}"
-        )));
-    }
-    Ok(body.to_string())
+        .expect("Manifest::to_json must return a JSON object");
+    format!("{body},\n  \"sig\": \"{sig}\"\n}}")
 }
 
 /// 在字节切片中定位配置 JSON 的边界 `(start, end)`（end = magic 起始，即 JSON 结束）。
@@ -180,11 +159,11 @@ pub fn locate_config(data: &[u8]) -> Result<(usize, usize), ManifestError> {
         if len == 0 || len > MAX_CONFIG_LEN {
             return Err(ManifestError::BadLength(len as u32));
         }
-        let start = data.len() - FOOTER_OVERHEAD - len;
-        if start < data.len() && start + len <= data.len() - FOOTER_OVERHEAD {
-            return Ok((start, data.len() - FOOTER_OVERHEAD));
-        }
-        return Err(ManifestError::BadLength(len as u32));
+        let json_end = data.len() - FOOTER_OVERHEAD;
+        let Some(start) = json_end.checked_sub(len) else {
+            return Err(ManifestError::BadLength(len as u32));
+        };
+        return Ok((start, json_end));
     }
     // 回退：扫描尾部窗口找 magic，位置即 JSON 结束。
     let window = &data[data.len().saturating_sub(SCAN_BACK)..];
@@ -208,21 +187,79 @@ pub fn locate_config(data: &[u8]) -> Result<(usize, usize), ManifestError> {
     Ok((json_end - len, json_end))
 }
 
-/// 从字节切片解析 manifest（定位 + 签名校验 + JSON 解析 + 字段校验）。
+/// 从字节切片解析 manifest（定位 + 强制签名校验 + JSON 解析 + 字段校验）。
 pub fn parse_manifest(data: &[u8]) -> Result<Manifest, ManifestError> {
+    parse_manifest_with_policy(data, true)
+}
+
+/// 显式兼容旧版无签名 footer。正式启动器读取路径不调用此入口，避免
+/// 删除 `sig` 后把篡改后的配置降级成“合法旧格式”。
+pub fn parse_manifest_legacy(data: &[u8]) -> Result<Manifest, ManifestError> {
+    parse_manifest_with_policy(data, false)
+}
+
+fn parse_manifest_with_policy(
+    data: &[u8],
+    require_signature: bool,
+) -> Result<Manifest, ManifestError> {
     let (start, end) = locate_config(data)?;
     if start >= end {
         return Err(ManifestError::BadJson("空配置".into()));
     }
     let json = std::str::from_utf8(&data[start..end])
         .map_err(|e| ManifestError::BadJson(format!("非 UTF-8: {e}")))?;
-    let unsigned = verify_signed_json(json)?;
-    manifest_from_json(&unsigned)
+    parse_manifest_json(json, require_signature)
 }
 
 /// 从配置 JSON 文本解析（字段严格校验：必填 4 项，未知字段报错）。
 pub fn manifest_from_json(json: &str) -> Result<Manifest, ManifestError> {
     let fields = parse_json_object(json).map_err(ManifestError::BadJson)?;
+    manifest_from_fields(fields)
+}
+
+/// Parse a manifest object and verify its optional signature.  Signature
+/// extraction is structural: a `sig` key must be unique, and escaped JSON
+/// spellings are decoded before the key is classified.  The HMAC covers the
+/// canonical `Manifest::to_json()` representation, so whitespace and field
+/// order cannot create a second signed meaning.
+fn parse_manifest_json(json: &str, require_signature: bool) -> Result<Manifest, ManifestError> {
+    let fields = parse_json_object(json).map_err(ManifestError::BadJson)?;
+    let mut unsigned = Vec::with_capacity(fields.len());
+    let mut signature = None;
+    for (key, value) in fields {
+        if key == "sig" {
+            if signature.replace(value).is_some() {
+                return Err(ManifestError::BadSignature(
+                    "sig 字段重复".to_string(),
+                ));
+            }
+        } else {
+            unsigned.push((key, value));
+        }
+    }
+
+    let manifest = manifest_from_fields(unsigned)?;
+    let Some(actual) = signature else {
+        if require_signature {
+            return Err(ManifestError::MissingSignature);
+        }
+        // Legacy unsigned manifests remain accepted only by the explicit
+        // compatibility parser.
+        return Ok(manifest);
+    };
+    if actual.len() != 64 || !actual.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(ManifestError::BadSignature("sig 字段格式非法".into()));
+    }
+    let expected = crate::sha256::hmac_hex(MANIFEST_SIGN_KEY, manifest.to_json().as_bytes());
+    if !actual.eq_ignore_ascii_case(&expected) {
+        return Err(ManifestError::BadSignature(format!(
+            "期望 {expected}，实际 {actual}"
+        )));
+    }
+    Ok(manifest)
+}
+
+fn manifest_from_fields(fields: Vec<(String, String)>) -> Result<Manifest, ManifestError> {
     let mut m = Manifest {
         game_id: String::new(),
         title: String::new(),
@@ -309,7 +346,7 @@ mod tests {
         let m = sample();
         let mut blob = vec![0u8; 256]; // 模拟 launcher.exe 主体
         blob.extend_from_slice(&m.to_footer_bytes());
-        let parsed = parse_manifest(&blob).unwrap();
+        let parsed = parse_manifest_legacy(&blob).unwrap();
         assert_eq!(parsed, m);
     }
 
@@ -321,8 +358,81 @@ mod tests {
         footer.extend_from_slice(&[0xAA; 64]); // 签名/填充块
         let mut blob = vec![0x00; 64];
         blob.extend_from_slice(&footer);
-        let parsed = parse_manifest(&blob).unwrap();
+        let parsed = parse_manifest_legacy(&blob).unwrap();
         assert_eq!(parsed, m);
+    }
+
+    #[test]
+    fn signed_footer_round_trip_and_tamper_rejection() {
+        let m = sample();
+        let signed = m.to_signed_footer_bytes();
+        assert_eq!(parse_manifest(&signed).unwrap(), m);
+
+        let mut tampered = signed.clone();
+        let marker = b"horizon-zero-dawn";
+        let pos = tampered
+            .windows(marker.len())
+            .position(|window| window == marker)
+            .expect("signed game_id present");
+        tampered[pos] = b"H"[0];
+        assert!(matches!(
+            parse_manifest(&tampered),
+            Err(ManifestError::BadSignature(_))
+        ));
+    }
+
+    #[test]
+    fn signed_manifest_cannot_be_downgraded_by_removing_sig() {
+        let m = sample();
+        let signed = m.to_signed_footer_bytes();
+        let (start, end) = locate_config(&signed).unwrap();
+        let signed_json = String::from_utf8(signed[start..end].to_vec()).unwrap();
+        let unsigned_json = signed_json
+            .rsplit_once(",\n  \"sig\": \"")
+            .map(|(body, _)| format!("{body}\n}}"))
+            .expect("signed footer");
+        let mut downgraded = signed.clone();
+        downgraded.splice(start..end, unsigned_json.as_bytes().iter().copied());
+        let n = downgraded.len();
+        downgraded[n - 4..].copy_from_slice(&(unsigned_json.len() as u32).to_le_bytes());
+        assert_eq!(
+            parse_manifest(&downgraded),
+            Err(ManifestError::MissingSignature)
+        );
+        assert_eq!(parse_manifest_legacy(&downgraded).unwrap(), m);
+    }
+
+    #[test]
+    fn signed_sig_key_is_parsed_structurally() {
+        let m = sample();
+        let signed = m.to_signed_footer_bytes();
+        let (start, end) = locate_config(&signed).unwrap();
+        let signed_json = String::from_utf8(signed[start..end].to_vec()).unwrap();
+        let escaped_key = signed_json.replace("\"sig\": \"", "\"\\u0073ig\": \"");
+        let mut escaped_blob = signed.clone();
+        escaped_blob.splice(start..end, escaped_key.as_bytes().iter().copied());
+        let escaped_footer_len = escaped_blob.len();
+        escaped_blob[escaped_footer_len - 4..]
+            .copy_from_slice(&(escaped_key.len() as u32).to_le_bytes());
+        assert_eq!(
+            parse_manifest(&escaped_blob).unwrap(),
+            m,
+            "sig key escaping must not bypass verification"
+        );
+
+        let duplicate_json = signed_json.replace(
+            "\n}",
+            ",\n  \"sig\": \"0000000000000000000000000000000000000000000000000000000000000000\"\n}",
+        );
+        let mut duplicate_blob = signed.clone();
+        duplicate_blob.splice(start..end, duplicate_json.as_bytes().iter().copied());
+        let duplicate_footer_len = duplicate_blob.len();
+        duplicate_blob[duplicate_footer_len - 4..]
+            .copy_from_slice(&(duplicate_json.len() as u32).to_le_bytes());
+        assert!(matches!(
+            parse_manifest(&duplicate_blob),
+            Err(ManifestError::BadSignature(_))
+        ));
     }
 
     #[test]
@@ -340,6 +450,13 @@ mod tests {
         // 篡改长度字段为超大值。
         footer[n - 4..].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
         assert_eq!(parse_manifest(&footer), Err(ManifestError::BadLength(0xFFFF_FFFF)));
+    }
+
+    #[test]
+    fn short_footer_length_is_rejected_without_underflow() {
+        let mut footer = Vec::from(FOOTER_MAGIC);
+        footer.extend_from_slice(&100u32.to_le_bytes());
+        assert_eq!(locate_config(&footer), Err(ManifestError::BadLength(100)));
     }
 
     #[test]

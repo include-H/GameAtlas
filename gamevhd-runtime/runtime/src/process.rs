@@ -12,6 +12,12 @@
 
 use std::fmt;
 
+#[cfg(not(target_os = "windows"))]
+use std::fs::OpenOptions;
+
+#[cfg(all(not(target_os = "windows"), unix))]
+use std::os::unix::io::AsRawFd;
+
 /// 进程树错误。
 #[derive(Debug)]
 pub enum ProcError {
@@ -37,12 +43,40 @@ impl std::error::Error for ProcError {}
 
 /// 生成 job 名称 `GameVHD_<game_id>`（无 game_id 时为 `GameVHD_`）。
 pub fn job_name(game_id: &str) -> String {
-    format!("GameVHD_{game_id}")
+    format!("GameVHD_{}", safe_object_component(game_id))
 }
 
 /// 生成运行互斥体名称 `Local\GameVHD_<game_id>_run`（会话级命名空间，同账号同会话防双开）。
 pub fn run_mutex_name(game_id: &str) -> String {
-    format!("Local\\GameVHD_{game_id}_run")
+    format!("Local\\GameVHD_{}_run", safe_object_component(game_id))
+}
+
+/// 生成按 box 路径归属的锁键。box 路径来自启动器参数，而不是 box.json，
+/// 因此它可作为 cleanup/run 共享的第二层资源锁，防止篡改 game_id 绕过互斥。
+pub fn box_mutex_key(box_path: &str) -> String {
+    format!("box:{}", crate::hoststate::canonical_box_path(box_path))
+}
+
+/// Keep ordinary ids readable, but never let a manifest-controlled id inject a
+/// namespace separator or other object-name syntax into a named kernel object.
+fn safe_object_component(game_id: &str) -> String {
+    if !game_id.is_empty()
+        && game_id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+    {
+        return game_id.to_string();
+    }
+    format!("id_{:016x}", fnv1a64(game_id.as_bytes()))
+}
+
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
 }
 
 /// 运行互斥锁守卫：持有期间阻止同一游戏的第二个实例启动。
@@ -51,7 +85,7 @@ pub struct RunMutex {
     #[cfg(target_os = "windows")]
     handle: crate::winffi::HANDLE,
     #[cfg(not(target_os = "windows"))]
-    lock_path: std::path::PathBuf,
+    file: std::fs::File,
 }
 
 /// 获取运行互斥锁；已被另一实例持有时返回 [`ProcError::AlreadyRunning`]。
@@ -60,6 +94,9 @@ pub fn acquire_run_mutex(game_id: &str) -> Result<RunMutex, ProcError> {
     use crate::winffi;
 
     let name = utf16_nul(&run_mutex_name(game_id));
+    // Create the named mutex without claiming ownership, then perform a
+    // zero-time wait.  This distinguishes a live owner (WAIT_TIMEOUT) from
+    // an abandoned mutex (WAIT_ABANDONED_0), which is the crash takeover path.
     let handle = unsafe { winffi::CreateMutexW(std::ptr::null(), 0, name.as_ptr()) };
     if handle == 0 {
         return Err(ProcError::Win32 {
@@ -67,63 +104,111 @@ pub fn acquire_run_mutex(game_id: &str) -> Result<RunMutex, ProcError> {
             code: last_error(),
         });
     }
-    if last_error() == winffi::ERROR_ALREADY_EXISTS {
-        unsafe { winffi::CloseHandle(handle) };
-        return Err(ProcError::AlreadyRunning);
+    match unsafe { winffi::WaitForSingleObject(handle, 0) } {
+        winffi::WAIT_OBJECT_0 | winffi::WAIT_ABANDONED_0 => Ok(RunMutex { handle }),
+        winffi::WAIT_TIMEOUT => {
+            unsafe { winffi::CloseHandle(handle) };
+            Err(ProcError::AlreadyRunning)
+        }
+        winffi::WAIT_FAILED => {
+            let code = last_error();
+            unsafe { winffi::CloseHandle(handle) };
+            Err(ProcError::Win32 {
+                op: "WaitForSingleObject(CreateMutexW)",
+                code,
+            })
+        }
+        _ => {
+            let code = last_error();
+            unsafe { winffi::CloseHandle(handle) };
+            Err(ProcError::Win32 {
+                op: "WaitForSingleObject(CreateMutexW)",
+                code,
+            })
+        }
     }
-    Ok(RunMutex { handle })
+}
+
+/// Lock the user-supplied box resource before reading box.json.  This lock is
+/// intentionally independent of the manifest-controlled game id.
+pub fn acquire_box_mutex(box_path: &str) -> Result<RunMutex, ProcError> {
+    acquire_run_mutex(&box_mutex_key(box_path))
 }
 
 impl Drop for RunMutex {
     #[cfg(target_os = "windows")]
     fn drop(&mut self) {
+        unsafe { crate::winffi::ReleaseMutex(self.handle) };
         unsafe { crate::winffi::CloseHandle(self.handle) };
     }
     #[cfg(not(target_os = "windows"))]
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.lock_path);
+        #[cfg(unix)]
+        unsafe {
+            let _ = flock(self.file.as_raw_fd(), LOCK_UN);
+        }
     }
 }
 
-/// 获取运行互斥锁（Linux 文件锁实现：`create_new` 原子创建 + PID 存活检查，
-/// 崩溃残留的锁文件可被新实例接管）。
+/// Stable lock-file location used by the advisory Unix lock.  The file may
+/// remain after a crash; ownership is the kernel lock, not its contents.
+#[cfg(not(target_os = "windows"))]
+pub fn run_mutex_lock_path(game_id: &str) -> std::path::PathBuf {
+    std::env::temp_dir().join(format!(
+        "gamevhd_{}_run.lock",
+        safe_object_component(game_id)
+    ))
+}
+
+#[cfg(all(not(target_os = "windows"), unix))]
+const LOCK_EX: i32 = 2;
+#[cfg(all(not(target_os = "windows"), unix))]
+const LOCK_NB: i32 = 4;
+#[cfg(all(not(target_os = "windows"), unix))]
+const LOCK_UN: i32 = 8;
+
+#[cfg(all(not(target_os = "windows"), unix))]
+unsafe extern "C" {
+    fn flock(fd: i32, operation: i32) -> i32;
+}
+
+/// Acquire a kernel-held advisory lock.  There is deliberately no PID-based
+/// stale takeover: closing the file descriptor releases a crashed process's
+/// lock automatically, while the path itself is harmless residue.
 #[cfg(not(target_os = "windows"))]
 pub fn acquire_run_mutex(game_id: &str) -> Result<RunMutex, ProcError> {
-    use std::fs::OpenOptions;
-    use std::io::Write;
-
-    let lock_path = std::env::temp_dir().join(format!("gamevhd_{game_id}_run.lock"));
-    match OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&lock_path)
+    #[cfg(unix)]
     {
-        Ok(mut f) => {
-            let _ = write!(f, "{}", std::process::id());
-            Ok(RunMutex { lock_path })
+        let path = run_mutex_lock_path(game_id);
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&path)
+            .map_err(|e| ProcError::Win32 {
+                op: "open lock file",
+                code: e.raw_os_error().unwrap_or(0) as u32,
+            })?;
+        let rc = unsafe { flock(file.as_raw_fd(), LOCK_EX | LOCK_NB) };
+        if rc == 0 {
+            return Ok(RunMutex { file });
         }
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            if lock_is_stale(&lock_path) {
-                let _ = std::fs::remove_file(&lock_path);
-                return acquire_run_mutex(game_id);
-            }
+        let code = std::io::Error::last_os_error()
+            .raw_os_error()
+            .unwrap_or(0);
+        if code == 11 || code == 35 {
             Err(ProcError::AlreadyRunning)
+        } else {
+            Err(ProcError::Win32 {
+                op: "flock",
+                code: code as u32,
+            })
         }
-        Err(e) => Err(ProcError::Win32 {
-            op: "open lock file",
-            code: e.raw_os_error().unwrap_or(0) as u32,
-        }),
     }
-}
-
-#[cfg(not(target_os = "windows"))]
-fn lock_is_stale(lock_path: &std::path::Path) -> bool {
-    let pid = std::fs::read_to_string(lock_path)
-        .ok()
-        .and_then(|s| s.trim().parse::<i32>().ok());
-    match pid {
-        Some(pid) if pid > 0 => !std::path::Path::new(&format!("/proc/{pid}")).exists(),
-        _ => true,
+    #[cfg(not(unix))]
+    {
+        let _ = game_id;
+        Err(ProcError::UnsupportedPlatform)
     }
 }
 
@@ -286,7 +371,7 @@ mod tests {
     #[test]
     fn job_name_format() {
         assert_eq!(job_name("abc"), "GameVHD_abc");
-        assert_eq!(job_name(""), "GameVHD_");
+        assert_eq!(job_name(""), "GameVHD_id_cbf29ce484222325");
         assert_eq!(job_name("horizon-zero-dawn"), "GameVHD_horizon-zero-dawn");
     }
 
@@ -297,6 +382,13 @@ mod tests {
             run_mutex_name("horizon-zero-dawn"),
             r"Local\GameVHD_horizon-zero-dawn_run"
         );
+    }
+
+    #[test]
+    fn box_mutex_key_is_not_a_path_component() {
+        let key = box_mutex_key(r"C:\GameData\box.json");
+        assert!(key.starts_with("box:"));
+        assert!(run_mutex_name(&key).starts_with(r"Local\GameVHD_id_"));
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -316,13 +408,20 @@ mod tests {
 
     #[cfg(not(target_os = "windows"))]
     #[test]
-    fn stale_lock_file_is_reclaimed() {
+    fn stale_lock_file_is_reusable_without_pid_guessing() {
         let gid = format!("stale-{}", std::process::id());
-        let path = std::env::temp_dir().join(format!("gamevhd_{gid}_run.lock"));
-        // 写入一个不存在的 PID（999999），模拟崩溃残留。
+        let path = run_mutex_lock_path(&gid);
+        // A stale file is only a name; the kernel lock is what matters.
         std::fs::write(&path, "999999").unwrap();
         let guard = acquire_run_mutex(&gid).expect("stale lock reclaimed");
         drop(guard);
+    }
+
+    #[test]
+    fn unsafe_game_id_cannot_change_object_namespace() {
+        let name = run_mutex_name(r"a\b/../../c");
+        assert!(name.starts_with(r"Local\GameVHD_id_"));
+        assert!(!name["Local\\GameVHD_".len()..].contains('\\'));
     }
 
     #[cfg(target_os = "windows")]

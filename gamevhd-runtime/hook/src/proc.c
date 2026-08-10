@@ -77,6 +77,11 @@ typedef NTSTATUS(NTAPI *P_NtQueryInformationProcess)(
     ULONG ProcessInformationLength,
     PULONG ReturnLength);
 
+typedef BOOL(WINAPI *P_QueryFullProcessImageNameW)(
+    HANDLE ProcessHandle, DWORD Flags, LPWSTR FileName, PDWORD Size);
+typedef BOOL(WINAPI *P_IsWow64Process2)(HANDLE Process, USHORT *ProcessMachine,
+                                        USHORT *NativeMachine);
+
 /* 注入失败时记录到 CHILD_INJECT_FAILED status= 的 NTSTATUS 值
  * （ntstatus.h 等价常量；用 u 后缀字面量避免 long 溢出告警）。 */
 #ifndef STATUS_SUCCESS
@@ -104,6 +109,8 @@ static P_NtCreateUserProcess pfnOrig_NtCreateUserProcess = NULL;
 static P_NtCreateProcessEx    pfnOrig_NtCreateProcessEx    = NULL;
 
 static P_NtQueryInformationProcess __sys_NtQueryInformationProcess = NULL;
+static P_QueryFullProcessImageNameW g_query_full_process_image = NULL;
+static P_IsWow64Process2 g_is_wow64_process2 = NULL;
 
 /* ================================================================ */
 /* 小工具                                                             */
@@ -131,19 +138,13 @@ static BOOLEAN gvhd_wcs_ieq(const wchar_t *a, const wchar_t *b)
  * 注入并记警告。IsWow64Process2 不可用（旧系统/32 位 Windows）时放行。 */
 static BOOLEAN gvhd_child_same_bits(HANDLE hProcess)
 {
-    typedef BOOL(WINAPI *P_IsWow64Process2)(HANDLE, USHORT *, USHORT *);
-    static P_IsWow64Process2 pIsWow64Process2 = NULL;
     USHORT pMachine = IMAGE_FILE_MACHINE_UNKNOWN;
     USHORT nMachine = 0;
 
-    if (pIsWow64Process2 == NULL) {
-        pIsWow64Process2 = (P_IsWow64Process2)(LPVOID)GetProcAddress(
-            GetModuleHandleW(L"kernel32.dll"), "IsWow64Process2");
-        if (pIsWow64Process2 == NULL) {
-            return TRUE;   /* 无法探测 → 放行（本钩子正常情况下只见到同位数子进程） */
-        }
+    if (g_is_wow64_process2 == NULL) {
+        return TRUE;   /* 旧系统无法探测 → 保持既有尽力注入语义。 */
     }
-    if (!pIsWow64Process2(hProcess, &pMachine, &nMachine)) {
+    if (!g_is_wow64_process2(hProcess, &pMachine, &nMachine)) {
         return TRUE;       /* 32 位 Windows：无 WoW64 → 必然是 x86 子进程 */
     }
 #if defined(_WIN64)
@@ -273,6 +274,9 @@ static const wchar_t *const gvhd_child_exclude_prefix[] = {
 static BOOLEAN gvhd_wcs_prefix_ieq(const wchar_t *s, const wchar_t *prefix)
 {
     while (*prefix != L'\0') {
+        if (*s == L'\0') {
+            return FALSE;
+        }
         if (gvhd_ascii_lower(*s) != gvhd_ascii_lower(*prefix)) {
             return FALSE;
         }
@@ -322,59 +326,85 @@ static BOOLEAN gvhd_child_anticheat(const wchar_t *name)
     return FALSE;
 }
 
-/* 取子进程 exe 文件名（不含路径）；失败返回 NULL（保守：调用方放行）。 */
-static const wchar_t *gvhd_child_image_name(HANDLE hProcess, WCHAR *buf, size_t cap)
+/* 取子进程完整 exe 路径。缓冲按 QueryFullProcessImageNameW 的需求动态扩容，
+ * 由调用方用 HeapFree 释放；失败返回 NULL（调用方放行）。 */
+static WCHAR *gvhd_child_image_path(HANDLE hProcess)
 {
-    typedef BOOL(WINAPI *P_QueryFullProcessImageNameW)(HANDLE, DWORD, LPWSTR, PDWORD);
-    static P_QueryFullProcessImageNameW pfn = NULL;
-    DWORD len;
-    const wchar_t *name;
+    DWORD cap = MAX_PATH;
 
-    if (cap < 1) {
+    if (g_query_full_process_image == NULL) {
         return NULL;
     }
-    if (pfn == NULL) {
-        pfn = (P_QueryFullProcessImageNameW)(LPVOID)GetProcAddress(
-            GetModuleHandleW(L"kernel32.dll"), "QueryFullProcessImageNameW");
-        if (pfn == NULL) {
+    for (unsigned attempt = 0; attempt < 6; ++attempt) {
+        WCHAR *buf;
+        DWORD len;
+        DWORD error;
+
+        if (cap < 2 || cap > 32768u) {
             return NULL;
         }
+        buf = (WCHAR *)HeapAlloc(GetProcessHeap(), 0,
+                                 (SIZE_T)cap * sizeof(WCHAR));
+        if (buf == NULL) {
+            return NULL;
+        }
+        len = cap;
+        if (g_query_full_process_image(hProcess, 0, buf, &len)) {
+            if (len < cap) {
+                buf[len] = L'\0';
+                return buf;
+            }
+            HeapFree(GetProcessHeap(), 0, buf);
+            return NULL;
+        }
+        error = GetLastError();
+        HeapFree(GetProcessHeap(), 0, buf);
+        if (error != ERROR_INSUFFICIENT_BUFFER) {
+            return NULL;
+        }
+        if (len >= cap && len < 32767u) {
+            cap = len + 1;
+        } else {
+            cap *= 2;
+        }
     }
-    len = (DWORD)(cap - 1);
-    if (!pfn(hProcess, 0, buf, &len)) {
-        return NULL;
-    }
-    buf[len] = L'\0';
-    name = wcsrchr(buf, L'\\');
-    return (name == NULL) ? buf : name + 1;
+    return NULL;
 }
 
-/* 用 QueryFullProcessImageNameW 取子进程 exe 名并匹配排除清单。
- * 取不到名字时放行（保守：宁可注入也不漏注入）。 */
-static BOOLEAN gvhd_child_excluded(HANDLE hProcess)
+static const wchar_t *gvhd_child_basename(const wchar_t *path)
 {
-    WCHAR path[MAX_PATH * 2];
-    const wchar_t *name;
-    size_t i;
+    const wchar_t *slash = wcsrchr(path, L'\\');
+    const wchar_t *forward = wcsrchr(path, L'/');
 
-    name = gvhd_child_image_name(hProcess, path, MAX_PATH * 2);
-    if (name == NULL) {
-        return FALSE;
+    if (forward != NULL && (slash == NULL || forward > slash)) {
+        slash = forward;
     }
+    return slash == NULL ? path : slash + 1;
+}
+
+/* 用 QueryFullProcessImageNameW 取到的 basename 匹配排除清单。 */
+static BOOLEAN gvhd_child_excluded_name(const wchar_t *name)
+{
+    size_t i;
+    BOOLEAN excluded = FALSE;
 
     for (i = 0; i < sizeof(gvhd_child_exclude_exact) / sizeof(gvhd_child_exclude_exact[0]);
          ++i) {
         if (gvhd_wcs_ieq(name, gvhd_child_exclude_exact[i])) {
-            return TRUE;
+            excluded = TRUE;
+            break;
         }
     }
-    for (i = 0; i < sizeof(gvhd_child_exclude_prefix) / sizeof(gvhd_child_exclude_prefix[0]);
-         ++i) {
-        if (gvhd_wcs_prefix_ieq(name, gvhd_child_exclude_prefix[i])) {
-            return TRUE;
+    if (!excluded) {
+        for (i = 0; i < sizeof(gvhd_child_exclude_prefix) / sizeof(gvhd_child_exclude_prefix[0]);
+             ++i) {
+            if (gvhd_wcs_prefix_ieq(name, gvhd_child_exclude_prefix[i])) {
+                excluded = TRUE;
+                break;
+            }
         }
     }
-    return FALSE;
+    return excluded;
 }
 
 static NTSTATUS gvhd_inject_child_impl(HANDLE hProcess)
@@ -505,29 +535,40 @@ cleanup:
 uint32_t gvhd_inject_child(void *h_process, void *h_thread)
 {
     HANDLE hp = (HANDLE)h_process;
+    WCHAR *path;
+    const wchar_t *name;
     NTSTATUS status;
-
-    if (gvhd_child_excluded(hp)) {
-        gvhd_log_write(L"CHILD_SKIPPED pid=%lu: excluded non-game child",
-                       (unsigned long)GetProcessId(hp));
-        return 0;
-    }
-    {
-        WCHAR path[MAX_PATH * 2];
-        const wchar_t *name = gvhd_child_image_name(hp, path, MAX_PATH * 2);
-        if (name != NULL && gvhd_child_anticheat(name)) {
-            gvhd_log_write(L"AC_DETECTED pid=%lu name=%ls: anti-cheat, isolation NOT guaranteed",
-                           (unsigned long)GetProcessId(hp), name);
-            return 0;
-        }
-    }
-    (void)h_thread;
 
     if (hp == NULL || hp == INVALID_HANDLE_VALUE) {
         gvhd_log_write(L"CHILD_INJECT_FAILED pid=0 status=0x%08lx",
                        (unsigned long)STATUS_INVALID_PARAMETER);
         return (uint32_t)STATUS_INVALID_PARAMETER;
     }
+
+    /* Unknown image identity is a fail-closed injection decision: do not
+     * inject an unclassified process when the API is unavailable or access is
+     * denied.  This keeps anti-cheat detection containment-only. */
+    path = gvhd_child_image_path(hp);
+    if (path == NULL) {
+        gvhd_log_write(L"CHILD_SKIPPED pid=%lu: image path unavailable, isolation NOT guaranteed",
+                       (unsigned long)GetProcessId(hp));
+        return 0;
+    }
+    name = gvhd_child_basename(path);
+    if (gvhd_child_anticheat(name)) {
+        gvhd_log_write(L"AC_DETECTED pid=%lu name=%ls: anti-cheat, isolation NOT guaranteed",
+                       (unsigned long)GetProcessId(hp), name);
+        HeapFree(GetProcessHeap(), 0, path);
+        return 0;
+    }
+    if (gvhd_child_excluded_name(name)) {
+        gvhd_log_write(L"CHILD_SKIPPED pid=%lu: excluded non-game child",
+                       (unsigned long)GetProcessId(hp));
+        HeapFree(GetProcessHeap(), 0, path);
+        return 0;
+    }
+    HeapFree(GetProcessHeap(), 0, path);
+    (void)h_thread;
 
     status = gvhd_inject_child_impl(hp);
     if (status == STATUS_SUCCESS) {
@@ -646,6 +687,10 @@ uint32_t gvhd_install_process_hooks(void)
     __sys_NtCreateProcessEx = (LPVOID)GetProcAddress(hNtdll, "NtCreateProcessEx");
     __sys_NtQueryInformationProcess = (P_NtQueryInformationProcess)(LPVOID)GetProcAddress(
         hNtdll, "NtQueryInformationProcess");
+    g_query_full_process_image = (P_QueryFullProcessImageNameW)(LPVOID)GetProcAddress(
+        GetModuleHandleW(L"kernel32.dll"), "QueryFullProcessImageNameW");
+    g_is_wow64_process2 = (P_IsWow64Process2)(LPVOID)GetProcAddress(
+        GetModuleHandleW(L"kernel32.dll"), "IsWow64Process2");
     if (__sys_NtCreateUserProcess == NULL || __sys_NtQueryInformationProcess == NULL) {
         gvhd_log_write(L"PROC_HOOK_RESOLVE_FAILED user=%p process=%p query=%p",
                        __sys_NtCreateUserProcess,

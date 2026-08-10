@@ -171,7 +171,8 @@ static BOOLEAN gvhd_file_copy_unicode(WCHAR *out, size_t cap,
 {
     size_t chars;
 
-    if (name == NULL || name->Buffer == NULL) {
+    if (name == NULL || name->Buffer == NULL ||
+        (name->Length % sizeof(WCHAR)) != 0) {
         return FALSE;
     }
     chars = (size_t)(name->Length / sizeof(WCHAR));
@@ -196,17 +197,51 @@ static size_t gvhd_file_native_prefix_len(const WCHAR *path)
     return 0;
 }
 
+/* GetFinalPathNameByHandleW returns the Win32 extended prefix `\\?\\`, while
+ * NtCreateFile expects the native DOS-device prefix `\\??\\`.  Keep the
+ * string length unchanged and normalize the prefix before handing it back to
+ * an NT syscall. */
+static void gvhd_file_nativeize_extended_prefix(WCHAR *path)
+{
+    if (path != NULL && path[0] == L'\\' && path[1] == L'\\' &&
+        path[2] == L'?' && path[3] == L'\\') {
+        path[1] = L'?';
+    }
+}
+
+/* Recognize a volume-GUID payload after the native DOS-device prefix. */
+static BOOLEAN gvhd_file_is_volume_guid_path(const WCHAR *path)
+{
+    static const WCHAR prefix[] = L"Volume{";
+    size_t i;
+    const WCHAR *close;
+
+    if (path == NULL) {
+        return FALSE;
+    }
+    for (i = 0; prefix[i] != L'\0'; ++i) {
+        if (path[i] == L'\0' || !gvhd_file_ieq_char(path[i], prefix[i])) {
+            return FALSE;
+        }
+    }
+    close = wcschr(path + i, L'}');
+    return close != NULL && (close[1] == L'\\' || close[1] == L'\0');
+}
+
 /* ================================================================ */
 /* 卷 GUID → 盘符映射表（P1-6，审计 B：\\?\Volume{GUID}\ 形态绕过   */
 /* 盘符前缀匹配；短名 8.3 绕过；SUBST 盘符检测）。                    */
 /* ================================================================ */
 
-#define GVHD_VOLMAP_MAX 32u
+#define GVHD_VOLMAP_MAX 128u
 
 static WCHAR g_vol_guid[GVHD_VOLMAP_MAX][64];
 static WCHAR g_vol_drive[GVHD_VOLMAP_MAX];
 static size_t g_vol_count = 0;
 static BOOLEAN g_vol_map_ready = FALSE;
+static BOOLEAN g_subst_drive[26];
+static WCHAR g_drive_device[26][GVHD_FILE_PATH_MAX];
+static BOOLEAN g_drive_device_ready = FALSE;
 
 /* init 时构建一次：FindFirstVolumeW 枚举卷 → GetVolumePathNamesForVolumeNameW
  * 取首个盘符挂载点。卷路径形态 `\\?\Volume{GUID}\`，映射表只存 GUID 段。 */
@@ -216,25 +251,36 @@ static void gvhd_file_build_volume_map(void)
     WCHAR vol[64];
     BOOL more;
 
+    if (g_vol_map_ready) {
+        return;
+    }
     hFind = FindFirstVolumeW(vol, 64);
     if (hFind == INVALID_HANDLE_VALUE) {
         g_vol_map_ready = TRUE;
         return;
     }
     do {
-        WCHAR paths[1024];
-        DWORD len = 1024;
-        if (g_vol_count < GVHD_VOLMAP_MAX &&
-            GetVolumePathNamesForVolumeNameW(vol, paths, len, &len) &&
-            len >= 3 && paths[1] == L':') {
-            const WCHAR *guid = vol + 4; /* 跳过 \\?\ */
-            WCHAR *end = wcschr(guid, L'\\');
-            size_t n = (end != NULL) ? (size_t)(end - guid) : wcslen(guid);
-            if (n > 0 && n < 64) {
-                wcsncpy(g_vol_guid[g_vol_count], guid, n);
-                g_vol_guid[g_vol_count][n] = L'\0';
-                g_vol_drive[g_vol_count] = (WCHAR)towlower(paths[0]);
-                ++g_vol_count;
+        WCHAR paths[4096];
+        DWORD len = (DWORD)(sizeof(paths) / sizeof(paths[0]));
+        const WCHAR *guid = vol + 4; /* 跳过 \\?\ */
+        WCHAR *end = wcschr(guid, L'\\');
+        size_t guid_len = (end != NULL) ? (size_t)(end - guid) : wcslen(guid);
+
+        if (guid_len > 0 && guid_len < 64 &&
+            GetVolumePathNamesForVolumeNameW(vol, paths, len, &len)) {
+            const WCHAR *mount = paths;
+            while (*mount != L'\0') {
+                if (mount[1] == L':' && mount[2] == L'\\' &&
+                    g_vol_count < GVHD_VOLMAP_MAX) {
+                    wcsncpy(g_vol_guid[g_vol_count], guid, guid_len);
+                    g_vol_guid[g_vol_count][guid_len] = L'\0';
+                    g_vol_drive[g_vol_count] =
+                        (mount[0] >= L'A' && mount[0] <= L'Z')
+                            ? (WCHAR)(mount[0] + (L'a' - L'A'))
+                            : mount[0];
+                    ++g_vol_count;
+                }
+                mount += wcslen(mount) + 1;
             }
         }
         more = FindNextVolumeW(hFind, vol, 64);
@@ -253,7 +299,18 @@ static BOOLEAN gvhd_file_volume_to_drive(WCHAR *path, size_t cap)
     }
     for (i = 0; i < g_vol_count; ++i) {
         size_t n = wcslen(g_vol_guid[i]);
-        if (wcsncmp(path, g_vol_guid[i], n) == 0 && path[n] == L'\\') {
+        size_t path_len = wcslen(path);
+        BOOLEAN match = TRUE;
+        if (path_len <= n || path[n] != L'\\') {
+            continue;
+        }
+        for (size_t j = 0; j < n; ++j) {
+            if (!gvhd_file_ieq_char(path[j], g_vol_guid[i][j])) {
+                match = FALSE;
+                break;
+            }
+        }
+        if (match) {
             WCHAR tmp[GVHD_FILE_PATH_MAX];
             size_t rest = wcslen(path + n + 1);
             if (3 + rest >= cap) {
@@ -270,6 +327,104 @@ static BOOLEAN gvhd_file_volume_to_drive(WCHAR *path, size_t cap)
     return FALSE;
 }
 
+static BOOLEAN gvhd_file_has_prefix_ieq(const WCHAR *path, const WCHAR *prefix)
+{
+    size_t i;
+
+    if (path == NULL || prefix == NULL) {
+        return FALSE;
+    }
+    for (i = 0; prefix[i] != L'\0'; ++i) {
+        if (path[i] == L'\0' || !gvhd_file_ieq_char(path[i], prefix[i])) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+/* QueryDosDeviceW provides the inverse spelling needed for callers that skip
+ * the DOS namespace and pass \Device\HarddiskVolume... directly to NtCreateFile. */
+static void gvhd_file_build_drive_device_map(void)
+{
+    WCHAR drive[] = L"A:";
+
+    if (g_drive_device_ready) {
+        return;
+    }
+    for (WCHAR c = L'A'; c <= L'Z'; ++c) {
+        WCHAR device[GVHD_FILE_PATH_MAX];
+        DWORD length;
+
+        drive[0] = c;
+        length = QueryDosDeviceW(drive, device, GVHD_FILE_PATH_MAX);
+        if (length > 0 && length < GVHD_FILE_PATH_MAX) {
+            wcsncpy(g_drive_device[c - L'A'], device, GVHD_FILE_PATH_MAX - 1);
+            g_drive_device[c - L'A'][GVHD_FILE_PATH_MAX - 1] = L'\0';
+        }
+    }
+    g_drive_device_ready = TRUE;
+}
+
+static BOOLEAN gvhd_file_is_local_device_path(const WCHAR *path)
+{
+    static const WCHAR *const prefixes[] = {
+        L"\\Device\\Harddisk",
+        L"\\Device\\CdRom",
+        L"\\Device\\Floppy",
+    };
+
+    for (size_t i = 0; i < sizeof(prefixes) / sizeof(prefixes[0]); ++i) {
+        if (gvhd_file_has_prefix_ieq(path, prefixes[i])) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+/* Convert a native local-storage path to a DOS drive path.  An unmapped local
+ * device is blocked by the caller instead of being passed through as a host
+ * path, which closes the direct-\Device spelling bypass. */
+static BOOLEAN gvhd_file_native_to_dos(WCHAR *path, size_t cap)
+{
+    for (size_t i = 0; i < 26; ++i) {
+        const WCHAR *device = g_drive_device[i];
+        size_t device_len = wcslen(device);
+        size_t path_len = wcslen(path);
+        const WCHAR *rest;
+        WCHAR tmp[GVHD_FILE_PATH_MAX];
+
+        if (device_len == 0 || !gvhd_file_is_local_device_path(device) ||
+            path_len < device_len) {
+            continue;
+        }
+        for (size_t j = 0; j < device_len; ++j) {
+            if (!gvhd_file_ieq_char(path[j], device[j])) {
+                device_len = 0;
+                break;
+            }
+        }
+        if (device_len == 0 ||
+            (path[device_len] != L'\0' && path[device_len] != L'\\')) {
+            continue;
+        }
+        rest = path + device_len;
+        if (wcslen(rest) + 4 >= cap) {
+            return FALSE;
+        }
+        tmp[0] = (WCHAR)(L'a' + i);
+        tmp[1] = L':';
+        tmp[2] = L'\\';
+        if (*rest == L'\0') {
+            tmp[3] = L'\0';
+        } else {
+            wcscpy(tmp + 3, rest + 1);
+        }
+        wcscpy(path, tmp);
+        return TRUE;
+    }
+    return FALSE;
+}
+
 /* init 时检测 SUBST / 网络盘符（QueryDosDeviceW 返回 \??\ 前缀即非设备盘）。
  * 不自动展开（SUBST 目标可能仍在宿主），只记警告供排错。 */
 static void gvhd_file_warn_subst_drives(void)
@@ -280,7 +435,8 @@ static void gvhd_file_warn_subst_drives(void)
         drive[0] = c;
         if (QueryDosDeviceW(drive, device, 256) > 0 &&
             wcsncmp(device, L"\\??\\", 4) == 0) {
-            gvhd_log_write(L"FILE_SUBST_DRIVE drive=%c target=%s", c, device);
+            g_subst_drive[c - L'A'] = TRUE;
+            gvhd_log_write(L"FILE_SUBST_DRIVE drive=%c target=%ls", c, device);
         }
     }
 }
@@ -293,6 +449,14 @@ static BOOLEAN gvhd_file_system_passthrough(const WCHAR *path)
         L"C:\\Program Files (x86)",
     };
 
+    if (path != NULL && path[1] == L':' && path[0] >= L'A' && path[0] <= L'Z' &&
+        g_subst_drive[path[0] - L'A']) {
+        return FALSE;
+    }
+    if (path != NULL && path[1] == L':' && path[0] >= L'a' && path[0] <= L'z' &&
+        g_subst_drive[path[0] - L'a']) {
+        return FALSE;
+    }
     for (size_t i = 0; i < sizeof(prefixes) / sizeof(prefixes[0]); ++i) {
         const WCHAR *rest;
         if (gvhd_file_under(path, prefixes[i], &rest)) {
@@ -326,6 +490,91 @@ static WCHAR gvhd_file_game_drive(void)
 static BOOLEAN gvhd_file_is_drive_path(const WCHAR *path)
 {
     return path[0] != L'\0' && path[1] == L':' && path[2] == L'\\';
+}
+
+/* Normalize a rooted DOS path lexically before applying policy.  This removes
+ * dot segments without consulting the filesystem, so C:\\Windows\\..\\Users
+ * cannot be classified as an OS path merely because of its spelling. */
+static BOOLEAN gvhd_file_normalize_dos(WCHAR *path, size_t cap)
+{
+    WCHAR normalized[GVHD_FILE_PATH_MAX];
+    size_t starts[GVHD_FILE_PATH_MAX / 2u];
+    size_t count = 0;
+    size_t out_len = 3;
+    size_t i = 3;
+    size_t input_len;
+
+    if (path == NULL || cap < 4) {
+        return FALSE;
+    }
+    input_len = wcslen(path);
+    if (input_len >= cap) {
+        return FALSE;
+    }
+    for (size_t j = 0; j < input_len; ++j) {
+        if (path[j] == L'/') {
+            path[j] = L'\\';
+        }
+    }
+    if (!gvhd_file_is_drive_path(path)) {
+        return FALSE;
+    }
+    normalized[0] = path[0];
+    normalized[1] = L':';
+    normalized[2] = L'\\';
+    normalized[3] = L'\0';
+    while (i <= input_len) {
+        size_t start;
+        size_t segment_len;
+
+        while (i < input_len && path[i] == L'\\') {
+            ++i;
+        }
+        if (i >= input_len) {
+            break;
+        }
+        start = i;
+        while (i < input_len && path[i] != L'\\') {
+            ++i;
+        }
+        segment_len = i - start;
+        if (segment_len == 1 && path[start] == L'.') {
+            continue;
+        }
+        if (segment_len == 2 && path[start] == L'.' && path[start + 1] == L'.') {
+            if (count > 0) {
+                out_len = starts[--count];
+                normalized[out_len] = L'\0';
+            }
+            continue;
+        }
+        if (count >= sizeof(starts) / sizeof(starts[0]) ||
+            out_len + (out_len > 3 ? 1u : 0u) + segment_len >= cap) {
+            return FALSE;
+        }
+        starts[count++] = out_len;
+        if (out_len > 3) {
+            normalized[out_len++] = L'\\';
+        }
+        memcpy(normalized + out_len, path + start, segment_len * sizeof(WCHAR));
+        out_len += segment_len;
+        normalized[out_len] = L'\0';
+    }
+    memcpy(path, normalized, (out_len + 1) * sizeof(WCHAR));
+    return TRUE;
+}
+
+static BOOLEAN gvhd_file_resolve_root(HANDLE root, WCHAR *out, size_t cap)
+{
+    DWORD n;
+
+    if (root == NULL || out == NULL || cap < 2 || cap > MAXDWORD) {
+        return FALSE;
+    }
+    ++g_file_reentry;
+    n = GetFinalPathNameByHandleW(root, out, (DWORD)cap, 0);
+    --g_file_reentry;
+    return n > 0 && n < cap;
 }
 
 /* Build a DOS path under GameData. Return FALSE for passthrough paths. */
@@ -404,6 +653,7 @@ static BOOLEAN gvhd_file_build_target(const WCHAR *source, WCHAR *target,
 
 struct gvhd_file_rewritten {
     BOOLEAN active;
+    BOOLEAN blocked;
     OBJECT_ATTRIBUTES oa;
     UNICODE_STRING name;
     WCHAR source_native[GVHD_FILE_PATH_MAX];
@@ -415,40 +665,128 @@ struct gvhd_file_rewritten {
 static void gvhd_file_eval_oa(const OBJECT_ATTRIBUTES *input,
                               struct gvhd_file_rewritten *rw)
 {
+    WCHAR relative[GVHD_FILE_PATH_MAX];
+    WCHAR root[GVHD_FILE_PATH_MAX];
     size_t native_prefix;
     size_t target_len;
 
     memset(rw, 0, sizeof(*rw));
-    if (input == NULL || input->RootDirectory != NULL ||
-        input->ObjectName == NULL ||
-        !gvhd_file_copy_unicode(rw->source_native, GVHD_FILE_PATH_MAX,
-                                input->ObjectName)) {
+    if (input == NULL || input->ObjectName == NULL) {
         return;
     }
-    native_prefix = gvhd_file_native_prefix_len(rw->source_native);
-    if (!gvhd_file_copy_unicode(rw->source_dos, GVHD_FILE_PATH_MAX,
-                                input->ObjectName) ||
-        native_prefix >= wcslen(rw->source_dos)) {
+    if (input->RootDirectory != NULL) {
+        if (!gvhd_file_copy_unicode(relative, GVHD_FILE_PATH_MAX,
+                                    input->ObjectName)) {
+            rw->blocked = TRUE;
+            return;
+        }
+        /* A leading backslash makes ObjectName absolute and causes Windows to
+         * ignore RootDirectory.  Joining it to the supplied root would both
+         * misresolve the file and permit a device path to evade normalization. */
+        if (relative[0] == L'\\') {
+            if (!gvhd_file_copy_unicode(rw->source_native, GVHD_FILE_PATH_MAX,
+                                        input->ObjectName)) {
+                rw->blocked = TRUE;
+                return;
+            }
+        } else {
+            if (!gvhd_file_resolve_root(input->RootDirectory, root,
+                                        GVHD_FILE_PATH_MAX)) {
+                rw->blocked = TRUE;
+                return;
+            }
+            size_t len = 0;
+            size_t root_len = wcslen(root);
+            const WCHAR *rel = relative;
+
+            if (!gvhd_file_append(rw->source_native, GVHD_FILE_PATH_MAX,
+                                  &len, root) || root_len == 0) {
+                rw->blocked = TRUE;
+                return;
+            }
+            while (len > 0 && rw->source_native[len - 1] == L'\\') {
+                --len;
+                rw->source_native[len] = L'\0';
+            }
+            while (*rel == L'\\' || *rel == L'/') {
+                ++rel;
+            }
+            if (*rel != L'\0' &&
+                (!gvhd_file_append_char(rw->source_native, GVHD_FILE_PATH_MAX,
+                                         &len, L'\\') ||
+                 !gvhd_file_append(rw->source_native, GVHD_FILE_PATH_MAX,
+                                   &len, rel))) {
+                rw->blocked = TRUE;
+                return;
+            }
+        }
+    } else if (!gvhd_file_copy_unicode(rw->source_native, GVHD_FILE_PATH_MAX,
+                                       input->ObjectName)) {
         return;
+    }
+    gvhd_file_nativeize_extended_prefix(rw->source_native);
+    if (gvhd_file_is_local_device_path(rw->source_native)) {
+        if (!g_drive_device_ready ||
+            !gvhd_file_native_to_dos(rw->source_native, GVHD_FILE_PATH_MAX)) {
+            rw->blocked = TRUE;
+            gvhd_log_write(L"FILE_NATIVE_DEVICE_BLOCKED path=%ls", rw->source_native);
+            return;
+        }
+    }
+    native_prefix = gvhd_file_native_prefix_len(rw->source_native);
+    {
+        size_t source_len = wcslen(rw->source_native);
+        if (native_prefix >= source_len || source_len >= GVHD_FILE_PATH_MAX) {
+            return;
+        }
+        memcpy(rw->source_dos, rw->source_native,
+               (source_len + 1) * sizeof(WCHAR));
     }
     /* The second copy above is intentionally replaced with the DOS suffix. */
     memmove(rw->source_dos, rw->source_native + native_prefix,
             (wcslen(rw->source_native + native_prefix) + 1) * sizeof(WCHAR));
 
+    /* Win32's extended UNC spelling is not a drive path.  Preserve UNC
+     * passthrough semantics after converting it to the ordinary DOS spelling. */
+    if (native_prefix > 0 && wcslen(rw->source_dos) >= 4 &&
+        gvhd_file_ieq_char(rw->source_dos[0], L'U') &&
+        gvhd_file_ieq_char(rw->source_dos[1], L'N') &&
+        gvhd_file_ieq_char(rw->source_dos[2], L'C') &&
+        rw->source_dos[3] == L'\\') {
+        size_t unc_len = wcslen(rw->source_dos + 4);
+        if (unc_len + 3 >= GVHD_FILE_PATH_MAX) {
+            return;
+        }
+        memmove(rw->source_dos + 2, rw->source_dos + 4,
+                (unc_len + 1) * sizeof(WCHAR));
+        rw->source_dos[0] = L'\\';
+        rw->source_dos[1] = L'\\';
+    }
+
     /* P1-6：卷 GUID 形态（\\?\Volume{GUID}\...）经映射表转盘符形态；
      * 转换后 target 直接用 DOS 形态（卷 GUID 前缀不适用于 GameData 目标）。 */
-    if (native_prefix > 0 &&
-        gvhd_file_volume_to_drive(rw->source_dos, GVHD_FILE_PATH_MAX)) {
-        native_prefix = 0;
+    if (gvhd_file_is_volume_guid_path(rw->source_dos) &&
+        !gvhd_file_volume_to_drive(rw->source_dos, GVHD_FILE_PATH_MAX)) {
+        /* An unmapped volume GUID must not fall through as a host path. */
+        rw->blocked = TRUE;
+        return;
     }
-    /* P1-6：8.3 短名展开（仅含 '~' 的路径段触发；GetLongPathNameW 走
-     * NtQueryDirectoryFile，不在本钩子拦截面内，无重入风险）。 */
+    if (!gvhd_file_normalize_dos(rw->source_dos, GVHD_FILE_PATH_MAX)) {
+        return;
+    }
+    /* P1-6：8.3 短名展开。The API may call back through the file hooks, so
+     * guard it explicitly even though normal MinHook resolution is indirect. */
     if (wcschr(rw->source_dos, L'~') != NULL) {
         WCHAR long_path[GVHD_FILE_PATH_MAX];
+        ++g_file_reentry;
         DWORD n = GetLongPathNameW(rw->source_dos, long_path,
                                    GVHD_FILE_PATH_MAX);
+        --g_file_reentry;
         if (n > 0 && n < GVHD_FILE_PATH_MAX) {
             wcscpy(rw->source_dos, long_path);
+            if (!gvhd_file_normalize_dos(rw->source_dos, GVHD_FILE_PATH_MAX)) {
+                return;
+            }
         }
     }
 
@@ -457,17 +795,26 @@ static void gvhd_file_eval_oa(const OBJECT_ATTRIBUTES *input,
         return;
     }
     target_len = wcslen(rw->target_dos);
-    if (native_prefix + target_len + 1 > GVHD_FILE_PATH_MAX) {
-        return;
+    {
+        size_t target_prefix = native_prefix > 0 ? native_prefix : 4;
+        if (target_prefix + target_len + 1 > GVHD_FILE_PATH_MAX) {
+            return;
+        }
+        if (native_prefix > 0) {
+            memcpy(rw->target_native, rw->source_native,
+                   native_prefix * sizeof(WCHAR));
+        } else {
+            memcpy(rw->target_native, L"\\??\\", 4 * sizeof(WCHAR));
+        }
+        memcpy(rw->target_native + target_prefix, rw->target_dos,
+               (target_len + 1) * sizeof(WCHAR));
     }
-    memcpy(rw->target_native, rw->source_native, native_prefix * sizeof(WCHAR));
-    memcpy(rw->target_native + native_prefix, rw->target_dos,
-           (target_len + 1) * sizeof(WCHAR));
 
     rw->name.Buffer = rw->target_native;
     rw->name.Length = (USHORT)(wcslen(rw->target_native) * sizeof(WCHAR));
     rw->name.MaximumLength = (USHORT)(GVHD_FILE_PATH_MAX * sizeof(WCHAR));
     rw->oa = *input;
+    rw->oa.RootDirectory = NULL;
     rw->oa.ObjectName = &rw->name;
     rw->active = TRUE;
 }
@@ -829,6 +1176,9 @@ static NTSTATUS NTAPI Hook_NtCreateFile(
                                     EaBuffer, EaLength);
     }
     gvhd_file_eval_oa(ObjectAttributes, &rw);
+    if (rw.blocked) {
+        return GVHD_STATUS_ACCESS_DENIED;
+    }
     if (!rw.active) {
         return pfnOrig_NtCreateFile(FileHandle, DesiredAccess, ObjectAttributes,
                                     IoStatusBlock, AllocationSize, FileAttributes,
@@ -916,6 +1266,9 @@ static NTSTATUS NTAPI Hook_NtOpenFile(
                                   IoStatusBlock, ShareAccess, OpenOptions);
     }
     gvhd_file_eval_oa(ObjectAttributes, &rw);
+    if (rw.blocked) {
+        return GVHD_STATUS_ACCESS_DENIED;
+    }
     if (!rw.active) {
         return pfnOrig_NtOpenFile(FileHandle, DesiredAccess, ObjectAttributes,
                                   IoStatusBlock, ShareAccess, OpenOptions);
@@ -1105,6 +1458,9 @@ static NTSTATUS NTAPI Hook_NtQueryAttributesFile(
         return pfnOrig_NtQueryAttributesFile(ObjectAttributes, FileInformation);
     }
     gvhd_file_eval_oa(ObjectAttributes, &rw);
+    if (rw.blocked) {
+        return GVHD_STATUS_ACCESS_DENIED;
+    }
     if (!rw.active) {
         return pfnOrig_NtQueryAttributesFile(ObjectAttributes, FileInformation);
     }
@@ -1131,6 +1487,9 @@ static NTSTATUS NTAPI Hook_NtQueryFullAttributesFile(
         return pfnOrig_NtQueryFullAttributesFile(ObjectAttributes, FileInformation);
     }
     gvhd_file_eval_oa(ObjectAttributes, &rw);
+    if (rw.blocked) {
+        return GVHD_STATUS_ACCESS_DENIED;
+    }
     if (!rw.active) {
         return pfnOrig_NtQueryFullAttributesFile(ObjectAttributes, FileInformation);
     }
@@ -1155,6 +1514,9 @@ static NTSTATUS NTAPI Hook_NtDeleteFile(POBJECT_ATTRIBUTES ObjectAttributes)
         return pfnOrig_NtDeleteFile(ObjectAttributes);
     }
     gvhd_file_eval_oa(ObjectAttributes, &rw);
+    if (rw.blocked) {
+        return GVHD_STATUS_ACCESS_DENIED;
+    }
     if (!rw.active) {
         return pfnOrig_NtDeleteFile(ObjectAttributes);
     }
@@ -1252,6 +1614,7 @@ uint32_t gvhd_install_file_hooks(void)
 
     /* P1-6：卷 GUID 映射表与 SUBST 检测（无递归风险：此时规则已装，
      * 卷 GUID/盘符路径不匹配重写规则，FindFirstVolumeW 等原样执行）。 */
+    gvhd_file_build_drive_device_map();
     gvhd_file_build_volume_map();
     gvhd_file_warn_subst_drives();
 

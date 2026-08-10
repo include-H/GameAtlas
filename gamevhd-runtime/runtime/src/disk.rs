@@ -132,6 +132,62 @@ pub fn is_parent_mismatch(code: u32) -> bool {
     )
 }
 
+fn canonical_cred_target(server: &str) -> String {
+    const DOS_EXT_UNC: &str = "\\\\?\\UNC\\";
+    const NT_UNC: &str = "\\??\\UNC\\";
+    let raw = server.trim().replace('/', "\\");
+    if raw.len() > 4096 {
+        return format!("GameVHD_invalid_{:016x}", fnv1a64(server.as_bytes()));
+    }
+    let unc = if raw
+        .get(..DOS_EXT_UNC.len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(DOS_EXT_UNC))
+    {
+        format!("\\\\{}", &raw[DOS_EXT_UNC.len()..])
+    } else if raw
+        .get(..NT_UNC.len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(NT_UNC))
+    {
+        format!("\\\\{}", &raw[NT_UNC.len()..])
+    } else {
+        raw.clone()
+    };
+    if let Some(rest) = unc.strip_prefix("\\\\") {
+        let mut parts = Vec::new();
+        for part in rest.split('\\') {
+            if part.is_empty() || part == "." {
+                continue;
+            }
+            if part == ".."
+                || part.chars().any(|c| c.is_control() || c == ':' || c == '"')
+            {
+                return format!("GameVHD_invalid_{:016x}", fnv1a64(server.as_bytes()));
+            }
+            parts.push(part.to_lowercase());
+        }
+        if parts.len() >= 2 {
+            return format!("GameVHD_unc_{}", parts.join("/"));
+        }
+    }
+    if !raw.is_empty()
+        && raw
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+    {
+        return format!("GameVHD_name_{}", raw.to_lowercase());
+    }
+    format!("GameVHD_invalid_{:016x}", fnv1a64(server.as_bytes()))
+}
+
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
+}
+
 // ---- 跨平台参数构造 ----
 
 /// `NETRESOURCEW` 字段规格（构造结果可跨平台断言，实际 FFI 填充见 imp）。
@@ -681,7 +737,7 @@ mod imp {
 
     /// 读取 SMB 凭据（Windows 凭据管理器，target `GameVHD_<server>`）。
     /// 返回 (用户名, 密码)；未存储返回 None。
-    pub fn read_smb_cred(server: &str) -> Option<(String, String)> {
+    pub fn read_smb_cred(server: &str) -> Result<Option<(String, String)>, DiskError> {
         use crate::winffi::{CredReadW, CRED_TYPE_GENERIC};
 
         let target = cred_target(server);
@@ -689,18 +745,35 @@ mod imp {
         let mut cred_ptr: *mut crate::winffi::CredentialW = std::ptr::null_mut();
         let ok = unsafe { CredReadW(target_wide.as_ptr(), CRED_TYPE_GENERIC, 0, &mut cred_ptr) };
         if ok == 0 {
-            return None;
+            let code = unsafe { crate::winffi::GetLastError() };
+            if code == crate::winffi::ERROR_NOT_FOUND {
+                return Ok(None);
+            }
+            return Err(DiskError::new(
+                classify_win32_error(code),
+                format!("CredReadW({target}) 失败: {code}"),
+            ));
+        }
+        if cred_ptr.is_null() {
+            return Err(DiskError::new(
+                DiskErrorKind::Other(0),
+                format!("CredReadW({target}) 返回空凭据"),
+            ));
         }
         let cred = unsafe { &*cred_ptr };
         let user = unsafe { from_wide(cred.user_name) };
-        let pass = if cred.credential_blob_size > 0 && !cred.credential_blob.is_null() {
-            let bytes = unsafe { std::slice::from_raw_parts(cred.credential_blob, cred.credential_blob_size as usize) };
-            String::from_utf8_lossy(bytes).into_owned()
+        let (pass, blob_size, blob_ptr) = if cred.credential_blob_size > 0 && !cred.credential_blob.is_null() {
+            let size = cred.credential_blob_size as usize;
+            let bytes = unsafe { std::slice::from_raw_parts(cred.credential_blob, size) };
+            (String::from_utf8_lossy(bytes).into_owned(), size, cred.credential_blob)
         } else {
-            String::new()
+            (String::new(), 0, std::ptr::null_mut())
         };
+        if !blob_ptr.is_null() {
+            unsafe { clear_secret_bytes(std::slice::from_raw_parts_mut(blob_ptr, blob_size)) };
+        }
         unsafe { crate::winffi::CredFree(cred_ptr as *mut u8) };
-        Some((user, pass))
+        Ok(Some((user, pass)))
     }
 
     /// 写入 SMB 凭据（Windows 凭据管理器，target `GameVHD_<server>`）。
@@ -710,6 +783,12 @@ mod imp {
         let target = cred_target(server);
         let target_wide = to_wide(&target);
         let user_wide = to_wide(user);
+        if pass.len() > u32::MAX as usize {
+            return Err(DiskError::new(
+                DiskErrorKind::Other(0),
+                "SMB 密码过长",
+            ));
+        }
         let mut blob: Vec<u8> = pass.as_bytes().to_vec();
         let cred = CredentialW {
             flags: 0,
@@ -726,7 +805,7 @@ mod imp {
             user_name: user_wide.as_ptr() as *mut u16,
         };
         let code = unsafe { CredWriteW(&cred as *const CredentialW, 0) };
-        // blob 在 CredWriteW 返回后由本函数栈持有至函数退出，无需提前清零。
+        clear_secret_bytes(&mut blob);
         if code == 0 {
             return Err(DiskError::new(
                 classify_win32_error(unsafe { crate::winffi::GetLastError() }),
@@ -756,10 +835,18 @@ mod imp {
         Ok(())
     }
 
-    /// 凭据 target 名：`GameVHD_<server>`，server 去尾部反斜杠（`\\srv\share\` → `\\srv\share`）。
+    /// Canonical credential target.  UNC spelling, slash direction, case and
+    /// trailing `.` components map to one target; `..` and malformed names
+    /// map to an unguessable invalid bucket instead of becoming a path-like
+    /// target that can alias another server/share.
     pub fn cred_target(server: &str) -> String {
-        let trimmed = server.trim_end_matches('\\');
-        format!("GameVHD_{trimmed}")
+        super::canonical_cred_target(server)
+    }
+
+    fn clear_secret_bytes(bytes: &mut [u8]) {
+        for byte in bytes {
+            unsafe { std::ptr::write_volatile(byte, 0) };
+        }
     }
 
     /// 创建差分盘（parent = UNC，格式按 parent 扩展名 VHD/VHDX 自适应）。
@@ -869,7 +956,7 @@ mod imp {
         };
         if code != 0 {
             return Err(DiskError::new(
-                classify_win32_error(code),
+                DiskErrorKind::VhdOpenFailed(code),
                 format!("OpenVirtualDisk({path}) 失败: {code:#x}"),
             ));
         }
@@ -926,24 +1013,23 @@ mod imp {
     pub fn detach_if_attached(vhd_path: &str) -> Result<bool, DiskError> {
         let handle = match open_vhd(vhd_path) {
             Ok(h) => h,
-            Err(_) => return Ok(false),
-        };
-        let mut buf = [0u16; 260];
-        let mut size: DWORD = (buf.len() * 2) as DWORD;
-        let rc = unsafe { GetVirtualDiskPhysicalPath(handle, &mut size, buf.as_mut_ptr()) };
-        if rc == 0 {
-            let code = unsafe { DetachVirtualDisk(handle, DETACH_VIRTUAL_DISK_FLAG_NONE, 0) };
-            unsafe { CloseHandle(handle) };
-            if code != 0 && code != 0xC03A_001C {
-                return Err(DiskError::new(
-                    classify_win32_error(code),
-                    format!("DetachVirtualDisk({vhd_path}) 失败: {code:#x}"),
-                ));
+            Err(e) if matches!(e.kind, DiskErrorKind::VhdOpenFailed(2 | 3 | 0xC03A_000D)) => {
+                return Ok(false)
             }
-            return Ok(true);
-        }
+            Err(e) => return Err(e),
+        };
+        let code = unsafe { DetachVirtualDisk(handle, DETACH_VIRTUAL_DISK_FLAG_NONE, 0) };
         unsafe { CloseHandle(handle) };
-        Ok(false)
+        if code == 0 {
+            Ok(true)
+        } else if code == 0xC03A_001C {
+            Ok(false)
+        } else {
+            Err(DiskError::new(
+                classify_win32_error(code),
+                format!("DetachVirtualDisk({vhd_path}) 失败: {code:#x}"),
+            ))
+        }
     }
 
     /// 查询 attach 后 VHD 的物理盘路径（`\\?\PhysicalDriveN`）。
@@ -1266,8 +1352,11 @@ pub fn detach_if_attached(_vhd_path: &str) -> Result<bool, DiskError> {
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn read_smb_cred(_server: &str) -> Option<(String, String)> {
-    None
+pub fn read_smb_cred(_server: &str) -> Result<Option<(String, String)>, DiskError> {
+    Err(DiskError::new(
+        DiskErrorKind::UnsupportedPlatform,
+        "凭据管理器仅支持 Windows",
+    ))
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -1288,7 +1377,7 @@ pub fn delete_smb_cred(_server: &str) -> Result<(), DiskError> {
 
 #[cfg(not(target_os = "windows"))]
 pub fn cred_target(server: &str) -> String {
-    format!("GameVHD_{}", server.trim_end_matches('\\'))
+    canonical_cred_target(server)
 }
 
 // ---- 单测（跨平台纯逻辑；Windows 专属布局断言双 target 编译时同样生效） ----
@@ -1453,5 +1542,32 @@ mod tests {
         let r = smb_connect_with_retry(0, || Ok(()));
         assert!(r.is_err());
         assert_eq!(r.unwrap_err().kind, DiskErrorKind::Other(0));
+    }
+
+    #[test]
+    fn credential_target_normalizes_unc_spellings_without_aliasing() {
+        let canonical = cred_target(r"\\Server\Share");
+        assert_eq!(canonical, "GameVHD_unc_server/share");
+        assert_eq!(cred_target(r"\\SERVER/./share/"), canonical);
+        assert_eq!(
+            cred_target(r"\\?\UNC\SERVER\SHARE"),
+            canonical,
+            "Win32 extended UNC must share the canonical target"
+        );
+        assert_eq!(
+            cred_target(r"\??\UNC\SERVER\SHARE"),
+            canonical,
+            "NT native UNC must share the canonical target"
+        );
+        let invalid = cred_target(r"\\server\share\..\other");
+        assert!(invalid.starts_with("GameVHD_invalid_"));
+        assert_ne!(invalid, canonical);
+    }
+
+    #[test]
+    fn credential_target_unicode_input_cannot_panic() {
+        let result = std::panic::catch_unwind(|| cred_target("你好\\server\\share"));
+        assert!(result.is_ok());
+        assert!(result.unwrap().starts_with("GameVHD_invalid_"));
     }
 }

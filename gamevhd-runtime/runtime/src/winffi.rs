@@ -30,6 +30,7 @@ pub const PAGE_READWRITE: u32 = 0x0000_0004;
 pub const PAGE_EXECUTE_READWRITE: u32 = 0x0000_0040;
 pub const INFINITE: u32 = 0xFFFF_FFFF;
 pub const WAIT_OBJECT_0: u32 = 0;
+pub const WAIT_ABANDONED_0: u32 = 0x0000_0080;
 pub const WAIT_TIMEOUT: u32 = 0x0000_0102;
 pub const WAIT_FAILED: u32 = 0xFFFF_FFFF;
 pub const INVALID_HANDLE_VALUE: usize = usize::MAX;
@@ -63,6 +64,7 @@ pub const ERROR_BUSY: LSTATUS = 170;
 pub const SE_PRIVILEGE_ENABLED: u32 = 0x0000_0002;
 pub const TOKEN_QUERY: u32 = 0x0000_0008;
 pub const TOKEN_ADJUST_PRIVILEGES: u32 = 0x0000_0020;
+pub const TOKEN_USER: u32 = 1;
 /// 特权列表有项未被启用（AdjustTokenPrivileges 返回 TRUE 但仍需检查）。
 pub const ERROR_NOT_ALL_ASSIGNED: u32 = 1300;
 
@@ -169,6 +171,12 @@ pub struct LuidAndAttributes {
     pub attributes: u32,
 }
 
+#[repr(C)]
+pub struct FileTime {
+    pub low: u32,
+    pub high: u32,
+}
+
 /// `TOKEN_PRIVILEGES`（单特权版本；`Privileges` 为 C 的 ANYSIZE_ARRAY=1）。
 #[repr(C)]
 pub struct TokenPrivileges {
@@ -261,11 +269,21 @@ extern "system" {
 
     pub fn GetExitCodeProcess(h_process: HANDLE, lp_exit_code: *mut DWORD) -> BOOL;
 
+    pub fn GetProcessTimes(
+        h_process: HANDLE,
+        creation_time: *mut FileTime,
+        exit_time: *mut FileTime,
+        kernel_time: *mut FileTime,
+        user_time: *mut FileTime,
+    ) -> BOOL;
+
     pub fn CreateMutexW(
         lp_mutex_attributes: *const u8,
         b_initial_owner: BOOL,
         lp_name: *const u16,
     ) -> HANDLE;
+
+    pub fn ReleaseMutex(h_mutex: HANDLE) -> BOOL;
 
     pub fn TerminateProcess(h_process: HANDLE, u_exit_code: u32) -> BOOL;
 
@@ -331,6 +349,16 @@ extern "system" {
         desired_access: DWORD,
         token_handle: *mut HANDLE,
     ) -> BOOL;
+
+    pub fn GetTokenInformation(
+        token_handle: HANDLE,
+        token_information_class: DWORD,
+        token_information: *mut u8,
+        token_information_length: DWORD,
+        return_length: *mut DWORD,
+    ) -> BOOL;
+
+    pub fn GetLengthSid(sid: *const u8) -> DWORD;
 
     pub fn AdjustTokenPrivileges(
         token_handle: HANDLE,

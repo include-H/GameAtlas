@@ -121,7 +121,12 @@ fn resolve_game_data_root(
     user_namespace: bool,
 ) -> Result<String, String> {
     if !configured_root.trim().is_empty() {
-        return Ok(abs_path(volume_root, configured_root));
+        let root = abs_path(volume_root, configured_root);
+        if user_namespace {
+            let tag = user_tag().ok_or_else(|| "无法确定当前用户，拒绝启用用户命名空间".to_string())?;
+            return Ok(join_windows_path(&root, &format!("user_{tag}")));
+        }
+        return Ok(root);
     }
     if external_base.trim().is_empty() {
         return Ok(join_windows_path(volume_root, "GameData"));
@@ -134,25 +139,85 @@ fn resolve_game_data_root(
     };
     let name = validate_game_data_name(name)?;
     let name = if user_namespace {
-        format!("{name}_{}", user_tag())
+        let tag = user_tag().ok_or_else(|| "无法确定当前用户，拒绝启用用户命名空间".to_string())?;
+        format!("{name}_{tag}")
     } else {
         name
     };
     Ok(join_windows_path(&abs_path(volume_root, external_base), &name))
 }
 
-/// 用户标识（FNV-1a 64 位哈希，小写 hex 8 位）：Windows 用户名的稳定短摘要。
-/// 不用明文用户名（目录名可含非法字符且泄露身份）；同机同用户哈希稳定。
-fn user_tag() -> String {
-    let user = std::env::var("USERNAME")
-        .or_else(|_| std::env::var("USER"))
-        .unwrap_or_default();
+/// 用户标识（FNV-1a 64 位哈希，小写 hex）：Windows 当前 token 的 SID
+/// 稳定短摘要。不使用 USERNAME/USER 环境变量，避免启动环境伪造身份。
+fn user_tag() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        return windows_user_tag();
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let identity = std::env::var("USER").unwrap_or_else(|_| "unknown".into());
+        return Some(user_tag_from_bytes(identity.to_lowercase().as_bytes()));
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn windows_user_tag() -> Option<String> {
+    use crate::winffi;
+
+    let mut token = 0;
+    let opened = unsafe {
+        winffi::OpenProcessToken(winffi::GetCurrentProcess(), winffi::TOKEN_QUERY, &mut token)
+    };
+    if opened == 0 {
+        return None;
+    }
+
+    let mut needed = 0;
+    let _ = unsafe {
+        winffi::GetTokenInformation(token, winffi::TOKEN_USER, std::ptr::null_mut(), 0, &mut needed)
+    };
+    if needed == 0 {
+        unsafe { winffi::CloseHandle(token) };
+        return None;
+    }
+    let mut buffer = vec![0u8; needed as usize];
+    let ok = unsafe {
+        winffi::GetTokenInformation(
+            token,
+            winffi::TOKEN_USER,
+            buffer.as_mut_ptr(),
+            needed,
+            &mut needed,
+        )
+    };
+    if ok == 0 {
+        unsafe { winffi::CloseHandle(token) };
+        return None;
+    }
+    let sid = unsafe { std::ptr::read_unaligned(buffer.as_ptr() as *const *const u8) };
+    let result = if sid.is_null() {
+        None
+    } else {
+        let sid_len = unsafe { winffi::GetLengthSid(sid) };
+        if sid_len == 0 {
+            None
+        } else {
+            let bytes = unsafe { std::slice::from_raw_parts(sid, sid_len as usize) };
+            Some(user_tag_from_bytes(bytes))
+        }
+    };
+    unsafe { winffi::CloseHandle(token) };
+    result
+}
+
+fn user_tag_from_bytes(bytes: &[u8]) -> String {
     let mut hash: u64 = 0xcbf29ce484222325;
-    for b in user.to_lowercase().bytes() {
-        hash ^= u64::from(b);
+    for byte in bytes {
+        hash ^= u64::from(*byte);
         hash = hash.wrapping_mul(0x100000001b3);
     }
-    format!("{hash:08x}")
+    format!("{hash:016x}")
 }
 
 /// hive 未单独指定时，跟随最终 GameData 根，确保外部状态库完整可同步。
@@ -208,6 +273,29 @@ fn log_path_for(game_id: &str, local_app_data: &str) -> String {
     format!("{base}\\GameAtlas\\logs\\{game_id}.log")
 }
 
+/// The launcher itself injects the selected root executable, so child-only
+/// detection is insufficient when the selected executable is an anti-cheat
+/// bootstrapper.  Refuse to launch that target through the injector; this is
+/// detection and containment, not an attempt to evade the component.
+fn is_anticheat_executable(path: &Path) -> bool {
+    let path_text = path.to_string_lossy();
+    let name = path_text.rsplit(['\\', '/']).next().unwrap_or_default().to_ascii_lowercase();
+    matches!(
+        name.as_str(),
+        "easyanticheat.exe"
+            | "easyanticheatservice.exe"
+            | "beservice.exe"
+            | "be.exe"
+            | "vgc.exe"
+            | "vanguardservice.exe"
+            | "anticheat.exe"
+            | "anticheatlauncher.exe"
+            | "steamservice.exe"
+    ) || ["easyanticheat", "battleye", "epicgameslauncher", "vgk"]
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
+}
+
 #[cfg(target_os = "windows")]
 mod win {
     use super::*;
@@ -243,18 +331,27 @@ mod win {
             if let Err(e) = self.detach_hive() {
                 crate::log_warn!("run 清理：hive 卸载失败（残留可 cleanup 处理）: {e}");
             }
-            // 崩溃恢复语义：无论当前 state，直接归 clean（绕过状态机校验）。
-            if let Ok(mut bf) = BoxFile::load(&self.box_path) {
-                bf.state = BoxState::Clean;
-                if let Err(e) = bf.save(&self.box_path) {
-                    crate::log_warn!("run 清理：box.json 状态回滚失败: {e}");
-                }
-            }
-            // 宿主权威状态按代数清除（generation 不匹配时静默跳过，避免
-            // 旧实例清理覆盖新运行记录）。
+            // The host record is the ownership check.  An old cleanup must
+            // not reset a box or state file belonging to a newer generation.
             if let Some((path, generation, game_id)) = self.host_state.take() {
-                if let Err(e) = crate::hoststate::mark_clean(&path, generation, &game_id) {
-                    crate::log_warn!("run 清理：宿主状态清除失败: {e}");
+                match crate::hoststate::mark_clean_for_box(
+                    &path,
+                    generation,
+                    &game_id,
+                    self.box_path.to_str(),
+                ) {
+                    Ok(true) => {
+                        if let Ok(mut bf) = BoxFile::load(&self.box_path) {
+                            bf.state = BoxState::Clean;
+                            if let Err(e) = bf.save(&self.box_path) {
+                                crate::log_warn!("run 清理：box.json 状态回滚失败: {e}");
+                            }
+                        }
+                    }
+                    Ok(false) => crate::log_warn!(
+                        "run 清理：generation/游戏/box 不匹配，跳过旧清理"
+                    ),
+                    Err(e) => crate::log_warn!("run 清理：宿主状态清除失败: {e}"),
                 }
             }
         }
@@ -270,6 +367,11 @@ mod win {
         let manifest: Manifest = load_manifest_file(&launcher)
             .map_err(|e| format!("启动器无卡带配置（非《title》.exe 形态）: {e}"))?;
         let launcher_dir = launcher.parent().unwrap_or(Path::new(".")).to_path_buf();
+
+        // Lock the user-supplied resource before reading game-writable
+        // metadata.  The game-id lock below is an additional per-game layer.
+        let _box_lock = process::acquire_box_mutex(box_path)
+            .map_err(|e| format!("box 资源互斥锁获取失败: {e}"))?;
 
         // 2. 读取 box.json（VHD 内 `GameData\box.json`）。
         let box_path_buf = PathBuf::from(box_path);
@@ -289,17 +391,31 @@ mod win {
 
         // 3. 并发互斥锁：同 game_id 已有实例运行则拒绝双开（审计 C1）。
         let game_id = bf.game_id.clone();
-        let _run_lock = crate::process::acquire_run_mutex(&game_id)
+        let _run_lock = process::acquire_run_mutex(&game_id)
             .map_err(|e| format!("并发互斥锁获取失败: {e}"))?;
 
         // 3.5 宿主权威状态（审计 E / P1-4）：写 running + 新 generation；
         //     崩溃残留的 running 记录（PID 已死）在此被接管。
         let local_app_data = std::env::var("LOCALAPPDATA")
             .map_err(|_| "缺少 LOCALAPPDATA 环境变量（无法定位宿主状态目录）".to_string())?;
-        let host_state_path = std::path::Path::new(local_app_data.trim_end_matches(['\\', '/']))
-            .join("GameAtlas")
-            .join(crate::hoststate::HOST_STATE_FILE_NAME);
+        let host_state_path = crate::hoststate::state_path_for_game(
+            std::path::Path::new(local_app_data.trim_end_matches(['\\', '/'])),
+            &game_id,
+        );
         let host_state = crate::hoststate::begin_run(&host_state_path, &game_id, box_path)?;
+
+        // Establish the guard immediately after begin_run.  Any failure after
+        // this point, including box.json or path setup, must clear this exact
+        // generation rather than leaving a permanent "running" record.
+        let mut guard = RunGuard {
+            box_path: PathBuf::from(crate::hoststate::canonical_box_path(box_path)),
+            hive: None,
+            host_state: Some((
+                host_state_path,
+                host_state.generation,
+                host_state.game_id.clone(),
+            )),
+        };
 
         // 4. 状态机 clean → running（先行落盘：run 中断后 cleanup 可识别）。
         bf.transition(BoxState::Running).map_err(|e| e.to_string())?;
@@ -326,17 +442,6 @@ mod win {
             registry_hive_path
         );
 
-        // RAII 清理守卫：此后任何 Err 提前返回都走 Drop 兜底。
-        let mut guard = RunGuard {
-            box_path: box_path_buf.clone(),
-            hive: None,
-            host_state: Some((
-                host_state_path,
-                host_state.generation,
-                host_state.game_id,
-            )),
-        };
-
         // 4. 挂载隔离 hive（RegLoadKeyW；损坏自动 .bak 恢复）。
         let h = hive::mount_hive(&bf.game_id, &registry_hive_path)
             .map_err(|e| format!("hive 挂载失败: {e}"))?;
@@ -354,6 +459,13 @@ mod win {
             bf.exe_relative = rel;
             bf.save(&box_path_buf)
                 .map_err(|e| format!("box.json 写 exe 记忆失败: {e}"))?;
+        }
+
+        if is_anticheat_executable(&exe_abs) {
+            return Err(format!(
+                "检测到反作弊组件 '{}'，已拒绝注入（不保证隔离）",
+                exe_abs.display()
+            ));
         }
 
         // 6. exe 位数 → 同目录 hook dll（协议 §6.3 位数不变式）。
@@ -504,7 +616,7 @@ mod tests {
         assert_eq!(
             resolve_game_data_root(r"G:\", r"G:\GameData", r"D:\GameAtlas", "地平线", "x", true)
                 .unwrap(),
-            r"G:\GameData"
+            format!(r"G:\GameData\user_{}", user_tag().unwrap())
         );
     }
 
@@ -529,11 +641,27 @@ mod tests {
     }
 
     #[test]
+    fn user_namespace_scopes_explicit_root_too() {
+        let scoped = resolve_game_data_root(
+            r"G:\", r"D:\GameAtlas\Horizon", "", "", "ignored", true
+        )
+        .unwrap();
+        assert!(scoped.starts_with(r"D:\GameAtlas\Horizon\user_"), "{scoped}");
+    }
+
+    #[test]
     fn data_root_name_is_derived_and_validated() {
         assert_eq!(derive_game_data_name(r"\\nas\share\地平线.vhd", "fallback"), "地平线");
         assert_eq!(derive_game_data_name("", "horizon-zero-dawn"), "horizon-zero-dawn");
         assert!(validate_game_data_name(r"bad\name").is_err());
         assert!(validate_game_data_name("地平线").is_ok());
+    }
+
+    #[test]
+    fn anti_cheat_main_process_is_refused_before_injection() {
+        assert!(is_anticheat_executable(Path::new(r"C:\Game\EasyAntiCheat.exe")));
+        assert!(is_anticheat_executable(Path::new(r"C:\Game\battleye_launcher.exe")));
+        assert!(!is_anticheat_executable(Path::new(r"C:\Game\MyGame.exe")));
     }
 
     #[test]

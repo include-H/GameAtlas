@@ -18,6 +18,44 @@ use crate::json::{escape_json, parse_json_object};
 /// state.json 的默认文件名（宿主 `%LOCALAPPDATA%\GameAtlas\` 下）。
 pub const HOST_STATE_FILE_NAME: &str = "state.json";
 
+/// Put each game's authority record in its own file.  The game id is hashed
+/// instead of used as a path component, so a tampered box cannot escape the
+/// host state directory or make two ids alias through separators/case.
+pub fn state_path_for_game(local_app_data: &Path, game_id: &str) -> std::path::PathBuf {
+    local_app_data
+        .join("GameAtlas")
+        .join("state")
+        .join(format!("state_{:016x}.json", fnv1a64(game_id.as_bytes())))
+}
+
+/// Normalize a box path for authority comparisons and resource locking.  An
+/// existing path is canonicalized so relative/absolute spellings and symlink
+/// aliases cannot select different locks; the fallback still normalizes slash
+/// direction when the file has already disappeared.
+pub fn canonical_box_path(path: &str) -> String {
+    let normalized = fs::canonicalize(Path::new(path))
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| path.to_string())
+        .replace('/', "\\");
+    #[cfg(target_os = "windows")]
+    {
+        normalized.to_ascii_lowercase()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        normalized
+    }
+}
+
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
+}
+
 /// 宿主权威运行状态。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostState {
@@ -30,6 +68,9 @@ pub struct HostState {
     pub pid: u32,
     /// 开始时间（Unix 秒）。
     pub started_at: u64,
+    /// OS-specific process creation identity.  Zero means an old state file
+    /// without this field; such a live PID is treated conservatively as busy.
+    pub process_identity: u64,
 }
 
 impl HostState {
@@ -50,7 +91,7 @@ pub fn load(path: &Path) -> Option<HostState> {
 pub fn begin_run(path: &Path, game_id: &str, box_path: &str) -> Result<HostState, String> {
     let prior = load(path);
     if let Some(p) = &prior {
-        if p.running() && p.game_id == game_id && pid_alive(p.pid) {
+        if p.running() && p.game_id == game_id && pid_is_same_live_process(p) {
             return Err(format!(
                 "宿主状态显示游戏 '{game_id}' 已在运行（pid={}，generation={}）",
                 p.pid, p.generation
@@ -60,10 +101,11 @@ pub fn begin_run(path: &Path, game_id: &str, box_path: &str) -> Result<HostState
     let state = HostState {
         generation: prior.map_or(0, |p| p.generation).saturating_add(1),
         game_id: game_id.to_string(),
-        box_path: box_path.to_string(),
+        box_path: canonical_box_path(box_path),
         state: "running".to_string(),
         pid: std::process::id(),
         started_at: now_secs(),
+        process_identity: process_identity(std::process::id()).unwrap_or(0),
     };
     save(path, &state).map_err(|e| format!("写宿主状态失败: {e}"))?;
     Ok(state)
@@ -72,14 +114,95 @@ pub fn begin_run(path: &Path, game_id: &str, box_path: &str) -> Result<HostState
 /// 结束一次运行：仅当现有记录的 generation 与 game_id 都匹配时才清除
 /// （置 clean 并保留记录）。不匹配说明记录已被更新的运行接管，跳过。
 pub fn mark_clean(path: &Path, generation: u64, game_id: &str) -> Result<(), String> {
+    mark_clean_for_box(path, generation, game_id, None).map(|_| ())
+}
+
+/// Mark a generation clean only when it still owns the supplied box.  The
+/// boolean is false for a newer generation or a different game/box.
+pub fn mark_clean_for_box(
+    path: &Path,
+    generation: u64,
+    game_id: &str,
+    box_path: Option<&str>,
+) -> Result<bool, String> {
     let Some(mut s) = load(path) else {
-        return Ok(());
+        return Ok(false);
     };
-    if s.generation != generation || s.game_id != game_id {
-        return Ok(());
+    if s.generation != generation
+        || s.game_id != game_id
+        || box_path.is_some_and(|p| !box_path_matches(&s.box_path, p))
+    {
+        return Ok(false);
     }
     s.state = "clean".to_string();
-    save(path, &s).map_err(|e| format!("写宿主状态失败: {e}"))
+    save(path, &s).map_err(|e| format!("写宿主状态失败: {e}"))?;
+    Ok(true)
+}
+
+/// Does the record still describe the same live process, rather than a PID
+/// that has since been reused by an unrelated process?
+pub fn owns_live_process(state: &HostState) -> bool {
+    state.running() && pid_is_same_live_process(state)
+}
+
+/// Find the authority record that owns a box path.  The game id in box.json
+/// is game-writable, so cleanup must be able to recover the state file without
+/// deriving its filename from that untrusted value.
+pub fn find_state_for_box(
+    local_app_data: &Path,
+    box_path: &str,
+) -> Option<(std::path::PathBuf, HostState)> {
+    let dir = local_app_data.join("GameAtlas").join("state");
+    let wanted = canonical_box_path(box_path);
+    let mut found: Option<(std::path::PathBuf, HostState)> = None;
+    for entry in fs::read_dir(dir).ok()? {
+        let Ok(entry) = entry else {
+            continue;
+        };
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if !file_type.is_file() {
+            continue;
+        }
+        let path = entry.path();
+        let Some(state) = load(&path) else {
+            continue;
+        };
+        if !box_path_matches(&state.box_path, &wanted) {
+            continue;
+        }
+        let newer = found
+            .as_ref()
+            .map_or(true, |(_, current)| state.generation > current.generation);
+        if newer {
+            found = Some((path, state));
+        }
+    }
+    found
+}
+
+fn pid_is_same_live_process(state: &HostState) -> bool {
+    if !pid_alive(state.pid) {
+        return false;
+    }
+    match state.process_identity {
+        0 => true,
+        expected => process_identity(state.pid) == Some(expected),
+    }
+}
+
+pub fn box_path_matches(left: &str, right: &str) -> bool {
+    let left = canonical_box_path(left);
+    let right = canonical_box_path(right);
+    #[cfg(target_os = "windows")]
+    {
+        left.eq_ignore_ascii_case(&right)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        left == right
+    }
 }
 
 /// 进程是否存活。
@@ -99,10 +222,48 @@ pub fn pid_alive(pid: u32) -> bool {
     ok != 0 && code == 259 // STILL_ACTIVE
 }
 
+#[cfg(target_os = "windows")]
+fn process_identity(pid: u32) -> Option<u64> {
+    let handle = unsafe { crate::winffi::OpenProcess(0x1000, 0, pid) };
+    if handle == 0 {
+        return None;
+    }
+    let mut created = crate::winffi::FileTime { low: 0, high: 0 };
+    let mut exited = crate::winffi::FileTime { low: 0, high: 0 };
+    let mut kernel = crate::winffi::FileTime { low: 0, high: 0 };
+    let mut user = crate::winffi::FileTime { low: 0, high: 0 };
+    let ok = unsafe {
+        crate::winffi::GetProcessTimes(
+            handle,
+            &mut created,
+            &mut exited,
+            &mut kernel,
+            &mut user,
+        )
+    };
+    unsafe { crate::winffi::CloseHandle(handle) };
+    (ok != 0).then_some((u64::from(created.high) << 32) | u64::from(created.low))
+}
+
 /// 进程是否存活（Linux：/proc/<pid> 存在）。
 #[cfg(not(target_os = "windows"))]
 pub fn pid_alive(pid: u32) -> bool {
-    pid > 0 && Path::new(&format!("/proc/{pid}")).exists()
+    process_stat(pid).is_some_and(|fields| fields.first().is_some_and(|state| *state != "Z" && *state != "X"))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn process_identity(pid: u32) -> Option<u64> {
+    let fields = process_stat(pid)?;
+    fields.get(19)?.parse().ok()
+}
+
+#[cfg(not(target_os = "windows"))]
+fn process_stat(pid: u32) -> Option<Vec<String>> {
+    // The command name may contain spaces and parentheses; everything after
+    // the final ')' has the stable `/proc/<pid>/stat` field layout.
+    let raw = fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    let tail = raw.rsplit_once(')')?.1;
+    Some(tail.split_whitespace().map(str::to_string).collect())
 }
 
 fn now_secs() -> u64 {
@@ -132,13 +293,14 @@ fn save(path: &Path, s: &HostState) -> Result<(), String> {
 
 fn to_json(s: &HostState) -> String {
     format!(
-        "{{\n  \"generation\": {},\n  \"game_id\": \"{}\",\n  \"box_path\": \"{}\",\n  \"state\": \"{}\",\n  \"pid\": {},\n  \"started_at\": {}\n}}",
+        "{{\n  \"generation\": {},\n  \"game_id\": \"{}\",\n  \"box_path\": \"{}\",\n  \"state\": \"{}\",\n  \"pid\": {},\n  \"started_at\": {},\n  \"process_identity\": {}\n}}",
         s.generation,
         escape_json(&s.game_id),
         escape_json(&s.box_path),
         escape_json(&s.state),
         s.pid,
         s.started_at,
+        s.process_identity,
     )
 }
 
@@ -150,8 +312,9 @@ fn from_json(s: &str) -> Result<HostState, String> {
         state: String::new(),
         pid: 0,
         started_at: 0,
+        process_identity: 0,
     };
-    let mut seen = [false; 6];
+    let mut seen = [false; 7];
     for (key, value) in parse_json_object(s).map_err(|e| format!("非法 JSON: {e}"))? {
         let idx = match key.as_str() {
             "generation" => 0,
@@ -160,6 +323,7 @@ fn from_json(s: &str) -> Result<HostState, String> {
             "state" => 3,
             "pid" => 4,
             "started_at" => 5,
+            "process_identity" => 6,
             other => return Err(format!("未知字段 '{other}'")),
         };
         if seen[idx] {
@@ -173,6 +337,9 @@ fn from_json(s: &str) -> Result<HostState, String> {
             3 => out.state = value,
             4 => out.pid = value.parse().map_err(|_| "非法 pid".to_string())?,
             5 => out.started_at = value.parse().map_err(|_| "非法 started_at".to_string())?,
+            6 => out.process_identity = value
+                .parse()
+                .map_err(|_| "非法 process_identity".to_string())?,
             _ => unreachable!(),
         }
     }
@@ -244,5 +411,35 @@ mod tests {
         // 再 begin 又是新代数。
         let s2 = begin_run(&p, "g1", "b.json").unwrap();
         assert_eq!(s2.generation, s.generation + 1);
+    }
+
+    #[test]
+    fn game_state_path_is_stable_and_cannot_escape() {
+        let root = Path::new(r"C:\Users\Hao\AppData\Local");
+        let a = state_path_for_game(root, r"a\..\b");
+        let b = state_path_for_game(root, r"a\..\b");
+        assert_eq!(a, b);
+        assert_eq!(a.parent().unwrap().file_name().unwrap(), "state");
+        assert!(a.file_name().unwrap().to_string_lossy().starts_with("state_"));
+    }
+
+    #[test]
+    fn state_lookup_uses_authoritative_box_path() {
+        let root = std::env::temp_dir().join(format!("gamevhd_state_lookup_{}", std::process::id()));
+        let state_path = state_path_for_game(&root, "authoritative-game");
+        let state = HostState {
+            generation: 4,
+            game_id: "authoritative-game".into(),
+            box_path: canonical_box_path("box.json"),
+            state: "clean".into(),
+            pid: 0,
+            started_at: 0,
+            process_identity: 0,
+        };
+        save(&state_path, &state).unwrap();
+        let found = find_state_for_box(&root, "box.json").expect("state found");
+        assert_eq!(found.0, state_path);
+        assert_eq!(found.1.game_id, "authoritative-game");
+        let _ = fs::remove_dir_all(root);
     }
 }

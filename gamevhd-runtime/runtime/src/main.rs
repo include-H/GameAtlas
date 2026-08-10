@@ -201,8 +201,7 @@ fn parse_letter(s: &str, what: &str) -> Result<char, String> {
 /// `<vhd>` 为本地差分盘路径（`%LOCALAPPDATA%\GameAtlas\diff\*.vhdx`）。
 /// `--parent` 提供时若差分盘不存在则基于该 UNC 基础盘创建（已存在幂等跳过）。
 /// `--smb` 提供时先连接只读共享（`--user` 可缺省走当前会话；密码取自
-/// Windows 凭据管理器（`store-cred` 写入）或环境变量 `GAMEVHD_SMB_PASS`，
-/// 不接收命令行明文）。
+/// Windows 凭据管理器（`store-cred` 写入），不接收命令行或环境变量明文。
 /// `--letter` 指定首选盘符，缺省取第一个空闲。`--retries` 为 SMB 重试次数。
 fn parse_mount(rest: &[String]) -> Result<Command, String> {
     let vhd = rest
@@ -401,25 +400,32 @@ fn cmd_mount(
 ) -> u8 {
     #[cfg(target_os = "windows")]
     {
-        // 密码解析顺序：凭据管理器（store-cred 写入）→ 环境变量
-        // GAMEVHD_SMB_PASS → None（复用现有 SMB 会话）。命令行永不明文传密。
-        let (smb_user, smb_pass) = smb
-            .map(|remote| {
-                let cred = disk::read_smb_cred(remote);
-                let env_pass = std::env::var("GAMEVHD_SMB_PASS").ok();
+        // Passwords come only from Windows Credential Manager.  An absent
+        // entry deliberately means "reuse the current SMB session"; no
+        // command-line or environment password fallback exists.
+        let (smb_user, smb_pass) = match smb {
+            Some(remote) => {
+                let cred = match disk::read_smb_cred(remote) {
+                    Ok(cred) => cred,
+                    Err(error) => {
+                        crate::log_error!("mount: 读取 SMB 凭据失败: {error}");
+                        return 1;
+                    }
+                };
                 let resolved_user = user
                     .map(str::to_string)
                     .or_else(|| cred.as_ref().map(|(u, _)| u.clone()))
                     .or_else(|| std::env::var("GAMEVHD_SMB_USER").ok());
-                let resolved_pass = cred
-                    .and_then(|(_, p)| if p.is_empty() { None } else { Some(p) })
-                    .or(env_pass);
+                let resolved_pass = cred.and_then(|(_, p)| {
+                    if p.is_empty() { None } else { Some(p) }
+                });
                 if resolved_pass.is_some() && resolved_user.is_none() {
                     crate::log_warn!("mount: 有密码但缺用户名（--user / 凭据 / GAMEVHD_SMB_USER）");
                 }
                 (resolved_user, resolved_pass)
-            })
-            .unwrap_or((user.map(str::to_string), None));
+            }
+            None => (user.map(str::to_string), None),
+        };
         let params = disk::MountParams {
             diff_path: vhd.to_string(),
             parent_unc: parent.map(str::to_string),
@@ -460,11 +466,17 @@ fn cmd_store_cred(server: &str, user: Option<&str>) -> u8 {
     #[cfg(target_os = "windows")]
     {
         let mut pass = String::new();
-        if std::io::stdin().read_line(&mut pass).is_err() || pass.trim().is_empty() {
+        if std::io::stdin().read_line(&mut pass).is_err() {
             crate::log_error!("store-cred: 请在 stdin 第一行输入密码");
             return 1;
         }
-        let pass = pass.trim();
+        while matches!(pass.chars().last(), Some('\r' | '\n')) {
+            pass.pop();
+        }
+        if pass.is_empty() {
+            crate::log_error!("store-cred: 密码不能为空");
+            return 1;
+        }
         let resolved_user = user
             .map(str::to_string)
             .or_else(|| std::env::var("GAMEVHD_SMB_USER").ok());
@@ -472,7 +484,9 @@ fn cmd_store_cred(server: &str, user: Option<&str>) -> u8 {
             crate::log_error!("store-cred: 需要 --user <U> 或环境变量 GAMEVHD_SMB_USER");
             return 1;
         };
-        match disk::store_smb_cred(server, &resolved_user, pass) {
+        let result = disk::store_smb_cred(server, &resolved_user, &pass);
+        clear_secret(&mut pass);
+        match result {
             Ok(()) => {
                 crate::log_info!("store-cred: 凭据已保存（target GameVHD_{server}）");
                 0
@@ -571,14 +585,16 @@ fn cmd_run(drive: char, box_path: &str, hklm_write_passthrough: bool) -> u8 {
 fn cmd_cleanup(box_path: &str, vhd_path: Option<&str>, host_state: Option<&str>) -> u8 {
     #[cfg(target_os = "windows")]
     {
-        // 宿主权威状态路径缺省为 %LOCALAPPDATA%\GameAtlas\state.json。
+        // The default host record is per-game.  A supplied --state path is
+        // retained as an explicit compatibility override.
         let state_path = match host_state {
             Some(p) => Some(std::path::PathBuf::from(p)),
-            None => std::env::var("LOCALAPPDATA").ok().map(|la| {
-                std::path::Path::new(la.trim_end_matches(['\\', '/']))
-                    .join("GameAtlas")
-                    .join(crate::hoststate::HOST_STATE_FILE_NAME)
-            }),
+            None => {
+                std::env::var("LOCALAPPDATA").ok().and_then(|la| {
+                    let root = Path::new(la.trim_end_matches(['\\', '/']));
+                    crate::hoststate::find_state_for_box(root, box_path).map(|(path, _)| path)
+                })
+            }
         };
         match cleanup::cleanup_box(box_path, vhd_path, state_path.as_deref()) {
             Ok(()) => {
@@ -714,7 +730,7 @@ fn cmd_selftest() -> u8 {
         skip_cache_dirs: false,
     };
     let mut blob = vec![0x00u8; 512];
-    blob.extend_from_slice(&sample.to_footer_bytes());
+    blob.extend_from_slice(&sample.to_signed_footer_bytes());
     match manifest::parse_manifest(&blob) {
         Ok(m) if m.game_id == "selftest" => println!("  [PASS] footer 自定位/解析"),
         Ok(_) => {
@@ -762,6 +778,19 @@ fn unsupported(cmd: &str, need: &str) -> u8 {
     3
 }
 
+/// Best-effort clearing for short-lived credential buffers.  The credential
+/// manager remains the durable owner; this only limits plaintext lifetime in
+/// the runtime's heap/stack copies.
+#[cfg(target_os = "windows")]
+fn clear_secret(value: &mut String) {
+    unsafe {
+        for byte in value.as_bytes_mut() {
+            std::ptr::write_volatile(byte, 0);
+        }
+    }
+    value.clear();
+}
+
 fn print_usage() {
     println!(
         "gamevhd-runtime {} — GameVHD 沙箱编排器（GameAtlas VHD 远程启动）",
@@ -773,7 +802,7 @@ fn print_usage() {
     println!("子命令:");
     println!("  mount <vhd> [--parent <UNC>] [--smb <UNC>] [--user <U>] [--letter <L>] [--retries <N>]");
     println!("                挂载 VHD（Windows；SMB→建差分→attach→定盘符）");
-    println!("                密码来源：store-cred 凭据管理器 > 环境变量 GAMEVHD_SMB_PASS，命令行不明文");
+    println!("                密码来源：store-cred 凭据管理器；未保存时复用当前 SMB 会话");
     println!("  store-cred <server> [--user <U>]  保存 SMB 凭据到 Windows 凭据管理器（密码从 stdin 读入）");
     println!("  delete-cred <server>              删除已保存的 SMB 凭据（幂等）");
     println!("  unmount <vhd> [--letter <L>] [--smb <UNC>]   卸载 VHD（Windows）");

@@ -27,7 +27,7 @@
 
 .CONTRACT (stage 4 CLI, contract text is the script header)
       gamevhd-runtime.exe mount <vhd> [--parent <UNC>] [--smb <UNC>]
-                        [--user <U>] [--pass <P>] [--letter <L>] [--retries <N>]
+                        [--user <U>] [--letter <L>] [--retries <N>]
       gamevhd-runtime.exe unmount <vhd> [--letter <L>] [--smb <UNC>]
 
       mount success prints to stdout: [MOUNT-OK] <letter>:
@@ -76,6 +76,16 @@ if (-not (Test-Path -LiteralPath $RuntimeExe -PathType Leaf)) {
     throw "runtime not found: $RuntimeExe"
 }
 
+if ($SmbPass) {
+    if (-not $SmbUser) {
+        throw 'SmbUser is required when SmbPass is supplied'
+    }
+    $credentialArgs = @('store-cred', $SmbUnc, '--user', $SmbUser)
+    $credentialOutput = $SmbPass | & $RuntimeExe @credentialArgs 2>&1 | Out-String
+    $credentialCode = $LASTEXITCODE
+    Assert-True ($credentialCode -eq 0) "store-cred exit 0 (actual $credentialCode): $credentialOutput"
+}
+
 $LetterArg = @()
 if ($Letter) {
     $LetterArg = @('--letter', $Letter)
@@ -98,7 +108,6 @@ $mountArgs = @(
     '--retries', "$SmbRetries"
 ) + $LetterArg
 if ($SmbUser) { $mountArgs += @('--user', $SmbUser) }
-if ($SmbPass) { $mountArgs += @('--pass', $SmbPass) }
 
 $r = Invoke-Runtime -ArgList $mountArgs
 Assert-True ($r.Code -eq 0) "mount exit 0 (actual $($r.Code)): $($r.Out)"

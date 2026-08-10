@@ -76,6 +76,7 @@
 #define GVHD_STATUS_OBJECT_PATH_NOT_FOUND   ((NTSTATUS)0xC000003Au)
 #define GVHD_STATUS_ACCESS_DENIED           ((NTSTATUS)0xC0000022u)
 #define GVHD_STATUS_BUFFER_OVERFLOW         ((NTSTATUS)0x80000005u)
+#define GVHD_STATUS_BUFFER_TOO_SMALL        ((NTSTATUS)0xC0000023u)
 #define GVHD_STATUS_INSUFFICIENT_RESOURCES  ((NTSTATUS)0xC000009Au)
 
 /* ================================================================ */
@@ -148,6 +149,23 @@ typedef NTSTATUS(NTAPI *P_NtDeleteKey)(
     HANDLE KeyHandle);
 typedef NTSTATUS(NTAPI *P_NtDeleteKeyEx)(
     HANDLE KeyHandle, ULONG Flags);
+typedef NTSTATUS(NTAPI *P_NtSetInformationKey)(
+    HANDLE KeyHandle, ULONG KeySetInformationClass, PVOID KeyInformation,
+    ULONG KeyInformationLength);
+typedef NTSTATUS(NTAPI *P_NtLoadKey)(
+    POBJECT_ATTRIBUTES TargetKey, POBJECT_ATTRIBUTES SourceFile);
+typedef NTSTATUS(NTAPI *P_NtLoadKey2)(
+    POBJECT_ATTRIBUTES TargetKey, POBJECT_ATTRIBUTES SourceFile, ULONG Flags);
+typedef NTSTATUS(NTAPI *P_NtLoadKeyEx)(
+    POBJECT_ATTRIBUTES TargetKey, POBJECT_ATTRIBUTES SourceFile, ULONG Flags,
+    HANDLE TrustClassKey);
+typedef NTSTATUS(NTAPI *P_NtReplaceKey)(
+    POBJECT_ATTRIBUTES NewFile, HANDLE TargetHandle, POBJECT_ATTRIBUTES ReplacedFile);
+typedef NTSTATUS(NTAPI *P_NtRestoreKey)(
+    HANDLE KeyHandle, HANDLE FileHandle, ULONG RestoreFlags);
+typedef NTSTATUS(NTAPI *P_NtSetSecurityObject)(
+    HANDLE Handle, SECURITY_INFORMATION SecurityInformation,
+    PSECURITY_DESCRIPTOR SecurityDescriptor);
 typedef NTSTATUS(NTAPI *P_NtQueryValueKey)(
     HANDLE KeyHandle, PUNICODE_STRING ValueName, KEY_VALUE_INFORMATION_CLASS KeyValueInformationClass,
     PVOID KeyValueInformation, ULONG Length, PULONG ResultLength);
@@ -188,6 +206,13 @@ static LPVOID __sys_NtSetValueKey = NULL;
 static LPVOID __sys_NtDeleteValueKey = NULL;
 static LPVOID __sys_NtDeleteKey = NULL;
 static LPVOID __sys_NtDeleteKeyEx = NULL;
+static LPVOID __sys_NtSetInformationKey = NULL;
+static LPVOID __sys_NtLoadKey = NULL;
+static LPVOID __sys_NtLoadKey2 = NULL;
+static LPVOID __sys_NtLoadKeyEx = NULL;
+static LPVOID __sys_NtReplaceKey = NULL;
+static LPVOID __sys_NtRestoreKey = NULL;
+static LPVOID __sys_NtSetSecurityObject = NULL;
 static LPVOID __sys_NtQueryValueKey = NULL;
 static LPVOID __sys_NtQueryMultipleValueKey = NULL;
 static LPVOID __sys_NtEnumerateValueKey = NULL;
@@ -209,6 +234,13 @@ static P_NtSetValueKey           pfnOrig_NtSetValueKey = NULL;
 static P_NtDeleteValueKey        pfnOrig_NtDeleteValueKey = NULL;
 static P_NtDeleteKey             pfnOrig_NtDeleteKey = NULL;
 static P_NtDeleteKeyEx           pfnOrig_NtDeleteKeyEx = NULL;
+static P_NtSetInformationKey     pfnOrig_NtSetInformationKey = NULL;
+static P_NtLoadKey               pfnOrig_NtLoadKey = NULL;
+static P_NtLoadKey2              pfnOrig_NtLoadKey2 = NULL;
+static P_NtLoadKeyEx             pfnOrig_NtLoadKeyEx = NULL;
+static P_NtReplaceKey            pfnOrig_NtReplaceKey = NULL;
+static P_NtRestoreKey            pfnOrig_NtRestoreKey = NULL;
+static P_NtSetSecurityObject     pfnOrig_NtSetSecurityObject = NULL;
 static P_NtQueryValueKey         pfnOrig_NtQueryValueKey = NULL;
 static P_NtQueryMultipleValueKey pfnOrig_NtQueryMultipleValueKey = NULL;
 static P_NtEnumerateValueKey     pfnOrig_NtEnumerateValueKey = NULL;
@@ -285,15 +317,30 @@ static BOOLEAN gvhd_reg_ieq_prefix(const wchar_t *path, const wchar_t *prefix)
 {
     size_t i;
 
-    if (prefix[0] == L'\0') {
+    if (path == NULL || prefix == NULL || prefix[0] == L'\0') {
         return FALSE;
     }
     for (i = 0; prefix[i] != L'\0'; ++i) {
+        if (path[i] == L'\0') {
+            return FALSE;
+        }
         if (gvhd_ascii_lower(path[i]) != gvhd_ascii_lower(prefix[i])) {
             return FALSE;
         }
     }
     return TRUE;
+}
+
+static BOOLEAN gvhd_reg_is_hklm_path(const wchar_t *path)
+{
+    size_t prefix_len;
+
+    if (path == NULL) {
+        return FALSE;
+    }
+    prefix_len = wcslen(GVHD_REG_PREFIX_MACHINE);
+    return gvhd_reg_ieq_prefix(path, GVHD_REG_PREFIX_MACHINE) &&
+           (path[prefix_len] == L'\0' || path[prefix_len] == L'\\');
 }
 
 /* ================================================================ */
@@ -351,7 +398,7 @@ static wchar_t *gvhd_reg_rewrite(const wchar_t *native, wchar_t *out, size_t out
         return out;
     }
 
-    if (gvhd_reg_ieq_prefix(native, GVHD_REG_PREFIX_MACHINE)) {
+    if (gvhd_reg_is_hklm_path(native)) {
         gvhd_reg_warn_hklm(native);
         return NULL;   /* HKLM 直通宿主 + 节流警告 */
     }
@@ -511,19 +558,27 @@ static NTSTATUS gvhd_reg_handle_path(HANDLE hKey, wchar_t *buf, size_t cap)
     NTSTATUS status;
     size_t nchars;
 
+    if (pfnOrig_NtQueryKey == NULL || buf == NULL || cap < 2) {
+        return GVHD_STATUS_OBJECT_PATH_NOT_FOUND;
+    }
     status = pfnOrig_NtQueryKey(hKey, KeyNameInformation, NULL, 0, &need);
-    if (status != GVHD_STATUS_BUFFER_OVERFLOW) {
+    if (status != GVHD_STATUS_BUFFER_OVERFLOW &&
+        status != GVHD_STATUS_BUFFER_TOO_SMALL) {
         return status;
+    }
+    if (need < sizeof(ULONG)) {
+        return GVHD_STATUS_OBJECT_PATH_NOT_FOUND;
     }
     kinf = (PKEY_NAME_INFORMATION)HeapAlloc(GetProcessHeap(), 0, need);
     if (kinf == NULL) {
         return GVHD_STATUS_INSUFFICIENT_RESOURCES;
     }
     status = pfnOrig_NtQueryKey(hKey, KeyNameInformation, kinf, need, &need);
-    if (status == GVHD_STATUS_SUCCESS || status == GVHD_STATUS_BUFFER_OVERFLOW) {
+    if (status == GVHD_STATUS_SUCCESS) {
         nchars = (size_t)(kinf->NameLength / sizeof(wchar_t));
         if (nchars >= cap) {
-            nchars = cap - 1;
+            HeapFree(GetProcessHeap(), 0, kinf);
+            return GVHD_STATUS_OBJECT_PATH_NOT_FOUND;
         }
         if (nchars > 0) {
             memcpy(buf, kinf->Name, nchars * sizeof(wchar_t));
@@ -535,6 +590,90 @@ static NTSTATUS gvhd_reg_handle_path(HANDLE hKey, wchar_t *buf, size_t cap)
     return status;
 }
 
+/* Resolve an OBJECT_ATTRIBUTES name to an absolute native path for policy
+ * checks.  Relative names are joined to RootDirectory's kernel path; failure
+ * is deliberately distinguishable so deny mode can fail closed. */
+static int gvhd_reg_oa_path_kind(const OBJECT_ATTRIBUTES *oa,
+                                 wchar_t *path, size_t cap)
+{
+    size_t name_chars;
+    size_t root_chars;
+
+    if (oa == NULL || oa->ObjectName == NULL ||
+        oa->ObjectName->Buffer == NULL || path == NULL || cap < 2 ||
+        (oa->ObjectName->Length % sizeof(wchar_t)) != 0) {
+        return -1;
+    }
+    name_chars = (size_t)(oa->ObjectName->Length / sizeof(wchar_t));
+    /* An OBJECT_ATTRIBUTES name beginning with '\\' is absolute; Windows
+     * ignores RootDirectory in that case.  Treating it as relative would let
+     * a HKLM path be hidden under an unrelated root handle. */
+    if (oa->RootDirectory == NULL || oa->ObjectName->Buffer[0] == L'\\') {
+        if (name_chars >= cap) {
+            return -1;
+        }
+        memcpy(path, oa->ObjectName->Buffer, name_chars * sizeof(wchar_t));
+        path[name_chars] = L'\0';
+        return gvhd_reg_is_hklm_path(path) ? 1 : 0;
+    }
+
+    if (gvhd_reg_handle_path(oa->RootDirectory, path, cap) != GVHD_STATUS_SUCCESS) {
+        return -1;
+    }
+    root_chars = wcslen(path);
+    if (name_chars == 0) {
+        return gvhd_reg_is_hklm_path(path) ? 1 : 0;
+    }
+    if (root_chars + 1 + name_chars >= cap) {
+        return -1;
+    }
+    path[root_chars] = L'\\';
+    memcpy(path + root_chars + 1, oa->ObjectName->Buffer,
+           name_chars * sizeof(wchar_t));
+    path[root_chars + 1 + name_chars] = L'\0';
+    return gvhd_reg_is_hklm_path(path) ? 1 : 0;
+}
+
+static NTSTATUS gvhd_reg_hklm_write_deny_oa(const OBJECT_ATTRIBUTES *oa)
+{
+    const struct gvhd_param_block *param = gvhd_get_param();
+    wchar_t path[GVHD_REG_PATH_MAX];
+    int kind;
+
+    if (!(param->flags & GVHD_PARAM_FLAG_HKLM_WRITE_DENY)) {
+        return GVHD_STATUS_SUCCESS;
+    }
+    kind = gvhd_reg_oa_path_kind(oa, path, GVHD_REG_PATH_MAX);
+    if (kind == 1) {
+        return gvhd_reg_hklm_write_deny(path);
+    }
+    if (kind < 0) {
+        gvhd_log_write(L"REG_HKLM_WRITE_DENIED <unresolved-object-attributes>");
+        return GVHD_STATUS_ACCESS_DENIED;
+    }
+    return GVHD_STATUS_SUCCESS;
+}
+
+static NTSTATUS gvhd_reg_hklm_write_deny_handle(HANDLE key_handle)
+{
+    const struct gvhd_param_block *param = gvhd_get_param();
+    wchar_t path[GVHD_REG_PATH_MAX];
+    NTSTATUS status;
+
+    if (!(param->flags & GVHD_PARAM_FLAG_HKLM_WRITE_DENY)) {
+        return GVHD_STATUS_SUCCESS;
+    }
+    status = gvhd_reg_handle_path(key_handle, path, GVHD_REG_PATH_MAX);
+    if (status != GVHD_STATUS_SUCCESS) {
+        gvhd_log_write(L"REG_HKLM_WRITE_DENIED <unresolved-key-handle>");
+        return GVHD_STATUS_ACCESS_DENIED;
+    }
+    if (gvhd_reg_is_hklm_path(path)) {
+        return gvhd_reg_hklm_write_deny(path);
+    }
+    return GVHD_STATUS_SUCCESS;
+}
+
 /* 句柄路径是否已是本沙箱 hive 之下（打开/创建时已重写 → 直接原函数即可）。 */
 static BOOLEAN gvhd_reg_is_hive_path(const wchar_t *path)
 {
@@ -543,10 +682,10 @@ static BOOLEAN gvhd_reg_is_hive_path(const wchar_t *path)
     size_t game_len = wcslen(param->game_id);
     size_t root_len = prefix_len + game_len;
 
-    if (wcsncmp(path, GVHD_REG_HIVE_ROOT, prefix_len) != 0) {
+    if (path == NULL || !gvhd_reg_ieq_prefix(path, GVHD_REG_HIVE_ROOT)) {
         return FALSE;
     }
-    if (wcsncmp(path + prefix_len, param->game_id, game_len) != 0) {
+    if (!gvhd_reg_ieq_prefix(path + prefix_len, param->game_id)) {
         return FALSE;
     }
     return path[root_len] == L'\\';   /* 必须是 hive 根之下，而非根本身 */
@@ -743,16 +882,9 @@ static NTSTATUS NTAPI Hook_NtCreateKey(
 
     gvhd_reg_eval_oa(ObjectAttributes, &rw);
     if (!rw.active) {
-        /* HKLM 写策略（P2-7）：路径级创建目标为 HKLM 时按 flag 拒绝。 */
-        if (ObjectAttributes != NULL && ObjectAttributes->ObjectName != NULL &&
-            ObjectAttributes->ObjectName->Buffer != NULL &&
-            gvhd_reg_ieq_prefix(ObjectAttributes->ObjectName->Buffer,
-                                GVHD_REG_PREFIX_MACHINE)) {
-            NTSTATUS deny = gvhd_reg_hklm_write_deny(
-                ObjectAttributes->ObjectName->Buffer);
-            if (deny != 0) {
-                return deny;
-            }
+        NTSTATUS deny = gvhd_reg_hklm_write_deny_oa(ObjectAttributes);
+        if (deny != GVHD_STATUS_SUCCESS) {
+            return deny;
         }
         return pfnOrig_NtCreateKey(KeyHandle, DesiredAccess, ObjectAttributes,
                                    TitleIndex, Class, CreateOptions, Disposition);
@@ -778,16 +910,9 @@ static NTSTATUS NTAPI Hook_NtCreateKeyEx(
 
     gvhd_reg_eval_oa(ObjectAttributes, &rw);
     if (!rw.active) {
-        /* HKLM 写策略（P2-7）：创建目标为 HKLM 时按 flag 拒绝。 */
-        if (ObjectAttributes != NULL && ObjectAttributes->ObjectName != NULL &&
-            ObjectAttributes->ObjectName->Buffer != NULL &&
-            gvhd_reg_ieq_prefix(ObjectAttributes->ObjectName->Buffer,
-                                GVHD_REG_PREFIX_MACHINE)) {
-            NTSTATUS deny = gvhd_reg_hklm_write_deny(
-                ObjectAttributes->ObjectName->Buffer);
-            if (deny != 0) {
-                return deny;
-            }
+        NTSTATUS deny = gvhd_reg_hklm_write_deny_oa(ObjectAttributes);
+        if (deny != GVHD_STATUS_SUCCESS) {
+            return deny;
         }
         return pfnOrig_NtCreateKeyEx(KeyHandle, DesiredAccess, ObjectAttributes,
                                      TitleIndex, Class, CreateOptions,
@@ -816,16 +941,9 @@ static NTSTATUS NTAPI Hook_NtCreateKeyTransacted(
 
     gvhd_reg_eval_oa(ObjectAttributes, &rw);
     if (!rw.active) {
-        /* HKLM 写策略（P2-7）：创建目标为 HKLM 时按 flag 拒绝。 */
-        if (ObjectAttributes != NULL && ObjectAttributes->ObjectName != NULL &&
-            ObjectAttributes->ObjectName->Buffer != NULL &&
-            gvhd_reg_ieq_prefix(ObjectAttributes->ObjectName->Buffer,
-                                GVHD_REG_PREFIX_MACHINE)) {
-            NTSTATUS deny = gvhd_reg_hklm_write_deny(
-                ObjectAttributes->ObjectName->Buffer);
-            if (deny != 0) {
-                return deny;
-            }
+        NTSTATUS deny = gvhd_reg_hklm_write_deny_oa(ObjectAttributes);
+        if (deny != GVHD_STATUS_SUCCESS) {
+            return deny;
         }
         return pfnOrig_NtCreateKeyTransacted(KeyHandle, DesiredAccess, ObjectAttributes,
                                              TitleIndex, Class, CreateOptions,
@@ -854,16 +972,9 @@ static NTSTATUS NTAPI Hook_NtCreateKeyTransactedEx(
 
     gvhd_reg_eval_oa(ObjectAttributes, &rw);
     if (!rw.active) {
-        /* HKLM 写策略（P2-7）：创建目标为 HKLM 时按 flag 拒绝。 */
-        if (ObjectAttributes != NULL && ObjectAttributes->ObjectName != NULL &&
-            ObjectAttributes->ObjectName->Buffer != NULL &&
-            gvhd_reg_ieq_prefix(ObjectAttributes->ObjectName->Buffer,
-                                GVHD_REG_PREFIX_MACHINE)) {
-            NTSTATUS deny = gvhd_reg_hklm_write_deny(
-                ObjectAttributes->ObjectName->Buffer);
-            if (deny != 0) {
-                return deny;
-            }
+        NTSTATUS deny = gvhd_reg_hklm_write_deny_oa(ObjectAttributes);
+        if (deny != GVHD_STATUS_SUCCESS) {
+            return deny;
         }
         return pfnOrig_NtCreateKeyTransactedEx(KeyHandle, DesiredAccess, ObjectAttributes,
                                                TitleIndex, Class, CreateOptions,
@@ -895,16 +1006,14 @@ static NTSTATUS NTAPI Hook_NtDeleteKey(HANDLE KeyHandle)
     wchar_t hive_path[GVHD_REG_PATH_MAX];
     NTSTATUS status;
 
+    status = gvhd_reg_hklm_write_deny_handle(KeyHandle);
+    if (status != GVHD_STATUS_SUCCESS) {
+        return status;
+    }
     /* 常见路径：句柄来自重写后的打开/创建 → 已指向 hive → 直接原函数 */
     status = gvhd_reg_handle_path(KeyHandle, path, GVHD_REG_PATH_MAX);
     if (status != GVHD_STATUS_SUCCESS) {
         return pfnOrig_NtDeleteKey(KeyHandle);   /* 无法识别：放行原行为 */
-    }
-    if (gvhd_reg_ieq_prefix(path, GVHD_REG_PREFIX_MACHINE)) {
-        NTSTATUS deny = gvhd_reg_hklm_write_deny(path);
-        if (deny != 0) {
-            return deny;
-        }
     }
     if (gvhd_reg_is_hive_path(path)) {
         return pfnOrig_NtDeleteKey(KeyHandle);
@@ -926,6 +1035,10 @@ static NTSTATUS NTAPI Hook_NtDeleteKeyEx(HANDLE KeyHandle, ULONG Flags)
     wchar_t hive_path[GVHD_REG_PATH_MAX];
     NTSTATUS status;
 
+    status = gvhd_reg_hklm_write_deny_handle(KeyHandle);
+    if (status != GVHD_STATUS_SUCCESS) {
+        return status;
+    }
     status = gvhd_reg_handle_path(KeyHandle, path, GVHD_REG_PATH_MAX);
     if (status != GVHD_STATUS_SUCCESS) {
         return pfnOrig_NtDeleteKeyEx(KeyHandle, Flags);
@@ -948,15 +1061,13 @@ static NTSTATUS NTAPI Hook_NtDeleteValueKey(HANDLE KeyHandle, PUNICODE_STRING Va
     wchar_t hive_path[GVHD_REG_PATH_MAX];
     NTSTATUS status;
 
+    status = gvhd_reg_hklm_write_deny_handle(KeyHandle);
+    if (status != GVHD_STATUS_SUCCESS) {
+        return status;
+    }
     status = gvhd_reg_handle_path(KeyHandle, path, GVHD_REG_PATH_MAX);
     if (status != GVHD_STATUS_SUCCESS) {
         return pfnOrig_NtDeleteValueKey(KeyHandle, ValueName);
-    }
-    if (gvhd_reg_ieq_prefix(path, GVHD_REG_PREFIX_MACHINE)) {
-        NTSTATUS deny = gvhd_reg_hklm_write_deny(path);
-        if (deny != 0) {
-            return deny;
-        }
     }
     if (gvhd_reg_is_hive_path(path)) {
         return pfnOrig_NtDeleteValueKey(KeyHandle, ValueName);
@@ -979,18 +1090,97 @@ static NTSTATUS NTAPI Hook_NtSetValueKey(
     HANDLE KeyHandle, PUNICODE_STRING ValueName, ULONG TitleIndex, ULONG Type,
     PVOID Data, ULONG DataSize)
 {
-    wchar_t path[GVHD_REG_PATH_MAX];
     NTSTATUS status;
 
-    status = gvhd_reg_handle_path(KeyHandle, path, GVHD_REG_PATH_MAX);
-    if (status == GVHD_STATUS_SUCCESS &&
-        gvhd_reg_ieq_prefix(path, GVHD_REG_PREFIX_MACHINE)) {
-        NTSTATUS deny = gvhd_reg_hklm_write_deny(path);
-        if (deny != 0) {
-            return deny;
-        }
+    status = gvhd_reg_hklm_write_deny_handle(KeyHandle);
+    if (status != GVHD_STATUS_SUCCESS) {
+        return status;
     }
     return pfnOrig_NtSetValueKey(KeyHandle, ValueName, TitleIndex, Type, Data, DataSize);
+}
+
+static NTSTATUS NTAPI Hook_NtSetInformationKey(
+    HANDLE KeyHandle, ULONG KeySetInformationClass, PVOID KeyInformation,
+    ULONG KeyInformationLength)
+{
+    NTSTATUS status = gvhd_reg_hklm_write_deny_handle(KeyHandle);
+
+    if (status != GVHD_STATUS_SUCCESS) {
+        return status;
+    }
+    return pfnOrig_NtSetInformationKey(
+        KeyHandle, KeySetInformationClass, KeyInformation, KeyInformationLength);
+}
+
+/* Registry hive load/replace/restore APIs mutate a key without going through
+ * NtCreateKey or NtSetValueKey.  Apply the same HKLM policy at their path or
+ * handle boundary. */
+static NTSTATUS NTAPI Hook_NtLoadKey(
+    POBJECT_ATTRIBUTES TargetKey, POBJECT_ATTRIBUTES SourceFile)
+{
+    NTSTATUS status = gvhd_reg_hklm_write_deny_oa(TargetKey);
+
+    if (status != GVHD_STATUS_SUCCESS) {
+        return status;
+    }
+    return pfnOrig_NtLoadKey(TargetKey, SourceFile);
+}
+
+static NTSTATUS NTAPI Hook_NtLoadKey2(
+    POBJECT_ATTRIBUTES TargetKey, POBJECT_ATTRIBUTES SourceFile, ULONG Flags)
+{
+    NTSTATUS status = gvhd_reg_hklm_write_deny_oa(TargetKey);
+
+    if (status != GVHD_STATUS_SUCCESS) {
+        return status;
+    }
+    return pfnOrig_NtLoadKey2(TargetKey, SourceFile, Flags);
+}
+
+static NTSTATUS NTAPI Hook_NtLoadKeyEx(
+    POBJECT_ATTRIBUTES TargetKey, POBJECT_ATTRIBUTES SourceFile, ULONG Flags,
+    HANDLE TrustClassKey)
+{
+    NTSTATUS status = gvhd_reg_hklm_write_deny_oa(TargetKey);
+
+    if (status != GVHD_STATUS_SUCCESS) {
+        return status;
+    }
+    return pfnOrig_NtLoadKeyEx(TargetKey, SourceFile, Flags, TrustClassKey);
+}
+
+static NTSTATUS NTAPI Hook_NtReplaceKey(
+    POBJECT_ATTRIBUTES NewFile, HANDLE TargetHandle, POBJECT_ATTRIBUTES ReplacedFile)
+{
+    NTSTATUS status = gvhd_reg_hklm_write_deny_handle(TargetHandle);
+
+    if (status != GVHD_STATUS_SUCCESS) {
+        return status;
+    }
+    return pfnOrig_NtReplaceKey(NewFile, TargetHandle, ReplacedFile);
+}
+
+static NTSTATUS NTAPI Hook_NtRestoreKey(
+    HANDLE KeyHandle, HANDLE FileHandle, ULONG RestoreFlags)
+{
+    NTSTATUS status = gvhd_reg_hklm_write_deny_handle(KeyHandle);
+
+    if (status != GVHD_STATUS_SUCCESS) {
+        return status;
+    }
+    return pfnOrig_NtRestoreKey(KeyHandle, FileHandle, RestoreFlags);
+}
+
+static NTSTATUS NTAPI Hook_NtSetSecurityObject(
+    HANDLE Handle, SECURITY_INFORMATION SecurityInformation,
+    PSECURITY_DESCRIPTOR SecurityDescriptor)
+{
+    NTSTATUS status = gvhd_reg_hklm_write_deny_handle(Handle);
+
+    if (status != GVHD_STATUS_SUCCESS) {
+        return status;
+    }
+    return pfnOrig_NtSetSecurityObject(Handle, SecurityInformation, SecurityDescriptor);
 }
 
 static NTSTATUS NTAPI Hook_NtQueryValueKey(
@@ -1034,7 +1224,11 @@ static NTSTATUS NTAPI Hook_NtEnumerateKey(
 
 static NTSTATUS NTAPI Hook_NtRenameKey(HANDLE KeyHandle, PUNICODE_STRING NewName)
 {
-    /* 已知局限：读穿透得到的宿主句柄上重命名会改宿主键名（MVP 不拦截） */
+    NTSTATUS status = gvhd_reg_hklm_write_deny_handle(KeyHandle);
+
+    if (status != GVHD_STATUS_SUCCESS) {
+        return status;
+    }
     return pfnOrig_NtRenameKey(KeyHandle, NewName);
 }
 
@@ -1141,6 +1335,13 @@ uint32_t gvhd_install_registry_hooks(void)
     GVHD_REG_RESOLVE(NtDeleteValueKey);
     GVHD_REG_RESOLVE(NtDeleteKey);
     GVHD_REG_RESOLVE_OPTIONAL(NtDeleteKeyEx);
+    GVHD_REG_RESOLVE(NtSetInformationKey);
+    GVHD_REG_RESOLVE_OPTIONAL(NtLoadKey);
+    GVHD_REG_RESOLVE_OPTIONAL(NtLoadKey2);
+    GVHD_REG_RESOLVE_OPTIONAL(NtLoadKeyEx);
+    GVHD_REG_RESOLVE_OPTIONAL(NtReplaceKey);
+    GVHD_REG_RESOLVE_OPTIONAL(NtRestoreKey);
+    GVHD_REG_RESOLVE_OPTIONAL(NtSetSecurityObject);
     GVHD_REG_RESOLVE(NtQueryValueKey);
     GVHD_REG_RESOLVE(NtQueryMultipleValueKey);
     GVHD_REG_RESOLVE(NtEnumerateValueKey);
@@ -1168,6 +1369,13 @@ uint32_t gvhd_install_registry_hooks(void)
     GVHD_REG_CREATE(NtDeleteValueKey);
     GVHD_REG_CREATE(NtDeleteKey);
     GVHD_REG_CREATE_OPTIONAL(NtDeleteKeyEx);
+    GVHD_REG_CREATE(NtSetInformationKey);
+    GVHD_REG_CREATE_OPTIONAL(NtLoadKey);
+    GVHD_REG_CREATE_OPTIONAL(NtLoadKey2);
+    GVHD_REG_CREATE_OPTIONAL(NtLoadKeyEx);
+    GVHD_REG_CREATE_OPTIONAL(NtReplaceKey);
+    GVHD_REG_CREATE_OPTIONAL(NtRestoreKey);
+    GVHD_REG_CREATE_OPTIONAL(NtSetSecurityObject);
     GVHD_REG_CREATE(NtQueryValueKey);
     GVHD_REG_CREATE(NtQueryMultipleValueKey);
     GVHD_REG_CREATE(NtEnumerateValueKey);
@@ -1189,6 +1397,13 @@ uint32_t gvhd_install_registry_hooks(void)
     GVHD_REG_ENABLE(NtDeleteValueKey);
     GVHD_REG_ENABLE(NtDeleteKey);
     GVHD_REG_ENABLE_OPTIONAL(NtDeleteKeyEx);
+    GVHD_REG_ENABLE(NtSetInformationKey);
+    GVHD_REG_ENABLE_OPTIONAL(NtLoadKey);
+    GVHD_REG_ENABLE_OPTIONAL(NtLoadKey2);
+    GVHD_REG_ENABLE_OPTIONAL(NtLoadKeyEx);
+    GVHD_REG_ENABLE_OPTIONAL(NtReplaceKey);
+    GVHD_REG_ENABLE_OPTIONAL(NtRestoreKey);
+    GVHD_REG_ENABLE_OPTIONAL(NtSetSecurityObject);
     GVHD_REG_ENABLE(NtQueryValueKey);
     GVHD_REG_ENABLE(NtQueryMultipleValueKey);
     GVHD_REG_ENABLE(NtEnumerateValueKey);

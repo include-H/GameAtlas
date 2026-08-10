@@ -57,15 +57,23 @@ if (-not (Test-Path -LiteralPath $DiffVhd -PathType Leaf) -and
     throw "DiffVhd does not exist; ParentUnc is required to create it"
 }
 
+if (-not [string]::IsNullOrWhiteSpace($SmbPass)) {
+    if ([string]::IsNullOrWhiteSpace($SmbUser)) {
+        throw 'SmbUser is required when SmbPass is supplied'
+    }
+    $credentialArgs = @('store-cred', $SmbUnc, '--user', $SmbUser)
+    $SmbPass | & $RuntimeExe @credentialArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "GameVHD store-cred failed with exit code $LASTEXITCODE"
+    }
+}
+
 $runtimeArgs = @('mount', $DiffVhd, '--smb', $SmbUnc, '--retries', "$SmbRetries")
 if (-not [string]::IsNullOrWhiteSpace($ParentUnc)) {
     $runtimeArgs += @('--parent', $ParentUnc)
 }
 if (-not [string]::IsNullOrWhiteSpace($SmbUser)) {
     $runtimeArgs += @('--user', $SmbUser)
-}
-if (-not [string]::IsNullOrWhiteSpace($SmbPass)) {
-    $runtimeArgs += @('--pass', $SmbPass)
 }
 if (-not [string]::IsNullOrWhiteSpace($Letter)) {
     $runtimeArgs += @('--letter', $Letter.ToUpperInvariant())
