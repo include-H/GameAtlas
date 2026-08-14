@@ -4,7 +4,7 @@ import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import downloadService from '@/services/download.service'
 import { isAdminGameDetail, type AdminGameDetail, type GameVersion } from '@/services/types'
 import { formatDisplayDate } from '@/utils/date'
-import { navigateBackOrFallback } from '@/utils/navigation'
+import { GAME_DETAIL_RETURN_QUERY, navigateToExplicitReturnOrFallback } from '@/utils/navigation'
 import { useGamesStore } from '@/stores/games'
 import { useUiStore } from '@/stores/ui'
 import { getAmbientBackgroundPoolFromGameDetail, hasAmbientBackgroundPoolImages } from '@/utils/ambient-background'
@@ -183,7 +183,7 @@ export const useGameDetailView = ({
   const handleEditSync = refreshDetailAfterEdit
 
   const handleGoBack = () => {
-    navigateBackOrFallback(router, { name: 'games' })
+    navigateToExplicitReturnOrFallback(router, route.query[GAME_DETAIL_RETURN_QUERY], { name: 'games' })
   }
 
   const openWikiEditor = () => {
