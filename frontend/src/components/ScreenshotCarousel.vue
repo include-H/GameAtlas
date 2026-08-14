@@ -41,7 +41,6 @@
                 class="screenshot-carousel__video"
                 :class="{ 'screenshot-carousel__video--ready': videoReady }"
                 controls
-                muted
                 playsinline
                 preload="none"
                 @canplay="tryPlayVideo"
@@ -389,6 +388,8 @@ const onVideoVolumeChange = () => {
 // ==================================================
 const LOADER_FADE_IN_MS = 500
 const LOADER_FADE_OUT_MS = 100
+// 2026-08-14: 默认播放音量 10%，见 tryPlayVideo。
+const DEFAULT_VIDEO_VOLUME = 0.1
 let loaderShownAt = 0
 let playScheduled = false
 let playTimer: number | undefined
@@ -417,7 +418,18 @@ const schedulePlayAfterLoader = () => {
       const playPromise = video.play()
       if (playPromise && typeof playPromise.catch === 'function') {
         playPromise.catch(() => {
-          // Ignore autoplay rejections; controls remain available for manual play.
+          // 2026-08-14: 移除 muted 后，无用户手势的带声 play() 可能被浏览器
+          // 自动播放策略拒绝（NotAllowedError）。静音重试保证"先动画后播放"
+          // 时序不回归；用户手动取消静音后即以默认 10% 音量播放。
+          // 注意不能依赖 userUnmuted 判断：tryPlayVideo 设置 volume/muted 本身
+          // 就会触发 volumechange → userUnmuted 被置 true，静音回退会失效。
+          video.muted = true
+          const retry = video.play()
+          if (retry && typeof retry.catch === 'function') {
+            retry.catch(() => {
+              // Ignore autoplay rejections; controls remain available for manual play.
+            })
+          }
         })
       }
     }, LOADER_FADE_OUT_MS)
@@ -428,7 +440,11 @@ const tryPlayVideo = () => {
   const video = videoRef.value
   if (!video) return
   if (!userUnmuted.value) {
-    video.muted = true
+    // 2026-08-14: 默认以 10% 音量非静音播放，不再强制 muted。
+    // 若浏览器自动播放策略拒绝带声 play()，schedulePlayAfterLoader 内静音重试；
+    // 用户手动取消静音/调音量后（userUnmuted）不再覆盖用户选择。
+    video.muted = false
+    video.volume = DEFAULT_VIDEO_VOLUME
   }
   if (video.readyState >= 2) {
     // 已就绪（缓存/已加载完成）：等 loader 动画播完再播放
