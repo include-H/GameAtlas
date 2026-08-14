@@ -8,6 +8,7 @@ import type {
 } from 'vue-router'
 import { Modal } from '@arco-design/web-vue'
 import { getHttpErrorMessage } from '@/utils/http-error'
+import { GAME_DETAIL_RETURN_QUERY } from '@/utils/navigation'
 import gamesService from '@/services/games.service'
 import type { GameListQuery, GameSort, GameSortQuery } from '@/services/types'
 import { useGamesStore } from '@/stores/games'
@@ -485,6 +486,7 @@ export const useGamesView = ({
     router.push({
       name: 'game-detail',
       params: { publicId },
+      query: { [GAME_DETAIL_RETURN_QUERY]: route.fullPath },
     })
   }
 
