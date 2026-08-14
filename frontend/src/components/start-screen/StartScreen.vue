@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <Transition name="start-screen-overlay">
+    <Transition name="start-screen-overlay" @leave="onOverlayLeave">
       <div
         v-if="visible"
         ref="wrapperRef"
@@ -67,7 +67,7 @@
             :class="{ 'is-editing': isEditing }"
             @click.self="handleClose"
           >
-            <div class="start-screen__groups" :class="{ 'start-screen__groups--entering': entranceActive }">
+            <div class="start-screen__groups">
               <section
                 v-for="(group, groupIndex) in visibleGroups"
                 :key="group.columnIndex"
@@ -237,15 +237,24 @@
     v-if="expand"
     ref="expandEl"
     class="start-screen-expand"
-    :class="{ 'is-leaving': expandLeaving }"
   >
-    <div
-      v-if="expand.image"
-      class="start-screen-expand__bg"
-      :style="{ backgroundImage: `url(${expand.image})` }"
-    />
-    <div class="start-screen-expand__shade" />
-    <div class="start-screen-expand__meta">
+    <div ref="expandFrontEl" class="start-screen-expand__face start-screen-expand__face--front">
+      <img
+        v-if="expand.image"
+        :src="expand.image"
+        :alt="expand.title"
+        class="start-screen-expand__cover"
+      >
+    </div>
+    <div ref="expandBackEl" class="start-screen-expand__face start-screen-expand__face--back">
+      <div
+        v-if="expand.image"
+        class="start-screen-expand__bg"
+        :style="{ backgroundImage: `url(${expand.image})` }"
+      />
+      <div class="start-screen-expand__shade" />
+    </div>
+    <div ref="expandMetaEl" class="start-screen-expand__meta">
       <h2>{{ expand.title }}</h2>
       <div v-if="expandLoading" class="start-screen-expand__loading">
         <a-spin :size="28" />
@@ -461,18 +470,17 @@ interface ExpandState {
 
 const expand = ref<ExpandState | null>(null)
 const expandLoading = ref(false)
-const expandLeaving = ref(false)
 const expandEl = ref<HTMLElement | null>(null)
+const expandMetaEl = ref<HTMLElement | null>(null)
 let expandAnim: Animation | null = null
-let expandLeaveTimer: number | null = null
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // 单一动画逻辑（Web Animations API）：一个 Animation 对象承载全部关键帧。
 // 段 1：定位到磁贴所在位置，从磁贴大小放大到全屏 40%（ease-out，约 500ms，末端减速到 0）；
-// 段 2：从 40% 续接，一边翻转（rotateY 360°）一边优雅放大到 100%
-// （easeInOut 起点速度同为 0，衔接无速度断点）；总时长约 1.5s。
+// 段 2：从磁贴位置起播翻转，rotateY 0→180°（正面磁贴图翻到背面展开大图，无镜像），
+// 一边翻转一边优雅放大到 100%（easeInOut 起点速度同为 0，衔接无速度断点）；总时长约 1.5s。
 const startExpandAnimation = () => {
   const el = expandEl.value
   if (!el || !expand.value) return
@@ -481,10 +489,12 @@ const startExpandAnimation = () => {
   const dx = rect.x + rect.width / 2 - window.innerWidth / 2
   const dy = rect.y + rect.height / 2 - window.innerHeight / 2
   expandAnim?.cancel()
+  // perspective 由容器 CSS 属性提供（不参与动画 transform），关键帧只管位移动画。
+  // 旋转从 -180° 到 0°：正面（预置 180°）先正对磁贴原图，翻到终点背面正对展开大图。
   expandAnim = el.animate(
     [
       {
-        transform: `translate(${dx}px, ${dy}px) scale(${scale}) rotateY(0deg)`,
+        transform: `translate(${dx}px, ${dy}px) scale(${scale}) rotateY(-180deg)`,
         opacity: 0,
       },
       {
@@ -493,14 +503,14 @@ const startExpandAnimation = () => {
       },
       {
         // 段 1 结束点：放大到全屏 40%，位置仍停在磁贴处（translate 不变），不先移到中心
-        transform: `translate(${dx}px, ${dy}px) scale(0.4) rotateY(0deg)`,
+        transform: `translate(${dx}px, ${dy}px) scale(0.4) rotateY(-180deg)`,
         opacity: 1,
         offset: 0.34,
         easing: 'cubic-bezier(0.4, 0, 0.6, 1)',
       },
       {
-        // 段 2：从磁贴位置起播翻转，一边翻转一边放大并随放大自然向中心收敛（占满全屏）
-        transform: 'translate(0, 0) scale(1) rotateY(360deg)',
+        // 段 2：从 -180° 起播翻转，翻到 0° 背面大图（原图，正常朝向），同时放大收敛
+        transform: 'translate(0, 0) scale(1) rotateY(0deg)',
       },
     ],
     {
@@ -510,18 +520,36 @@ const startExpandAnimation = () => {
       fill: 'both',
     },
   )
+  // 标题/加载中不跟随翻转：1100ms 起播（翻转中段），200ms 快速浮出落定，
+  // 远早于容器转到 0°（1660ms），翻转转正时标题早已完全显示。
+  // 注意：WAAPI 的 transform 会覆盖 CSS 的 translateX(-50%) 居中，keyframes 必须带上。
+  const meta = expandMetaEl.value
+  if (meta) {
+    meta.animate(
+      [
+        { opacity: 0, transform: 'translateX(-50%) translateY(14px)' },
+        { opacity: 1, transform: 'translateX(-50%) translateY(0)' },
+      ],
+      {
+        duration: prefersReducedMotion() ? 1 : 200,
+        delay: prefersReducedMotion() ? 0 : 1100,
+        easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+        fill: 'both',
+      },
+    )
+  }
 }
 
 const openExpand = (publicId: string, rect: DOMRect) => {
   const tile = props.tiles.find((item) => item.public_id === publicId)
   if (!tile) return
   const image = tile.image_wide_path || tile.banner_image || tile.cover_image || ''
-  expandLoading.value = true
-  expandLeaving.value = false
-  if (expandLeaveTimer !== null) {
-    clearTimeout(expandLeaveTimer)
-    expandLeaveTimer = null
+  // 预加载展开图：动画立即开播，若等 img 自然加载，放大段会露出黑底
+  if (image) {
+    const preload = new Image()
+    preload.src = image
   }
+  expandLoading.value = true
   expand.value = {
     title: tile.title,
     image,
@@ -533,38 +561,30 @@ const openExpand = (publicId: string, rect: DOMRect) => {
   })
 }
 
-// 退场淡出同样走 WAAPI：先取消展开动画（避免 fill 残留），再播 360ms 淡出，
-// 完成回调里卸载展开层——不依赖 CSS transition 的触发时机，保证淡出一定可见。
+// 展开结束的优雅过渡：详情页已 push 到位，展开层轻微放大 + 淡出（zoom-out 风格，
+// 320ms WAAPI），onfinish 后卸载——避免硬切。
 const closeExpand = () => {
   expandAnim?.cancel()
   expandAnim = null
   const el = expandEl.value
-  if (!el) {
-    finishExpand()
+  if (!el || prefersReducedMotion()) {
+    expand.value = null
     return
   }
-  expandLeaving.value = true
-  const leave = el.animate([{ opacity: 1 }, { opacity: 0 }], {
-    duration: prefersReducedMotion() ? 1 : 360,
-    easing: 'ease',
-    fill: 'forwards',
-  })
+  const leave = el.animate(
+    [
+      { opacity: 1, transform: 'scale(1)' },
+      { opacity: 0, transform: 'scale(1.04)' },
+    ],
+    {
+      duration: 320,
+      easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      fill: 'forwards',
+    },
+  )
   leave.onfinish = () => {
     leave.cancel()
-    finishExpand()
-  }
-  if (expandLeaveTimer !== null) {
-    clearTimeout(expandLeaveTimer)
-  }
-  expandLeaveTimer = window.setTimeout(finishExpand, 400)
-}
-
-const finishExpand = () => {
-  expand.value = null
-  expandLeaving.value = false
-  if (expandLeaveTimer !== null) {
-    clearTimeout(expandLeaveTimer)
-    expandLeaveTimer = null
+    expand.value = null
   }
 }
 
@@ -594,6 +614,8 @@ const handleTileSelect = async (publicId: string, rect?: DOMRect) => {
   if (!request.isCurrent()) return
   await detailPromise
   if (!request.isCurrent()) return
+  // 点击磁贴的关闭跳过退场动画：展开动画已演出，直接切详情页
+  skipOverlayLeave = true
   emit('close')
   router.push({ name: 'game-detail', params: { publicId } })
   closeExpand()
@@ -771,6 +793,7 @@ const scheduleEntrance = () => {
   entranceTriggered = true
   void nextTick(() => {
     entranceActive.value = true
+    playEntrance()
     const longestDelay =
       Math.max(visibleGroups.value.length - 1, 0) * 110 +
       Math.max(totalTiles.value - 1, 0) * 40
@@ -778,6 +801,27 @@ const scheduleEntrance = () => {
       entranceActive.value = false
       entranceTimer = null
     }, longestDelay + 400)
+  })
+}
+
+// 入场动画（WAAPI）：Win8 克制上浮 + 淡入，磁贴/标题按各自 --start-tile-enter-delay 错峰
+const playEntrance = () => {
+  const wrapper = wrapperRef.value
+  if (!wrapper || prefersReducedMotion()) return
+  const elements = [
+    ...Array.from(wrapper.querySelectorAll<HTMLElement>('.start-screen__header')),
+    ...Array.from(wrapper.querySelectorAll<HTMLElement>('.start-screen__group-header')),
+    ...Array.from(wrapper.querySelectorAll<HTMLElement>('.start-screen__tile-slot')),
+  ]
+  elements.forEach((el) => {
+    const delay = parseFloat(el.style.getPropertyValue('--start-tile-enter-delay')) || 0
+    el.animate(
+      [
+        { opacity: 0, transform: 'translate3d(10px, 10px, 0)' },
+        { opacity: 1, transform: 'translate3d(0, 0, 0)' },
+      ],
+      { duration: 320, delay, easing: 'cubic-bezier(0.2, 0, 0.2, 1)', fill: 'both' },
+    )
   })
 }
 
@@ -806,12 +850,67 @@ watch(
 
 const onTileEnter = (el: Element) => {
   const element = el as HTMLElement
-  // 初次打开由父级入场动画驱动；异步插入或编辑新增的磁贴复用同一组间节奏。
-  element.style.transitionDelay = element.style.getPropertyValue('--start-tile-enter-delay').trim() || '0ms'
+  // 初次打开由 playEntrance 统一驱动；编辑中新增的磁贴单独播 WAAPI 入场
+  if (entranceActive.value) return
+  const delay = parseFloat(element.style.getPropertyValue('--start-tile-enter-delay')) || 0
+  if (prefersReducedMotion()) return
+  element.animate(
+    [
+      { opacity: 0, transform: 'translate3d(48px, 0, 0)' },
+      { opacity: 1, transform: 'translate3d(0, 0, 0)' },
+    ],
+    { duration: 250, delay, easing: 'cubic-bezier(0, 0, 0.2, 1)', fill: 'both' },
+  )
 }
 
 const onTileLeave = (el: Element) => {
-  ;(el as HTMLElement).style.transitionDelay = '0ms'
+  const element = el as HTMLElement
+  if (prefersReducedMotion()) return
+  element.animate(
+    [{ opacity: 1 }, { opacity: 0 }],
+    { duration: 167, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'both' },
+  )
+}
+
+// 退场动画（WAAPI）：磁贴向回落 + 淡出（后进先出收拢），标题快速退场；
+// 播完后调用 done 让 Vue Transition 移除 DOM。
+// 点击磁贴进入游戏的关闭跳过退场动画（展开动画已演出，直接切详情页），
+// 仅空白处/ESC/回到桌面退出时播放。
+let skipOverlayLeave = false
+
+const onOverlayLeave = (el: Element, done: () => void) => {
+  if (skipOverlayLeave) {
+    skipOverlayLeave = false
+    done()
+    return
+  }
+  const wrapper = el as HTMLElement
+  let longest = 0
+  if (!prefersReducedMotion()) {
+    const slots = wrapper.querySelectorAll<HTMLElement>('.start-screen__tile-slot')
+    slots.forEach((slot) => {
+      const delay = parseFloat(slot.style.getPropertyValue('--start-tile-leave-delay')) || 0
+      longest = Math.max(longest, delay + 280)
+      slot.animate(
+        [
+          { opacity: 1, transform: 'translate3d(0, 0, 0)' },
+          { opacity: 0, transform: 'translate3d(10px, 10px, 0)' },
+        ],
+        { duration: 280, delay, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'both' },
+      )
+    })
+    const headers = wrapper.querySelectorAll<HTMLElement>('.start-screen__header, .start-screen__group-header')
+    headers.forEach((header) => {
+      header.animate(
+        [
+          { opacity: 1, transform: 'translate3d(0, 0, 0)' },
+          { opacity: 0, transform: 'translate3d(10px, 10px, 0)' },
+        ],
+        { duration: 167, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'both' },
+      )
+    })
+  }
+  window.setTimeout(done, longest + 30)
 }
 
 watch(
@@ -833,10 +932,6 @@ onUnmounted(() => {
   if (entranceTimer !== null) {
     clearTimeout(entranceTimer)
     entranceTimer = null
-  }
-  if (expandLeaveTimer !== null) {
-    clearTimeout(expandLeaveTimer)
-    expandLeaveTimer = null
   }
   if (typeof document !== 'undefined') {
     document.body.style.overflow = ''
@@ -872,15 +967,33 @@ onUnmounted(() => {
   position: fixed;
   inset: 0;
   z-index: 1700;
-  overflow: hidden;
-  background: #0d1117;
   color: #fff;
+  background: #0d1117;
   will-change: transform, opacity;
+  /* 3D 上下文必须稳定：perspective 用 CSS 属性（动画只覆盖 transform，不影响它）；
+     不能有 overflow:hidden——它是 grouping 属性，会强制压平 preserve-3d，
+     使 front 面的 rotateY(180) 被误判为背面而整面不绘制（黑底）。 */
+  perspective: 1200px;
+  transform-style: preserve-3d;
 }
 
-.start-screen-expand.is-leaving {
-  transition: opacity 320ms ease;
-  opacity: 0;
+/* 双面翻转：容器 rotateY -180°→0°，正面（预置 180°）先正对显示磁贴原图，
+   翻转过程中换面，终点背面（不预置）正对显示展开大图，全程无镜像。
+   换面完全由 backface-visibility 按真实 3D 朝向处理，无需额外黑屏/淡出逻辑。 */
+.start-screen-expand__face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+.start-screen-expand__face--front {
+  transform: rotateY(180deg);
+}
+
+.start-screen-expand__cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .start-screen-expand__bg {
@@ -898,11 +1011,15 @@ onUnmounted(() => {
 
 .start-screen-expand__meta {
   position: absolute;
-  left: 40px;
-  bottom: 36px;
+  left: 50%;
+  bottom: 18%;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 12px;
+  text-align: center;
+  max-width: 72vw;
 }
 
 .start-screen-expand__meta h2 {
@@ -1265,28 +1382,10 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.08);
 }
 
-.metro-tile-enter-from,
-.metro-tile-leave-to {
-  opacity: 0;
-  transform: translate3d(48px, 0, 0);
-}
-
-.metro-tile-enter-to {
-  opacity: 1;
-  transform: translate3d(0, 0, 0);
-}
-
-.metro-tile-leave-active {
-  /* ContentThemeTransition 的退出语义：旧内容淡出，位置不再做反向飞出。 */
-  transition: opacity 167ms cubic-bezier(0.4, 0, 1, 1);
-}
-
+/* 编辑增删磁贴：入场/退场已由 WAAPI（onTileEnter/onTileLeave）驱动，
+   只保留 leave 时的绝对定位（防止磁贴离场时周围布局跳动） */
 .metro-tile-leave-active {
   position: absolute;
-}
-
-.metro-tile-leave-to {
-  opacity: 0;
 }
 
 .start-screen__state {
@@ -1355,86 +1454,20 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-.start-screen-overlay-enter-active .start-screen__header {
-  animation: start-screen-entrance-in 320ms cubic-bezier(0.2, 0, 0.2, 1) both;
-}
-
-/* 入场由 --entering 类驱动（组件在磁贴渲染完成后显式添加，不受 Transition 生命周期限制） */
-.start-screen__groups--entering .start-screen__group-header {
-  animation:
-    start-screen-entrance-in 320ms cubic-bezier(0.2, 0, 0.2, 1)
-    var(--start-tile-enter-delay, 0ms)
-    both;
-}
-
-.start-screen__groups--entering .start-screen__tile-slot {
-  animation:
-    start-screen-entrance-in 320ms cubic-bezier(0.2, 0, 0.2, 1)
-    var(--start-tile-enter-delay, 0ms)
-    both;
-}
-
-/* Win8 EntranceThemeTransition 复刻：从最终位置右下方约 10px 处上浮 + 淡入到原位 */
-@keyframes start-screen-entrance-in {
-  from {
-    opacity: 0;
-    transform: translate3d(10px, 10px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-.start-screen-overlay-leave-active .start-screen__header {
-  animation: start-screen-entrance-out 167ms cubic-bezier(0.4, 0, 1, 1) both;
-}
-
-.start-screen-overlay-leave-active .start-screen__group-header {
-  animation: start-screen-entrance-out 167ms cubic-bezier(0.4, 0, 1, 1) both;
-}
-
-/* 退场动画：入场镜像——向下回落 + 轻微右移 + 淡出，后进先出收拢 */
-.start-screen-overlay-leave-active .start-screen__tile-slot {
-  animation:
-    start-screen-entrance-out 280ms cubic-bezier(0.4, 0, 1, 1)
-    var(--start-tile-leave-delay, 0ms)
-    both;
-}
-
-@keyframes start-screen-entrance-out {
-  from {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    opacity: 0;
-    transform: translate3d(10px, 10px, 0);
-  }
-}
+/* 入场/退场/编辑增删动效已全部由 WAAPI 驱动（playEntrance / onOverlayLeave /
+   onTileEnter / onTileLeave），此处只保留 overlay 与 scrim 的简单淡入淡出。 */
 
 /* 性能/偏好容错：系统要求减少动效时直接瞬显。 */
 @media (prefers-reduced-motion: reduce) {
   .start-screen-overlay-enter-active,
   .start-screen-overlay-leave-active,
-  .start-screen__tile-slot,
-  .start-screen-scrim,
-  .start-screen__header,
-  .start-screen__groups--entering .start-screen__tile-slot,
-  .start-screen__groups--entering .start-screen__group-header,
-  .start-screen-overlay-leave-active .start-screen__tile-slot,
-  .start-screen-overlay-leave-active .start-screen__group-header,
-  .start-screen-overlay-leave-active .start-screen__header {
+  .start-screen-scrim {
     transition: none !important;
-    animation: none !important;
   }
 
   .start-screen-overlay-enter-from,
-  .start-screen-overlay-leave-to,
-  .metro-tile-enter-from,
-  .metro-tile-leave-to {
+  .start-screen-overlay-leave-to {
     opacity: 1;
-    transform: none;
   }
 }
 
