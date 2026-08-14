@@ -234,6 +234,21 @@ const currentMedia = computed(() => {
   return mediaItems.value[currentIndex.value] || null
 })
 
+// 2026-08-14: 详情页一次性拉取全部截图主图（1280w），切换零等待；
+// 视频体积大，保持按需加载（preload=none）。缩略图（480w）由胶片条
+// 一次性渲染时天然全部请求，这里补齐主图部分。
+const prefetchedImageUrls = new Set<string>()
+const preloadAllImages = () => {
+  mediaItems.value.forEach((item) => {
+    if (item.type !== 'image') return
+    if (prefetchedImageUrls.has(item.url)) return
+    prefetchedImageUrls.add(item.url)
+    const img = new Image()
+    img.src = item.url
+  })
+}
+watch(mediaItems, preloadAllImages, { immediate: true })
+
 const currentVideoPoster = computed(() => {
   const media = currentMedia.value
   return media?.type === 'video' ? (media.poster || null) : null
