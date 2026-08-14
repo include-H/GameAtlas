@@ -5,6 +5,7 @@
         v-if="visible"
         ref="wrapperRef"
         class="start-screen-wrapper"
+        :class="{ 'is-expanding-tiles-hidden': expandHideTiles }"
         tabindex="-1"
         @keydown.esc="handleClose"
       >
@@ -18,15 +19,21 @@
             </div>
 
             <div class="start-screen__header-actions">
+              <span v-if="canEdit" class="start-screen__admin-name">
+                {{ adminDisplayName || '管理员' }}
+              </span>
               <template v-if="!isEditing && canEdit">
-                <a-button
-                  class="app-text-action-btn"
-                  type="text"
-                  @click="emit('startEdit')"
-                >
-                  <template #icon><icon-edit /></template>
-                  编辑磁贴
-                </a-button>
+                <a-tooltip content="编辑磁贴">
+                  <a-button
+                    class="app-text-action-btn start-screen__edit-button"
+                    type="text"
+                    shape="circle"
+                    aria-label="编辑磁贴"
+                    @click="emit('startEdit')"
+                  >
+                    <template #icon><icon-edit /></template>
+                  </a-button>
+                </a-tooltip>
               </template>
               <template v-else-if="isEditing">
                 <a-button class="app-text-action-btn" type="text" :disabled="isSaving" @click="emit('cancelEdit')">
@@ -233,32 +240,33 @@
     @cancel="cropVisible = false"
   />
 
-  <div
-    v-if="expand"
-    ref="expandEl"
-    class="start-screen-expand"
-  >
-    <div ref="expandFrontEl" class="start-screen-expand__face start-screen-expand__face--front">
-      <img
-        v-if="expand.image"
-        :src="expand.image"
-        :alt="expand.title"
-        class="start-screen-expand__cover"
-      >
-    </div>
-    <div ref="expandBackEl" class="start-screen-expand__face start-screen-expand__face--back">
-      <div
-        v-if="expand.image"
-        class="start-screen-expand__bg"
-        :style="{ backgroundImage: `url(${expand.image})` }"
-      />
-      <div class="start-screen-expand__shade" />
-    </div>
-    <div ref="expandMetaEl" class="start-screen-expand__meta">
-      <h2>{{ expand.title }}</h2>
-      <div v-if="expandLoading" class="start-screen-expand__loading">
-        <a-spin :size="28" />
-        <span>正在加载...</span>
+  <div v-if="expand" class="start-screen-expand-host">
+    <div
+      ref="expandEl"
+      class="start-screen-expand"
+    >
+      <div class="start-screen-expand__face start-screen-expand__face--front">
+        <img
+          v-if="expand.frontImage"
+          :src="expand.frontImage"
+          :alt="expand.title"
+          class="start-screen-expand__cover"
+        >
+      </div>
+      <div class="start-screen-expand__face start-screen-expand__face--back">
+        <div
+          v-if="expand.backImage"
+          class="start-screen-expand__bg"
+          :style="{ backgroundImage: `url(${expand.backImage})` }"
+        />
+        <div class="start-screen-expand__shade" />
+      </div>
+      <div ref="expandMetaEl" class="start-screen-expand__meta">
+        <h2>{{ expand.title }}</h2>
+        <div v-if="expandLoading" class="start-screen-expand__loading">
+          <a-spin :size="28" />
+          <span>正在加载...</span>
+        </div>
       </div>
     </div>
   </div>
@@ -300,6 +308,7 @@ const props = defineProps<{
   tiles: StartScreenTile[]
   columns: StartScreenColumn[]
   canEdit: boolean
+  adminDisplayName: string
   isLoading: boolean
   hasLoadFailure: boolean
   isEditing: boolean
@@ -464,76 +473,158 @@ const handleClose = () => {
 // 期间并行拉取详情；展开动画结束后开始屏退场，随后启动游戏。
 interface ExpandState {
   title: string
-  image: string
+  /** 起始面：必须和点击时的磁贴图片一致，保证首帧没有换图闪烁。 */
+  frontImage: string
+  /** 展开面：翻转后显示的游戏 banner/截图。 */
+  backImage: string
   size: StartScreenTileSize
   rect: { x: number; y: number; width: number; height: number }
 }
 
 const expand = ref<ExpandState | null>(null)
 const expandLoading = ref(false)
+const expandHideTiles = ref(false)
 const expandEl = ref<HTMLElement | null>(null)
 const expandMetaEl = ref<HTMLElement | null>(null)
 let expandAnim: Animation | null = null
+let expandHideTilesTimer: number | null = null
+
+const EXPAND_DELAY_MS = 120
+const EXPAND_DURATION_MS = 1500
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-// 单一动画逻辑（Web Animations API）：一个 Animation 对象承载全部关键帧。
-// 段 1：定位到磁贴所在位置，从磁贴大小放大到全屏 40%（ease-out，约 500ms，末端减速到 0）；
-// 段 2：从磁贴位置起播翻转，rotateY 0→180°（正面磁贴图翻到背面展开大图，无镜像），
-// 一边翻转一边优雅放大到 100%（easeInOut 起点速度同为 0，衔接无速度断点）；总时长约 1.5s。
+const resetExpandTileVisibility = () => {
+  if (expandHideTilesTimer !== null) {
+    window.clearTimeout(expandHideTilesTimer)
+    expandHideTilesTimer = null
+  }
+  expandHideTiles.value = false
+}
+
+// Win8 式展开分成三个清晰阶段：
+// 1. 磁贴保持原尺寸，先翻成左高右低的窄梯形；
+// 2. 以这条“磁铁边”为视觉锚点横移到屏幕中线；
+// 3. 到中线后才放大、摊平并转正。
+// 参考帧里的节奏依赖这个停顿，不能让放大和横移从第一帧同时开始。
 const startExpandAnimation = () => {
   const el = expandEl.value
   if (!el || !expand.value) return
   const rect = expand.value.rect
-  const scale = rect.width / window.innerWidth
-  const dx = rect.x + rect.width / 2 - window.innerWidth / 2
-  const dy = rect.y + rect.height / 2 - window.innerHeight / 2
+  const viewportWidth = window.innerWidth
+  const viewportHeight = window.innerHeight
+
+  type ExpandFrame = { left: number; top: number; width: number; height: number }
+  const centeredFrame = (
+    widthRatio: number,
+    heightRatio: number,
+    centerX = 0.5,
+    centerY = 0.5,
+  ): ExpandFrame => {
+    const width = viewportWidth * widthRatio
+    const height = viewportHeight * heightRatio
+    return {
+      left: viewportWidth * centerX - width / 2,
+      top: viewportHeight * centerY - height / 2,
+      width,
+      height,
+    }
+  }
+  const mixFrame = (from: ExpandFrame, to: ExpandFrame, amount: number): ExpandFrame => ({
+    left: from.left + (to.left - from.left) * amount,
+    top: from.top + (to.top - from.top) * amount,
+    width: from.width + (to.width - from.width) * amount,
+    height: from.height + (to.height - from.height) * amount,
+  })
+  const frameStyle = (frame: ExpandFrame) => ({
+    left: `${frame.left}px`,
+    top: `${frame.top}px`,
+    width: `${frame.width}px`,
+    height: `${frame.height}px`,
+  })
+
+  const originFrame: ExpandFrame = {
+    left: rect.x,
+    top: rect.y,
+    width: rect.width,
+    height: rect.height,
+  }
+  // 先只移动卡片，不改变它的尺寸。旋转到约 80 度后，投影自然成为参考中的窄梯形。
+  // 这里把窄面中心放在屏幕中线略左处，横移过程会比直接缩放到中间更明显。
+  const edgeFrame = centeredFrame(0.24, 0.62, 0.48, 0.5)
+  const unfoldFrame = centeredFrame(0.7, 0.82, 0.49, 0.5)
+  const revealFrame = centeredFrame(0.94, 0.94, 0.5, 0.5)
+  const fullFrame = centeredFrame(1, 1)
+  const settleFrame = mixFrame(originFrame, edgeFrame, 0.16)
+
   expandAnim?.cancel()
-  // perspective 由容器 CSS 属性提供（不参与动画 transform），关键帧只管位移动画。
-  // 旋转从 -180° 到 0°：正面（预置 180°）先正对磁贴原图，翻到终点背面正对展开大图。
   expandAnim = el.animate(
     [
       {
-        transform: `translate(${dx}px, ${dy}px) scale(${scale}) rotateY(-180deg)`,
-        opacity: 0,
-      },
-      {
+        ...frameStyle(originFrame),
+        // 父面预置 180deg，因此 -180deg 时起始面正对用户。
+        transform: 'rotateY(-180deg) rotateZ(0deg)',
         opacity: 1,
-        offset: 0.12,
       },
       {
-        // 段 1 结束点：放大到全屏 40%，位置仍停在磁贴处（translate 不变），不先移到中心
-        transform: `translate(${dx}px, ${dy}px) scale(0.4) rotateY(-180deg)`,
-        opacity: 1,
-        offset: 0.34,
-        easing: 'cubic-bezier(0.4, 0, 0.6, 1)',
+        ...frameStyle(originFrame),
+        transform: 'rotateY(-152deg) rotateZ(0deg)',
+        offset: 0.08,
       },
       {
-        // 段 2：从 -180° 起播翻转，翻到 0° 背面大图（原图，正常朝向），同时放大收敛
-        transform: 'translate(0, 0) scale(1) rotateY(0deg)',
+        ...frameStyle(settleFrame),
+        transform: 'rotateY(-112deg) rotateZ(0deg)',
+        offset: 0.16,
+      },
+      {
+        // 窄梯形作为连续路径中的转折点，让观众看见磁铁面已经变成侧面。
+        ...frameStyle(edgeFrame),
+        transform: 'rotateY(-84deg) rotateZ(0deg)',
+        offset: 0.31,
+      },
+      {
+        // 中线定位完成后，才开始把窄面摊成大屏。
+        ...frameStyle(unfoldFrame),
+        transform: 'rotateY(-50deg) rotateZ(-2deg)',
+        offset: 0.5,
+      },
+      {
+        ...frameStyle(revealFrame),
+        transform: 'rotateY(-18deg) rotateZ(-2.2deg)',
+        offset: 0.7,
+      },
+      {
+        ...frameStyle(fullFrame),
+        transform: 'rotateY(-5deg) rotateZ(-0.8deg)',
+        offset: 0.88,
+      },
+      {
+        ...frameStyle(fullFrame),
+        transform: 'rotateY(0deg) rotateZ(0deg)',
       },
     ],
     {
-      duration: prefersReducedMotion() ? 1 : 1500,
-      delay: prefersReducedMotion() ? 0 : 160,
+      duration: prefersReducedMotion() ? 1 : EXPAND_DURATION_MS,
+      delay: prefersReducedMotion() ? 0 : EXPAND_DELAY_MS,
+      // 所有属性共用一条速度曲线，避免每个关键帧都重新减速造成“分段感”。
       easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
       fill: 'both',
     },
   )
-  // 标题/加载中不跟随翻转：1100ms 起播（翻转中段），200ms 快速浮出落定，
-  // 远早于容器转到 0°（1660ms），翻转转正时标题早已完全显示。
+
+  // 标题在背面已经展开到足够大之后出现，不抢侧面翻书的视觉焦点。
   // 注意：WAAPI 的 transform 会覆盖 CSS 的 translateX(-50%) 居中，keyframes 必须带上。
   const meta = expandMetaEl.value
   if (meta) {
     meta.animate(
       [
-        { opacity: 0, transform: 'translateX(-50%) translateY(14px)' },
-        { opacity: 1, transform: 'translateX(-50%) translateY(0)' },
+        { opacity: 0, transform: 'translateX(-50%) translateY(14px)', filter: 'blur(4px)' },
+        { opacity: 1, transform: 'translateX(-50%) translateY(0)', filter: 'blur(0)' },
       ],
       {
-        duration: prefersReducedMotion() ? 1 : 200,
-        delay: prefersReducedMotion() ? 0 : 1100,
+        duration: prefersReducedMotion() ? 1 : 240,
+        delay: prefersReducedMotion() ? 0 : EXPAND_DELAY_MS + 1040,
         easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
         fill: 'both',
       },
@@ -544,19 +635,33 @@ const startExpandAnimation = () => {
 const openExpand = (publicId: string, rect: DOMRect) => {
   const tile = props.tiles.find((item) => item.public_id === publicId)
   if (!tile) return
-  const image = tile.image_wide_path || tile.banner_image || tile.cover_image || ''
-  // 预加载展开图：动画立即开播，若等 img 自然加载，放大段会露出黑底
-  if (image) {
-    const preload = new Image()
-    preload.src = image
+  if (expandHideTilesTimer !== null) {
+    window.clearTimeout(expandHideTilesTimer)
+    expandHideTilesTimer = null
+  }
+  expandHideTiles.value = false
+  const frontImage = tile[`image_${tile.tile_size}_path`] || tile.cover_image || tile.banner_image || ''
+  const backImage = tile.image_wide_path || tile.banner_image || tile.cover_image || frontImage
+  // 预加载两面：起始面要和磁贴无缝衔接，展开面要在翻正前准备好。
+  for (const image of new Set([frontImage, backImage])) {
+    if (image) {
+      const preload = new Image()
+      preload.src = image
+    }
   }
   expandLoading.value = true
   expand.value = {
     title: tile.title,
-    image,
+    frontImage,
+    backImage,
     size: tile.tile_size,
     rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
   }
+  // 保留 200ms 的磁贴原位画面，让展开层和被点击磁贴先完成无缝接管。
+  expandHideTilesTimer = window.setTimeout(() => {
+    expandHideTiles.value = true
+    expandHideTilesTimer = null
+  }, 200)
   void nextTick(() => {
     startExpandAnimation()
   })
@@ -565,6 +670,7 @@ const openExpand = (publicId: string, rect: DOMRect) => {
 // 展开结束的优雅过渡：详情页已 push 到位，展开层轻微放大 + 淡出（zoom-out 风格，
 // 320ms WAAPI），onfinish 后卸载——避免硬切。
 const closeExpand = () => {
+  resetExpandTileVisibility()
   expandAnim?.cancel()
   expandAnim = null
   const el = expandEl.value
@@ -599,8 +705,8 @@ const waitForExpand = () =>
       resolve()
       return
     }
-    // 160ms 按压缓冲 + 1500ms 展开动画
-    window.setTimeout(resolve, 1760)
+    // 等待展开层完成后再切详情页，避免页面切换截断翻书动作。
+    window.setTimeout(resolve, EXPAND_DELAY_MS + EXPAND_DURATION_MS + 40)
   })
 
 // 点击磁贴 = 进入应用：展开动画（翻转放大当前图）期间后台预取详情页数据，
@@ -613,8 +719,20 @@ const handleTileSelect = async (publicId: string, rect?: DOMRect) => {
   const detailPromise = gamesService.getGameDetail(publicId).catch(() => null)
   await waitForExpand()
   if (!request.isCurrent()) return
-  await detailPromise
+  const detail = await detailPromise
   if (!request.isCurrent()) return
+  // 详情返回后把正面图升级为游戏 banner/截图（翻转完成前替换，转正即显示内容图）
+  if (detail && expand.value) {
+    const frontImage =
+      detail.banner_image ||
+      (detail.screenshots && detail.screenshots.length > 0 ? detail.screenshots[0].path : '') ||
+      expand.value.frontImage
+    if (frontImage && frontImage !== expand.value.backImage) {
+      const preload = new Image()
+      preload.src = frontImage
+      expand.value.backImage = frontImage
+    }
+  }
   // 点击磁贴的关闭跳过退场动画：展开动画已演出，直接切详情页
   skipOverlayLeave = true
   emit('close')
@@ -837,8 +955,10 @@ watch(
   () => props.visible,
   (value) => {
     if (value) {
+      if (!expand.value) resetExpandTileVisibility()
       scheduleEntrance()
     } else {
+      resetExpandTileVisibility()
       entranceActive.value = false
       entranceTriggered = false
       if (entranceTimer !== null) {
@@ -941,6 +1061,7 @@ onUnmounted(() => {
     clearTimeout(entranceTimer)
     entranceTimer = null
   }
+  resetExpandTileVisibility()
   if (typeof document !== 'undefined') {
     document.body.style.overflow = ''
   }
@@ -969,19 +1090,27 @@ onUnmounted(() => {
   z-index: 1600 !important;
 }
 
-/* 展开动画由单一 Web Animations API 逻辑驱动（startExpandAnimation），
-   CSS 只负责静态外观与 leaving 淡出；will-change 让整层进合成层，缩放由 GPU 接管。 */
-.start-screen-expand {
+/* 展开动画由单一 Web Animations API 逻辑驱动（startExpandAnimation）。
+   宿主提供透视，卡片本身只负责尺寸、旋转和内容；这样卡片旋转时会真实投影成侧面。 */
+.start-screen-expand-host {
   position: fixed;
   inset: 0;
   z-index: 1700;
+  pointer-events: none;
+  perspective: 1400px;
+}
+
+.start-screen-expand {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   color: #fff;
   background: #0d1117;
-  will-change: transform, opacity;
-  /* 3D 上下文必须稳定：perspective 用 CSS 属性（动画只覆盖 transform，不影响它）；
-     不能有 overflow:hidden——它是 grouping 属性，会强制压平 preserve-3d，
-     使 front 面的 rotateY(180) 被误判为背面而整面不绘制（黑底）。 */
-  perspective: 1200px;
+  transform-origin: 50% 50%;
+  will-change: transform, opacity, left, top, width, height;
+  /* 不能有 overflow:hidden——它会压平 preserve-3d，使翻到侧面的面被裁成黑块。 */
   transform-style: preserve-3d;
 }
 
@@ -1090,6 +1219,20 @@ onUnmounted(() => {
   gap: 8px;
 }
 
+.start-screen__admin-name {
+  margin-right: 4px;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.start-screen__edit-button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 24px;
+}
+
 .start-screen__save-error {
   margin: 0 0 12px;
   padding: 8px 12px;
@@ -1114,6 +1257,13 @@ onUnmounted(() => {
   align-items: flex-start;
   gap: 48px;
   width: max-content;
+  transition: opacity 120ms ease;
+}
+
+/* 展开层接管磁贴后，背景网格淡出，避免其他磁贴穿过 3D 卡片露出来。 */
+.start-screen-wrapper.is-expanding-tiles-hidden .start-screen__groups {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .start-screen__group {

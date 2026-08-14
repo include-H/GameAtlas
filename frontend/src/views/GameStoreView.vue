@@ -111,6 +111,8 @@ const updateStageScale = () => {
 }
 
 let storeResizeObserver: ResizeObserver | null = null
+let waifuInitTimer: number | null = null
+let waifuInitIdleId: number | null = null
 
 const onPickGame = (game: StoreShelfGame, event: MouseEvent) => {
   const button = event.currentTarget as HTMLElement | null
@@ -157,15 +159,32 @@ onMounted(() => {
   }
   startSession()
   waifu.reset()
-  void waifu.init().catch(() => {
-    waifu.cleanup()
-    if (!waifu.disposed.value) {
-      uiStore.addAlert('看板娘加载失败，已停用', 'warning')
-    }
-  })
+  // 看板娘是后置增强：资源已在应用启动时空闲预热（命中缓存），
+  // 空闲时再启动避免与首屏图片/视频抢带宽；2s 兜底确保必来
+  const runWaifuInit = () => {
+    void waifu.init().catch(() => {
+      waifu.cleanup()
+      if (!waifu.disposed.value) {
+        uiStore.addAlert('看板娘加载失败，已停用', 'warning')
+      }
+    })
+  }
+  if (typeof requestIdleCallback === 'function') {
+    waifuInitIdleId = requestIdleCallback(() => runWaifuInit(), { timeout: 2000 })
+  } else {
+    waifuInitTimer = window.setTimeout(runWaifuInit, 800)
+  }
 })
 
 onUnmounted(() => {
+  if (waifuInitTimer !== null) {
+    window.clearTimeout(waifuInitTimer)
+    waifuInitTimer = null
+  }
+  if (waifuInitIdleId !== null) {
+    cancelIdleCallback(waifuInitIdleId)
+    waifuInitIdleId = null
+  }
   window.removeEventListener('keydown', handleKeydown)
   storeResizeObserver?.disconnect()
   storeResizeObserver = null
@@ -200,12 +219,20 @@ onUnmounted(() => {
   perspective: 800px;
 }
 
-.store-stage--dim .store-backwall,
-.store-stage--dim .store-shelf,
-.store-stage--dim .store-crt,
-.store-stage--dim .store-counter,
-.store-stage--dim .store-floor {
-  filter: brightness(0.45) saturate(0.8);
-  transition: filter 0.35s ease;
+/* 拿盒调暗：单层黑色 overlay 的 opacity 过渡（黑 55% 叠加 ≡ brightness(0.45)），
+   替代原先 5 个场景元素各自的全屏 filter 过渡，纯 alpha 混合零实时模糊 */
+.store-stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  z-index: 7;
+}
+
+.store-stage--dim::after {
+  opacity: 1;
 }
 </style>

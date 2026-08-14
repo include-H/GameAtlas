@@ -59,6 +59,7 @@ declare module 'vue' {
     ATextarea: typeof import('@arco-design/web-vue')['Textarea']
     ATimeline: typeof import('@arco-design/web-vue')['Timeline']
     ATimelineItem: typeof import('@arco-design/web-vue')['TimelineItem']
+    ATooltip: typeof import('@arco-design/web-vue')['Tooltip']
     AUpload: typeof import('@arco-design/web-vue')['Upload']
     BannerCropModal: typeof import('./components/edit-game/BannerCropModal.vue')['default']
     CardRow: typeof import('./components/CardRow.vue')['default']

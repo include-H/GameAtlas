@@ -137,6 +137,7 @@
     :tiles="startScreenTiles"
     :columns="startScreenColumns"
     :can-edit="isAdmin"
+    :admin-display-name="adminDisplayName"
     :is-loading="startScreenLoading"
     :has-load-failure="startScreenLoadFailed"
     :is-editing="startScreenEditing"
@@ -319,6 +320,32 @@ watch(
     document.querySelector('.content')?.scrollTo({ top: 0 })
   },
 )
+
+// 看板娘资源预热：应用启动空闲时低优先级预取，进游戏店时命中缓存秒现，
+// 避免 Live2D 三件套 + 模型贴图（1.1M）在进店瞬间才开始下载。
+const PREFETCH_WAIFU_URLS = [
+  '/live2d-widget/waifu.css',
+  '/live2d-widget/waifu-tips.js',
+  '/live2d-widget/live2d.min.js',
+  '/live2d-models/model/kobayaxi/index.json',
+  '/live2d-models/model/kobayaxi/Kobayaxi.moc',
+  '/live2d-models/model/kobayaxi/Kobayaxi.2048/texture_00.png',
+]
+
+const prefetchWaifuResources = () => {
+  for (const url of PREFETCH_WAIFU_URLS) {
+    const link = document.createElement('link')
+    link.rel = 'prefetch'
+    link.href = url
+    document.head.appendChild(link)
+  }
+}
+
+if (typeof requestIdleCallback === 'function') {
+  requestIdleCallback(() => prefetchWaifuResources(), { timeout: 3000 })
+} else {
+  window.setTimeout(prefetchWaifuResources, 1000)
+}
 </script>
 
 <style scoped src="./App.css"></style>

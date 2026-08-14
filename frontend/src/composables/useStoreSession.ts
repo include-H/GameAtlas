@@ -50,22 +50,35 @@ export const useStoreSession = () => {
 
   const loadStorePosters = async (signal: AbortSignal, request: RequestGenerationGuard) => {
     try {
-      // 与全局抽卡池同一数据源：遍历游戏列表收集 banner 与截图
-      const pools: AmbientBackgroundPool[] = []
-      let page = 1
-      while (true) {
-        const result = await gamesService.getGames({
-          query: { page, limit: 100 },
-          sort: { field: 'created_at', order: 'desc' },
-          signal,
-        })
-        if (isStoreDisposed || !request.isCurrent()) return
-        pools.push(getAmbientBackgroundPoolFromGames(result.data))
-        const totalPages = Math.max(1, result.pagination.totalPages || 1)
-        if (page >= totalPages) break
-        page += 1
+      // 海报只需 3 张，从最近创建的 2 页（200 个）游戏里挑选足够多样；
+      // 并行请求而非全库串行分页，避免大库时进店被几十个串行请求拖慢。
+      const POSTER_PAGE_LIMIT = 2
+      const posterQuery = {
+        query: { page: 1, limit: 100 },
+        sort: { field: 'created_at', order: 'desc' } as const,
+        signal,
       }
+      const firstPage = await gamesService.getGames(posterQuery)
       if (isStoreDisposed || !request.isCurrent()) return
+      const totalPages = Math.min(POSTER_PAGE_LIMIT, Math.max(1, firstPage.pagination.totalPages || 1))
+
+      const restResults = await Promise.allSettled(
+        Array.from({ length: totalPages - 1 }, (_, i) =>
+          gamesService.getGames({
+            query: { page: i + 2, limit: 100 },
+            sort: { field: 'created_at', order: 'desc' },
+            signal,
+          }),
+        ),
+      )
+      if (isStoreDisposed || !request.isCurrent()) return
+
+      const pools = [getAmbientBackgroundPoolFromGames(firstPage.data)]
+      for (const result of restResults) {
+        if (result.status === 'fulfilled') {
+          pools.push(getAmbientBackgroundPoolFromGames(result.value.data))
+        }
+      }
       storePosters.value = pickPosterImages(mergeAmbientBackgroundPools(pools))
     } catch {
       if (isStoreDisposed || !request.isCurrent()) return
