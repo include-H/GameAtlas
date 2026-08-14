@@ -26,7 +26,6 @@ import { isAdminGameDetail } from './types'
 
 interface GameStatsApiResponse {
   total_games: number
-  total_downloads: number
   recent_games: GameListItemDto[]
   recently_updated_games: GameListItemDto[]
   popular_games: GameListItemDto[]
@@ -316,7 +315,6 @@ const gamesService = {
     const response = await get<ApiEnvelope<GameStatsApiResponse>>('/games/stats')
     return {
       total_games: response.data.total_games,
-      total_downloads: response.data.total_downloads,
       recent_games: response.data.recent_games.map((item) => normalizeGameListItem(item)),
       recently_updated_games: response.data.recently_updated_games.map((item) => normalizeGameListItem(item)),
       popular_games: response.data.popular_games.map((item) => normalizeGameListItem(item)),

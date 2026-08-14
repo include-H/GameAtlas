@@ -356,7 +356,6 @@ export interface GameVersion {
 
 export interface GameStats {
   total_games: number
-  total_downloads: number
   recent_games: GameListItem[]
   recently_updated_games: GameListItem[]
   popular_games: GameListItem[]

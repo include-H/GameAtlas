@@ -154,16 +154,14 @@ func (r *GameCatalogRepository) Stats(params domain.GamesListParams) (*domain.Ga
 	summaryQuery := fmt.Sprintf(`
 		SELECT
 			COUNT(*) AS total_games,
-			COALESCE(SUM(g.downloads), 0) AS total_downloads,
 			COALESCE(SUM(CASE WHEN (%s) THEN 1 ELSE 0 END), 0) AS pending_reviews
 		FROM games g
 		WHERE %s
 	`, pendingAnyIssueCondition(false), baseWhere)
 
 	type statsRow struct {
-		TotalGames     int   `db:"total_games"`
-		TotalDownloads int64 `db:"total_downloads"`
-		PendingReviews int   `db:"pending_reviews"`
+		TotalGames     int `db:"total_games"`
+		PendingReviews int `db:"pending_reviews"`
 	}
 
 	summaryStmt, summaryArgs, err := sqlx.Named(summaryQuery, args)
@@ -248,7 +246,6 @@ func (r *GameCatalogRepository) Stats(params domain.GamesListParams) (*domain.Ga
 
 	return &domain.GameStats{
 		TotalGames:           summary.TotalGames,
-		TotalDownloads:       summary.TotalDownloads,
 		RecentGames:          recentGames,
 		RecentlyUpdatedGames: recentlyUpdatedGames,
 		PopularGames:         popularGames,

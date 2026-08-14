@@ -68,7 +68,6 @@ describe('games store favorite sync', () => {
     } as unknown as GameDetail
     store.stats = {
       total_games: 1,
-      total_downloads: 10,
       favorite_count: 0,
       pending_reviews: 0,
       recent_games: [

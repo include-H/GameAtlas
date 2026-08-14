@@ -27,12 +27,6 @@
         <a-skeleton-shape class="dashboard-skeleton__hero-shape" />
         <a-skeleton-line :rows="2" />
       </a-skeleton>
-      <a-skeleton :animation="true" class="dashboard-skeleton__stats">
-        <a-skeleton-shape class="dashboard-skeleton__stat" />
-        <a-skeleton-shape class="dashboard-skeleton__stat" />
-        <a-skeleton-shape class="dashboard-skeleton__stat" />
-        <a-skeleton-shape class="dashboard-skeleton__stat" />
-      </a-skeleton>
       <a-skeleton :animation="true" class="dashboard-skeleton__rows">
         <a-skeleton-line :rows="4" />
       </a-skeleton>
@@ -48,14 +42,6 @@
         @browse-games="router.push({ name: 'games' })"
         @add-game="showAddGameModal = true"
         @open-pending="router.push({ name: 'pending-center' })"
-      />
-
-      <stat-overview
-        class="dashboard-stats-section"
-        :total-games="totalGames"
-        :total-downloads="totalDownloads"
-        :favorite-count="favoriteCount"
-        :pending-reviews="pendingReviews"
       />
 
       <a-divider class="dashboard-divider" />
@@ -104,13 +90,6 @@
         @toggle-favorite="toggleFavorite"
       />
 
-      <pending-overview
-        v-if="isAdmin"
-        :pending-reviews="pendingReviews"
-        :groups="pendingGroups"
-        @open-pending="router.push({ name: 'pending-center' })"
-      />
-
       <!-- Empty State -->
       <div v-if="isEmpty" class="dashboard-empty">
         <icon-trophy class="dashboard-empty-icon" />
@@ -152,9 +131,7 @@ import { useRouter } from 'vue-router'
 import { IconTrophy } from '@arco-design/web-vue/es/icon'
 import AddGameModal from '@/components/AddGameModal.vue'
 import DashboardHero from '@/components/dashboard/DashboardHero.vue'
-import StatOverview from '@/components/dashboard/StatOverview.vue'
 import GameRowSection from '@/components/dashboard/GameRowSection.vue'
-import PendingOverview from '@/components/dashboard/PendingOverview.vue'
 import gamesService from '@/services/games.service'
 import type { GameListItem } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
@@ -184,13 +161,10 @@ const addGameSubmitting = ref(false)
 const dashboardRequests = createRequestGeneration()
 
 const totalGames = computed(() => gamesStore.stats?.total_games ?? 0)
-const totalDownloads = computed(() => gamesStore.stats?.total_downloads ?? 0)
 const recentAdditions = computed(() => gamesStore.stats?.recent_games ?? [])
 const mostPlayed = computed(() => gamesStore.stats?.popular_games ?? [])
 const favoriteGames = computed(() => gamesStore.stats?.favorite_games ?? [])
-const favoriteCount = computed(() => gamesStore.stats?.favorite_count ?? 0)
 const pendingReviews = computed(() => gamesStore.stats?.pending_reviews ?? 0)
-const pendingGroups = computed(() => gamesStore.stats?.pending_issue_counts ?? null)
 
 // “最近完善”与“最近添加”去重：同一款游戏优先出现在最近添加，避免两行重复。
 const recentlyUpdated = computed(() => {
@@ -315,10 +289,6 @@ onActivated(async () => {
   margin-bottom: 24px;
 }
 
-.dashboard-stats-section {
-  margin-bottom: 8px;
-}
-
 .dashboard-skeleton {
   display: flex;
   flex-direction: column;
@@ -334,17 +304,6 @@ onActivated(async () => {
   width: 100%;
   height: 320px;
   margin-bottom: 16px;
-}
-
-.dashboard-skeleton__stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.dashboard-skeleton__stat {
-  width: 100%;
-  height: 104px;
 }
 
 .dashboard-skeleton__rows {
@@ -375,17 +334,5 @@ onActivated(async () => {
 .dashboard-empty-text {
   color: var(--color-text-3);
   margin: 0 0 24px;
-}
-
-@media (max-width: 992px) {
-  .dashboard-skeleton__stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 576px) {
-  .dashboard-skeleton__stats {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

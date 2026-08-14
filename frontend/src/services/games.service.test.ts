@@ -475,7 +475,6 @@ describe('games service', () => {
     getMock.mockResolvedValue({
       data: {
         total_games: 3,
-        total_downloads: 7,
         recent_games: [{ ...baseGame, is_favorite: true }],
         recently_updated_games: [{ ...baseGame, public_id: 'game-10', is_favorite: false }],
         popular_games: [{ ...baseGame, public_id: 'game-9', is_favorite: true }],

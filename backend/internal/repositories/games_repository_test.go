@@ -114,9 +114,9 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	secondGameID := insertRepositoryGame(t, db, "stats-b", "Stats B", "public")
 	privateGameID := insertRepositoryGame(t, db, "stats-private", "Stats Private", "private")
 
-	updateRepositoryGameStats(t, db, firstGameID, 10, "2024-01-02 00:00:00")
-	updateRepositoryGameStats(t, db, secondGameID, 30, "2024-01-03 00:00:00")
-	updateRepositoryPrivateGameStats(t, db, "stats-private", 99, "2024-01-04 00:00:00")
+	updateRepositoryGameStats(t, db, firstGameID, 0, "2024-01-02 00:00:00")
+	updateRepositoryGameStats(t, db, secondGameID, 0, "2024-01-03 00:00:00")
+	updateRepositoryPrivateGameStats(t, db, "stats-private", 0, "2024-01-04 00:00:00")
 	// 让第二个游戏成为“最近完善”的唯一候选：updated_at 明显晚于 created_at。
 	if _, err := db.Exec(`UPDATE games SET updated_at = ? WHERE id = ?`, "2024-02-01 00:00:00", secondGameID); err != nil {
 		t.Fatalf("set stats game updated_at: %v", err)
@@ -172,9 +172,6 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 
 	if stats.TotalGames != 2 {
 		t.Fatalf("TotalGames = %d, want 2", stats.TotalGames)
-	}
-	if stats.TotalDownloads != 40 {
-		t.Fatalf("TotalDownloads = %d, want 40", stats.TotalDownloads)
 	}
 	if stats.PendingReviews != 1 {
 		t.Fatalf("PendingReviews = %d, want 1 native pending public game", stats.PendingReviews)

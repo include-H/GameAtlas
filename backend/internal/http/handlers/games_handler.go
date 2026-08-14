@@ -113,7 +113,6 @@ func (h *GamesHandler) Stats(c *gin.Context) {
 
 	writeJSONSuccess(c, http.StatusOK, gin.H{
 		"total_games":            stats.TotalGames,
-		"total_downloads":        stats.TotalDownloads,
 		"recent_games":           toGameListItemResponses(stats.RecentGames),
 		"recently_updated_games": toGameListItemResponses(stats.RecentlyUpdatedGames),
 		"popular_games":          toGameListItemResponses(stats.PopularGames),
