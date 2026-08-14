@@ -245,21 +245,23 @@
       ref="expandEl"
       class="start-screen-expand"
     >
-      <div class="start-screen-expand__face start-screen-expand__face--front">
-        <img
-          v-if="expand.frontImage"
-          :src="expand.frontImage"
-          :alt="expand.title"
-          class="start-screen-expand__cover"
-        >
-      </div>
-      <div class="start-screen-expand__face start-screen-expand__face--back">
-        <div
-          v-if="expand.backImage"
-          class="start-screen-expand__bg"
-          :style="{ backgroundImage: `url(${expand.backImage})` }"
-        />
-        <div class="start-screen-expand__shade" />
+      <div ref="expandFlipEl" class="start-screen-expand__flip">
+        <div class="start-screen-expand__face start-screen-expand__face--front">
+          <img
+            v-if="expand.frontImage"
+            :src="expand.frontImage"
+            :alt="expand.title"
+            class="start-screen-expand__cover"
+          >
+        </div>
+        <div class="start-screen-expand__face start-screen-expand__face--back">
+          <div
+            v-if="expand.backImage"
+            class="start-screen-expand__bg"
+            :style="{ backgroundImage: `url(${expand.backImage})` }"
+          />
+          <div class="start-screen-expand__shade" />
+        </div>
       </div>
       <div ref="expandMetaEl" class="start-screen-expand__meta">
         <h2>{{ expand.title }}</h2>
@@ -485,8 +487,10 @@ const expand = ref<ExpandState | null>(null)
 const expandLoading = ref(false)
 const expandHideTiles = ref(false)
 const expandEl = ref<HTMLElement | null>(null)
+const expandFlipEl = ref<HTMLElement | null>(null)
 const expandMetaEl = ref<HTMLElement | null>(null)
 let expandAnim: Animation | null = null
+let expandRotAnim: Animation | null = null
 let expandHideTilesTimer: number | null = null
 
 const EXPAND_DELAY_MS = 120
@@ -503,11 +507,11 @@ const resetExpandTileVisibility = () => {
   expandHideTiles.value = false
 }
 
-// Win8 式展开分成三个清晰阶段：
-// 1. 磁贴保持原尺寸，先翻成左高右低的窄梯形；
-// 2. 以这条“磁铁边”为视觉锚点横移到屏幕中线；
-// 3. 到中线后才放大、摊平并转正。
-// 参考帧里的节奏依赖这个停顿，不能让放大和横移从第一帧同时开始。
+// Win8 式展开：位移段（磁贴 → 微放大 → 屏幕中轴）翻转只做轻微梯形抬角（图保持清晰），
+// 到中轴后才快速翻过侧面转正，避免“位移的黑块”（侧面时双面 backface 隐藏只露容器黑底）。
+//   - moveAnim 作用于容器：translate + 非等比 scale，表达帧路径
+//   - rotAnim 作用于 __flip 子层：rotateY -180°→0° + rotateZ 微歪斜
+// 两个元素各自动画，天然无矩阵耦合。
 const startExpandAnimation = () => {
   const el = expandEl.value
   if (!el || !expand.value) return
@@ -537,12 +541,6 @@ const startExpandAnimation = () => {
     width: from.width + (to.width - from.width) * amount,
     height: from.height + (to.height - from.height) * amount,
   })
-  const frameStyle = (frame: ExpandFrame) => ({
-    left: `${frame.left}px`,
-    top: `${frame.top}px`,
-    width: `${frame.width}px`,
-    height: `${frame.height}px`,
-  })
 
   const originFrame: ExpandFrame = {
     left: rect.x,
@@ -550,68 +548,125 @@ const startExpandAnimation = () => {
     width: rect.width,
     height: rect.height,
   }
-  // 先只移动卡片，不改变它的尺寸。旋转到约 80 度后，投影自然成为参考中的窄梯形。
-  // 这里把窄面中心放在屏幕中线略左处，横移过程会比直接缩放到中间更明显。
-  const edgeFrame = centeredFrame(0.24, 0.62, 0.48, 0.5)
-  const unfoldFrame = centeredFrame(0.7, 0.82, 0.49, 0.5)
+  // 梯形尺寸收敛在“微微放大”区间：高约 0.45 屏高（左缘抬起成梯形的长度感），
+  // 宽度约 0.26 屏宽（2x4 磁贴原宽约 0.17 屏宽，×1.2 后的展开中态）。
+  const edgeFrame = centeredFrame(0.26, 0.45, 0.47, 0.5)
+  const unfoldFrame = centeredFrame(0.72, 0.8, 0.49, 0.5)
   const revealFrame = centeredFrame(0.94, 0.94, 0.5, 0.5)
   const fullFrame = centeredFrame(1, 1)
   const settleFrame = mixFrame(originFrame, edgeFrame, 0.16)
 
+  // 帧表达：尺寸用 width/height（layout），位移用 translate——容器 transform 只含平移，
+  // 避免非等比 scale 祖先 + preserve-3d 子层（rotateY）的浏览器渲染失效（黑块）。
+  const frameStyle = (frame: ExpandFrame) => {
+    const tx = frame.left + frame.width / 2 - viewportWidth / 2
+    const ty = frame.top + frame.height / 2 - viewportHeight / 2
+    return {
+      transform: `translate(${tx}px, ${ty}px)`,
+      width: `${frame.width}px`,
+      height: `${frame.height}px`,
+    }
+  }
+
   expandAnim?.cancel()
-  expandAnim = el.animate(
+  const animOptions = {
+    duration: prefersReducedMotion() ? 1 : EXPAND_DURATION_MS,
+    delay: prefersReducedMotion() ? 0 : EXPAND_DELAY_MS,
+    // 所有属性共用一条速度曲线，避免每个关键帧都重新减速造成“分段感”。
+    easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+    fill: 'both' as const,
+  }
+  // 动画 1（容器）：位移（translate）+ 尺寸（width/height），无旋转无缩放
+  const moveAnim = el.animate(
     [
       {
+        // 0%：与磁贴完全对齐（无痕衔接）
         ...frameStyle(originFrame),
-        // 父面预置 180deg，因此 -180deg 时起始面正对用户。
-        transform: 'rotateY(-180deg) rotateZ(0deg)',
         opacity: 1,
       },
       {
         ...frameStyle(originFrame),
-        transform: 'rotateY(-152deg) rotateZ(0deg)',
+        opacity: 1,
         offset: 0.08,
       },
       {
+        // 16%：微放大 + 开始向中轴移动（翻转只轻抬，图保持清晰）
         ...frameStyle(settleFrame),
-        transform: 'rotateY(-112deg) rotateZ(0deg)',
         offset: 0.16,
+        easing: 'cubic-bezier(0.15, 0.85, 0.3, 1)',
       },
       {
-        // 窄梯形作为连续路径中的转折点，让观众看见磁铁面已经变成侧面。
+        // 31%：到屏幕中轴（梯形右缘贴中轴），翻转快速翻过侧面
         ...frameStyle(edgeFrame),
-        transform: 'rotateY(-84deg) rotateZ(0deg)',
         offset: 0.31,
+        easing: 'cubic-bezier(0.3, 0.1, 0.4, 1)',
       },
       {
-        // 中线定位完成后，才开始把窄面摊成大屏。
+        // 55%：翻过侧面后开始摊开
         ...frameStyle(unfoldFrame),
-        transform: 'rotateY(-50deg) rotateZ(-2deg)',
-        offset: 0.5,
+        offset: 0.55,
+        easing: 'cubic-bezier(0.35, 0.05, 0.4, 1)',
       },
       {
         ...frameStyle(revealFrame),
-        transform: 'rotateY(-18deg) rotateZ(-2.2deg)',
-        offset: 0.7,
+        offset: 0.75,
       },
       {
         ...frameStyle(fullFrame),
+        offset: 0.9,
+      },
+      {
+        ...frameStyle(fullFrame),
+      },
+    ],
+    animOptions,
+  )
+  // 动画 2（翻转层）：位移段保持 -180°~-160°（磁贴图清晰可见），
+  // 31% 到中轴后快速翻过侧面（-90°），再摊开转正（0°）。
+  // rotateZ 微歪斜模拟“由下往上”的翻书手感。
+  // perspective 由容器 CSS 属性提供（不参与动画 transform），关键帧只管位移动画。
+  const flipEl = expandFlipEl.value
+  if (!flipEl) {
+    expandAnim?.cancel()
+    expand.value = null
+    return
+  }
+  const rotAnim = flipEl.animate(
+    [
+      {
+        // 父面预置 180deg，因此 -180deg 时起始面正对用户。
+        transform: 'rotateY(-180deg) rotateZ(0deg)',
+      },
+      {
+        // 16%：位移段仅轻抬（左缘梯形），磁贴图保持清晰
+        transform: 'rotateY(-160deg) rotateZ(0deg)',
+        offset: 0.16,
+        easing: 'cubic-bezier(0.15, 0.85, 0.3, 1)',
+      },
+      {
+        // 31%：到中轴，快速翻过侧面（图被 backface 隐藏的窗口极短）
+        transform: 'rotateY(-90deg) rotateZ(0deg)',
+        offset: 0.31,
+        easing: 'cubic-bezier(0.3, 0.1, 0.4, 1)',
+      },
+      {
+        // 55%：翻出背面内容图
+        transform: 'rotateY(-30deg) rotateZ(-2deg)',
+        offset: 0.55,
+        easing: 'cubic-bezier(0.35, 0.05, 0.4, 1)',
+      },
+      {
         transform: 'rotateY(-5deg) rotateZ(-0.8deg)',
         offset: 0.88,
       },
       {
-        ...frameStyle(fullFrame),
         transform: 'rotateY(0deg) rotateZ(0deg)',
       },
     ],
-    {
-      duration: prefersReducedMotion() ? 1 : EXPAND_DURATION_MS,
-      delay: prefersReducedMotion() ? 0 : EXPAND_DELAY_MS,
-      // 所有属性共用一条速度曲线，避免每个关键帧都重新减速造成“分段感”。
-      easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-      fill: 'both',
-    },
+    animOptions,
   )
+  expandAnim = moveAnim
+  expandRotAnim = rotAnim
 
   // 标题在背面已经展开到足够大之后出现，不抢侧面翻书的视觉焦点。
   // 注意：WAAPI 的 transform 会覆盖 CSS 的 translateX(-50%) 居中，keyframes 必须带上。
@@ -673,6 +728,8 @@ const closeExpand = () => {
   resetExpandTileVisibility()
   expandAnim?.cancel()
   expandAnim = null
+  expandRotAnim?.cancel()
+  expandRotAnim = null
   const el = expandEl.value
   if (!el || prefersReducedMotion()) {
     expand.value = null
@@ -1109,8 +1166,16 @@ onUnmounted(() => {
   color: #fff;
   background: #0d1117;
   transform-origin: 50% 50%;
-  will-change: transform, opacity, left, top, width, height;
+  will-change: transform, opacity, width, height;
   /* 不能有 overflow:hidden——它会压平 preserve-3d，使翻到侧面的面被裁成黑块。 */
+  transform-style: preserve-3d;
+}
+
+/* 翻转层：容器只做位移/缩放（translate+scale，GPU 合成），翻转在此层独立进行，
+   避免 translate/scale/rotateY 挤在同一个 transform 被矩阵插值耦合（大角度旋转会“一阵一阵”）。 */
+.start-screen-expand__flip {
+  position: absolute;
+  inset: 0;
   transform-style: preserve-3d;
 }
 
