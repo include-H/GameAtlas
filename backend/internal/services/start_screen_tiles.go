@@ -173,7 +173,7 @@ func (s *StartScreenTilesService) validateTiles(tiles []domain.StartScreenTileWr
 			return nil, domain.ErrValidation
 		}
 		rows, cols := startScreenTileSpan(tileSize)
-		if tile.GridRow+rows > domain.StartScreenColumnRows || tile.GridCol+cols > domain.StartScreenColumnCols {
+		if tile.GridRow+rows > domain.StartScreenMaxRows || tile.GridCol+cols > domain.StartScreenFreeCols {
 			return nil, domain.ErrValidation
 		}
 		if _, exists := seen[tile.GameID]; exists {
@@ -212,14 +212,16 @@ func (s *StartScreenTilesService) validateTiles(tiles []domain.StartScreenTileWr
 	return normalized, nil
 }
 
+// Win10 磁贴比例体系：没有 1x1 那么小的资源，最小单元从 2x2 起，
+// 2x2（小）→ 2x4（宽）→ 4x4（大）。
 func startScreenTileSpan(tileSize string) (int, int) {
 	switch domain.StartScreenTileSize(tileSize) {
 	case domain.StartScreenTileSizeLarge:
-		return 2, 2
+		return 4, 4
 	case domain.StartScreenTileSizeWide:
-		return 1, 2
+		return 2, 4
 	default:
-		return 1, 1
+		return 2, 2
 	}
 }
 
@@ -258,17 +260,23 @@ func findStartScreenFreePosition(
 		if exists {
 			return column
 		}
-		column = make([][]bool, domain.StartScreenColumnRows)
-		for row := range column {
-			column[row] = make([]bool, domain.StartScreenColumnCols)
-		}
+		column = make([][]bool, 0, 8)
 		occupied[columnIndex] = column
+		return column
+	}
+
+	ensureRow := func(column [][]bool, row int) [][]bool {
+		for len(column) <= row {
+			column = append(column, make([]bool, domain.StartScreenFreeCols))
+		}
 		return column
 	}
 
 	occupy := func(columnIndex, row, col, spanRows, spanCols int) {
 		column := ensureColumn(columnIndex)
 		for r := row; r < row+spanRows; r += 1 {
+			column = ensureRow(column, r)
+			occupied[columnIndex] = column
 			for c := col; c < col+spanCols; c += 1 {
 				column[r][c] = true
 			}
@@ -278,8 +286,12 @@ func findStartScreenFreePosition(
 	fits := func(columnIndex, row, col, spanRows, spanCols int) bool {
 		column := ensureColumn(columnIndex)
 		for r := row; r < row+spanRows; r += 1 {
+			if r >= len(column) {
+				continue
+			}
+			line := column[r]
 			for c := col; c < col+spanCols; c += 1 {
-				if column[r][c] {
+				if line[c] {
 					return false
 				}
 			}
@@ -293,15 +305,12 @@ func findStartScreenFreePosition(
 		if row < 0 {
 			row = 0
 		}
-		if row > domain.StartScreenColumnRows-tileRows {
-			row = domain.StartScreenColumnRows - tileRows
-		}
 		col := tile.GridCol
 		if col < 0 {
 			col = 0
 		}
-		if col > domain.StartScreenColumnCols-tileCols {
-			col = domain.StartScreenColumnCols - tileCols
+		if col > domain.StartScreenFreeCols-tileCols {
+			col = domain.StartScreenFreeCols - tileCols
 		}
 		occupy(tile.ColumnIndex, row, col, tileRows, tileCols)
 	}
@@ -313,9 +322,10 @@ func findStartScreenFreePosition(
 		}
 	}
 
+	// 组内 12 列行优先找空位，行数不限（空行必然可放，不会死循环）。
 	for columnIndex := 0; columnIndex <= maxColumnIndex; columnIndex += 1 {
-		for row := 0; row <= domain.StartScreenColumnRows-rows; row += 1 {
-			for col := 0; col <= domain.StartScreenColumnCols-cols; col += 1 {
+		for row := 0; ; row += 1 {
+			for col := 0; col <= domain.StartScreenFreeCols-cols; col += 1 {
 				if fits(columnIndex, row, col, rows, cols) {
 					return startScreenTilePosition{
 						columnIndex: columnIndex,

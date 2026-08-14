@@ -217,9 +217,9 @@ const renderPreview = (aspect: number, targetWidth: number, targetHeight: number
 
 const renderPreviews = () => {
   if (!imageLoaded.value) return
-  previewLarge.value = renderPreview(1, 234, 234)
-  previewWide.value = renderPreview(2, 234, 110)
-  previewSmall.value = renderPreview(1, 110, 110)
+  previewLarge.value = renderPreview(1, 440, 440)
+  previewWide.value = renderPreview(2, 440, 220)
+  previewSmall.value = renderPreview(1, 220, 220)
 }
 
 const regionToBlob = (aspect: number, targetWidth: number, targetHeight: number): Promise<Blob> => {
@@ -251,9 +251,9 @@ const regionToBlob = (aspect: number, targetWidth: number, targetHeight: number)
 const handleConfirm = async () => {
   try {
     const [large, wide, small] = await Promise.all([
-      regionToBlob(1, 234, 234),
-      regionToBlob(2, 234, 110),
-      regionToBlob(1, 110, 110),
+      regionToBlob(1, 440, 440),
+      regionToBlob(2, 440, 220),
+      regionToBlob(1, 220, 220),
     ])
     emit('confirm', { large, wide, small })
   } catch {

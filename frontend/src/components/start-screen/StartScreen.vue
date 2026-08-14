@@ -67,87 +67,128 @@
             :class="{ 'is-editing': isEditing }"
             @click.self="handleClose"
           >
-            <div class="start-screen__columns">
-              <div
-                v-for="(column, columnIndex) in visibleColumns"
-                :key="columnIndex"
-                class="start-screen__column"
+            <div class="start-screen__groups" :class="{ 'start-screen__groups--entering': entranceActive }">
+              <section
+                v-for="(group, groupIndex) in visibleGroups"
+                :key="group.columnIndex"
+                class="start-screen__group"
+                :style="{
+                  '--start-group-cols': groupCols(group),
+                  '--start-group-rows': Math.max(groupMaxRow(group), 1),
+                }"
+                :data-start-screen-cell="true"
+                :data-column-index="group.columnIndex"
+                data-row="0"
+                data-col="0"
               >
-                <div class="start-screen__column-header">
+                <div
+                  class="start-screen__group-header"
+                  :style="{ '--start-tile-enter-delay': groupEnterDelay(groupIndex) }"
+                >
                   <input
                     v-if="isEditing"
-                    class="start-screen__column-name-input"
-                    :value="columnNameOf(columnIndex)"
-                    :placeholder="`列 ${columnIndex + 1}`"
-                    @change="handleRenameColumn(columnIndex, $event)"
+                    class="start-screen__group-name-input"
+                    :value="columnNameOf(group.columnIndex)"
+                    :placeholder="`组 ${group.columnIndex + 1}`"                    @change="handleRenameColumn(group.columnIndex, $event)"
                   >
-                  <span v-else class="start-screen__column-name">{{ columnNameOf(columnIndex) }}</span>
+                  <span v-else class="start-screen__group-name">{{ columnNameOf(group.columnIndex) }}</span>
                   <button
-                    v-if="isEditing && !columnHasTiles(columnIndex)"
-                    class="app-text-action-btn start-screen__column-remove"
+                    v-if="isEditing && !columnHasTiles(group.columnIndex)"
+                    class="app-text-action-btn start-screen__group-remove"
                     type="button"
-                    :aria-label="`删除空列 ${columnIndex + 1}`"
-                    @click="emit('removeColumn', columnIndex)"
+                    :aria-label="`删除空组 ${group.columnIndex + 1}`"
+                    @click="emit('removeColumn', group.columnIndex)"
                   >
                     <icon-close />
                   </button>
                 </div>
 
-                <div class="start-screen__column-grid">
-                  <template v-if="isEditing">
-                    <div
-                      v-for="cell in gridCells"
-                      :key="`cell-${cell.row}-${cell.col}`"
-                      class="start-screen__drop-cell"
-                      :class="{ 'start-screen__drop-cell--target': isDropTarget(columnIndex, cell.row, cell.col) }"
-                      :data-start-screen-cell="true"
-                      :data-column-index="columnIndex"
-                      :data-row="cell.row"
-                      :data-col="cell.col"
-                      :style="{ gridColumnStart: cell.col + 1, gridRowStart: cell.row + 1 }"
-                    />
-                  </template>
-                  <TransitionGroup
-                    name="metro-tile"
-                    tag="div"
-                    class="start-screen__column-tiles"
-                    @enter="onTileEnter"
-                    @leave="onTileLeave"
-                  >
-                    <div
-                      v-for="(slot, slotIndex) in column.slots"
-                      :key="slot.tile.game_id"
-                      :class="[
-                        'start-screen__tile-slot',
-                        `start-screen__tile-slot--${slot.tile.tile_size}`,
-                        { 'start-screen__tile-slot--dragging': isDraggedTile(slot.tile) },
-                        { 'start-screen__tile-slot--target': isDropTarget(columnIndex, slot.row, slot.col) },
-                      ]"
-                      :style="{
-                        gridColumnStart: slot.col + 1,
-                        gridRowStart: slot.row + 1,
-                        '--start-tile-enter-delay': tileEnterDelay(columnIndex, slotIndex),
-                      }"
-                      :data-tile-index="slot.globalIndex"
-                      :data-start-screen-cell="true"
-                      :data-column-index="columnIndex"
-                      :data-row="slot.row"
-                      :data-col="slot.col"
-                      @pointerdown="onTilePointerDown(slot.globalIndex, $event)"
-                    >
-                      <MetroTile
-                        :tile="slot.tile"
-                        :color-index="slot.globalIndex"
-                        :editing="isEditing"
-                        @select="handleTileSelect"
-                        @crop="handleCrop"
-                        @resize="emit('resize', $event)"
-                        @remove="emit('remove', $event)"
+                <div class="start-screen__group-grid-row">
+                  <div class="start-screen__group-grid">
+                    <template v-if="isEditing">
+                      <div
+                        v-for="cell in groupCells(group)"
+                        :key="`cell-${cell.row}-${cell.col}`"
+                        class="start-screen__drop-cell"
+                        :class="{ 'start-screen__drop-cell--target': isDropTarget(group.columnIndex, cell.row, cell.col) }"
+                        :data-start-screen-cell="true"
+                        :data-column-index="group.columnIndex"
+                        :data-row="cell.row"
+                        :data-col="cell.col"
+                        :style="{ gridColumnStart: cell.col + 1, gridRowStart: cell.row + 1 }"
                       />
-                    </div>
-                  </TransitionGroup>
+                    </template>
+                    <TransitionGroup
+                      name="metro-tile"
+                      tag="div"
+                      class="start-screen__group-tiles"
+                      @enter="onTileEnter"
+                      @leave="onTileLeave"
+                    >
+                      <div
+                        v-for="(slot, slotIndex) in group.slots"
+                        :key="slot.tile.game_id"
+                        :class="[
+                          'start-screen__tile-slot',
+                          `start-screen__tile-slot--${slot.tile.tile_size}`,
+                          { 'start-screen__tile-slot--dragging': isDraggedTile(slot.tile) },
+                          { 'start-screen__tile-slot--target': isDropTarget(group.columnIndex, slot.row, slot.col) },
+                        ]"
+                        :style="{
+                          gridColumnStart: slot.col + 1,
+                          gridColumnEnd: slot.col + 1 + tileSpan(slot.tile.tile_size).cols,
+                          gridRowStart: slot.row + 1,
+                          gridRowEnd: slot.row + 1 + tileSpan(slot.tile.tile_size).rows,
+                          '--start-tile-enter-delay': tileEnterDelay(groupIndex, slotIndex),
+                          '--start-tile-leave-delay': tileLeaveDelay(groupIndex, slotIndex),
+                        }"
+                        :data-tile-index="slot.globalIndex"
+                        :data-start-screen-cell="true"
+                        :data-column-index="group.columnIndex"
+                        :data-row="slot.row"
+                        :data-col="slot.col"
+                        @pointerdown="onTilePointerDown(slot.globalIndex, $event)"
+                      >
+                        <MetroTile
+                          :tile="slot.tile"
+                          :color-index="slot.globalIndex"
+                          :editing="isEditing"
+                          @select="handleTileSelect"
+                          @crop="handleCrop"
+                          @resize="emit('resize', $event)"
+                          @remove="emit('remove', $event)"
+                        />
+                      </div>
+                    </TransitionGroup>
+                  </div>
+
+                  <div
+                    v-if="isEditing"
+                    class="start-screen__group-append-col"
+                    :class="{ 'start-screen__group-append--target': isDropTarget(group.columnIndex, 0, groupCols(group)) }"
+                    :data-start-screen-cell="true"
+                    :data-column-index="group.columnIndex"
+                    data-row="0"
+                    :data-col="groupCols(group)"
+                    :title="`追加列 ${groupCols(group) + 1}`"
+                  >
+                    <icon-plus />
+                  </div>
                 </div>
-              </div>
+
+                <div
+                  v-if="isEditing"
+                  class="start-screen__group-append"
+                  :class="{ 'start-screen__group-append--target': isDropTarget(group.columnIndex, groupMaxRow(group), 0) }"
+                  :data-start-screen-cell="true"
+                  :data-column-index="group.columnIndex"
+                  :data-row="groupMaxRow(group)"
+                  data-col="0"
+                >
+                  <icon-plus />
+                  <span>拖到此处追加</span>
+                </div>
+              </section>
 
               <button
                 v-if="isEditing"
@@ -192,39 +233,36 @@
     @cancel="cropVisible = false"
   />
 
-  <a-modal
-    class="start-screen-modal"
-    :visible="launchModalVisible"
-    :footer="false"
-    :width="480"
-    :title="`开始游戏：${launchTitle}`"
-    @cancel="launchModalVisible = false"
+  <div
+    v-if="expand"
+    ref="expandEl"
+    class="start-screen-expand"
+    :class="{ 'is-leaving': expandLeaving }"
   >
-    <div class="start-screen-launch-list">
-      <button
-        v-for="option in launchOptions"
-        :key="option.id"
-        type="button"
-        class="start-screen-launch-item"
-        @click="handleLaunchVersion(option)"
-      >
-        <icon-play-arrow />
-        <span class="start-screen-launch-item__name">{{ option.version }}</span>
-        <span class="start-screen-launch-item__action">开始游戏</span>
-      </button>
+    <div
+      v-if="expand.image"
+      class="start-screen-expand__bg"
+      :style="{ backgroundImage: `url(${expand.image})` }"
+    />
+    <div class="start-screen-expand__shade" />
+    <div class="start-screen-expand__meta">
+      <h2>{{ expand.title }}</h2>
+      <div v-if="expandLoading" class="start-screen-expand__loading">
+        <a-spin :size="28" />
+        <span>正在加载...</span>
+      </div>
     </div>
-  </a-modal>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   IconClose,
   IconDesktop,
   IconEdit,
   IconExclamationCircle,
-  IconPlayArrow,
   IconPlus,
   IconStar,
 } from '@arco-design/web-vue/es/icon'
@@ -235,11 +273,17 @@ import type { StartScreenColumn, StartScreenTile, StartScreenTileSize } from '@/
 import {
   findStartScreenDropTarget,
   layoutStartScreenTiles,
-  START_SCREEN_COLUMN_COLS,
-  START_SCREEN_COLUMN_ROWS,
+  START_SCREEN_FREE_COLS,
 } from '@/utils/start-screen-layout'
-import gamesService, { mapGameVersions } from '@/services/games.service'
+import type { PackedStartScreenGroup } from '@/utils/start-screen-layout'
+import gamesService from '@/services/games.service'
 import { createRequestGeneration } from '@/utils/request-generation'
+
+const TILE_SPANS: Record<StartScreenTileSize, { rows: number; cols: number }> = {
+  small: { rows: 2, cols: 2 },
+  wide: { rows: 2, cols: 4 },
+  large: { rows: 4, cols: 4 },
+}
 
 const props = defineProps<{
   visible: boolean
@@ -275,9 +319,6 @@ const metroAreaRef = ref<HTMLElement | null>(null)
 const cropVisible = ref(false)
 const cropGameId = ref<number | null>(null)
 const cropBanners = ref<string[]>([])
-const launchModalVisible = ref(false)
-const launchTitle = ref('')
-const launchOptions = ref<Array<{ id: string; version: string; url: string }>>([])
 const tileDetailRequests = createRequestGeneration()
 const cropDetailRequests = createRequestGeneration()
 
@@ -308,26 +349,58 @@ const displayTiles = computed(() => {
   return props.tiles.filter((tile) => tile.game_id !== dragState.value?.gameId)
 })
 
-const layoutColumns = computed(() => layoutStartScreenTiles(displayTiles.value, props.columns.length))
-const visibleColumns = computed(() => {
-  const columns = layoutColumns.value
-  if (!props.isEditing) return columns.filter((column) => column.slots.length > 0)
+const layoutGroups = computed(() => layoutStartScreenTiles(displayTiles.value, props.columns.length))
+const visibleGroups = computed(() => {
+  const groups = layoutGroups.value
+  if (!props.isEditing) return groups.filter((group) => group.slots.length > 0)
   if (props.tiles.length === 0 && props.columns.length === 0) return []
-  return columns
+  return groups
 })
-// EntranceThemeTransition 的 IsStaggeringEnabled 等价物：按磁贴在容器中的顺序错开，
-// 而不是按行或按屏幕两侧硬切。首个磁贴立即进入，后续项目以短间隔跟随。
-const tileEnterDelay = (columnIndex: number, slotIndex: number) => {
-  const previousTileCount = visibleColumns.value
-    .slice(0, columnIndex)
-    .reduce((count, column) => count + column.slots.length, 0)
-  const sequenceIndex = previousTileCount + slotIndex
-  return `${Math.min(sequenceIndex, 14) * 32}ms`
+const tileSpan = (size: StartScreenTileSize) => TILE_SPANS[size]
+// EntranceThemeTransition 复刻：磁贴从其最终位置右下方约 10px 处上浮 + 淡入到原位，
+// 位移克制（10px 量级，无大滑入无缩放）。错峰：组间重叠启动（下一组在第一组播到
+// 约 1/3 时开始），组内磁贴轻微级联（40ms），整体呈现"一组一块逐组收拢"的层次。
+const groupEnterDelay = (groupIndex: number) => `${groupIndex * 110}ms`
+const tileEnterDelay = (groupIndex: number, slotIndex: number) => {
+  const delay = groupIndex * 110 + slotIndex * 40
+  return `${delay}ms`
 }
-const gridCells = Array.from({ length: START_SCREEN_COLUMN_ROWS * START_SCREEN_COLUMN_COLS }, (_, index) => ({
-  row: Math.floor(index / START_SCREEN_COLUMN_COLS),
-  col: index % START_SCREEN_COLUMN_COLS,
-}))
+const totalTiles = computed(() =>
+  visibleGroups.value.reduce((count, group) => count + group.slots.length, 0),
+)
+// 退场波浪反向收拢：后进先出的磁贴先飞出。
+const tileLeaveDelay = (groupIndex: number, slotIndex: number) => {
+  const maxGroup = visibleGroups.value.length - 1
+  const maxSlot = (visibleGroups.value[groupIndex]?.slots.length ?? 1) - 1
+  const delay = (maxGroup - groupIndex) * 110 + Math.max(maxSlot - slotIndex, 0) * 40
+  return `${delay}ms`
+}
+const groupMaxRow = (group: PackedStartScreenGroup) =>
+  group.slots.reduce(
+    (max, slot) => Math.max(max, slot.row + tileSpan(slot.tile.tile_size).rows),
+    0,
+  )
+// 组宽按磁贴实际占用收缩（上限 12 列）：磁贴少时网格紧凑，不撑满一屏空白；
+// 至少留 2 列兜底（编辑模式空组也有可拖入的区域）。
+const groupCols = (group: PackedStartScreenGroup) => {
+  const needed = group.slots.reduce(
+    (max, slot) => Math.max(max, slot.col + tileSpan(slot.tile.tile_size).cols),
+    0,
+  )
+  return Math.min(START_SCREEN_FREE_COLS, Math.max(needed, 2))
+}
+const groupCells = (group: PackedStartScreenGroup) => {
+  // 网格只精确覆盖磁贴占用的行，不向下延伸虚空格；组尾由追加条承接拖放。
+  const rows = groupMaxRow(group)
+  const cols = groupCols(group)
+  const cells: Array<{ row: number; col: number }> = []
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      cells.push({ row, col })
+    }
+  }
+  return cells
+}
 const newColumnIndex = computed(() => {
   const maxTileColumn = props.tiles.reduce(
     (max, tile) => Math.max(max, Number.isFinite(tile.column_index) ? tile.column_index : 0),
@@ -355,7 +428,7 @@ const columnHasTiles = (columnIndex: number) =>
 
 const columnNameOf = (index: number) => {
   const name = props.columns[index]?.name?.trim()
-  return name || `列 ${index + 1}`
+  return name || `组 ${index + 1}`
 }
 
 const handleRenameColumn = (index: number, event: Event) => {
@@ -377,39 +450,153 @@ const handleClose = () => {
   emit('close')
 }
 
-// 点击磁贴 = 开始游戏：单个可启动版本直接下载启动脚本，多个弹窗选择，无则回退详情页。
-const handleTileSelect = async (publicId: string) => {
-  const request = tileDetailRequests.begin()
-  emit('close')
-  try {
-    const detail = await gamesService.getGameDetail(publicId)
-    if (!request.isCurrent()) return
-    const launchable = mapGameVersions(detail).filter((version) => version.canLaunch && version.launchScriptUrl)
-    if (launchable.length === 0) {
-      router.push({ name: 'game-detail', params: { publicId } })
-      return
-    }
-    if (launchable.length === 1) {
-      window.location.assign(launchable[0].launchScriptUrl!)
-      return
-    }
-    launchTitle.value = detail.title
-    launchOptions.value = launchable.map((version) => ({
-      id: version.id,
-      version: version.version,
-      url: version.launchScriptUrl!,
-    }))
-    launchModalVisible.value = true
-  } catch {
-    if (!request.isCurrent()) return
-    // 拉取失败时回退到详情页，不阻塞用户。
-    router.push({ name: 'game-detail', params: { publicId } })
+// Xbox 式展开层：点击磁贴后，从磁贴位置翻转放大成 16:9 大图（当前显示的 banner），
+// 期间并行拉取详情；展开动画结束后开始屏退场，随后启动游戏。
+interface ExpandState {
+  title: string
+  image: string
+  size: StartScreenTileSize
+  rect: { x: number; y: number; width: number; height: number }
+}
+
+const expand = ref<ExpandState | null>(null)
+const expandLoading = ref(false)
+const expandLeaving = ref(false)
+const expandEl = ref<HTMLElement | null>(null)
+let expandAnim: Animation | null = null
+let expandLeaveTimer: number | null = null
+
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+// 单一动画逻辑（Web Animations API）：一个 Animation 对象承载全部关键帧。
+// 段 1：定位到磁贴所在位置，从磁贴大小放大到全屏 40%（ease-out，约 500ms，末端减速到 0）；
+// 段 2：从 40% 续接，一边翻转（rotateY 360°）一边优雅放大到 100%
+// （easeInOut 起点速度同为 0，衔接无速度断点）；总时长约 1.5s。
+const startExpandAnimation = () => {
+  const el = expandEl.value
+  if (!el || !expand.value) return
+  const rect = expand.value.rect
+  const scale = rect.width / window.innerWidth
+  const dx = rect.x + rect.width / 2 - window.innerWidth / 2
+  const dy = rect.y + rect.height / 2 - window.innerHeight / 2
+  expandAnim?.cancel()
+  expandAnim = el.animate(
+    [
+      {
+        transform: `translate(${dx}px, ${dy}px) scale(${scale}) rotateY(0deg)`,
+        opacity: 0,
+      },
+      {
+        opacity: 1,
+        offset: 0.12,
+      },
+      {
+        // 段 1 结束点：放大到全屏 40%，位置仍停在磁贴处（translate 不变），不先移到中心
+        transform: `translate(${dx}px, ${dy}px) scale(0.4) rotateY(0deg)`,
+        opacity: 1,
+        offset: 0.34,
+        easing: 'cubic-bezier(0.4, 0, 0.6, 1)',
+      },
+      {
+        // 段 2：从磁贴位置起播翻转，一边翻转一边放大并随放大自然向中心收敛（占满全屏）
+        transform: 'translate(0, 0) scale(1) rotateY(360deg)',
+      },
+    ],
+    {
+      duration: prefersReducedMotion() ? 1 : 1500,
+      delay: prefersReducedMotion() ? 0 : 160,
+      easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      fill: 'both',
+    },
+  )
+}
+
+const openExpand = (publicId: string, rect: DOMRect) => {
+  const tile = props.tiles.find((item) => item.public_id === publicId)
+  if (!tile) return
+  const image = tile.image_wide_path || tile.banner_image || tile.cover_image || ''
+  expandLoading.value = true
+  expandLeaving.value = false
+  if (expandLeaveTimer !== null) {
+    clearTimeout(expandLeaveTimer)
+    expandLeaveTimer = null
+  }
+  expand.value = {
+    title: tile.title,
+    image,
+    size: tile.tile_size,
+    rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+  }
+  void nextTick(() => {
+    startExpandAnimation()
+  })
+}
+
+// 退场淡出同样走 WAAPI：先取消展开动画（避免 fill 残留），再播 360ms 淡出，
+// 完成回调里卸载展开层——不依赖 CSS transition 的触发时机，保证淡出一定可见。
+const closeExpand = () => {
+  expandAnim?.cancel()
+  expandAnim = null
+  const el = expandEl.value
+  if (!el) {
+    finishExpand()
+    return
+  }
+  expandLeaving.value = true
+  const leave = el.animate([{ opacity: 1 }, { opacity: 0 }], {
+    duration: prefersReducedMotion() ? 1 : 360,
+    easing: 'ease',
+    fill: 'forwards',
+  })
+  leave.onfinish = () => {
+    leave.cancel()
+    finishExpand()
+  }
+  if (expandLeaveTimer !== null) {
+    clearTimeout(expandLeaveTimer)
+  }
+  expandLeaveTimer = window.setTimeout(finishExpand, 400)
+}
+
+const finishExpand = () => {
+  expand.value = null
+  expandLeaving.value = false
+  if (expandLeaveTimer !== null) {
+    clearTimeout(expandLeaveTimer)
+    expandLeaveTimer = null
   }
 }
 
-const handleLaunchVersion = (option: { id: string; version: string; url: string }) => {
-  launchModalVisible.value = false
-  window.location.assign(option.url)
+const waitForExpand = () =>
+  new Promise<void>((resolve) => {
+    if (typeof window === 'undefined') {
+      resolve()
+      return
+    }
+    if (prefersReducedMotion()) {
+      resolve()
+      return
+    }
+    // 160ms 按压缓冲 + 1500ms 展开动画
+    window.setTimeout(resolve, 1760)
+  })
+
+// 点击磁贴 = 进入应用：展开动画（翻转放大当前图）期间后台预取详情页数据，
+// 动画播完直接切到游戏详情页（详情页自带启动入口，无弹窗打断）。
+const handleTileSelect = async (publicId: string, rect?: DOMRect) => {
+  const request = tileDetailRequests.begin()
+  if (rect) {
+    openExpand(publicId, rect)
+  }
+  const detailPromise = gamesService.getGameDetail(publicId).catch(() => null)
+  await waitForExpand()
+  if (!request.isCurrent()) return
+  await detailPromise
+  if (!request.isCurrent()) return
+  emit('close')
+  router.push({ name: 'game-detail', params: { publicId } })
+  closeExpand()
 }
 
 const handleBrowseGames = () => {
@@ -442,6 +629,7 @@ const handleCropConfirm = (blobs: Record<StartScreenTileSize, Blob>) => {
   cropGameId.value = null
 }
 
+/* Win8 组横排：滚轮横向翻组 */
 const handleWheel = (event: WheelEvent) => {
   const area = metroAreaRef.value
   if (!area) return
@@ -570,6 +758,52 @@ const endDrag = () => {
   window.removeEventListener('pointercancel', onWindowPointerCancel)
 }
 
+// 入场动画与磁贴渲染解耦：磁贴是异步加载的，overlay 的 enter-active 类在加载完成前就可能
+// 被 Vue 移除，动画永远赶不上。改为由组件显式控制：tiles 渲染完成后加 --entering 类触发
+// 右滑入场，最晚磁贴动画结束后移除。
+const entranceActive = ref(false)
+let entranceTriggered = false
+let entranceTimer: number | null = null
+
+const scheduleEntrance = () => {
+  if (entranceTriggered || !props.visible) return
+  if (totalTiles.value === 0) return
+  entranceTriggered = true
+  void nextTick(() => {
+    entranceActive.value = true
+    const longestDelay =
+      Math.max(visibleGroups.value.length - 1, 0) * 110 +
+      Math.max(totalTiles.value - 1, 0) * 40
+    entranceTimer = window.setTimeout(() => {
+      entranceActive.value = false
+      entranceTimer = null
+    }, longestDelay + 400)
+  })
+}
+
+watch(
+  () => props.visible,
+  (value) => {
+    if (value) {
+      scheduleEntrance()
+    } else {
+      entranceActive.value = false
+      entranceTriggered = false
+      if (entranceTimer !== null) {
+        clearTimeout(entranceTimer)
+        entranceTimer = null
+      }
+    }
+  },
+)
+
+watch(
+  () => props.tiles.length,
+  () => {
+    scheduleEntrance()
+  },
+)
+
 const onTileEnter = (el: Element) => {
   const element = el as HTMLElement
   // 初次打开由父级入场动画驱动；异步插入或编辑新增的磁贴复用同一组间节奏。
@@ -596,6 +830,14 @@ onUnmounted(() => {
   tileDetailRequests.invalidate()
   cropDetailRequests.invalidate()
   endDrag()
+  if (entranceTimer !== null) {
+    clearTimeout(entranceTimer)
+    entranceTimer = null
+  }
+  if (expandLeaveTimer !== null) {
+    clearTimeout(expandLeaveTimer)
+    expandLeaveTimer = null
+  }
   if (typeof document !== 'undefined') {
     document.body.style.overflow = ''
   }
@@ -604,8 +846,8 @@ onUnmounted(() => {
 
 <style>
 /* 开始屏幕是沉浸式品牌页特例：全屏场景色、Win8 磁贴网格与动效留在组件内，不外溢到全局 token。
-   磁贴自由排列：列只是 2 格宽 × 6 行高的容器（约三个 2x2 大正方形占地），
-   按顺序行优先塞入，当前列放不下就向右另开一列，列间距 50px。 */
+   全屏自定义网格（Win8.1/Win10 形态）：组（列）只是顶部标签，磁贴在 12 列无限行的
+   自由网格内摆放，组与组垂直堆叠；间距对齐 Win8 的 5px。 */
 .start-screen-wrapper {
   position: fixed;
   inset: 0;
@@ -624,6 +866,62 @@ onUnmounted(() => {
   z-index: 1600 !important;
 }
 
+/* 展开动画由单一 Web Animations API 逻辑驱动（startExpandAnimation），
+   CSS 只负责静态外观与 leaving 淡出；will-change 让整层进合成层，缩放由 GPU 接管。 */
+.start-screen-expand {
+  position: fixed;
+  inset: 0;
+  z-index: 1700;
+  overflow: hidden;
+  background: #0d1117;
+  color: #fff;
+  will-change: transform, opacity;
+}
+
+.start-screen-expand.is-leaving {
+  transition: opacity 320ms ease;
+  opacity: 0;
+}
+
+.start-screen-expand__bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+.start-screen-expand__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.5) 100%);
+}
+
+.start-screen-expand__meta {
+  position: absolute;
+  left: 40px;
+  bottom: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.start-screen-expand__meta h2 {
+  margin: 0;
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.65);
+}
+
+.start-screen-expand__loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 14px;
+}
+
 .start-screen-scrim {
   position: absolute;
   inset: 0;
@@ -639,10 +937,10 @@ onUnmounted(() => {
   flex-direction: column;
   padding: 40px 56px 28px;
   color: #fff;
-  /* 一列 = 三个大正方形占地纵向堆叠（大 2x2 + 两个长 2x1 + 四个 1x1 的 2x2），
-     列高 6 行、列宽 2 格；行高随视口自适应，720p 可整列放下 */
-  --start-cell: clamp(56px, 8.5vh, 96px);
-  --start-gap: clamp(8px, 1.2vh, 14px);
+  /* 12 列网格 + Win10 磁贴比例（2x2/2x4/4x4）：单元约 4vw，
+     2x2 小磁贴 ≈ Win8 的 125px 量级；组间横向滚动翻屏 */
+  --start-cell: clamp(32px, 4vw, 60px);
+  --start-gap: 5px;
 }
 
 .start-screen__header {
@@ -685,36 +983,44 @@ onUnmounted(() => {
   scrollbar-width: thin;
 }
 
-.start-screen__columns {
+.start-screen__groups {
   display: flex;
+  flex-direction: row;
   align-items: flex-start;
-  gap: 50px;
+  gap: 48px;
   width: max-content;
 }
 
-.start-screen__column-grid {
-  display: grid;
-  grid-template-columns: repeat(2, var(--start-cell));
-  grid-template-rows: repeat(6, var(--start-cell));
-  gap: var(--start-gap);
-  position: relative;
-  width: max-content;
-}
-
-.start-screen__column {
+.start-screen__group {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.start-screen__column-header {
+.start-screen__group-grid-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--start-gap);
+}
+
+.start-screen__group-grid {
+  display: grid;
+  /* 组宽按磁贴实际占用收缩（--start-group-cols，上限 12），磁贴少时紧凑排列 */
+  grid-template-columns: repeat(var(--start-group-cols, 12), var(--start-cell));
+  grid-auto-rows: var(--start-cell);
+  gap: var(--start-gap);
+  position: relative;
+  width: max-content;
+}
+
+.start-screen__group-header {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
 
-.start-screen__column-name {
+.start-screen__group-name {
   flex: 1;
   min-width: 0;
   font-size: 14px;
@@ -724,7 +1030,7 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-.start-screen__column-name-input {
+.start-screen__group-name-input {
   flex: 1;
   min-width: 0;
   box-sizing: border-box;
@@ -738,7 +1044,7 @@ onUnmounted(() => {
   outline: none;
 }
 
-.start-screen__column-remove {
+.start-screen__group-remove {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -749,12 +1055,12 @@ onUnmounted(() => {
   border-radius: 6px;
 }
 
-.start-screen__column-name-input:focus {
+.start-screen__group-name-input:focus {
   border-color: rgba(255, 255, 255, 0.75);
   background: rgba(255, 255, 255, 0.14);
 }
 
-.start-screen__column-tiles {
+.start-screen__group-tiles {
   display: contents;
 }
 
@@ -775,15 +1081,58 @@ onUnmounted(() => {
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45);
 }
 
+/* 组尾追加条：承接网格之外（磁贴下方新行）的拖放，替代向下延伸的虚空格 */
+.start-screen__group-append {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: calc(var(--start-cell) * var(--start-group-cols, 2) + var(--start-gap) * (var(--start-group-cols, 2) - 1));
+  height: var(--start-cell);
+  box-sizing: border-box;
+  border: 2px dashed rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 12px;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.start-screen__group-append--target {
+  border-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+/* 组尾横向追加条：承接网格右侧（新列）的拖放，拖入后组宽自动扩展 */
+.start-screen__group-append-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--start-cell);
+  height: calc(var(--start-cell) * var(--start-group-rows, 1) + var(--start-gap) * (var(--start-group-rows, 1) - 1));
+  box-sizing: border-box;
+  border: 2px dashed rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.42);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.start-screen__group-append-col:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .start-screen__new-column {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  flex-shrink: 0;
-  width: calc(var(--start-cell) * 2 + var(--start-gap));
-  min-height: calc(var(--start-cell) * 6 + var(--start-gap) * 5);
+  width: calc(var(--start-cell) * 12 + var(--start-gap) * 11);
+  min-height: 72px;
   border: 2px dashed rgba(255, 255, 255, 0.42);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.05);
@@ -816,21 +1165,6 @@ onUnmounted(() => {
     transform 250ms cubic-bezier(0, 0, 0.2, 1);
 }
 
-.start-screen__tile-slot--small {
-  grid-column-end: span 1;
-  grid-row-end: span 1;
-}
-
-.start-screen__tile-slot--wide {
-  grid-column-end: span 2;
-  grid-row-end: span 1;
-}
-
-.start-screen__tile-slot--large {
-  grid-column-end: span 2;
-  grid-row-end: span 2;
-}
-
 .start-screen__tile-slot--dragging {
   opacity: 0;
   pointer-events: none;
@@ -857,18 +1191,18 @@ onUnmounted(() => {
 }
 
 .start-screen__drag-ghost--small {
-  width: var(--start-cell);
-  height: var(--start-cell);
+  width: calc(var(--start-cell) * 2 + var(--start-gap));
+  height: calc(var(--start-cell) * 2 + var(--start-gap));
 }
 
 .start-screen__drag-ghost--wide {
-  width: calc(var(--start-cell) * 2 + var(--start-gap));
-  height: var(--start-cell);
+  width: calc(var(--start-cell) * 4 + var(--start-gap) * 3);
+  height: calc(var(--start-cell) * 2 + var(--start-gap));
 }
 
 .start-screen__drag-ghost--large {
-  width: calc(var(--start-cell) * 2 + var(--start-gap));
-  height: calc(var(--start-cell) * 2 + var(--start-gap));
+  width: calc(var(--start-cell) * 4 + var(--start-gap) * 3);
+  height: calc(var(--start-cell) * 4 + var(--start-gap) * 3);
 }
 
 .start-screen-launch-list {
@@ -1003,12 +1337,9 @@ onUnmounted(() => {
 }
 
 .start-screen-overlay-leave-active {
-  /* 退出与 ContentThemeTransition 一致，只淡出内容层，不反向缩放整屏。 */
-  transition: opacity 167ms cubic-bezier(0.4, 0, 1, 1);
-}
-
-.start-screen-overlay-leave-to {
-  opacity: 0;
+  /* 退场由内容层动画演出（磁贴右飞、背景渐暗、标题移出），
+     外层不整体淡出——否则 167ms 全透明会盖住磁贴的飞出动画。 */
+  transition: none;
 }
 
 .start-screen-scrim {
@@ -1025,24 +1356,60 @@ onUnmounted(() => {
 }
 
 .start-screen-overlay-enter-active .start-screen__header {
-  animation: start-screen-entrance-in 250ms cubic-bezier(0, 0, 0.2, 1) both;
+  animation: start-screen-entrance-in 320ms cubic-bezier(0.2, 0, 0.2, 1) both;
 }
 
-.start-screen-overlay-enter-active .start-screen__tile-slot {
+/* 入场由 --entering 类驱动（组件在磁贴渲染完成后显式添加，不受 Transition 生命周期限制） */
+.start-screen__groups--entering .start-screen__group-header {
   animation:
-    start-screen-entrance-in 250ms cubic-bezier(0, 0, 0.2, 1)
+    start-screen-entrance-in 320ms cubic-bezier(0.2, 0, 0.2, 1)
     var(--start-tile-enter-delay, 0ms)
     both;
 }
 
+.start-screen__groups--entering .start-screen__tile-slot {
+  animation:
+    start-screen-entrance-in 320ms cubic-bezier(0.2, 0, 0.2, 1)
+    var(--start-tile-enter-delay, 0ms)
+    both;
+}
+
+/* Win8 EntranceThemeTransition 复刻：从最终位置右下方约 10px 处上浮 + 淡入到原位 */
 @keyframes start-screen-entrance-in {
   from {
     opacity: 0;
-    transform: translate3d(48px, 0, 0);
+    transform: translate3d(10px, 10px, 0);
   }
   to {
     opacity: 1;
     transform: translate3d(0, 0, 0);
+  }
+}
+
+.start-screen-overlay-leave-active .start-screen__header {
+  animation: start-screen-entrance-out 167ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.start-screen-overlay-leave-active .start-screen__group-header {
+  animation: start-screen-entrance-out 167ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+/* 退场动画：入场镜像——向下回落 + 轻微右移 + 淡出，后进先出收拢 */
+.start-screen-overlay-leave-active .start-screen__tile-slot {
+  animation:
+    start-screen-entrance-out 280ms cubic-bezier(0.4, 0, 1, 1)
+    var(--start-tile-leave-delay, 0ms)
+    both;
+}
+
+@keyframes start-screen-entrance-out {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(10px, 10px, 0);
   }
 }
 
@@ -1053,7 +1420,11 @@ onUnmounted(() => {
   .start-screen__tile-slot,
   .start-screen-scrim,
   .start-screen__header,
-  .start-screen-overlay-enter-active .start-screen__tile-slot {
+  .start-screen__groups--entering .start-screen__tile-slot,
+  .start-screen__groups--entering .start-screen__group-header,
+  .start-screen-overlay-leave-active .start-screen__tile-slot,
+  .start-screen-overlay-leave-active .start-screen__group-header,
+  .start-screen-overlay-leave-active .start-screen__header {
     transition: none !important;
     animation: none !important;
   }

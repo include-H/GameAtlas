@@ -5,8 +5,9 @@ const (
 	StartScreenTileSizeWide  StartScreenTileSize = "wide"
 	StartScreenTileSizeLarge StartScreenTileSize = "large"
 
-	StartScreenColumnRows = 6
-	StartScreenColumnCols = 2
+	// 全屏自定义网格：组（列）只是顶部标签，磁贴在 12 列无限行的自由网格内摆放。
+	StartScreenFreeCols = 12
+	StartScreenMaxRows  = 200
 )
 
 type StartScreenTileSize string

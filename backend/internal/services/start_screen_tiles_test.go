@@ -141,13 +141,13 @@ func TestStartScreenTilesUpdateRejectsInvalidInput(t *testing.T) {
 	if _, err := service.Update([]domain.StartScreenColumnWrite{{Name: strings.Repeat("名", 31)}}, nil); !errors.Is(err, domain.ErrValidation) {
 		t.Fatalf("long column name error = %v, want ErrValidation", err)
 	}
-	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{GameID: gameID, TileSize: "small", GridRow: 6}}); !errors.Is(err, domain.ErrValidation) {
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{GameID: gameID, TileSize: "small", GridRow: 199}}); !errors.Is(err, domain.ErrValidation) {
 		t.Fatalf("out of bounds row error = %v, want ErrValidation", err)
 	}
-	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{GameID: gameID, TileSize: "wide", GridCol: 1}}); !errors.Is(err, domain.ErrValidation) {
-		t.Fatalf("wide tile second column error = %v, want ErrValidation", err)
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{GameID: gameID, TileSize: "wide", GridCol: 9}}); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("wide tile out of bounds col error = %v, want ErrValidation", err)
 	}
-	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{GameID: gameID, TileSize: "large", GridRow: 5}}); !errors.Is(err, domain.ErrValidation) {
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{GameID: gameID, TileSize: "large", GridRow: 197}}); !errors.Is(err, domain.ErrValidation) {
 		t.Fatalf("large tile low row error = %v, want ErrValidation", err)
 	}
 }
@@ -404,8 +404,9 @@ func TestStartScreenTilesAddTileAppendsAtEnd(t *testing.T) {
 	if layout.Tiles[1].GameID != secondID || layout.Tiles[1].TileSize != "wide" || layout.Tiles[1].SortOrder != 1 {
 		t.Fatalf("appended tile = %+v, want second game at the end", layout.Tiles[1])
 	}
-	if layout.Tiles[1].ColumnIndex != 0 || layout.Tiles[1].GridRow != 1 || layout.Tiles[1].GridCol != 0 {
-		t.Fatalf("appended tile position = %+v, want next free wide cell in first column", layout.Tiles[1])
+	// 12 列网格：small（2x2）占 col0-1，wide（2x4）就近放在同行 col2-5。
+	if layout.Tiles[1].ColumnIndex != 0 || layout.Tiles[1].GridRow != 0 || layout.Tiles[1].GridCol != 2 {
+		t.Fatalf("appended tile position = %+v, want next free wide cell in the group", layout.Tiles[1])
 	}
 
 	// 重复添加同一游戏：幂等，不产生重复磁贴。
@@ -461,8 +462,10 @@ func TestStartScreenTilesAddTileFillsEmptyColumnFirst(t *testing.T) {
 			break
 		}
 	}
-	if added == nil || added.ColumnIndex != 1 || added.GridRow != 0 || added.GridCol != 0 {
-		t.Fatalf("appended tile = %+v, want empty middle column first cell", added)
+	// 12 列网格：组 0 前三行被三个 large（4x4）占满 col0-3，wide 就近落在同行 col4-7，
+	// 不再需要等"整列放满"才开新列。
+	if added == nil || added.ColumnIndex != 0 || added.GridRow != 0 || added.GridCol != 4 {
+		t.Fatalf("appended tile = %+v, want nearest free cell in the group", added)
 	}
 }
 

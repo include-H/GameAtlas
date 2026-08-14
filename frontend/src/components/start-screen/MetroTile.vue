@@ -5,9 +5,11 @@
     :class="[
       `metro-tile--${tile.tile_size}`,
       { 'metro-tile--editing': editing },
+      ...(pressDir ? [`metro-tile--press-${pressDir}`] : []),
     ]"
     :style="tileStyle"
     :title="tile.title"
+    @pointerdown="onPointerDown"
     @click="handleClick"
   >
     <img
@@ -54,9 +56,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { IconClose, IconExpand, IconImage } from '@arco-design/web-vue/es/icon'
 import type { StartScreenTile, StartScreenTileSize } from '@/services/types'
+
+// Win8 磁贴按压：按哪里哪里微微下沉——transform-origin 移到按下位置的对角，
+// 小角度单轴组合旋转，按下侧位移最大、对角几乎不动。仅按压期间生效。
+type PressDirection = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 
 const props = defineProps<{
   tile: StartScreenTile
@@ -65,11 +71,55 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  select: [publicId: string]
+  select: [publicId: string, rect: DOMRect]
   crop: [gameId: number]
   resize: [gameId: number]
   remove: [gameId: number]
 }>()
+
+const pressDir = ref<PressDirection | null>(null)
+let pressClearTimer: number | null = null
+
+const clearPressNow = () => {
+  if (pressClearTimer !== null) {
+    clearTimeout(pressClearTimer)
+    pressClearTimer = null
+  }
+  pressDir.value = null
+  window.removeEventListener('pointerup', onPointerUpRelease)
+  window.removeEventListener('pointercancel', onPointerCancel)
+}
+
+// 松开后保持按压姿态 180ms：让 150ms 的倾斜过渡完整走完，避免快速点击时一闪而过。
+const onPointerUpRelease = () => {
+  window.removeEventListener('pointerup', onPointerUpRelease)
+  window.removeEventListener('pointercancel', onPointerCancel)
+  if (pressClearTimer !== null) {
+    clearTimeout(pressClearTimer)
+  }
+  pressClearTimer = window.setTimeout(() => {
+    pressDir.value = null
+    pressClearTimer = null
+  }, 180)
+}
+
+const onPointerCancel = () => {
+  clearPressNow()
+}
+
+const onPointerDown = (event: PointerEvent) => {
+  if (props.editing) return
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const dx = event.clientX - rect.left - rect.width / 2
+  const dy = event.clientY - rect.top - rect.height / 2
+  const row = dy >= 0 ? 'bottom' : 'top'
+  const col = dx >= 0 ? 'right' : 'left'
+  pressDir.value = `${row}-${col}` as PressDirection
+  window.addEventListener('pointerup', onPointerUpRelease)
+  window.addEventListener('pointercancel', onPointerCancel)
+}
+
+onUnmounted(clearPressNow)
 
 // Win8 Metro 24 色磁贴配色：开始屏幕是沉浸式品牌页特例，色板留在组件内部不外溢。
 const metroColors = [
@@ -97,9 +147,10 @@ const tileStyle = computed(() => ({
   '--metro-tile-color': metroColors[props.colorIndex % metroColors.length],
 }))
 
-const handleClick = () => {
+const handleClick = (event: MouseEvent) => {
   if (props.editing) return
-  emit('select', props.tile.public_id)
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  emit('select', props.tile.public_id, rect)
 }
 </script>
 
@@ -125,6 +176,27 @@ const handleClick = () => {
 .metro-tile:hover {
   transform: translateY(-2px) scale(1.02);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+}
+
+/* Win8 按压：transform-origin 在按下位置的对角，按下侧局部下沉、对角几乎不动 */
+.metro-tile--press-top-left:active {
+  transform: perspective(1000px) rotateX(5deg) rotateY(-5deg);
+  transform-origin: 100% 100%;
+}
+
+.metro-tile--press-top-right:active {
+  transform: perspective(1000px) rotateX(5deg) rotateY(5deg);
+  transform-origin: 0% 100%;
+}
+
+.metro-tile--press-bottom-left:active {
+  transform: perspective(1000px) rotateX(-5deg) rotateY(-5deg);
+  transform-origin: 100% 0%;
+}
+
+.metro-tile--press-bottom-right:active {
+  transform: perspective(1000px) rotateX(-5deg) rotateY(5deg);
+  transform-origin: 0% 0%;
 }
 
 .metro-tile--editing {
@@ -196,8 +268,9 @@ const handleClick = () => {
   background: rgba(0, 0, 0, 0.68);
 }
 
+/* Win10 编辑布局：调整尺寸手柄固定在右上角，裁剪/移除依次左移 */
 .metro-tile__resize {
-  right: 70px;
+  right: 6px;
 }
 
 .metro-tile__crop {
@@ -205,7 +278,7 @@ const handleClick = () => {
 }
 
 .metro-tile__remove {
-  right: 6px;
+  right: 70px;
 }
 
 @media (hover: none) {
