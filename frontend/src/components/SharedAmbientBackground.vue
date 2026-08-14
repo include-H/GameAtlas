@@ -297,7 +297,19 @@ watch(
   filter: saturate(1.02) blur(8px) brightness(1.1);
   transform: scale(1.015);
   transform-origin: center center;
-  transition: opacity 0.85s ease;
+  /* 非活动层在过渡结束后 visibility:hidden，释放全屏 blur 合成层（GPU 纹理）
+     切换时由 .is-active 立即恢复可见，避免隐藏后切回闪烁 */
+  visibility: hidden;
+  transition:
+    opacity 0.85s ease,
+    visibility 0s linear 0.85s;
+}
+
+.shared-ambient-bg__layer.is-active {
+  visibility: visible;
+  transition:
+    opacity 0.85s ease,
+    visibility 0s;
 }
 
 .shared-ambient-bg__overlay {

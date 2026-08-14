@@ -278,14 +278,6 @@ const toggleCrtPause = () => {
 }
 
 /* ---------- 动画 ---------- */
-@keyframes crt-noise {
-  0% { background-position: 0 0; }
-  25% { background-position: -20px 8px; }
-  50% { background-position: 12px -14.67px; }
-  75% { background-position: -8px -20px; }
-  100% { background-position: 16px 12px; }
-}
-
 @keyframes crt-flicker {
   0%, 100% { opacity: 1; }
   92% { opacity: 1; }
