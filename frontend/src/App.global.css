@@ -62,8 +62,6 @@ body {
 
 .app-sider.arco-layout-sider {
   background: var(--app-sider-surface);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border-right: 1px solid var(--app-sider-border);
   z-index: 99;
   position: relative;
@@ -93,11 +91,9 @@ body {
 
 .app-sider :is(.arco-layout-sider-trigger, .arco-layout-sider-trigger-light) {
   height: 48px;
-  background: color-mix(in srgb, var(--app-sider-surface) 72%, transparent);
+  background: color-mix(in srgb, var(--app-sider-surface) 92%, transparent);
   border-top: 1px solid var(--app-sider-border);
   color: color-mix(in srgb, var(--color-text-1) 74%, var(--color-primary-light-2) 26%);
-  backdrop-filter: blur(10px) saturate(120%);
-  -webkit-backdrop-filter: blur(10px) saturate(120%);
   box-shadow: none;
   transition:
     background-color var(--transition-fast),
@@ -112,7 +108,7 @@ body {
 }
 
 .app-sider.arco-layout-sider-collapsed :is(.arco-layout-sider-trigger, .arco-layout-sider-trigger-light) {
-  background: color-mix(in srgb, var(--app-sider-surface) 56%, transparent);
+  background: color-mix(in srgb, var(--app-sider-surface) 88%, transparent);
   border-top-color: color-mix(in srgb, var(--app-sider-border) 78%, transparent);
 }
 
@@ -138,28 +134,22 @@ body {
 
 .mobile-drawer .arco-drawer-mask {
   background: var(--app-scrim);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 .mobile-drawer .arco-drawer-content {
   background: var(--app-sider-surface) !important;
   border-right: 1px solid var(--app-sider-border);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   box-shadow: var(--app-header-shadow);
 }
 
 .mobile-drawer .arco-drawer {
   background: var(--app-sider-surface) !important;
   border-right: 1px solid var(--app-sider-border);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   box-shadow: var(--app-header-shadow);
 }
 
 .mobile-drawer .arco-drawer-header {
-  background: color-mix(in srgb, var(--app-sider-surface) 82%, transparent) !important;
+  background: color-mix(in srgb, var(--app-sider-surface) 92%, transparent) !important;
   border-bottom: 1px solid var(--app-sider-border);
 }
 

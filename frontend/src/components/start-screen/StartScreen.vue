@@ -286,6 +286,7 @@ import {
 } from '@/utils/start-screen-layout'
 import type { PackedStartScreenGroup } from '@/utils/start-screen-layout'
 import gamesService from '@/services/games.service'
+import { GAME_DETAIL_RETURN_QUERY } from '@/utils/navigation'
 import { createRequestGeneration } from '@/utils/request-generation'
 
 const TILE_SPANS: Record<StartScreenTileSize, { rows: number; cols: number }> = {
@@ -617,7 +618,14 @@ const handleTileSelect = async (publicId: string, rect?: DOMRect) => {
   // 点击磁贴的关闭跳过退场动画：展开动画已演出，直接切详情页
   skipOverlayLeave = true
   emit('close')
-  router.push({ name: 'game-detail', params: { publicId } })
+  // 开始屏幕是全局覆盖层：覆盖在游戏库上时保留筛选上下文，覆盖在其他页面上时统一回游戏库。
+  const currentRoute = router.currentRoute.value
+  const returnTo = currentRoute.name === 'games' ? currentRoute.fullPath : '/games'
+  router.push({
+    name: 'game-detail',
+    params: { publicId },
+    query: { [GAME_DETAIL_RETURN_QUERY]: returnTo },
+  })
   closeExpand()
 }
 
@@ -1042,9 +1050,9 @@ onUnmounted(() => {
 .start-screen-scrim {
   position: absolute;
   inset: 0;
-  /* 半透明遮罩：让开始屏幕透出当前全局背景（自定义 bg / 环境背景池），同时保证文字可读 */
+  /* 半透明遮罩：让开始屏幕透出当前全局背景（自定义 bg / 环境背景池），同时保证文字可读。
+     背景本身已模糊（SharedAmbientBackground 静态 blur），无需 backdrop-filter */
   background: rgba(8, 10, 16, 0.46);
-  backdrop-filter: blur(4px);
 }
 
 .start-screen {

@@ -328,9 +328,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(8, 5, 3, 0.58);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  background: rgba(8, 5, 3, 0.72);
 }
 
 .store-inspect__box {

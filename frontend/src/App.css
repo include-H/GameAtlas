@@ -131,8 +131,6 @@
   color: color-mix(in srgb, var(--color-text-2) 72%, var(--color-text-3));
   font-size: 13px;
   background: var(--app-footer-surface);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   height: 48px;
   display: flex;
   align-items: center;
@@ -165,10 +163,8 @@
   height: 48px;
   border: 1px solid var(--app-sider-border);
   border-radius: 16px;
-  background: color-mix(in srgb, var(--app-sider-surface) 72%, transparent) !important;
+  background: color-mix(in srgb, var(--app-sider-surface) 92%, transparent) !important;
   color: color-mix(in srgb, var(--color-text-1) 74%, var(--color-primary-light-2) 26%) !important;
-  backdrop-filter: blur(10px) saturate(120%);
-  -webkit-backdrop-filter: blur(10px) saturate(120%);
   box-shadow: var(--shadow-hover);
   transition:
     background-color var(--transition-fast),
@@ -184,7 +180,7 @@
 }
 
 .mobile-menu-btn.mobile-menu-btn--active {
-  background: color-mix(in srgb, var(--app-sider-surface) 56%, transparent) !important;
+  background: color-mix(in srgb, var(--app-sider-surface) 88%, transparent) !important;
   border-color: color-mix(in srgb, var(--app-sider-border) 78%, transparent);
 }
 

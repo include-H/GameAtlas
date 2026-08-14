@@ -137,10 +137,11 @@
   --app-header-shadow: 0 10px 28px rgba(19, 26, 40, 0.08);
   --app-header-highlight: linear-gradient(90deg, rgba(26, 159, 255, 0.12), rgba(26, 159, 255, 0));
   --app-header-hover: rgba(26, 159, 255, 0.08);
-  --app-sider-surface: color-mix(in srgb, var(--app-header-surface) 52%, transparent);
+  /* 无 backdrop-filter 的玻璃质感：高不透明度半透明表面 + 细边框 + 高光，降低全屏实时模糊开销 */
+  --app-sider-surface: color-mix(in srgb, var(--app-header-surface) 88%, transparent);
   --app-sider-border: color-mix(in srgb, var(--app-card-border) 84%, rgba(26, 159, 255, 0.12));
   --app-sider-hover: color-mix(in srgb, var(--app-sider-surface) 72%, rgba(26, 159, 255, 0.06));
-  --app-footer-surface: color-mix(in srgb, var(--app-header-surface) 48%, transparent);
+  --app-footer-surface: color-mix(in srgb, var(--app-header-surface) 86%, transparent);
   --app-footer-border: color-mix(in srgb, var(--app-header-border) 78%, transparent);
   --app-footer-shadow: 0 -10px 24px rgba(19, 26, 40, 0.06);
 }
@@ -177,10 +178,11 @@ body[arco-theme='dark'] {
   --app-header-shadow: 0 16px 36px rgba(2, 7, 13, 0.36);
   --app-header-highlight: linear-gradient(90deg, rgba(154, 183, 211, 0.1), rgba(154, 183, 211, 0));
   --app-header-hover: rgba(154, 183, 211, 0.08);
-  --app-sider-surface: color-mix(in srgb, var(--app-header-surface) 56%, transparent);
+  /* 无 backdrop-filter 的玻璃质感：高不透明度半透明表面 + 细边框 + 高光，降低全屏实时模糊开销 */
+  --app-sider-surface: color-mix(in srgb, var(--app-header-surface) 90%, transparent);
   --app-sider-border: color-mix(in srgb, var(--app-card-border) 84%, rgba(168, 190, 214, 0.12));
   --app-sider-hover: color-mix(in srgb, var(--app-sider-surface) 74%, rgba(122, 162, 199, 0.08));
-  --app-footer-surface: color-mix(in srgb, var(--app-header-surface) 52%, transparent);
+  --app-footer-surface: color-mix(in srgb, var(--app-header-surface) 88%, transparent);
   --app-footer-border: color-mix(in srgb, var(--app-header-border) 82%, transparent);
   --app-footer-shadow: 0 -14px 28px rgba(2, 7, 13, 0.22);
 
@@ -306,8 +308,6 @@ body[arco-theme='dark'] #app {
 
 .glass-header {
   background: var(--app-header-surface) !important;
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
   border-bottom: 1px solid var(--app-header-border) !important;
   box-shadow: var(--app-header-shadow);
   position: relative;
