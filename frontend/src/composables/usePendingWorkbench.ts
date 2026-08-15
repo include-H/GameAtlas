@@ -34,8 +34,6 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   const searchQuery = ref('')
   const selectedIssue = ref<string | undefined>()
   const sortBy = ref<PendingWorkbenchSortBy>('issue-count')
-  const onlySevere = ref(false)
-  const onlyRecent = ref(false)
   const showIgnored = ref(false)
   const pendingIssueIgnoredTotal = ref(0)
   const pendingIssueCounts = ref<Record<string, number>>({})
@@ -85,16 +83,12 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     searchQuery.value = ''
     selectedIssue.value = undefined
     sortBy.value = 'issue-count'
-    onlySevere.value = false
-    onlyRecent.value = false
     showIgnored.value = false
   }
 
   const buildWorkbenchQuery = () => ({
     search: searchQuery.value.trim() || undefined,
     issue: selectedIssue.value,
-    onlySevere: onlySevere.value,
-    onlyRecent: onlyRecent.value,
     showIgnored: showIgnored.value,
     sortBy: sortBy.value,
   })
@@ -113,8 +107,6 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
           search: query.search,
           pending_issue: query.issue,
           pending_include_ignored: query.showIgnored,
-          pending_severe: query.onlySevere,
-          pending_recent_days: query.onlyRecent ? 7 : undefined,
         },
         sort: resolvePendingWorkbenchSort(query.sortBy),
       })
@@ -156,7 +148,7 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
   }
 
   watch(
-    [searchQuery, selectedIssue, sortBy, onlySevere, onlyRecent, showIgnored],
+    [searchQuery, selectedIssue, sortBy, showIgnored],
     async () => {
       await loadWorkbenchGames(1)
     },
@@ -217,8 +209,6 @@ export const usePendingWorkbench = (options: UsePendingWorkbenchOptions) => {
     pendingGames,
     pendingIssueCounts,
     pendingIssueIgnoredTotal,
-    onlyRecent,
-    onlySevere,
     searchQuery,
     selectedIssue,
     showIgnored,

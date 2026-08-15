@@ -70,19 +70,7 @@
             <a-option value="downloads-desc">下载量高优先</a-option>
           </a-select>
         </a-col>
-        <a-col :xs="12" :sm="6" :md="3" :lg="3">
-          <div class="filter-toggle">
-            <span>仅严重项</span>
-            <a-switch v-model="onlySevere" />
-          </div>
-        </a-col>
-        <a-col :xs="12" :sm="6" :md="2" :lg="3">
-          <div class="filter-toggle">
-            <span>近 7 天</span>
-            <a-switch v-model="onlyRecent" />
-          </div>
-        </a-col>
-        <a-col :xs="12" :sm="6" :md="3" :lg="3">
+        <a-col :xs="24" :sm="12" :md="6" :lg="3">
           <div class="filter-toggle">
             <span>显示已忽略</span>
             <a-switch v-model="showIgnored" />
@@ -251,6 +239,12 @@
                 </template>
                 编辑资料
               </a-button>
+              <a-button class="app-text-action-btn" type="text" @click="openMedia(activeGame)">
+                <template #icon>
+                  <icon-image />
+                </template>
+                素材管理
+              </a-button>
               <a-button class="app-text-action-btn" type="text" @click="openWiki(activeGame)">
                 <template #icon>
                   <icon-book />
@@ -287,7 +281,7 @@ import { useUiStore } from '@/stores/ui'
 const EditGameModal = defineAsyncComponent(() => import('@/components/EditGameModal.vue'))
 import { PENDING_WORKBENCH_PAGE_SIZE } from '@/composables/usePendingWorkbench'
 import { usePendingCenterView } from '@/composables/usePendingCenterView'
-import { IconBook, IconEdit, IconRefresh, IconRight, IconSearch } from '@arco-design/web-vue/es/icon'
+import { IconBook, IconEdit, IconImage, IconRefresh, IconRight, IconSearch } from '@arco-design/web-vue/es/icon'
 
 defineOptions({
   name: 'PendingCenterView',
@@ -319,9 +313,8 @@ const {
   isSevereGame,
   isLoading,
   pendingIssueCounts,
-  onlyRecent,
-  onlySevere,
   openEdit,
+  openMedia,
   openWiki,
   pendingIssueDefinitions,
   refreshWorkbench,

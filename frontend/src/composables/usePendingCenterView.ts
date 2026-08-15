@@ -60,8 +60,6 @@ export const usePendingCenterView = ({
     isLoading,
     pendingIssueCounts,
     loadWorkbenchGames,
-    onlyRecent,
-    onlySevere,
     resetFilters,
     restoreIssue,
     searchQuery,
@@ -219,6 +217,14 @@ export const usePendingCenterView = ({
     })
   }
 
+  const openMedia = (game: GameListItem | null) => {
+    if (!game?.public_id) return
+    router.push({
+      name: 'game-media',
+      params: { publicId: game.public_id },
+    })
+  }
+
   const refreshWorkbench = async () => {
     await loadWorkbenchGames()
   }
@@ -291,11 +297,10 @@ export const usePendingCenterView = ({
     isLoading,
     isSevereGame,
     pendingIssueCounts,
-    onlyRecent,
-    onlySevere,
     openEdit,
     openWiki,
     pendingIssueDefinitions,
+    openMedia,
     refreshWorkbench,
     resetFilters,
     restoreIssue,

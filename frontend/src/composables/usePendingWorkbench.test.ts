@@ -76,8 +76,6 @@ describe('usePendingWorkbench', () => {
         search: undefined,
         pending_issue: undefined,
         pending_include_ignored: false,
-        pending_severe: false,
-        pending_recent_days: undefined,
       },
       sort: {
         field: 'pending_issue_count',
@@ -120,8 +118,6 @@ describe('usePendingWorkbench', () => {
     const workbench = usePendingWorkbench({ addAlert: vi.fn() })
     workbench.searchQuery.value = 'halo'
     workbench.selectedIssue.value = 'missing-assets'
-    workbench.onlySevere.value = true
-    workbench.onlyRecent.value = true
     workbench.showIgnored.value = true
     workbench.sortBy.value = 'downloads-desc'
 
@@ -137,8 +133,6 @@ describe('usePendingWorkbench', () => {
         search: 'halo',
         pending_issue: 'missing-assets',
         pending_include_ignored: true,
-        pending_severe: true,
-        pending_recent_days: 7,
       },
       sort: {
         field: 'downloads',
