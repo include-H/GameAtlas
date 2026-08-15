@@ -278,21 +278,48 @@ describe('packStartScreenTiles', () => {
     }
   })
 
-  it('spills past the group bottom into the right column top (chain)', () => {
-    // 组高 12 行：row10 有两个 2x2（col0/col2），row12 的 4x4 已溢出到组1 顶部 (0,0)
-    // 落点 row10 col0 覆盖 row10 col0 的磁贴 → 下移一格到 row12 → 越界 → 溢到组1 顶部 (0,0)，
-    // 顶到已溢出的 4x4 → 4x4 继续下移
+  it('does not open a new column while the group has free horizontal space', () => {
+    // 组0 只有 row10 的两个 2x2（横向 12 列远未占满）
+    // 落点 row10 col0 覆盖 row10 col0 的磁贴 → 下移一格越界 → 组内还有空位 → 横向回填，不开新列
     const tiles = [
       makeTile(1, 'small', { column_index: 0, grid_row: 10, grid_col: 0 }),
       makeTile(2, 'small', { column_index: 0, grid_row: 10, grid_col: 2 }),
-      makeTile(3, 'large', { column_index: 1, grid_row: 0, grid_col: 0 }),
     ]
 
     const plan = planStartScreenInsertion(tiles, 99, 0, 10, 0, 'small')
     expect(plan?.target).toEqual({ columnIndex: 0, row: 10, col: 0 })
     const moved = plan?.moves ?? []
-    // 磁贴1 被顶：组0 放不下 → 溢到组1 顶部，顶到磁贴3 → 磁贴3 下移一格 (4,0)
-    expect(moved.find((m) => m.gameId === 1)).toMatchObject({ columnIndex: 1, row: 0, col: 0 })
-    expect(moved.find((m) => m.gameId === 3)).toMatchObject({ columnIndex: 1, row: 4, col: 0 })
+    // 磁贴1 被顶：组底越界 → 组内 12 行内找空位（row0 起横向 first-fit）→ 回填组内，不开新列
+    expect(moved.find((m) => m.gameId === 1)).toMatchObject({ columnIndex: 0, row: 0, col: 0 })
+    expect(moved.find((m) => m.gameId === 2)).toBeUndefined()
+  })
+
+  it('spills to the right column only when the group is fully packed (chain)', () => {
+    // 组0：9 个 4x4 填满 12 行 × 12 列（3 并排 × 3 层）
+    // 组1：1 个 4x4 在顶部
+    const tiles = []
+    for (let layer = 0; layer < 3; layer += 1) {
+      for (let col = 0; col <= 8; col += 4) {
+        tiles.push(
+          makeTile(10 + layer * 3 + col / 4, 'large', {
+            column_index: 0,
+            grid_row: layer * 4,
+            grid_col: col,
+          }),
+        )
+      }
+    }
+    tiles.push(makeTile(99, 'large', { column_index: 1, grid_row: 0, grid_col: 0 }))
+
+    // 落点 row10 col0 覆盖组0 底部 large（row8-11 col0-3）→ 下移越界 → 组内已满 → 溢右
+    const plan = planStartScreenInsertion(tiles, 100, 0, 10, 0, 'large')
+    expect(plan?.target).toEqual({ columnIndex: 0, row: 8, col: 0 })
+    const moved = plan?.moves ?? []
+    // 组0 底部的 large（gameId 16，row8 col0）被顶：组0 无空位 → 溢到组1 顶部，
+    // 顶到组1 的 large(99) → 99 继续下移 (4,0)
+    expect(moved.find((m) => m.gameId === 99)).toMatchObject({ columnIndex: 1, row: 4, col: 0 })
+    expect(moved.find((m) => m.gameId === 16)).toMatchObject({ columnIndex: 1, row: 0, col: 0 })
+    // 落点磁贴 row10 clamp 到 row8
+    expect(plan?.target.row).toBe(8)
   })
 })

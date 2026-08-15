@@ -47,18 +47,38 @@ const fits = (occupied: Occupancy, row: number, col: number, rows: number, cols:
   return true
 }
 
+const rectOverlaps = (
+  aRow: number,
+  aCol: number,
+  aRows: number,
+  aCols: number,
+  bRow: number,
+  bCol: number,
+  bRows: number,
+  bCols: number,
+): boolean =>
+  aRow < bRow + bRows &&
+  aRow + aRows > bRow &&
+  aCol < bCol + bCols &&
+  aCol + aCols > bCol
+
 // 行优先找空位；超出 maxRow（磁贴底部越界）返回 null，由调用方决定溢出迁移。
+// avoid 为保留区（如落点矩形）：被顶磁贴回填时不得占回落点位置。
 const findFirstFit = (
   occupied: Occupancy,
   rows: number,
   cols: number,
   fromRow = 0,
   maxRow = Number.POSITIVE_INFINITY,
+  avoid?: { row: number; col: number; rows: number; cols: number },
 ): { row: number; col: number } | null => {
   let row = fromRow
   for (;;) {
     if (row + rows > maxRow) return null
     for (let col = 0; col <= START_SCREEN_FREE_COLS - cols; col += 1) {
+      if (avoid && rectOverlaps(row, col, rows, cols, avoid.row, avoid.col, avoid.rows, avoid.cols)) {
+        continue
+      }
       if (fits(occupied, row, col, rows, cols)) {
         return { row, col }
       }
@@ -358,7 +378,9 @@ export function findStartScreenDropTarget(
     START_SCREEN_FREE_COLS - span.cols,
     Math.max(0, Math.trunc(col || 0)),
   )
-  const target = resolveDropTarget(targetColumn ?? createOccupancy(), span, requestedRow, requestedCol)
+  // 落点不越组底（组高 12 行上限）
+  const clampedRow = Math.min(requestedRow, START_SCREEN_GROUP_MAX_ROWS - span.rows)
+  const target = resolveDropTarget(targetColumn ?? createOccupancy(), span, clampedRow, requestedCol)
   return { columnIndex: Math.max(0, Math.trunc(columnIndex || 0)), row: target.row, col: target.col }
 }
 
@@ -438,6 +460,8 @@ const planDisplacement = (
 ): StartScreenInsertionMove[] => {
   const moves: StartScreenInsertionMove[] = []
   const placed = new Map<number, { row: number; col: number }>()
+  // 落点矩形 = 保留区：被顶磁贴的组内回填/溢右都必须避开它
+  const reserve = { row, col, rows, cols }
 
   const placeWithShift = (
     gameId: number,
@@ -469,7 +493,22 @@ const planDisplacement = (
       }
       const nextRow = blockerPos.row + blockerSpan.rows
       if (nextRow + blockerSpan.rows > START_SCREEN_GROUP_MAX_ROWS) {
-        placeWithShift(blocker.game_id, blockerSpan, blockerColumn + 1, 0, blockerPos.col)
+        // 组底放不下：先在组内 12 行内横向找空位（占满横向 12 列后才开新列）；
+        // 回填必须避开落点保留区，否则顶出去的磁贴会回到原位与落点互推（死循环）
+        const sameColumnOcc = columns.get(blockerColumn) ?? createOccupancy()
+        const inGroup = findFirstFit(
+          sameColumnOcc,
+          blockerSpan.rows,
+          blockerSpan.cols,
+          0,
+          START_SCREEN_GROUP_MAX_ROWS,
+          reserve,
+        )
+        if (inGroup) {
+          placeWithShift(blocker.game_id, blockerSpan, blockerColumn, inGroup.row, inGroup.col)
+        } else {
+          placeWithShift(blocker.game_id, blockerSpan, blockerColumn + 1, 0, blockerPos.col)
+        }
       } else {
         placeWithShift(blocker.game_id, blockerSpan, blockerColumn, nextRow, blockerPos.col)
       }
@@ -509,10 +548,12 @@ export function planStartScreenInsertion(
     START_SCREEN_FREE_COLS - span.cols,
     Math.max(0, Math.trunc(col || 0)),
   )
+  // 落点不越组底：拖到组下方时吸附到组底（组高 12 行上限）
+  const clampedRow = Math.min(requestedRow, START_SCREEN_GROUP_MAX_ROWS - span.rows)
   // 目标列为空（无磁贴）→ 请求坐标直接可用
   const target = targetColumn
-    ? resolveDropTarget(targetColumn, span, requestedRow, requestedCol)
-    : { columnIndex: 0, row: requestedRow, col: requestedCol }
+    ? resolveDropTarget(targetColumn, span, clampedRow, requestedCol)
+    : { columnIndex: 0, row: clampedRow, col: requestedCol }
   if (!targetColumn || fits(targetColumn, target.row, target.col, span.rows, span.cols)) {
     return { target: { columnIndex: requestedColumnIndex, row: target.row, col: target.col }, moves: [] }
   }
