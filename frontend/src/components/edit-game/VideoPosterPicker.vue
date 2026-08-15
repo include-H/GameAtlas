@@ -29,7 +29,7 @@
 import { ref } from 'vue'
 import { extractVideoFrameFromElement } from '@/utils/video-poster'
 
-export interface VideoPosterTarget {
+interface VideoPosterTarget {
   path: string
   poster_path?: string | null
 }

@@ -25,13 +25,13 @@ export interface PackedStartScreenGroup {
   slots: PackedStartScreenSlot[]
 }
 
-export interface StartScreenDropTarget {
+interface StartScreenDropTarget {
   columnIndex: number
   row: number
   col: number
 }
 
-export interface NormalizeStartScreenOptions {
+interface NormalizeStartScreenOptions {
   compressRows?: boolean
 }
 
@@ -324,14 +324,14 @@ export function findStartScreenDropTarget(
   return { columnIndex: requestedColumnIndex, row: clampedRow, col: requestedCol }
 }
 
-export interface StartScreenInsertionMove {
+interface StartScreenInsertionMove {
   gameId: number
   columnIndex: number
   row: number
   col: number
 }
 
-export interface StartScreenInsertionPlan {
+interface StartScreenInsertionPlan {
   target: StartScreenDropTarget
   moves: StartScreenInsertionMove[]
 }

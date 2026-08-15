@@ -23,7 +23,7 @@ const NEXT_TILE_SIZE: Record<StartScreenTileSize, StartScreenTileSize> = {
 }
 
 // 与后端 domain.StartScreenMaxFlipImages 保持一致：轮播总帧数 = 首帧 + 追加帧 ≤ 4。
-export const START_SCREEN_MAX_FLIP_IMAGES = 3
+const START_SCREEN_MAX_FLIP_IMAGES = 3
 
 const describeSaveError = (error: unknown): string => {
   const status = getHttpStatus(error)
