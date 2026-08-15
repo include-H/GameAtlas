@@ -22,6 +22,7 @@
           <div ref="canvasRef" class="tile-crop__canvas" @mousedown="onMouseDown">
             <img
               ref="imgRef"
+              :key="cropSession"
               :src="activeSrc"
               class="tile-crop__image"
               draggable="false"
@@ -96,6 +97,9 @@ type CropMode = 'square' | 'wide'
 const mode = ref<CropMode>('square')
 const activeSrc = ref('')
 const selectedBanner = ref<string | null>(null)
+// 每次打开递增，作为 img 的 :key 强制重建元素——src 不变时浏览器不重发 load 事件，
+// 否则二次打开同一张图 imageLoaded 永远是 false（预览不生成、确定按钮禁用）。
+const cropSession = ref(0)
 const canvasRef = ref<HTMLElement | null>(null)
 const imgRef = ref<HTMLImageElement | null>(null)
 const imageLoaded = ref(false)
@@ -133,6 +137,7 @@ const windowStyle = computed(() => ({
 
 watch(() => props.visible, (value) => {
   if (value) {
+    cropSession.value += 1
     activeSrc.value = props.imageSrc
     selectedBanner.value = props.banners.includes(props.imageSrc) ? props.imageSrc : null
     imageLoaded.value = false
