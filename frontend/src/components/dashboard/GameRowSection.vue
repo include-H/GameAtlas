@@ -12,7 +12,6 @@
         :game="item"
         @view="handleView"
         @view-series="handleViewSeries"
-        @toggle-favorite="handleToggleFavorite"
       />
     </template>
   </card-row>
@@ -34,10 +33,8 @@ defineProps<{
 const emit = defineEmits<{
   view: [publicId: string]
   'view-series': [id: number]
-  'toggle-favorite': [gameRef: string]
 }>()
 
 const handleView = (publicId: string) => emit('view', publicId)
 const handleViewSeries = (id: number) => emit('view-series', id)
-const handleToggleFavorite = (gameRef: string) => emit('toggle-favorite', gameRef)
 </script>

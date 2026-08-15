@@ -93,7 +93,6 @@ type gameListItemResponse struct {
 	FileCount         int64                           `json:"file_count,omitempty"`
 	DeveloperCount    int64                           `json:"developer_count,omitempty"`
 	PublisherCount    int64                           `json:"publisher_count,omitempty"`
-	IsFavorite        bool                            `json:"is_favorite"`
 	Series            *gameSeriesResponse             `json:"series"`
 	PendingIssues     *pendingIssueEvaluationResponse `json:"pending_issues,omitempty"`
 	CreatedAt         string                          `json:"created_at"`
@@ -208,7 +207,6 @@ type gameDetailResponse struct {
 	Files            []gameFileResponse              `json:"files"`
 	LogoVisible      bool                            `json:"logo_visible"`
 	SavePathTemplate string                          `json:"save_path_template"`
-	IsFavorite       bool                            `json:"is_favorite"`
 	PendingIssues    *pendingIssueEvaluationResponse `json:"pending_issues,omitempty"`
 	CreatedAt        string                          `json:"created_at"`
 	UpdatedAt        string                          `json:"updated_at"`

@@ -54,7 +54,6 @@
         view-all-route="/games?sort=created_at&order=desc"
         @view="viewGame"
         @view-series="viewSeries"
-        @toggle-favorite="toggleFavorite"
       />
 
       <game-row-section
@@ -65,18 +64,6 @@
         view-all-route="/games?sort=downloads&order=desc"
         @view="viewGame"
         @view-series="viewSeries"
-        @toggle-favorite="toggleFavorite"
-      />
-
-      <game-row-section
-        v-if="favoriteGames.length > 0"
-        title="我的收藏"
-        icon="mdi-heart"
-        :items="favoriteGames"
-        view-all-route="/games?favorite=true"
-        @view="viewGame"
-        @view-series="viewSeries"
-        @toggle-favorite="toggleFavorite"
       />
 
       <game-row-section
@@ -87,7 +74,6 @@
         view-all-route="/games"
         @view="viewGame"
         @view-series="viewSeries"
-        @toggle-favorite="toggleFavorite"
       />
 
       <!-- Empty State -->
@@ -163,7 +149,6 @@ const dashboardRequests = createRequestGeneration()
 const totalGames = computed(() => gamesStore.stats?.total_games ?? 0)
 const recentAdditions = computed(() => gamesStore.stats?.recent_games ?? [])
 const mostPlayed = computed(() => gamesStore.stats?.popular_games ?? [])
-const favoriteGames = computed(() => gamesStore.stats?.favorite_games ?? [])
 const pendingReviews = computed(() => gamesStore.stats?.pending_reviews ?? 0)
 
 // “最近完善”与“最近添加”去重：同一款游戏优先出现在最近添加，避免两行重复。
@@ -205,16 +190,6 @@ const viewSeries = (id: number) => {
     name: 'series-detail',
     params: { id: String(id) },
   })
-}
-
-const toggleFavorite = async (gameRef: string) => {
-  if (!gameRef) return
-  try {
-    await gamesStore.toggleFavorite(gameRef)
-    uiStore.addAlert('收藏已更新', 'success')
-  } catch {
-    uiStore.addAlert('更新收藏失败', 'error')
-  }
 }
 
 const loadDashboardData = async () => {

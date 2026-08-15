@@ -13,16 +13,14 @@ func newSplitGamesHandlerForTest(cfg config.Config, db *sqlx.DB) *GamesHandler {
 	gameFilesRepo := repositories.NewGameFilesRepository(db)
 	metadataRepo := repositories.NewMetadataRepository(db)
 	reviewRepo := repositories.NewReviewIssueOverrideRepository(db)
-	favoriteRepo := repositories.NewFavoriteGamesRepository(db)
 
 	assetCleanupTasksRepo := repositories.NewAssetCleanupTasksRepository(db)
-	catalogService := services.NewGameCatalogService(repositories.NewGameCatalogRepository(gamesRepo, favoriteRepo), reviewRepo)
+	catalogService := services.NewGameCatalogService(repositories.NewGameCatalogRepository(gamesRepo), reviewRepo)
 	metadataService := services.NewMetadataService(metadataRepo)
 	return NewSplitGamesHandler(
 		catalogService,
 		services.NewGameTimelineService(gamesRepo),
 		services.NewGameDetailService(gamesRepo, gameFilesRepo, reviewRepo),
 		services.NewGameAggregateService(cfg, gamesRepo, metadataService, catalogService, assetCleanupTasksRepo),
-		services.NewGameFavoriteService(gamesRepo, favoriteRepo),
 	)
 }

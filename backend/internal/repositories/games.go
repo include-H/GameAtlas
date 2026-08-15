@@ -108,7 +108,6 @@ func gamesListItemSelectColumns() string {
 			COALESCE(fs.file_count, 0) AS file_count,
 			COALESCE(ds.developer_count, 0) AS developer_count,
 			COALESCE(ps.publisher_count, 0) AS publisher_count,
-			CASE WHEN fg.game_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
 			s.id AS series_id,
 			s.name AS series_name,
 			g.created_at,
@@ -216,12 +215,6 @@ func (r *GamesRepository) buildGamesListWhere(params domain.GamesListParams, exc
 	if params.SeriesID > 0 {
 		where = append(where, "g.series_id = :series_id")
 		args["series_id"] = params.SeriesID
-	}
-	if params.FavoriteOnly {
-		// 2026-05-01: FavoriteOnly is intentionally one-way. Transport/service code must
-		// reject favorite=false before reaching the repository; do not reinterpret false
-		// here as "exclude favorites" or add fallback behavior.
-		where = append(where, "EXISTS (SELECT 1 FROM favorite_games fg WHERE fg.game_id = g.id)")
 	}
 
 	return where, args, nil

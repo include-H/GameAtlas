@@ -29,8 +29,6 @@ interface GameStatsApiResponse {
   recent_games: GameListItemDto[]
   recently_updated_games: GameListItemDto[]
   popular_games: GameListItemDto[]
-  favorite_games: GameListItemDto[]
-  favorite_count: number
   pending_reviews: number
   pending_issue_counts: PendingIssueCounts | null
 }
@@ -83,14 +81,6 @@ function buildGamesQueryParams(params?: {
   const search = typeof params?.query?.search === 'string' ? params.query.search.trim() : ''
   if (search) queryParams.append('search', search)
   if (params?.query?.visibility) queryParams.append('visibility', params.query.visibility)
-  // 2026-05-01: forward route-owned favorite transport values verbatim so the backend
-  // decoder decides validity. Do not silently drop favorite=false or unknown strings here,
-  // otherwise the client hides a bad query instead of surfacing the backend 400 contract.
-  if (typeof params?.query?.favorite_raw === 'string' && params.query.favorite_raw.trim().length > 0) {
-    queryParams.append('favorite', params.query.favorite_raw.trim())
-  } else if (typeof params?.query?.favorite === 'boolean') {
-    queryParams.append('favorite', String(params.query.favorite))
-  }
   if (typeof params?.query?.pending === 'boolean') queryParams.append('pending', String(params.query.pending))
   if (params?.query?.pending_issue) queryParams.append('pending_issue', params.query.pending_issue)
   if (typeof params?.query?.pending_include_ignored === 'boolean') queryParams.append('pending_include_ignored', String(params.query.pending_include_ignored))
@@ -124,8 +114,7 @@ async function fetchGamesPage<P extends GameListPagination = GameListPagination>
 }
 
 function normalizeGameListItem(item: GameListItemDto): GameListItem {
-  const { is_favorite, ...rest } = item
-  return { ...rest, isFavorite: is_favorite }
+  return item
 }
 
 function readTimelinePagination(response: TimelineGamesApiResponse): TimelinePaginationApi {
@@ -137,10 +126,8 @@ function readTimelinePagination(response: TimelineGamesApiResponse): TimelinePag
 }
 
 function normalizeGameDetail(item: GameDetailDto): GameDetail {
-  const { is_favorite, ...rest } = item
   return {
-    ...rest,
-    isFavorite: is_favorite,
+    ...item,
     covers: item.covers,
     logos: item.logos,
     preview_videos: item.preview_videos,
@@ -302,15 +289,6 @@ const gamesService = {
     }
   },
 
-  async setFavorite(gameId: string, isFavorite: boolean): Promise<{ isFavorite: boolean }> {
-    const response = isFavorite
-      ? await put<ApiEnvelope<{ is_favorite: boolean }>>(`/games/${gameId}/favorite`, {})
-      : await del<ApiEnvelope<{ is_favorite: boolean }>>(`/games/${gameId}/favorite`)
-    return {
-      isFavorite: Boolean(response.data.is_favorite),
-    }
-  },
-
   async getStats(): Promise<GameStats> {
     const response = await get<ApiEnvelope<GameStatsApiResponse>>('/games/stats')
     return {
@@ -318,8 +296,6 @@ const gamesService = {
       recent_games: response.data.recent_games.map((item) => normalizeGameListItem(item)),
       recently_updated_games: response.data.recently_updated_games.map((item) => normalizeGameListItem(item)),
       popular_games: response.data.popular_games.map((item) => normalizeGameListItem(item)),
-      favorite_games: response.data.favorite_games.map((item) => normalizeGameListItem(item)),
-      favorite_count: response.data.favorite_count,
       pending_reviews: response.data.pending_reviews,
       pending_issue_counts: response.data.pending_issue_counts,
     }

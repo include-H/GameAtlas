@@ -194,16 +194,6 @@ export const useGameDetailView = ({
     })
   }
 
-  const handleToggleFavorite = async () => {
-    if (!game.value?.public_id) return
-    try {
-      await gamesStore.toggleFavorite(game.value.public_id)
-      uiStore.addAlert('收藏已更新', 'success')
-    } catch {
-      uiStore.addAlert('更新收藏失败', 'error')
-    }
-  }
-
   const openEditModal = () => {
     if (!canEdit.value) return
     if (!editableGame.value) {
@@ -357,7 +347,6 @@ export const useGameDetailView = ({
     handleEditSuccess,
     handleEditSync,
     handleGoBack,
-    handleToggleFavorite,
     hasWikiContent,
     openEditModal,
     openWikiEditor,

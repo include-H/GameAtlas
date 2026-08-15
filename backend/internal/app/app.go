@@ -79,8 +79,7 @@ func New(cfg config.Config) (*App, error) {
 	}
 
 	assetReconcileService := services.NewAssetReconcileService(cfg, sqliteDB)
-	favoriteGamesRepo := repositories.NewFavoriteGamesRepository(sqliteDB)
-	catalogRepo := repositories.NewGameCatalogRepository(gamesRepo, favoriteGamesRepo)
+	catalogRepo := repositories.NewGameCatalogRepository(gamesRepo)
 	reviewIssueOverridesRepo := repositories.NewReviewIssueOverrideRepository(sqliteDB)
 	catalogService := services.NewGameCatalogService(catalogRepo, reviewIssueOverridesRepo)
 	assetCleanupTasksRepo := repositories.NewAssetCleanupTasksRepository(sqliteDB)

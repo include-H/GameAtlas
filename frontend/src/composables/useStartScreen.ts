@@ -2,7 +2,6 @@ import { ref } from 'vue'
 import { getHttpErrorMessage, getHttpStatus } from '@/utils/http-error'
 import { normalizeStartScreenTiles } from '@/utils/start-screen-layout'
 import type {
-  GameListItem,
   StartScreenColumn,
   StartScreenLayout,
   StartScreenLayoutInput,
@@ -13,7 +12,6 @@ import { createRequestGeneration } from '@/utils/request-generation'
 
 interface UseStartScreenOptions {
   fetchTiles: () => Promise<StartScreenLayout>
-  fetchFavorites: () => Promise<GameListItem[]>
   saveTiles: (input: StartScreenLayoutInput) => Promise<StartScreenLayout>
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
 }
@@ -63,25 +61,8 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
         applyLayout(saved)
         return
       }
-      // 没有保存过自定义磁贴时，先用收藏游戏作为默认磁贴；列名留空，展示时按"列 N"兜底。
-      const favorites = await options.fetchFavorites()
-      if (!request.isCurrent()) return
-      tiles.value = normalizeStartScreenTiles(
-        favorites.map((game, index) => ({
-          game_id: game.id,
-          public_id: game.public_id,
-          title: game.title,
-          tile_size: 'small' as const,
-          image_path: game.primary_screenshot || game.cover_image,
-          focus_x: 50,
-          focus_y: 50,
-          flip_images: null,
-          sort_order: index,
-          column_index: 0,
-          grid_row: 0,
-          grid_col: 0,
-        })),
-      )
+      // 未保存过布局：空态引导（非编辑态显示"去游戏库逛逛"）。
+      tiles.value = []
       columns.value = []
     } catch {
       if (!request.isCurrent()) return

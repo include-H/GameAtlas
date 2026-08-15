@@ -79,39 +79,4 @@ describe('publishers service', () => {
 
     expect(postMock).toHaveBeenCalledWith('/publishers', { name: 'Atlus' })
   })
-
-  it('normalizes publisher games without retaining the api favorite field', async () => {
-    getMock.mockResolvedValue({
-      data: {
-        publisher: { id: 7, name: 'Atlus' },
-        games: [{
-          id: 42,
-          public_id: 'persona-5',
-          title: 'Persona 5',
-          is_favorite: true,
-        }],
-        pagination: {
-          page: 1,
-          limit: 24,
-          total: 1,
-          totalPages: 1,
-        },
-      },
-    })
-
-    const detail = await publishersService.getPublisherDetail(7, { page: 1, limit: 24 })
-
-    expect(detail.games[0]).toMatchObject({
-      id: 42,
-      public_id: 'persona-5',
-      isFavorite: true,
-    })
-    expect(detail.games[0]).not.toHaveProperty('is_favorite')
-    expect(detail.pagination).toEqual({
-      page: 1,
-      limit: 24,
-      total: 1,
-      totalPages: 1,
-    })
-  })
 })

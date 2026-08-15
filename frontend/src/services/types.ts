@@ -207,7 +207,6 @@ export interface GameListItemDto {
   file_count?: number
   developer_count?: number
   publisher_count?: number
-  is_favorite: boolean
   series: GameSeriesSummary | null
   pending_issues?: PendingIssueEvaluation
   downloads: number
@@ -313,16 +312,10 @@ export interface GameListQuery {
   pending_include_ignored?: boolean
   pending_severe?: boolean
   pending_recent_days?: number
-  favorite?: boolean
-  favorite_raw?: string
 }
 
-interface Favoritable {
-  isFavorite: boolean
-}
-
-type GameListItemView = Omit<GameListItemDto, 'is_favorite'> & Favoritable
-export type GameDetailView<TFile extends GameFileEntry = GameFileEntry> = Omit<GameDetailDtoBase<TFile>, 'is_favorite'> & Favoritable
+type GameListItemView = GameListItemDto
+export type GameDetailView<TFile extends GameFileEntry = GameFileEntry> = GameDetailDtoBase<TFile>
 export type GameListItem = GameListItemView
 export type PublicGameDetail = GameDetailView<PublicGameFileEntry>
 export type AdminGameDetail = GameDetailView<AdminGameFileEntry>
@@ -359,8 +352,6 @@ export interface GameStats {
   recent_games: GameListItem[]
   recently_updated_games: GameListItem[]
   popular_games: GameListItem[]
-  favorite_games: GameListItem[]
-  favorite_count: number
   pending_reviews: number
   pending_issue_counts: PendingIssueCounts | null
 }

@@ -27,7 +27,6 @@ func (r *GamesRepository) GetByID(id int64) (*domain.Game, error) {
 			NULL AS primary_screenshot,
 			logo_visible,
 			save_path_template,
-			CASE WHEN EXISTS (SELECT 1 FROM favorite_games fg WHERE fg.game_id = games.id) THEN 1 ELSE 0 END AS is_favorite,
 			created_at,
 			updated_at
 		FROM games
@@ -58,7 +57,6 @@ func (r *GamesRepository) GetByPublicID(publicID string) (*domain.Game, error) {
 			NULL AS primary_screenshot,
 			logo_visible,
 			save_path_template,
-			CASE WHEN EXISTS (SELECT 1 FROM favorite_games fg WHERE fg.game_id = games.id) THEN 1 ELSE 0 END AS is_favorite,
 			created_at,
 			updated_at
 		FROM games

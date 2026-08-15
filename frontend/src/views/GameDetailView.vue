@@ -24,19 +24,7 @@
         <div class="header-info">
           <h1 class="header-title">{{ game.title }}</h1>
           <div class="header-actions">
-            <a-button
-              class="app-text-action-btn"
-              type="text"
-              :status="game.isFavorite ? 'danger' : undefined"
-              @click="handleToggleFavorite"
-            >
-              <template #icon>
-                <icon-heart-fill v-if="game.isFavorite" />
-                <icon-heart v-else />
-              </template>
-              {{ game.isFavorite ? '已收藏' : '收藏' }}
-            </a-button>
-
+            
             <a-button
               v-if="canEdit"
               class="app-text-action-btn"
@@ -272,9 +260,7 @@ import {
   IconEdit,
   IconLeft,
   IconImage,
-  IconDownload,
-  IconHeart,
-  IconHeartFill
+  IconDownload
 } from '@arco-design/web-vue/es/icon'
 
 const route = useRoute()
@@ -298,7 +284,6 @@ const {
   handleEditSuccess,
   handleEditSync,
   handleGoBack,
-  handleToggleFavorite,
   hasWikiContent,
   openEditModal,
   openWikiEditor,

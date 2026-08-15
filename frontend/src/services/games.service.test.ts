@@ -37,7 +37,6 @@ const baseGame = {
   file_count: 0,
   developer_count: 0,
   publisher_count: 0,
-  is_favorite: false,
   series: null,
   downloads: 0,
   created_at: '2026-03-25T00:00:00Z',
@@ -53,12 +52,11 @@ describe('games service', () => {
     vi.unstubAllEnvs()
   })
 
-  it('loads games, builds query params and maps backend favorite state', async () => {
+  it('loads games and builds query params', async () => {
     getMock.mockResolvedValue({
       data: [
         {
           ...baseGame,
-          is_favorite: true,
           series: { id: 12, name: 'Halo' },
         },
         {
@@ -90,9 +88,9 @@ describe('games service', () => {
       },
     })
 
-    expect(result.data.map((item) => ({ id: item.public_id, isFavorite: item.isFavorite, series: item.series }))).toEqual([
-      { id: 'game-1', isFavorite: true, series: { id: 12, name: 'Halo' } },
-      { id: 'game-2', isFavorite: false, series: null },
+    expect(result.data.map((item) => ({ id: item.public_id, series: item.series }))).toEqual([
+      { id: 'game-1', series: { id: 12, name: 'Halo' } },
+      { id: 'game-2', series: null },
     ])
 
     const params = getMock.mock.calls[0]?.[1]?.params as URLSearchParams
@@ -102,54 +100,9 @@ describe('games service', () => {
     expect(params.get('search')).toBe('halo')
     expect(params.get('series')).toBeNull()
     expect(params.get('pending')).toBe('false')
-    expect(params.get('favorite')).toBeNull()
     expect(params.get('sort')).toBe('updated_at')
     expect(params.get('order')).toBe('desc')
     expect(params.get('seed')).toBe('9')
-  })
-
-  it('passes favorite filter through to the backend', async () => {
-    getMock.mockResolvedValue({
-      data: [{ ...baseGame, id: 2, public_id: 'game-2', is_favorite: true }],
-      pagination: {
-        page: 1,
-        limit: 20,
-        total: 1,
-        totalPages: 1,
-      },
-    })
-
-    const result = await gamesService.getGames({
-      query: {
-        favorite: true,
-      },
-    })
-
-    expect(result.data).toHaveLength(1)
-    expect(result.data[0]?.public_id).toBe('game-2')
-    const params = getMock.mock.calls[0]?.[1]?.params as URLSearchParams
-    expect(params.get('favorite')).toBe('true')
-  })
-
-  it('sends favorite=false so the backend transport layer can reject it', async () => {
-    getMock.mockResolvedValue({
-      data: [{ ...baseGame, id: 2, public_id: 'game-2', is_favorite: true }],
-      pagination: {
-        page: 1,
-        limit: 20,
-        total: 1,
-        totalPages: 1,
-      },
-    })
-
-    await gamesService.getGames({
-      query: {
-        favorite: false,
-      },
-    })
-
-    const params = getMock.mock.calls[0]?.[1]?.params as URLSearchParams
-    expect(params.get('favorite')).toBe('false')
   })
 
   it('passes abort signals through list and preview video requests', async () => {
@@ -178,27 +131,6 @@ describe('games service', () => {
       '/games/preview-videos',
       expect.objectContaining({ signal: controller.signal }),
     )
-  })
-
-  it('passes through invalid favorite transport values from route-owned callers', async () => {
-    getMock.mockResolvedValue({
-      data: [{ ...baseGame, id: 2, public_id: 'game-2', is_favorite: true }],
-      pagination: {
-        page: 1,
-        limit: 20,
-        total: 1,
-        totalPages: 1,
-      },
-    })
-
-    await gamesService.getGames({
-      query: {
-        favorite_raw: 'favorites',
-      },
-    })
-
-    const params = getMock.mock.calls[0]?.[1]?.params as URLSearchParams
-    expect(params.get('favorite')).toBe('favorites')
   })
 
   it('returns delete warnings when game removal leaves cleanup tasks', async () => {
@@ -450,55 +382,6 @@ describe('games service', () => {
     await expect(gamesService.getAdminGameDetail('game-1')).rejects.toThrow(
       '管理端游戏详情需要已解析的 file_path 值',
     )
-  })
-
-  it('sets favorite state through backend endpoints', async () => {
-    putMock.mockResolvedValueOnce({
-      data: {
-        is_favorite: true,
-      },
-    })
-    delMock.mockResolvedValueOnce({
-      data: {
-        is_favorite: false,
-      },
-    })
-
-    await expect(gamesService.setFavorite('game-1', true)).resolves.toEqual({ isFavorite: true })
-    await expect(gamesService.setFavorite('game-1', false)).resolves.toEqual({ isFavorite: false })
-
-    expect(putMock).toHaveBeenCalledWith('/games/game-1/favorite', {})
-    expect(delMock).toHaveBeenCalledWith('/games/game-1/favorite')
-  })
-
-  it('maps stats and uses backend favorite count', async () => {
-    getMock.mockResolvedValue({
-      data: {
-        total_games: 3,
-        recent_games: [{ ...baseGame, is_favorite: true }],
-        recently_updated_games: [{ ...baseGame, public_id: 'game-10', is_favorite: false }],
-        popular_games: [{ ...baseGame, public_id: 'game-9', is_favorite: true }],
-        favorite_games: [{ ...baseGame, public_id: 'game-11', is_favorite: true }],
-        favorite_count: 2,
-        pending_reviews: 2,
-        pending_issue_counts: {
-          groups: { 'missing-assets': 1, 'missing-wiki': 2 },
-          ignored_total: 0,
-        },
-      },
-    })
-
-    const result = await gamesService.getStats()
-
-    expect(result.total_games).toBe(3)
-    expect(result.favorite_count).toBe(2)
-    expect(result.recent_games[0]?.isFavorite).toBe(true)
-    expect(result.recently_updated_games[0]?.public_id).toBe('game-10')
-    expect(result.popular_games[0]?.isFavorite).toBe(true)
-    expect(result.favorite_games[0]?.public_id).toBe('game-11')
-    expect(result.pending_reviews).toBe(2)
-    expect(result.pending_issue_counts?.groups['missing-assets']).toBe(1)
-    expect(result.pending_issue_counts?.groups['missing-wiki']).toBe(2)
   })
 
   it('serializes aggregate relation fields as full replacement payload', async () => {

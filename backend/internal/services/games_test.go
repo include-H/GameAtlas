@@ -233,7 +233,7 @@ func TestGamesServiceDeletePrunesSeriesFromMetadataList(t *testing.T) {
 	gamesRepo := repositories.NewGamesRepository(db)
 	metadataService := NewMetadataService(repositories.NewMetadataRepository(db))
 	catalogService := NewGameCatalogService(
-		repositories.NewGameCatalogRepository(gamesRepo, repositories.NewFavoriteGamesRepository(db)),
+		repositories.NewGameCatalogRepository(gamesRepo),
 		repositories.NewReviewIssueOverrideRepository(db),
 	)
 	service := NewGameAggregateService(

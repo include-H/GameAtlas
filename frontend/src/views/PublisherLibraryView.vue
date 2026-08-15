@@ -3,7 +3,7 @@
     <div class="publisher-library__header page-hero">
       <div class="page-hero__content">
         <h1 class="publisher-library__title page-hero__title text-gradient">发行商库</h1>
-        <p class="publisher-library__subtitle page-hero__subtitle">按发行商，整理每一份游戏收藏。</p>
+        <p class="publisher-library__subtitle page-hero__subtitle">按发行商，浏览你的游戏库。</p>
       </div>
       <div class="publisher-library__search app-glass-surface">
         <div class="publisher-library__search-body app-input-action-row">

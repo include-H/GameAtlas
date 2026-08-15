@@ -93,7 +93,7 @@ func newServicesAssetsService(db *sqlx.DB, assetsDir string) *AssetsService {
 func newServicesCatalogService(db *sqlx.DB) *GameCatalogService {
 	gamesRepo := repositories.NewGamesRepository(db)
 	return NewGameCatalogService(
-		repositories.NewGameCatalogRepository(gamesRepo, repositories.NewFavoriteGamesRepository(db)),
+		repositories.NewGameCatalogRepository(gamesRepo),
 		repositories.NewReviewIssueOverrideRepository(db),
 	)
 }
@@ -109,7 +109,7 @@ func newServicesDetailService(db *sqlx.DB) *GameDetailService {
 
 func newServicesAggregateService(db *sqlx.DB, cfg config.Config) *GameAggregateService {
 	gamesRepo := repositories.NewGamesRepository(db)
-	catalogRepo := repositories.NewGameCatalogRepository(gamesRepo, repositories.NewFavoriteGamesRepository(db))
+	catalogRepo := repositories.NewGameCatalogRepository(gamesRepo)
 	reviewIssueOverridesRepo := repositories.NewReviewIssueOverrideRepository(db)
 	catalogService := NewGameCatalogService(catalogRepo, reviewIssueOverridesRepo)
 	return NewGameAggregateService(
@@ -156,7 +156,6 @@ func mustLoadServicesGame(t *testing.T, db *sqlx.DB, gameID int64) domain.Game {
 			downloads,
 			NULL AS primary_screenshot,
 			logo_visible,
-			0 AS is_favorite,
 			created_at,
 			updated_at
 		FROM games

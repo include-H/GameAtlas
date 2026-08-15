@@ -84,15 +84,6 @@ const parsePositiveRouteNumber = (
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
 }
 
-const parseRouteBoolean = (
-  value: LocationQueryValue | LocationQueryValue[] | undefined,
-): boolean | undefined => {
-  const raw = readSingleQueryValue(value)
-  if (raw === 'true') return true
-  if (raw === 'false') return false
-  return undefined
-}
-
 export const parseGamesSortField = (value: string | undefined): GamesSortField | undefined => {
   return value && SORT_FIELDS.has(value as GamesSortField) ? value as GamesSortField : undefined
 }
@@ -134,8 +125,6 @@ export const buildGamesListRequest = ({
   const rawSort = readSingleQueryValue(routeQuery.sort)
   const rawOrder = readSingleQueryValue(routeQuery.order)
   const sortField = parseGamesSortField(rawSort)
-  const rawFavorite = readSingleQueryValue(routeQuery.favorite)
-  const favorite = parseRouteBoolean(routeQuery.favorite)
   const rawVisibility = readSingleQueryValue(routeQuery.visibility)
   const visibility = rawVisibility === 'private' ? 'private' as const : rawVisibility === 'public' ? 'public' as const : undefined
 
@@ -145,12 +134,7 @@ export const buildGamesListRequest = ({
       limit: GAMES_PAGE_SIZE,
       search: normalizeCommittedSearchValue(readSingleQueryValue(routeQuery.search)),
       visibility,
-      favorite,
     },
-  }
-
-  if (rawFavorite !== undefined && favorite === undefined) {
-    request.query.favorite_raw = rawFavorite
   }
 
   // 2026-05-01: forward route-owned sort/order values verbatim whenever they are present.
@@ -172,20 +156,8 @@ export const buildGamesListRequest = ({
 export const hasGamesActiveFilters = (routeQuery: LocationQuery): boolean => {
   return Boolean(
     normalizeCommittedSearchValue(readSingleQueryValue(routeQuery.search))
-    || parseRouteBoolean(routeQuery.favorite) === true
     || readSingleQueryValue(routeQuery.visibility) === 'private',
   )
-}
-
-export const normalizeGamesFavoriteRouteQuery = (routeQuery: LocationQuery): LocationQueryRaw | null => {
-  const rawFavorite = readSingleQueryValue(routeQuery.favorite)
-  if (rawFavorite === undefined) {
-    return null
-  }
-  // 2026-05-01: keep malformed favorite values in the route so shared URLs and bad links
-  // fail at the backend transport boundary. GamesView only treats favorite=true as an active
-  // UI filter, but it must not silently rewrite favorite=false or arbitrary strings away.
-  return null
 }
 
 export const normalizeGamesSortRouteQuery = (routeQuery: LocationQuery): LocationQueryRaw | null => {
@@ -299,7 +271,6 @@ export const useGamesView = ({
   const viewMode = ref<GamesViewMode>('grid')
   const showAddModal = ref(false)
   const addGameSubmitting = ref(false)
-  const isTogglingFavorite = ref(false)
   let listRequestId = 0
   let loadMoreObserver: IntersectionObserver | null = null
   // 记录最后一次真正发起加载时的 query 内容快照。keep-alive 返回时 route.query 引用
@@ -352,10 +323,6 @@ export const useGamesView = ({
     },
   })
 
-  const filterFavorites = computed(() => {
-    return parseRouteBoolean(route.query.favorite) === true
-  })
-
   const filterPrivate = computed(() => {
     return readSingleQueryValue(route.query.visibility) === 'private'
   })
@@ -363,7 +330,6 @@ export const useGamesView = ({
   const hasActiveFilters = computed(() => hasGamesActiveFilters(route.query))
 
   const pageTitle = computed(() => {
-    if (filterFavorites.value) return '收藏的游戏'
     if (filterPrivate.value) return '私有游戏'
     return '所有游戏'
   })
@@ -377,8 +343,7 @@ export const useGamesView = ({
   }
 
   const normalizeRouteSortQuery = () => {
-    const query = normalizeGamesFavoriteRouteQuery(route.query)
-      || normalizeGamesPaginationRouteQuery(route.query)
+    const query = normalizeGamesPaginationRouteQuery(route.query)
       || normalizeGamesSortRouteQuery(route.query)
     if (!query || isSameRouteQuery(route.query, query)) return false
 
@@ -528,19 +493,6 @@ export const useGamesView = ({
     }
   }
 
-  const toggleFavorite = async (gameRef: string) => {
-    if (!gameRef) return
-    isTogglingFavorite.value = true
-    try {
-      await gamesStore.toggleFavorite(gameRef)
-      uiStore.addAlert('收藏已更新', 'success')
-    } catch {
-      uiStore.addAlert('更新收藏失败', 'error')
-    } finally {
-      isTogglingFavorite.value = false
-    }
-  }
-
   const deleteGame = async (gameRef: string, title: string) => {
     try {
       const result = await gamesService.deleteGame(gameRef)
@@ -645,7 +597,6 @@ export const useGamesView = ({
   return {
     clearFilters,
     addGameSubmitting,
-    filterFavorites,
     filterPrivate,
     games,
     handleAddGame,
@@ -656,7 +607,6 @@ export const useGamesView = ({
     hasLoadFailure,
     isLoading,
     isLoadingMore,
-    isTogglingFavorite,
     loadGames,
     pageTitle,
     pagination,
@@ -664,7 +614,6 @@ export const useGamesView = ({
     showAddModal,
     sortBy,
     sortOptions,
-    toggleFavorite,
     updateRoute,
     viewGame,
     viewSeries,

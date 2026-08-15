@@ -120,10 +120,8 @@ describe('useEditGameFormBootstrap', () => {
       file_count: 0,
       developer_count: 0,
       publisher_count: 0,
-      is_favorite: false,
       created_at: '2026-03-25T00:00:00Z',
       updated_at: '2026-03-25T00:00:00Z',
-      isFavorite: false,
     } as AdminGameDetail)
 
     expect(form.value.preview_videos.map((item) => item.asset_uid)).toEqual(['video-first', 'video-primary'])
@@ -235,10 +233,8 @@ describe('useEditGameFormBootstrap', () => {
       file_count: 0,
       developer_count: 0,
       publisher_count: 0,
-      is_favorite: false,
       created_at: '2026-03-25T00:00:00Z',
       updated_at: '2026-03-25T00:00:00Z',
-      isFavorite: false,
     } as AdminGameDetail)
 
     expect(form.value.file_paths.map((item) => item.id)).toEqual([22, 21])

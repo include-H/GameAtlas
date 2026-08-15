@@ -41,13 +41,7 @@ export const seriesService = {
     })
     return {
       series: response.data.series,
-      games: response.data.games.map((item): GameListItem => {
-        const { is_favorite, ...game } = item
-        return {
-          ...game,
-          isFavorite: is_favorite,
-        }
-      }),
+      games: response.data.games.map((item) => item as GameListItem),
       pagination: response.data.pagination,
     }
   },

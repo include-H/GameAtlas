@@ -1,31 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { useStartScreen } from './useStartScreen'
 import type {
-  GameListItem,
   StartScreenColumn,
   StartScreenLayout,
   StartScreenTile,
 } from '@/services/types'
-
-const makeGame = (publicId: string, id = 1): GameListItem => ({
-  id,
-  public_id: publicId,
-  title: publicId,
-  title_alt: null,
-  visibility: 'public',
-  summary: null,
-  release_date: null,
-  cover_image: null,
-  banner_image: null,
-  wiki_content: null,
-  downloads: 0,
-  primary_screenshot: null,
-  logo_visible: true,
-  isFavorite: false,
-  series: null,
-  created_at: '',
-  updated_at: '',
-} as unknown as GameListItem)
 
 const makeTile = (
   gameId: number,
@@ -64,52 +43,45 @@ const makeLayout = (tiles: StartScreenTile[], columns: StartScreenColumn[] = [])
 
 const createScreen = (overrides: Partial<{
   fetchTiles: () => Promise<StartScreenLayout>
-  fetchFavorites: () => Promise<GameListItem[]>
   saveTiles: () => Promise<StartScreenLayout>
   addAlert: () => void
 }> = {}) => {
   const fetchTiles = overrides.fetchTiles ?? vi.fn().mockResolvedValue(makeLayout([]))
-  const fetchFavorites = overrides.fetchFavorites ?? vi.fn().mockResolvedValue([])
   const saveTiles = overrides.saveTiles ?? vi.fn().mockResolvedValue(makeLayout([]))
   const addAlert = overrides.addAlert ?? vi.fn()
   const screen = useStartScreen({
     fetchTiles,
-    fetchFavorites,
     saveTiles,
     addAlert,
   })
-  return { screen, fetchTiles, fetchFavorites, saveTiles, addAlert }
+  return { screen, fetchTiles, saveTiles, addAlert }
 }
 
 describe('useStartScreen', () => {
-  it('falls back to favorites as default tiles when nothing is saved', async () => {
-    const { screen, fetchTiles, fetchFavorites } = createScreen({
+  it('keeps an empty layout when nothing is saved', async () => {
+    const { screen, fetchTiles } = createScreen({
       fetchTiles: vi.fn().mockResolvedValue(makeLayout([])),
-      fetchFavorites: vi.fn().mockResolvedValue([makeGame('a', 1), makeGame('b', 2)]),
     })
 
     screen.open()
     await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
 
     expect(fetchTiles).toHaveBeenCalledTimes(1)
-    expect(fetchFavorites).toHaveBeenCalledTimes(1)
-    expect(screen.tiles.value.map((tile) => tile.public_id)).toEqual(['a', 'b'])
+    expect(screen.tiles.value).toEqual([])
     expect(screen.columns.value).toEqual([])
   })
 
   it('uses the saved layout with column names', async () => {
-    const { screen, fetchFavorites } = createScreen({
+    const { screen } = createScreen({
       fetchTiles: vi.fn().mockResolvedValue(makeLayout(
         [makeTile(1, 'a', 'wide')],
         [makeColumn('我的收藏')],
       )),
-      fetchFavorites: vi.fn(),
     })
 
     screen.open()
     await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
 
-    expect(fetchFavorites).not.toHaveBeenCalled()
     expect(screen.tiles.value).toEqual([makeTile(1, 'a', 'wide')])
     expect(screen.columns.value[0]?.name).toBe('我的收藏')
   })

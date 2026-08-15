@@ -19,7 +19,7 @@ export const useGamesStore = defineStore('games', () => {
     totalPages: 0,
   })
 
-  // 2026-04-08: games list/detail/stats/favorite flows keep separate request state.
+  // 2026-04-08: games list/detail/stats flows keep separate request state.
   // Impact: one read/write failure no longer leaks into another surface's loading/error semantics.
   const listLoading = ref(false)
   const detailLoading = ref(false)
@@ -27,7 +27,6 @@ export const useGamesStore = defineStore('games', () => {
   const listError = ref<string | null>(null)
   const detailError = ref<string | null>(null)
   const statsError = ref<string | null>(null)
-  const favoriteError = ref<string | null>(null)
 
   const listRequests = createRequestGeneration()
   const detailRequests = createRequestGeneration()
@@ -36,97 +35,6 @@ export const useGamesStore = defineStore('games', () => {
   // Computed
   const hasMorePages = computed(() => pagination.value.page < pagination.value.totalPages)
   const totalPages = computed(() => pagination.value.totalPages)
-
-  const applyFavoriteState = (gameId: string, isFavorite: boolean) => {
-    const updateGame = (game: { isFavorite?: boolean }) => {
-      game.isFavorite = isFavorite
-    }
-
-    const sourceGame =
-      games.value.find(game => game.public_id === gameId)
-      || (currentGame.value && currentGame.value.public_id === gameId ? currentGame.value : null)
-      || stats.value?.recent_games.find(game => game.public_id === gameId)
-      || stats.value?.recently_updated_games.find(game => game.public_id === gameId)
-      || stats.value?.popular_games.find(game => game.public_id === gameId)
-      || stats.value?.favorite_games.find(game => game.public_id === gameId)
-      || null
-
-    games.value.forEach((game) => {
-      if (game.public_id === gameId) {
-        updateGame(game)
-      }
-    })
-
-    if (currentGame.value && currentGame.value.public_id === gameId) {
-      updateGame(currentGame.value)
-    }
-
-    if (!stats.value) {
-      return
-    }
-
-    stats.value.recent_games.forEach(game => {
-      if (game.public_id === gameId) {
-        updateGame(game)
-      }
-    })
-
-    stats.value.recently_updated_games.forEach(game => {
-      if (game.public_id === gameId) {
-        updateGame(game)
-      }
-    })
-
-    stats.value.popular_games.forEach(game => {
-      if (game.public_id === gameId) {
-        updateGame(game)
-      }
-    })
-
-    stats.value.favorite_games.forEach(game => {
-      if (game.public_id === gameId) {
-        updateGame(game)
-      }
-    })
-
-    if (typeof stats.value.favorite_count === 'number') {
-      if (isFavorite) {
-        stats.value.favorite_count += 1
-      } else {
-        stats.value.favorite_count = Math.max(0, stats.value.favorite_count - 1)
-      }
-    } else if (isFavorite && sourceGame) {
-      stats.value.favorite_count = 1
-    }
-
-    if (isFavorite) {
-      const alreadyInFavorites = stats.value.favorite_games.some(game => game.public_id === gameId)
-      if (!alreadyInFavorites) {
-        const candidate =
-          stats.value.recent_games.find(game => game.public_id === gameId)
-          || stats.value.recently_updated_games.find(game => game.public_id === gameId)
-          || stats.value.popular_games.find(game => game.public_id === gameId)
-        if (candidate) {
-          stats.value.favorite_games.unshift(candidate)
-        }
-      }
-    } else {
-      stats.value.favorite_games = stats.value.favorite_games.filter(game => game.public_id !== gameId)
-    }
-  }
-
-  const getFavoriteState = (gameId: string) => {
-    const sourceGame =
-      games.value.find(game => game.public_id === gameId)
-      || (currentGame.value && currentGame.value.public_id === gameId ? currentGame.value : null)
-      || stats.value?.recent_games.find(game => game.public_id === gameId)
-      || stats.value?.recently_updated_games.find(game => game.public_id === gameId)
-      || stats.value?.popular_games.find(game => game.public_id === gameId)
-      || stats.value?.favorite_games.find(game => game.public_id === gameId)
-      || null
-
-    return Boolean(sourceGame?.isFavorite)
-  }
 
   // Actions
   const fetchGames = async (
@@ -238,19 +146,6 @@ export const useGamesStore = defineStore('games', () => {
     }
   }
 
-  const toggleFavorite = async (gameId: string) => {
-    favoriteError.value = null
-    try {
-      const result = await gamesService.setFavorite(gameId, !getFavoriteState(gameId))
-      applyFavoriteState(gameId, result.isFavorite)
-
-      return result.isFavorite
-    } catch (err) {
-      favoriteError.value = getHttpErrorMessage(err, '切换收藏失败')
-      throw err
-    }
-  }
-
   return {
     // State
     games,
@@ -264,7 +159,6 @@ export const useGamesStore = defineStore('games', () => {
     listError,
     detailError,
     statsError,
-    favoriteError,
     // Computed
     hasMorePages,
     totalPages,
@@ -272,7 +166,6 @@ export const useGamesStore = defineStore('games', () => {
     fetchGames,
     fetchGame,
     fetchStats,
-    toggleFavorite,
     applyAggregateListItem,
   }
 })

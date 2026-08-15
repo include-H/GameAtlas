@@ -4,7 +4,7 @@
     <div class="view-header">
       <div class="view-header-title-group">
         <h1 class="view-title text-gradient">{{ pageTitle }}</h1>
-        <p class="view-subtitle">你收藏的每一款，都在这里。</p>
+        <p class="view-subtitle">你库里的每一款，都在这里。</p>
       </div>
 
       <a-space>
@@ -59,28 +59,13 @@
           </a-select>
         </a-col>
 
-        <!-- Favorites Toggle -->
-        <a-col :xs="24" :sm="8" :md="1" :lg="1" :xl="1" :xxl="1" class="games-filters-col games-filters-col--favorite">
-          <a-tag
-            checkable
-            :checked="filterFavorites"
-            color="red"
-            class="favorite-toggle-tag"
-            @click="updateRoute({ favorite: filterFavorites ? undefined : 'true' })"
-          >
-            <icon-heart-fill v-if="filterFavorites" />
-            <icon-heart v-else />
-            收藏
-          </a-tag>
-        </a-col>
-
         <!-- Private Toggle (admin only) -->
-        <a-col v-if="isAdmin" :xs="24" :sm="8" :md="1" :lg="1" :xl="1" :xxl="1" class="games-filters-col games-filters-col--favorite">
+        <a-col v-if="isAdmin" :xs="24" :sm="8" :md="1" :lg="1" :xl="1" :xxl="1" class="games-filters-col games-filters-col--private">
           <a-tag
             checkable
             :checked="filterPrivate"
             color="orangered"
-            class="favorite-toggle-tag"
+            class="private-toggle-tag"
             @click="updateRoute({ visibility: filterPrivate ? undefined : 'private' })"
           >
             <icon-lock />
@@ -101,14 +86,7 @@
             >
               搜索: {{ route.query.search }}
             </a-tag>
-            <a-tag
-              v-if="filterFavorites"
-              closable
-              @close="updateRoute({ favorite: undefined })"
-            >
-              仅收藏
-            </a-tag>
-            <a-tag
+                        <a-tag
               v-if="filterPrivate && isAdmin"
               closable
               @close="updateRoute({ visibility: undefined })"
@@ -155,8 +133,7 @@
               :is-on-start-screen="startScreenGameIds.has(virtualItem.game.id)"
               @view="viewGame"
               @view-series="viewSeries"
-              @toggle-favorite="toggleFavorite"
-              @delete="handleDelete($event, virtualItem.game.title)"
+                @delete="handleDelete($event, virtualItem.game.title)"
               @add-to-start-screen="handleAddToStartScreen"
               @remove-from-start-screen="handleRemoveFromStartScreen"
             />
@@ -228,7 +205,7 @@ import startScreenService from '@/services/start-screen.service'
 import type { GameListItem, StartScreenLayout } from '@/services/types'
 import { getHttpErrorMessage } from '@/utils/http-error'
 import { createRequestGeneration } from '@/utils/request-generation'
-import { IconApps, IconHeart, IconHeartFill, IconList, IconLock, IconPlus, IconSearch, IconSort, IconTrophy } from '@arco-design/web-vue/es/icon'
+import { IconApps, IconList, IconLock, IconPlus, IconSearch, IconSort, IconTrophy } from '@arco-design/web-vue/es/icon'
 
 defineOptions({
   name: 'GamesView',
@@ -256,7 +233,6 @@ const startScreenRequests = createRequestGeneration()
 const {
   clearFilters,
   addGameSubmitting,
-  filterFavorites,
   filterPrivate,
   games,
   handleAddGame,
@@ -272,7 +248,6 @@ const {
   showAddModal,
   sortBy,
   sortOptions,
-  toggleFavorite,
   updateRoute,
   viewGame,
   viewSeries,

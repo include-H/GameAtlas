@@ -15,16 +15,6 @@
       <!-- Overlay with gradient -->
       <div class="game-card__overlay" />
 
-      <!-- Favorite badge -->
-      <a-tag
-        v-if="game.isFavorite"
-        color="red"
-        class="game-card__favorite"
-      >
-        <template #icon>
-          <icon-heart-fill />
-        </template>
-      </a-tag>
     </div>
 
     <!-- Card Content -->
@@ -58,17 +48,6 @@
         </button>
 
         <div v-if="!isList" class="game-card__actions">
-          <a-button
-            type="text"
-            size="small"
-            :class="['app-text-action-btn', { 'is-favorite': game.isFavorite }]"
-            @click.stop="handleToggleFavorite"
-          >
-            <template #icon>
-              <icon-heart v-if="!game.isFavorite" />
-              <icon-heart-fill v-else />
-            </template>
-          </a-button>
           <a-dropdown v-if="isAdmin && (canDelete || canAddToStartScreen)">
             <a-button
               class="app-text-action-btn"
@@ -109,15 +88,13 @@ import type { GameListItem, TimelineGame } from '@/services/types'
 import { useAuthStore } from '@/stores/auth'
 import { withAssetWidth } from '@/utils/asset-url'
 import {
-  IconHeartFill,
-  IconHeart,
   IconMore,
   IconDelete,
   IconApps,
 } from '@arco-design/web-vue/es/icon'
 
 interface Props {
-  game: (GameListItem | TimelineGame) & { isFavorite?: boolean }
+  game: GameListItem | TimelineGame
   isList?: boolean
   coverOnly?: boolean
   canAddToStartScreen?: boolean
@@ -139,7 +116,6 @@ const { isAdmin } = storeToRefs(authStore)
 const emit = defineEmits<{
   view: [id: string]
   'view-series': [id: number]
-  'toggle-favorite': [id: string]
   delete: [id: string]
   'add-to-start-screen': [id: number]
   'remove-from-start-screen': [id: number]
@@ -148,11 +124,6 @@ const emit = defineEmits<{
 const handleView = () => {
   if (!props.game.public_id) return
   emit('view', props.game.public_id)
-}
-
-const handleToggleFavorite = () => {
-  if (!props.game.public_id) return
-  emit('toggle-favorite', props.game.public_id)
 }
 
 const handleViewSeries = () => {
@@ -257,11 +228,6 @@ const displayImage = computed(() => {
   transform: translateY(-2px);
 }
 
-.game-card--cover-only .game-card__favorite {
-  top: 6px;
-  left: 6px;
-}
-
 .game-card__image-wrapper {
   position: relative;
   width: 100%;
@@ -285,12 +251,6 @@ const displayImage = computed(() => {
 
 .game-card:hover .game-card__overlay {
   opacity: 1;
-}
-
-.game-card__favorite {
-  position: absolute;
-  top: 8px;
-  left: 8px;
 }
 
 .game-card__content {
@@ -356,10 +316,6 @@ const displayImage = computed(() => {
 
 .game-card__row--actions-only {
   justify-content: flex-end;
-}
-
-.game-card__actions .is-favorite {
-  color: rgb(var(--danger-6));
 }
 
 @media (max-width: 768px) {

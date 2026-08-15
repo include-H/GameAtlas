@@ -5,7 +5,6 @@ import {
   buildGamesListRequest,
   buildGamesRouteQuery,
   hasGamesActiveFilters,
-  normalizeGamesFavoriteRouteQuery,
   normalizeGamesPaginationRouteQuery,
   normalizeGamesSortRouteQuery,
   parseGamesSortField,
@@ -45,7 +44,6 @@ describe('useGamesView helpers', () => {
         page: 1,
         limit: 24,
         search: 'halo',
-        favorite: undefined,
       },
     })
   })
@@ -65,7 +63,6 @@ describe('useGamesView helpers', () => {
         page: 1,
         limit: 24,
         search: 'halo',
-        favorite: undefined,
       },
       sort: {
         field: 'legacy_default',
@@ -103,36 +100,6 @@ describe('useGamesView helpers', () => {
       order: 'desc',
       search: 'halo',
     })
-  })
-
-  it('preserves favorite=false so the backend transport layer can reject it', () => {
-    const result = normalizeGamesFavoriteRouteQuery({
-      page: '2',
-      favorite: 'false',
-      search: 'halo',
-    })
-
-    expect(result).toBeNull()
-  })
-
-  it('preserves invalid favorite query values so the backend can reject them', () => {
-    const result = normalizeGamesFavoriteRouteQuery({
-      page: '2',
-      favorite: 'favorites',
-      search: 'halo',
-    })
-
-    expect(result).toBeNull()
-  })
-
-  it('preserves favorite=true as the only valid favorite route value', () => {
-    const result = normalizeGamesFavoriteRouteQuery({
-      page: '2',
-      favorite: 'true',
-      search: 'halo',
-    })
-
-    expect(result).toBeNull()
   })
 
   it('drops invalid pagination query values before request building', () => {
@@ -180,11 +147,9 @@ describe('useGamesView helpers', () => {
       {
         page: '3',
         limit: '48',
-        favorite: 'true',
       },
       {
         search: 'halo',
-        favorite: undefined,
       },
     )
 
@@ -202,7 +167,6 @@ describe('useGamesView helpers', () => {
         sort: 'random',
         order: 'desc',
         seed: '99',
-        favorite: 'true',
       },
     })
 
@@ -211,7 +175,6 @@ describe('useGamesView helpers', () => {
         page: 1,
         limit: 24,
         search: 'halo',
-        favorite: true,
       },
       sort: {
         field: 'random',
@@ -235,7 +198,6 @@ describe('useGamesView helpers', () => {
         page: 1,
         limit: 24,
         search: 'halo',
-        favorite: undefined,
       },
     })
   })
@@ -253,7 +215,6 @@ describe('useGamesView helpers', () => {
         page: 1,
         limit: 24,
         search: undefined,
-        favorite: undefined,
       },
     })
     expect(hasGamesActiveFilters({ search: '   ' })).toBe(false)
@@ -272,7 +233,6 @@ describe('useGamesView helpers', () => {
         page: 1,
         limit: 24,
         search: undefined,
-        favorite: undefined,
       },
       sort: {
         field: 'random',
@@ -293,65 +253,8 @@ describe('useGamesView helpers', () => {
     expect(result).toBeNull()
   })
 
-  it('passes native favorite route semantics through to the backend request', () => {
-    const result = buildGamesListRequest({
-      routeQuery: {
-        page: '2',
-        favorite: 'true',
-      },
-    })
-
-    expect(result).toEqual({
-      query: {
-        page: 1,
-        limit: 24,
-        search: undefined,
-        favorite: true,
-      },
-    })
-  })
-
-  it('forwards favorite=false so the backend can reject the invalid query', () => {
-    const result = buildGamesListRequest({
-      routeQuery: {
-        page: '2',
-        favorite: 'false',
-      },
-    })
-
-    expect(result).toEqual({
-      query: {
-        page: 1,
-        limit: 24,
-        search: undefined,
-        favorite: false,
-      },
-    })
-  })
-
-  it('forwards invalid favorite strings so the backend can reject them', () => {
-    const result = buildGamesListRequest({
-      routeQuery: {
-        page: '2',
-        favorite: 'favorites',
-      },
-    })
-
-    expect(result).toEqual({
-      query: {
-        page: 1,
-        limit: 24,
-        search: undefined,
-        favorite: undefined,
-        favorite_raw: 'favorites',
-      },
-    })
-  })
-
   it('treats only committed route filters as active filters', () => {
     expect(hasGamesActiveFilters({})).toBe(false)
     expect(hasGamesActiveFilters({ search: 'halo' })).toBe(true)
-    expect(hasGamesActiveFilters({ favorite: 'true' })).toBe(true)
-    expect(hasGamesActiveFilters({ favorite: 'false' })).toBe(false)
   })
 })

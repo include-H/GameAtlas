@@ -166,9 +166,8 @@ import useMenu from '@/hooks/useMenu'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import { useGlobalOverlay } from '@/composables/useGlobalOverlay'
-import gamesService from '@/services/games.service'
 import startScreenService from '@/services/start-screen.service'
-import type { GameListItem, StartScreenLayoutInput } from '@/services/types'
+import type { StartScreenLayoutInput } from '@/services/types'
 import AlertBanner from '@/components/AlertBanner.vue'
 import AppNavigationMenu from '@/components/AppNavigationMenu.vue'
 import SharedAmbientBackground from '@/components/SharedAmbientBackground.vue'
@@ -230,21 +229,6 @@ const {
   renameColumn: renameStartScreenColumn,
 } = useStartScreen({
   fetchTiles: () => startScreenService.getTiles(),
-  fetchFavorites: async () => {
-    const favorites: GameListItem[] = []
-    let page = 1
-    while (true) {
-      const result = await gamesService.getGames({
-        query: { favorite: true, page, limit: 100 },
-      })
-      favorites.push(...result.data)
-      if (result.data.length === 0 || page >= result.pagination.totalPages || favorites.length >= 500) {
-        break
-      }
-      page += 1
-    }
-    return favorites
-  },
   saveTiles: (input: StartScreenLayoutInput) => startScreenService.updateTiles(input),
   addAlert: (message, type) => {
     uiStore.addAlert(message, type)

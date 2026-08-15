@@ -28,7 +28,6 @@ type Game struct {
 	PrimaryScreenshot *string `db:"primary_screenshot"`
 	LogoVisible       bool    `db:"logo_visible"`
 	SavePathTemplate  string  `db:"save_path_template"`
-	IsFavorite        bool    `db:"is_favorite"`
 	CreatedAt         string  `db:"created_at"`
 	UpdatedAt         string  `db:"updated_at"`
 }
@@ -53,7 +52,6 @@ type GameListItem struct {
 	FileCount         int64   `db:"file_count"`
 	DeveloperCount    int64   `db:"developer_count"`
 	PublisherCount    int64   `db:"publisher_count"`
-	IsFavorite        bool    `db:"is_favorite"`
 	SeriesID          *int64  `db:"series_id"`
 	SeriesName        *string `db:"series_name"`
 	PendingIssues     *PendingIssueEvaluation
@@ -75,7 +73,6 @@ type MetadataGameSummary struct {
 	WikiContent       *string `db:"wiki_content"`
 	Downloads         int64   `db:"downloads"`
 	PrimaryScreenshot *string `db:"primary_screenshot"`
-	IsFavorite        bool    `db:"is_favorite"`
 	SeriesID          *int64  `db:"series_id"`
 	SeriesName        *string `db:"series_name"`
 	CreatedAt         string  `db:"created_at"`
@@ -138,7 +135,6 @@ type GamesListParams struct {
 	PendingIssue          string
 	PendingSevereOnly     bool
 	PendingRecentDays     int
-	FavoriteOnly          bool
 	Visibility            string
 	IncludeAll            bool
 	Sort                  string
@@ -293,8 +289,6 @@ type GameStats struct {
 	RecentGames          []GameListItem
 	RecentlyUpdatedGames []GameListItem
 	PopularGames         []GameListItem
-	FavoriteGames        []GameListItem
-	FavoriteCount        int
 	PendingReviews       int
 	PendingGroups        *PendingIssueCountSummary
 }

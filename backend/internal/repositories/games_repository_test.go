@@ -145,12 +145,6 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	insertRepositoryAsset(t, db, privateGameID, "screen-private", "screenshot", "/assets/stats-private/only.png", 0)
 	insertRepositoryGameFile(t, db, secondGameID, "/roms/stats-b.rom")
 	insertRepositoryGameFile(t, db, privateGameID, "/roms/stats-private.rom")
-	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, secondGameID); err != nil {
-		t.Fatalf("insert favorite game: %v", err)
-	}
-	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, privateGameID); err != nil {
-		t.Fatalf("insert private favorite game: %v", err)
-	}
 
 	developerID := insertRepositoryDeveloper(t, db, "Stats Developer", "stats-developer")
 	publisherID := insertRepositoryPublisher(t, db, "Stats Publisher", "stats-publisher")
@@ -163,7 +157,7 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 		t.Fatalf("set stats game series: %v", err)
 	}
 
-	catalogRepo := NewGameCatalogRepository(repo, NewFavoriteGamesRepository(db))
+	catalogRepo := NewGameCatalogRepository(repo)
 
 	stats, err := catalogRepo.Stats(domain.GamesListParams{})
 	if err != nil {
@@ -176,9 +170,6 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	if stats.PendingReviews != 1 {
 		t.Fatalf("PendingReviews = %d, want 1 native pending public game", stats.PendingReviews)
 	}
-	if stats.FavoriteCount != 1 {
-		t.Fatalf("FavoriteCount = %d, want 1 visible public favorite", stats.FavoriteCount)
-	}
 
 	if len(stats.RecentGames) != 2 || stats.RecentGames[0].ID != secondGameID {
 		t.Fatalf("RecentGames = %+v, want second game first", stats.RecentGames)
@@ -189,12 +180,6 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	if len(stats.PopularGames) != 2 || stats.PopularGames[0].ID != secondGameID {
 		t.Fatalf("PopularGames = %+v, want second game first", stats.PopularGames)
 	}
-	if len(stats.FavoriteGames) != 1 || stats.FavoriteGames[0].ID != secondGameID {
-		t.Fatalf("FavoriteGames = %+v, want only second game", stats.FavoriteGames)
-	}
-	if !stats.FavoriteGames[0].IsFavorite {
-		t.Fatalf("favorite[0].IsFavorite = false, want true")
-	}
 	if stats.PopularGames[0].ScreenshotCount != 2 {
 		t.Fatalf("popular[0].ScreenshotCount = %d, want 2", stats.PopularGames[0].ScreenshotCount)
 	}
@@ -204,9 +189,6 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	if stats.PopularGames[0].FileCount != 1 {
 		t.Fatalf("popular[0].FileCount = %d, want 1", stats.PopularGames[0].FileCount)
 	}
-	if !stats.PopularGames[0].IsFavorite {
-		t.Fatalf("popular[0].IsFavorite = false, want true")
-	}
 	if stats.PopularGames[0].SeriesID == nil || *stats.PopularGames[0].SeriesID != seriesID {
 		t.Fatalf("popular[0].SeriesID = %v, want %d", stats.PopularGames[0].SeriesID, seriesID)
 	}
@@ -215,121 +197,12 @@ func TestGamesRepositoryStatsExcludesPrivateGamesAndLoadsAssetCounts(t *testing.
 	}
 }
 
-func TestGamesRepositoryStatsIncludesPrivateFavoritesForAdmin(t *testing.T) {
-	db := openRepositoryTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	repo := NewGamesRepository(db)
-	publicGameID := insertRepositoryGame(t, db, "stats-admin-public", "Stats Admin Public", "public")
-	privateGameID := insertRepositoryGame(t, db, "stats-admin-private", "Stats Admin Private", "private")
-
-	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, publicGameID); err != nil {
-		t.Fatalf("insert public favorite game: %v", err)
-	}
-	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, privateGameID); err != nil {
-		t.Fatalf("insert private favorite game: %v", err)
-	}
-
-	catalogRepo := NewGameCatalogRepository(repo, NewFavoriteGamesRepository(db))
-
-	stats, err := catalogRepo.Stats(domain.GamesListParams{IncludeAll: true})
-	if err != nil {
-		t.Fatalf("Stats returned error: %v", err)
-	}
-
-	if stats.FavoriteCount != 2 {
-		t.Fatalf("FavoriteCount = %d, want 2 favorites for admin scope", stats.FavoriteCount)
-	}
-	if len(stats.FavoriteGames) != 2 {
-		t.Fatalf("FavoriteGames = %d, want 2 favorites for admin scope", len(stats.FavoriteGames))
-	}
-}
-
-func TestGameCatalogRepositoryListFiltersFavoritesAndExposesFavoriteState(t *testing.T) {
-	db := openRepositoryTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	repo := NewGamesRepository(db)
-	catalogRepo := NewGameCatalogRepository(repo, NewFavoriteGamesRepository(db))
-	favoriteID := insertRepositoryGame(t, db, "favorite-a", "Favorite A", "public")
-	otherID := insertRepositoryGame(t, db, "favorite-b", "Favorite B", "public")
-	privateFavoriteID := insertRepositoryGame(t, db, "favorite-private", "Favorite Private", "private")
-
-	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, favoriteID); err != nil {
-		t.Fatalf("insert public favorite: %v", err)
-	}
-	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, privateFavoriteID); err != nil {
-		t.Fatalf("insert private favorite: %v", err)
-	}
-	seriesID := insertRepositorySeries(t, db, "Favorite Series", "favorite-series")
-	if _, err := db.Exec(`UPDATE games SET series_id = ? WHERE id = ?`, seriesID, favoriteID); err != nil {
-		t.Fatalf("set favorite series: %v", err)
-	}
-
-	games, total, err := catalogRepo.List(domain.GamesListParams{
-		Page:         1,
-		Limit:        10,
-		FavoriteOnly: true,
-		Sort:         "updated_at",
-		Order:        "desc",
-	})
-	if err != nil {
-		t.Fatalf("List favorite-only returned error: %v", err)
-	}
-
-	if total != 1 {
-		t.Fatalf("total = %d, want 1", total)
-	}
-	if len(games) != 1 || games[0].ID != favoriteID {
-		t.Fatalf("games = %+v, want only public favorite game", games)
-	}
-	if !games[0].IsFavorite {
-		t.Fatalf("games[0].IsFavorite = false, want true")
-	}
-	if games[0].SeriesID == nil || *games[0].SeriesID != seriesID {
-		t.Fatalf("games[0].SeriesID = %v, want %d", games[0].SeriesID, seriesID)
-	}
-	if games[0].SeriesName == nil || *games[0].SeriesName != "Favorite Series" {
-		t.Fatalf("games[0].SeriesName = %v, want Favorite Series", games[0].SeriesName)
-	}
-
-	allGames, allTotal, err := catalogRepo.List(domain.GamesListParams{
-		Page:         1,
-		Limit:        10,
-		IncludeAll:   true,
-		FavoriteOnly: true,
-		Sort:         "updated_at",
-		Order:        "desc",
-	})
-	if err != nil {
-		t.Fatalf("List favorite-only includeAll returned error: %v", err)
-	}
-
-	if allTotal != 2 {
-		t.Fatalf("includeAll total = %d, want 2", allTotal)
-	}
-	if len(allGames) != 2 {
-		t.Fatalf("len(includeAll games) = %d, want 2", len(allGames))
-	}
-	if allGames[0].ID != privateFavoriteID && allGames[1].ID != privateFavoriteID {
-		t.Fatalf("includeAll games = %+v, want private favorite included", allGames)
-	}
-	for _, game := range allGames {
-		if !game.IsFavorite {
-			t.Fatalf("includeAll game %+v has IsFavorite=false, want true", game)
-		}
-		if game.ID == otherID {
-			t.Fatalf("unexpected non-favorite game in results: %+v", game)
-		}
-	}
-}
-
 func TestGameCatalogRepositoryListPendingOnlyFiltersResolvedAndIgnoredIssues(t *testing.T) {
 	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
-	catalogRepo := NewGameCatalogRepository(repo, NewFavoriteGamesRepository(db))
+	catalogRepo := NewGameCatalogRepository(repo)
 
 	visiblePendingID := insertRepositoryGame(t, db, "pending-visible", "Pending Visible", "public")
 	resolvedID := insertRepositoryGame(t, db, "pending-resolved", "Pending Resolved", "public")
@@ -443,7 +316,7 @@ func TestGameCatalogRepositoryListPendingOnlySupportsNativeSortAndFilters(t *tes
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
-	catalogRepo := NewGameCatalogRepository(repo, NewFavoriteGamesRepository(db))
+	catalogRepo := NewGameCatalogRepository(repo)
 
 	severeID := insertRepositoryGame(t, db, "pending-severe", "Pending Severe", "public")
 	recentID := insertRepositoryGame(t, db, "pending-recent", "Pending Recent", "public")
@@ -492,7 +365,7 @@ func TestGameCatalogRepositoryCountPendingGroupsUsesQueueFiltersButIgnoresIssueS
 	defer func() { _ = db.Close() }()
 
 	repo := NewGamesRepository(db)
-	catalogRepo := NewGameCatalogRepository(repo, NewFavoriteGamesRepository(db))
+	catalogRepo := NewGameCatalogRepository(repo)
 
 	_ = insertRepositoryGame(t, db, "pending-asset", "Pending Asset", "public")
 	wikiID := insertRepositoryGame(t, db, "pending-wiki", "Pending Wiki", "public")

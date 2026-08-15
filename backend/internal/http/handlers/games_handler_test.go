@@ -27,7 +27,7 @@ func TestGamesHandlerListTimelineRejectsInvalidCursor(t *testing.T) {
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodGet, "/api/games/timeline?cursor=bad", nil)
 
-	handler := NewSplitGamesHandler(nil, nil, nil, nil, nil)
+	handler := NewSplitGamesHandler(nil, nil, nil, nil)
 	handler.ListTimeline(context)
 
 	if recorder.Code != http.StatusBadRequest {
@@ -52,7 +52,7 @@ func TestGamesHandlerListTimelineRejectsInvalidLimit(t *testing.T) {
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(http.MethodGet, "/api/games/timeline?limit=oops", nil)
 
-	handler := NewSplitGamesHandler(nil, nil, nil, nil, nil)
+	handler := NewSplitGamesHandler(nil, nil, nil, nil)
 	handler.ListTimeline(context)
 
 	if recorder.Code != http.StatusBadRequest {
@@ -178,10 +178,6 @@ func TestGamesHandlerStatsIncludesHomeFeedCollections(t *testing.T) {
 	`, "2025-12-02 00:00:00", "2026-01-03 00:00:00", secondID); err != nil {
 		t.Fatalf("set second stats game timestamps: %v", err)
 	}
-	if _, err := db.Exec(`INSERT INTO favorite_games (game_id) VALUES (?)`, secondID); err != nil {
-		t.Fatalf("insert stats favorite game: %v", err)
-	}
-
 	handler := newSplitGamesHandlerForTest(config.Config{}, db)
 
 	recorder := httptest.NewRecorder()
@@ -235,12 +231,6 @@ func TestGamesHandlerStatsIncludesHomeFeedCollections(t *testing.T) {
 	}
 	if len(response.Data.PopularGames) != 2 {
 		t.Fatalf("popular_games = %d, want 2", len(response.Data.PopularGames))
-	}
-	if len(response.Data.FavoriteGames) != 1 || response.Data.FavoriteGames[0].ID != secondID {
-		t.Fatalf("favorite_games = %+v, want only second game", response.Data.FavoriteGames)
-	}
-	if response.Data.FavoriteCount != 1 {
-		t.Fatalf("favorite_count = %d, want 1", response.Data.FavoriteCount)
 	}
 	if response.Data.PendingIssueCounts.Groups["missing-assets"] != 2 ||
 		response.Data.PendingIssueCounts.Groups["missing-wiki"] != 2 ||
@@ -677,28 +667,6 @@ func TestGamesHandlerListRejectsInvalidPendingQueryBoolean(t *testing.T) {
 	}
 }
 
-func TestGamesHandlerListRejectsFavoriteFalseQuery(t *testing.T) {
-	t.Setenv("GIN_MODE", gin.TestMode)
-
-	db := openGamesHandlerTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	handler := newSplitGamesHandlerForTest(config.Config{}, db)
-
-	recorder := httptest.NewRecorder()
-	context, _ := gin.CreateTestContext(recorder)
-	context.Request = httptest.NewRequest(http.MethodGet, "/api/games?favorite=false", nil)
-
-	handler.List(context)
-
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
-	}
-	if !strings.Contains(recorder.Body.String(), `"error":"无效的游戏查询参数: favorite"`) {
-		t.Fatalf("body = %s, want 无效的游戏查询参数: favorite", recorder.Body.String())
-	}
-}
-
 func TestGamesHandlerListRejectsRandomSortWithoutSeed(t *testing.T) {
 	t.Setenv("GIN_MODE", gin.TestMode)
 
@@ -792,44 +760,6 @@ func TestGamesHandlerCreateRejectsUnknownFields(t *testing.T) {
 	}
 	if !strings.Contains(recorder.Body.String(), `"error":"无效的游戏请求"`) {
 		t.Fatalf("body = %s, want 无效的游戏请求", recorder.Body.String())
-	}
-}
-
-func TestGamesHandlerFavoriteEndpointsPersistState(t *testing.T) {
-	t.Setenv("GIN_MODE", gin.TestMode)
-
-	db := openGamesHandlerTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	insertGamesHandlerTestGame(t, db, "favorite-toggle", "Favorite Toggle", "public", "")
-	handler := newSplitGamesHandlerForTest(config.Config{}, db)
-
-	favoriteRecorder := httptest.NewRecorder()
-	favoriteContext, _ := gin.CreateTestContext(favoriteRecorder)
-	favoriteContext.Request = httptest.NewRequest(http.MethodPut, "/api/games/favorite-toggle/favorite", nil)
-	favoriteContext.Params = gin.Params{{Key: "publicId", Value: "favorite-toggle"}}
-
-	handler.Favorite(favoriteContext)
-
-	if favoriteRecorder.Code != http.StatusOK {
-		t.Fatalf("favorite status = %d, want %d, body=%s", favoriteRecorder.Code, http.StatusOK, favoriteRecorder.Body.String())
-	}
-	if !strings.Contains(favoriteRecorder.Body.String(), `"is_favorite":true`) {
-		t.Fatalf("favorite body = %s, want is_favorite true", favoriteRecorder.Body.String())
-	}
-
-	unfavoriteRecorder := httptest.NewRecorder()
-	unfavoriteContext, _ := gin.CreateTestContext(unfavoriteRecorder)
-	unfavoriteContext.Request = httptest.NewRequest(http.MethodDelete, "/api/games/favorite-toggle/favorite", nil)
-	unfavoriteContext.Params = gin.Params{{Key: "publicId", Value: "favorite-toggle"}}
-
-	handler.Unfavorite(unfavoriteContext)
-
-	if unfavoriteRecorder.Code != http.StatusOK {
-		t.Fatalf("unfavorite status = %d, want %d, body=%s", unfavoriteRecorder.Code, http.StatusOK, unfavoriteRecorder.Body.String())
-	}
-	if !strings.Contains(unfavoriteRecorder.Body.String(), `"is_favorite":false`) {
-		t.Fatalf("unfavorite body = %s, want is_favorite false", unfavoriteRecorder.Body.String())
 	}
 }
 

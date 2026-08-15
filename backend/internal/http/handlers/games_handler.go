@@ -17,7 +17,6 @@ type GamesHandler struct {
 	timeline  *services.GameTimelineService
 	detail    *services.GameDetailService
 	aggregate *services.GameAggregateService
-	favorites *services.GameFavoriteService
 }
 
 // NewSplitGamesHandler keeps HTTP routing aligned with the split application services.
@@ -28,14 +27,12 @@ func NewSplitGamesHandler(
 	timeline *services.GameTimelineService,
 	detail *services.GameDetailService,
 	aggregate *services.GameAggregateService,
-	favorites *services.GameFavoriteService,
 ) *GamesHandler {
 	return &GamesHandler{
 		catalog:   catalog,
 		timeline:  timeline,
 		detail:    detail,
 		aggregate: aggregate,
-		favorites: favorites,
 	}
 }
 
@@ -116,8 +113,6 @@ func (h *GamesHandler) Stats(c *gin.Context) {
 		"recent_games":           toGameListItemResponses(stats.RecentGames),
 		"recently_updated_games": toGameListItemResponses(stats.RecentlyUpdatedGames),
 		"popular_games":          toGameListItemResponses(stats.PopularGames),
-		"favorite_games":         toGameListItemResponses(stats.FavoriteGames),
-		"favorite_count":         stats.FavoriteCount,
 		"pending_reviews":        stats.PendingReviews,
 		"pending_issue_counts":   toPendingIssueCountSummaryResponse(stats.PendingGroups),
 	})
@@ -252,43 +247,4 @@ func (h *GamesHandler) Delete(c *gin.Context) {
 	}
 
 	writeJSONSuccess(c, http.StatusOK, data)
-}
-
-// Favorite/Unfavorite 有意不做 requireAdmin：favorite_games 是单用户/家庭场景下的
-// 全局收藏状态，匿名访客也可切换（与"我的收藏"共享同一份数据）。
-// 若未来引入多用户或需要管理员独占写权限，应先在这里加门禁并同步前端。
-func (h *GamesHandler) Favorite(c *gin.Context) {
-	id, ok := parseGamePublicIDParam(c, "publicId", h.favorites.ResolveGameID)
-	if !ok {
-		return
-	}
-
-	isFavorite, err := h.favorites.Set(id, true, isAdminRequest(c))
-	if err != nil {
-		// 2026-05-09: 统一为中文错误信息
-		writeServiceError(c, err, "无效的游戏请求")
-		return
-	}
-
-	writeJSONSuccess(c, http.StatusOK, gin.H{
-		"is_favorite": isFavorite,
-	})
-}
-
-func (h *GamesHandler) Unfavorite(c *gin.Context) {
-	id, ok := parseGamePublicIDParam(c, "publicId", h.favorites.ResolveGameID)
-	if !ok {
-		return
-	}
-
-	isFavorite, err := h.favorites.Set(id, false, isAdminRequest(c))
-	if err != nil {
-		// 2026-05-09: 统一为中文错误信息
-		writeServiceError(c, err, "无效的游戏请求")
-		return
-	}
-
-	writeJSONSuccess(c, http.StatusOK, gin.H{
-		"is_favorite": isFavorite,
-	})
 }

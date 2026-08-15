@@ -30,7 +30,6 @@
             :game="game"
             @view="openGame"
             @view-series="openSeries"
-            @toggle-favorite="toggleFavorite"
           />
         </div>
       </div>
@@ -54,7 +53,6 @@ import { onActivated, onDeactivated, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { IconLeft } from '@arco-design/web-vue/es/icon'
 import { useUiStore } from '@/stores/ui'
-import { useGamesStore } from '@/stores/games'
 import { publishersService } from '@/services/publishers.service'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import GameCard from '@/components/GameCard.vue'
@@ -72,7 +70,6 @@ const DETAIL_PAGE_SIZE = 24
 const route = useRoute()
 const router = useRouter()
 const uiStore = useUiStore()
-const gamesStore = useGamesStore()
 
 const loadMoreSentinel = ref<HTMLElement | null>(null)
 const publisherName = ref('发行商')
@@ -147,20 +144,6 @@ const openSeries = (id: number) => {
     name: 'series-detail',
     params: { id: String(id) },
   })
-}
-
-const toggleFavorite = async (gameRef: string) => {
-  if (!gameRef) return
-  try {
-    const isFavorite = await gamesStore.toggleFavorite(gameRef)
-    games.value.forEach((game) => {
-      if (game.public_id === gameRef) {
-        game.isFavorite = isFavorite
-      }
-    })
-  } catch {
-    uiStore.addAlert('更新收藏失败', 'error')
-  }
 }
 
 watch(

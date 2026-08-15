@@ -105,21 +105,6 @@ func decodeGamesListParams(c *gin.Context) (domain.GamesListParams, bool) {
 		}
 		params.PendingSevereOnly = value
 	}
-	if raw := c.Query("favorite"); raw != "" {
-		value, ok := parseGamesListBoolQuery(c, "favorite")
-		if !ok {
-			return domain.GamesListParams{}, false
-		}
-		// 2026-05-01: games list transport only accepts favorite=true as a valid filter.
-		// Impact: favorite=false is not a negative predicate; reject it here instead of
-		// letting repository semantics silently collapse it into the same behavior as "missing".
-		if !value {
-			writeGamesListQueryError(c, "favorite")
-			return domain.GamesListParams{}, false
-		}
-		params.FavoriteOnly = value
-	}
-
 	if raw := strings.TrimSpace(c.Query("visibility")); raw != "" {
 		if raw != domain.GameVisibilityPublic && raw != domain.GameVisibilityPrivate {
 			writeGamesListQueryError(c, "visibility")
