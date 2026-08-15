@@ -65,7 +65,7 @@
   width: 100%;
 }
 
-.favorite-toggle-tag {
+.private-toggle-tag {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -194,7 +194,7 @@
 
   .games-filters-col--search,
   .games-filters-col--sort,
-  .games-filters-col--favorite {
+  .games-filters-col--private {
     flex: 0 0 50%;
     max-width: 50%;
   }
@@ -208,7 +208,7 @@
 @media (max-width: 576px) {
   .games-filters-col--search,
   .games-filters-col--sort,
-  .games-filters-col--favorite,
+  .games-filters-col--private,
   .games-filters-col--tags {
     flex: 0 0 100%;
     max-width: 100%;

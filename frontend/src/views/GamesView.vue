@@ -60,7 +60,7 @@
         </a-col>
 
         <!-- Private Toggle (admin only) -->
-        <a-col v-if="isAdmin" :xs="24" :sm="8" :md="1" :lg="1" :xl="1" :xxl="1" class="games-filters-col games-filters-col--private">
+        <a-col v-if="isAdmin" :xs="24" :sm="8" :md="3" :lg="2" :xl="2" :xxl="2" class="games-filters-col games-filters-col--private">
           <a-tag
             checkable
             :checked="filterPrivate"
