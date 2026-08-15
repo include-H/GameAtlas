@@ -1,149 +1,220 @@
-# GameAtlas Moonlight Web 浏览器串流可行性设计
+# GameAtlas Moonlight Web 浏览器串流 + 统一执行代理可行性设计
 
-> 状态：**初稿**（2026-08-15，DeepSeek 产出，待评审）
-> 定位：GameManager 开始游戏双选项（本地 bat / Moonlight 远程）之远程游玩的可行性论证与实施路线
-> 关联：`docs/GameVHD_DXVK集成设计.md`（同类可行性设计文风）、本地游玩 bat 生成链路（现状）
-> 动机：不想为远程游玩装 Moonlight 客户端，希望"开始游戏 → 选 Moonlight 远程 → 浏览器直接玩"
+> 状态：**v2 修订**（2026-08-15；初稿仅覆盖串流链路，本次并入"统一执行代理"设计，形成一条链两种执行形态）
+> 定位：GameManager 开始游戏双选项（本地 bat / Moonlight 远程）之远程游玩的完整设计；统一执行代理（改造 exe）为推荐形态
+> 关联：`backend/internal/services/windows_launch.go`（现状 bat 生成）、feature/gamevhd-runtime-sandbox 分支（GameVHD launcher、差分盘、gvhook）、`docs/GameVHD_DXVK集成设计.md`
+> 蓝本：`royka1/moonlight-webclient`（moonlight-common-c 编 WASM + WebCodecs 解码 + 键鼠捕获，自研浏览器客户端参照）
 
 ## 0. TL;DR（先给结论）
 
-- **目标**：开始游戏页提供两个选项——① 下载 bat 本地游玩（现有）；② Moonlight 远程（浏览器直接玩，零客户端）。
-- **可行性：成立**，但它是三方协作的链路，不是自研播放器：
-  - **宿主面**：Sunshine（游戏 PC）——app 启动（可指向 GameManager 生成的 bat）、NVENC 编码、客户端配对。
-  - **流面**：`moonlight-web-stream`（第三方，Rust + TS）——浏览器 WebRTC 播放器，配对持久化，有 Docker 镜像，WebSocket 传输兜底。
-  - **控制面**：GameManager 后端——"开始游戏 → 远程"编排、会话/时长记录、iframe 全屏集成。
-- **关键结论与坑**（详见 §4 决策表）：
-  - 🔴 浏览器无法直连 GameStream 协议（需裸 TCP/UDP），**必须有本地代理**——moonlight-web 就是这层代理，不可省略。
-  - 🟠 自动启动需 **fork moonlight-web 前端** 加 `?app=&autostart=1` 参数（TS 前端，改动小；源码未核）。
-  - 🟠 时长统计的权威来源用 **Sunshine app 的"运行前/后"命令回调 GameManager API**，而非前端 postMessage（app 退出必然触发，postMessage 只做 UI 回跳）。
-  - 🟡 延迟比原生 Moonlight 略高，局域网内可接受；动作竞技类不保证。
-- **实施分三阶段**：P0 真机手工验证（零代码）→ P1 自动启动（fork 前端 + 按钮）→ P2 完整闭环（会话记录 + 脚本复用）。P0 未过，不进入 P1。
+- **目标**：开始游戏提供两个选项——① 下载 bat 本地游玩（现有）；② Moonlight 远程（浏览器直接玩）。两条选项共享同一条"游戏执行链"，只是交付方式不同。
+- **一条链**：`点击远程启动 → WOL 唤醒（未开机）→ 等待主机就绪 → 串流连接 → 触发游戏执行 → 画面游玩 → 退出 → 生命周期清理与上报`。
+- **两种执行形态**：
+  - **形态 1（不启用 feature）**：现状 bat 链路——目标机下载 bat 手动运行，bat 自管挂载/启动/清理。**自动化有缺口**：串流连上后没有"监听者"等请求，无法远程自动拉起游戏。
+  - **形态 2（推荐，启用 feature）**：改造 GameVHD launcher exe 为**统一执行代理**，常驻监听 Atlas 请求，吸收 bat 全部职责（挂载差分盘/启动/清理）+ 新增监听/上报能力。它补齐了形态 1 的缺口——**bat 是"人肉 agent"，改造 exe 是"机器 agent"**。
+- **浏览器客户端**：不依赖原生 Moonlight，以 `moonlight-webclient` 为蓝本（moonlight-common-c → WASM + WebCodecs 硬解 + Pointer/Keyboard Lock 键鼠），或最小改动借壳 moonlight-web-stream。自研程度与工作量成反比，见 D6。
+- **实施分四阶段**：P0 真机验证 → P1 自动启动 → P2 统一 Agent → P3 深集成。P0 未过不进 P1。
 
 ## 1. 背景与动机
 
-### 1.1 为什么做
+### 1.1 现状与缺口
 
-- 现有"开始游戏"只有下载 bat 本地游玩：客户端机器要能访问 NAS 游戏库（或 GameVHD 沙箱），且只在装了配套环境的机器上可用。
-- 场景诉求：NAS 局域网内任何设备（笔记本、平板、电视浏览器）不装任何客户端，浏览器打开即玩。
-- 配套生态：Sunshine 在游戏 PC 上运行、浏览器有成熟的 WebRTC 串流客户端（moonlight-web-stream），GameManager 缺的是把三者编排起来的"总指挥"。
+- 现有"开始游戏"只有下载 bat：`windows_launch.go` 生成 bat 壳（内嵌 base64 PS 主脚本），由目标机用户**手动**运行；bat 自管 SMB VHD 差分盘挂载、游戏进程、退出清理。
+- 想加"Moonlight 远程"选项，但沿用手动 bat 无法闭环：串流画面连上后，**没有实体接收"启动游戏"请求**——人不在目标机前，bat 无人执行。
+- 于是想到形态 2：把 feature 分支的 launcher exe 改造成服务——**既当远程 agent，也当本地执行器**，由 Atlas 统一编排。
 
-### 1.2 为什么不自研播放器
+### 1.2 为什么浏览器直接玩
 
-- GameStream 协议要求裸 TCP/UDP socket + NVENC 流处理 + 低延迟编解码，浏览器不具备，自研 WebRTC 桥是巨型工程。
-- moonlight-web-stream 已实现：WebRTC/WebSocket 双传输、H.264/HEVC/AV1、配对流程、流统计、i18n（含中文），454★ 且持续更新。性价比远超自研。
+- 免装 Moonlight 客户端：NAS 局域网内任何带浏览器的设备（笔记本/平板/电视）即开即玩。
+- GameStream 协议需裸 TCP/UDP，浏览器无法直连，必须经本地代理（moonlight-web-stream 的 Rust streamer，或自研 Go 桥 + WASM 客户端）。
 
-### 1.3 为什么把"启动"交给 Sunshine 而不是自管
-
-- Sunshine 的 app 天然就是"任意命令/bat"，与 GameManager 已生成的本地游玩脚本同构——远程游玩复用同一脚本，只是执行者在游戏 PC 侧。
-- Sunshine 的 `/launch`、`/resume`、`/cancel` 需客户端配对证书认证，而 moonlight-web 本身已是持久化配对的客户端，**GameManager 不需要持有 Sunshine 凭据**，也不实现配对协议。
-
-## 2. 架构总览
+## 2. 统一链路全景
 
 ```text
-浏览器（客户端，零安装）
-  │  打开 GameManager → "开始游戏 → Moonlight 远程" → 全屏 iframe
-  │  WebRTC UDP（媒体流，浏览器直连 NAS，不经反代）   ←┐
-  ▼                                                    │
-GameManager 后端（NAS，控制面）                         │
-  ├─ 编排：保活/拉起 moonlight-web、记录会话、API       │
-  └─ 反向代理 moonlight-web 的 HTTP(S)（同源出 /stream）│
-       ▼                                                │
-moonlight-web（NAS，流面）—— web-server + streamer 子进程
-  │  RTSP/Enet/RTP（GameStream 协议，局域网）            │
-  ▼                                                    │
-Sunshine（游戏 PC，宿主面）→ 启动 app（GameManager bat 脚本）→ NVENC 编码
+┌─────────────────────── 控制面：GameManager（NAS 后端 + 前端）──────────────────────┐
+│ 开始远程游玩 → WOL → 轮询探活 → 下发 launch → 会话记录 → 收到结束 → 时长入库          │
+└──────────────┬───────────────────────────────────────────────────────┬─────────────┘
+               │ HTTP + token                              HTTP + token │
+   ┌───────────▼──────────┐                              ┌─────────────▼─────────────┐
+   │ 流面：浏览器客户端      │  WebRTC(RTP UDP)  ┌─────────┴────────┐  │ 执行面：统一 Agent    │
+   │ (WebCodecs+键鼠)      │◄─────────────────►│ Sunshine(游戏PC) │◄─┤ (改造 exe, 常驻监听)  │
+   └───────────────────────┘   WebSocket 兜底   └──────────────────┘  │ 挂载差分→启动→清理→上报│
+                                                                     └─────────────────────┘
 ```
 
-三个面各自独立、接口最小：
+- **控制面**（本项目）：编排、WOL、探活、会话、反代（若借壳）/接口（若自研）。
+- **流面**：浏览器播放器 + 协议桥（两选一，见 D6）。
+- **执行面**：统一 Agent（形态 2）或手动 bat（形态 1 降级）。
 
-| 面 | 组件 | 职责 | 状态 |
+### 2.1 全生命周期时序（形态 2）
+
+```text
+前端                 Atlas 后端(NAS)        统一 Agent(目标机)       Sunshine(游戏 PC)
+ │  点击"远程游玩"       │                       │                        │
+ │────────────────────► │                       │                        │
+ │                      │── WOL magic packet ──►│ (UDP 9 广播, 未开机时)  │
+ │                      │    ┌──────────────────┴────── 目标机开机 ──────┐
+ │                      │◄── 轮询 /health 直至就绪 ──│ (agent 开机自启)      │
+ │                      │── POST /launch {game_id, mode} ──►│            │
+ │                      │                       │ 挂载差分盘(SMB VHD)      │
+ │                      │                       │ 启动游戏进程             │
+ │                      │                       │ 状态上报 running         │
+ │◄── 串流地址/会话 id ──┤                       │                        │
+ │ 打开串流画面          │◄──────────────────────│──── RTP 编码流 ──────────│
+ │ (桌面 or 游戏直出)     │                       │                        │
+ │   游戏退出            │                       │◄── 进程退出检测 ──────────│
+ │◄── stream-end ────────┤                       │                        │
+ │                      │                       │ 清理差分层 → 上报时长     │
+ │                      │── 会话入库(开始/结束/时长) ────────────────────────►│
+```
+
+## 3. 统一执行代理（改造 exe，形态 2 核心）
+
+### 3.1 角色矩阵（同一 exe，部署在哪就是什么角色）
+
+| 角色 | 部署位置 | 触发源 | 职责 |
 |---|---|---|---|
-| 控制面 | GameManager 后端 | 按钮编排、会话记录、iframe 宿主、反向代理 | 本项目（P1/P2） |
-| 流面 | moonlight-web-stream | 播放器 + GameStream 协议桥 | 第三方（fork 前端） |
-| 宿主面 | Sunshine + GameManager 脚本 | app 启动、编码、配对 | 配置（P0 验证） |
+| **Agent-远程** | 游戏 PC（Sunshine 同机） | Atlas HTTP 请求 | 挂载差分盘 → 启动游戏 → 状态上报 → 退出清理；串流画面由 Sunshine 提供 |
+| **Agent-本地** | 客户端本机（非 Sunshine 设备） | Atlas HTTP 请求 | 同上 + **下载管理**（从 Atlas 拉取游戏包/资源）全生命周期 |
+| **降级-手动** | 任意 | 下载 bat 手动运行 | 现状 bat 流程原样保留（无 feature 环境兜底） |
 
-## 3. 证据边界（可行性判断依据）
+### 3.2 与现有 bat 的关系
+
+- bat 的职责全部被 Agent 吸收（挂载/启动/清理是同一套 GameVHD 逻辑），Agent 新增：常驻监听、鉴权、状态上报、会话回调。
+- **bat 退化为降级通道**：Agent 不可用（无 feature 环境/未部署）时保持现状能力。
+- 生成侧（Atlas）：bat 生成逻辑保留；Agent 模式下由 API 下发同一启动参数（VHD 路径、差分文件名、SavePath 模板）。
+
+### 3.3 协议与接口（草案）
+
+- 传输：HTTP/JSON，局域网；鉴权 Bearer token（Atlas 设置页生成、可轮换）。
+- 接口（Agent 侧）：
+  - `GET /health` → 就绪探活（Atlas 轮询，含开机等待）
+  - `POST /launch {game_id}` → 挂载差分 + 启动，返回会话 id
+  - `POST /stop {session_id}` → 主动停止（保底，正常以进程退出为准）
+  - `GET /status` → 当前会话状态
+- 接口（Atlas 侧，Agent 回调）：`POST /api/agent/events`（started/stopped + 时长）——权威时长来源。
+- 单例/防重入：差分盘锁复用 GameVHD 既有设计；同一游戏运行中禁止二次 launch。
+
+### 3.4 生命周期状态机
+
+```text
+idle → launching(挂载差分盘) → running(游戏进程) → cleaning(回收差分盘) → idle
+         │ 失败                    │ 进程退出/stop       │
+         └─→ error(上报, 清理残留)  └───────────────────┘
+```
+
+### 3.5 服务形态与安全
+
+- **常驻 exe + 开机自启注册**（非 Windows SCM Service）：权限要求低、调试/升级简单、卸载干净；启动失败自动拉起（计划任务/启动目录）。
+- 仅监听局域网网卡；token 由 Atlas 下发并支持轮换；不做公网暴露（远程场景走内网穿透/Tailscale 另行评估）。
+
+## 4. 串流接入链
+
+| 环节 | 方案 | 备注 |
+|---|---|---|
+| WOL 唤醒 | Atlas 后端发 UDP 9 magic packet（需记录目标机 MAC） | Go stdlib 即可；目标机主板/网卡需开启 WOL |
+| 等待就绪 | 轮询 Agent `GET /health`（含 Windows 登录延迟、agent 自启竞态，超时可调） | 就绪后可先做串流预连接 |
+| 串流连接 | Sunshine Desktop app（桌面先行）或 Sunshine app 直启游戏 | 见 D9 两种模式 |
+| 触发游戏 | Agent `POST /launch`（形态 2）/ 手动 bat（形态 1 降级） | 形态 1 自动化缺口即在此 |
+| 画面 | 浏览器客户端（WebRTC/WebSocket） | 见 §5 |
+| 退出 | 游戏进程退出 → Agent 清理上报 → Atlas 会话入库 → 前端关闭串流 | stream-end 仅做 UI 回跳 |
+
+## 5. 浏览器客户端（流面）——两选一
+
+| 选项 | 做法 | 工作量 | 适用 |
+|---|---|---|---|
+| **B. 自研（蓝本）** | 以 `royka1/moonlight-webclient` 为蓝本：moonlight-common-c 编 WASM（协议/配对/RTSP/Enet/RTP 全在 WASM 跑），浏览器只写 WebCodecs 解码（H.264/HEVC/AV1）+ Pointer/Keyboard Lock 键鼠 + UI；配对凭据存 Atlas DB，前端连 Atlas 的桥 | 1-2 周 | 深集成诉求（配对进 DB、自动 launch、悬浮窗、时长天然闭环）——与 Agent 形态契合 |
+| **C. 借壳** | fork moonlight-web-stream 加 `?app=&autostart=1` + `parent.postMessage('stream-end')` | 1-2 天 | 快速验证、先跑通链路 |
+
+- 视频：WebCodecs `VideoDecoder` 硬解 → VideoFrame → canvas/`MediaStreamTrackGenerator`；需自写 RTP depacketizer（AVCC 拼接，蓝本已有思路）。
+- 音频：OPUS → WebCodecs `AudioDecoder`。
+- 键鼠：Pointer Lock + Keyboard Lock（Chrome 全屏）+ Gamepad API。
+- 浏览器不能发裸 UDP → 协议桥（WASM 内联的 WebSocket 中继，或借壳方案自带 streamer）省不掉；Direct Sockets API（Chrome 129+）可作 P3 试点，受 PNA/局域网限制。
+
+## 6. 证据边界（可行性判断依据）
 
 | # | 事实 | 证据来源 | 影响 |
 |---|---|---|---|
-| 1 | GameStream 需要裸 TCP/UDP socket，浏览器不支持；官方无纯 Web 客户端 | moonlight-docs FAQ | 必须有本地代理（moonlight-web），不可省略 |
-| 2 | moonlight-web-stream v2：Rust web-server + streamer 子进程，WebRTC 传输，WebSocket 兜底，H.264/HEVC/AV1，Docker 镜像 | 仓库 README、Docker Hub | 可行；锁 v2.6+（含信令竞态修复、i18n） |
-| 3 | Sunshine app 可指向任意命令/批处理 | Sunshine 文档 | 与 GameManager 本地 bat 复用，双选项同源 |
-| 4 | Sunshine `/launch` `/resume` `/cancel` 需客户端配对证书；moonlight-web 自身为持久化配对客户端（data.json） | DeepWiki NVHTTP 章节 | GameManager 不碰配对/凭据 |
-| 5 | `/resume` 支持加入已运行会话 | DeepWiki NVHTTP 章节 | 可作为"断线重连"体验的备选路径 |
-| 6 | moonlight-web 前端为 TS；`?app=&autostart=1` 与 `parent.postMessage` 支持**未核实** | 仓库结构（待 P0 后核源码） | fork 改造点，需 P0 后代码验证 |
-| 7 | moonlight-web 需暴露 UDP 端口范围（Docker 默认 40000-40100/udp） | Docker Hub | iframe 反代只管 HTTP(S)；UDP 由浏览器直连 NAS |
-| 8 | Docker 部署需 `WEBRTC_NAT_1TO1_HOST=LAN_IP` 供浏览器协商 | Docker Hub | NAS 部署时必配；P0 即验证 |
+| 1 | GameStream 需裸 TCP/UDP，浏览器不支持；官方无纯 Web 客户端 | moonlight-docs FAQ | 必须有本地代理/桥 |
+| 2 | `royka1/moonlight-webclient`：moonlight-common-c → WASM + WebCodecs + 键鼠端到端可用（配对/launch/解码/输入全通） | 仓库 README（实测说明） | B 路线（自研）成立，非理论 |
+| 3 | moonlight-web-stream v2：Rust server + streamer，WebRTC/WebSocket 双传输，H.264/HEVC/AV1，Docker | 仓库/Docker Hub | C 路线（借壳）成立 |
+| 4 | Sunshine app 可指向任意命令/bat | Sunshine 文档 | 执行面可复用同一启动脚本 |
+| 5 | Sunshine `/launch /resume /cancel` 需客户端配对证书；moonlight-webclient 与 moonlight-web 均已是配对客户端 | DeepWiki NVHTTP | 配对一次性，持久化即可 |
+| 6 | 现有 bat 生成链路在 `windows_launch.go`（bat 壳 + base64 PS + SMB VHD 差分盘） | 代码 | Agent 复用同一套挂载/清理逻辑，成本低 |
+| 7 | GameVHD launcher 为 Rust 编排器，零依赖（`pe.rs`、`hook_dll_for`、差分盘逻辑） | feature 分支、DXVK 设计文档 | 加 HTTP 监听 + token 鉴权即得 Agent |
+| 8 | WOL：UDP 9 广播 magic packet，Go stdlib 可实现 | 通用事实 | 控制面成本极低 |
+| 9 | WebCodecs/Keyboard Lock/Pointer Lock 在 Chromium 系浏览器成熟 | 平台事实 | 流面能力具备 |
+| 10 | 目标机需 Agent 自启 + Windows 登录时序 | 平台事实 | 探活轮询需容忍登录延迟 |
 
-## 4. 关键设计决策
+## 7. 关键设计决策
 
 | 决策点 | 结论 | 理由 | 风险 |
 |---|---|---|---|
-| D1 部署位 | moonlight-web 作为 **NAS 独立服务（Docker 优先）**；GameManager 不内嵌二进制、不管理其子进程 | 进程/升级/数据（data.json）归 Docker 管，GameManager 只做入口 | NAS 需开 8080 + UDP 端口段；版本升级由用户 Docker 侧执行 |
-| D2 配对/账号 | 一次性人工配对；GameManager 设置页只配置"主机地址 + 游戏 app 名映射"，不实现 NvHTTP 配对 | 配对协议复杂且 moonlight-web 已内置；持久化在它 data.json | 换主机/重装 moonlight-web 需重新配对（罕见，文档化） |
-| D3 自动启动 | **fork moonlight-web 前端**加 `?app=&autostart=1`（加载后自动定位主机并点击 launch） | moonlight-web 本身就是已配对客户端，自己 launch 最干净；GameManager 不碰 Sunshine 凭据 | fork 上游合并成本；改动点需 P0 后核源码确认 |
-| D4 时长统计 | **Sunshine app "运行前/后"命令回调 GameManager API**（POST /api/stream-session），作为权威来源；前端 postMessage 仅做 UI 回跳 | app 退出必然触发（进程结束钩子），比前端事件可靠；前端关闭页面也不丢数据 | 需给每个游戏 app 配钩子（可脚本生成，见 D7） |
-| D5 结束回跳 | iframe 全屏 + `parent.postMessage('stream-end')` → GameManager 收事件关全屏回游戏详情 | 同源反代下 postMessage 安全可控 | 浏览器关页/断网时收不到——兜底由 D4 的权威时长补 |
-| D6 集成形态 | GameManager 后端反代 moonlight-web HTTP(S) 到 `/stream/` 同源路径，iframe 嵌入；WebRTC UDP 不经反代 | 同源免跨域、免 TLS 自签证书警告；UDP 媒体流浏览器直连 NAS 局域网可达 | 反代需正确透传 WebSocket（升级头）；Nginx/Go 均可，Go 自带 revproxy 即可 |
-| D7 脚本复用 | 生成本地游玩 bat 的同时，产出该游戏 Sunshine app 配置片段（命令指向同一 bat 的远程路径），并提供批量导入指引 | 双选项同脚本，行为一致；避免维护两套启动逻辑 | Sunshine app 是手导配置（无 API 写配置）——P2 提供"复制片段"而非自动配置 |
-| D8 并发互斥 | 同一游戏"本地 bat"与"Moonlight 远程"**禁止同时启动**（GameVHD 差分盘锁/运行中标记） | 防止双写冲突（沙箱盘、存档） | GameManager 需统一"运行中"状态位，两选项共享 |
+| D1 执行形态 | **形态 2（统一 Agent）为主**，形态 1 作降级保留 | Agent 补齐自动化缺口、共享 GameVHD 逻辑、本地/远程同源 | feature 分支需合入主线并维护 |
+| D2 Agent 服务形态 | 常驻 exe + 开机自启，非 SCM Service | 权限/调试/升级简单 | 开机自启竞态需探活兜底 |
+| D3 Agent 鉴权 | 局域网 + Bearer token（Atlas 生成/轮换） | 最小够用；不开放公网 | token 泄露面=局域网 |
+| D4 会话权威来源 | Agent 上报（进程退出必然触发），前端 postMessage 仅 UI 回跳 | 可靠性优先；浏览器关页不丢数据 | 需 Atlas 事件接口幂等 |
+| D5 WOL | Atlas 后端发 UDP 9；设置页维护 目标机 MAC + 关机状态 | Go stdlib，成本低 | 目标机 BIOS/网卡需开 WOL |
+| D6 浏览器客户端 | **B（自研，蓝本）与 Agent 形态配套**；P0 阶段先 C 借壳跑通链路 | 深集成价值高；借壳快速验证 | B 有 1-2 周成本；C 是 fork，深集成受限 |
+| D7 串流模式 | 双模式：桌面先行（登录/操作）与 Sunshine app 直启游戏（纯游戏） | 覆盖"先看桌面"与"直接玩"两种诉求 | 直启模式需 Agent 与 Sunshine 同一进程环境（同机） |
+| D8 下载管理（Agent-本地） | 复用现有下载/文件服务，Agent 侧做"拉取→落盘→挂载→启动" | 本地角色全生命周期成立 | 大文件下载与挂载的并发/断点需沿用现有下载实现 |
+| D9 双开互斥 | 统一"运行中"状态位：本地与远程共享 | 差分盘锁防双写 | 状态位一致性（异常退出需超时回收） |
+| D10 配对 | 一次性人工配对（借壳）/ WASM 内配对凭据存 Atlas DB（自研） | 不实现 NvHTTP 配对协议 | 换主机需重配（文档化） |
 
-## 5. 分阶段实施（P0 未过不进 P1）
+## 8. 实施阶段（P0 未过不进 P1）
 
-### P0 真机手工验证（零代码，1-2 小时）
+### P0 真机手工验证（零代码）
+1. NAS 起 moonlight-web-stream Docker（`WEBRTC_NAT_1TO1_HOST` + UDP 端口段）→ 浏览器串流手工跑通
+2. 核 moonlight-web-stream 前端源码：`?app=` 自动启动与退出 postMessage 的改动成本（决定 P1 是借壳还是直接上自研）
+3. 实测：延迟观感（1080p60）、WebSocket 兜底、手柄（Gamepad API）、退出流程
+4. 验收：局域网 1080p60 可玩、配对持久化、WebSocket 可通
 
-1. NAS 起 moonlight-web-stream Docker（配 `WEBRTC_NAT_1TO1_HOST` + UDP 端口段）
-2. 浏览器首次访问：建 admin 账号 → 添加主机（游戏 PC 地址）→ 配对（Sunshine PIN）
-3. 手工启动一个 app，实测：延迟观感、WebSocket 兜底切换、音频/手柄（浏览器 Gamepad API）、退出流程
-4. **核源码**：前端是否易加 `?app=` 自动启动与退出 postMessage（决定 D3 改动量）
-5. 验收标准：局域网内 1080p60 基本可玩（延迟主观可接受）、配对持久化（重启后免配）、WebSocket 模式可通
+### P1 自动启动（串流链闭环）
+1. 借壳方案：fork 前端加 `?host=&app=&autostart=1` + `parent.postMessage('stream-end')`
+2. Atlas 设置页：目标机配置（主机地址、MAC、app 映射）+ 后端 WOL + 探活轮询
+3. 游戏详情"开始游戏"加"Moonlight 远程游玩"→ WOL → 探活 → 全屏 iframe（带 autostart）→ stream-end 回跳
+4. 会话兜底：轮询 Sunshine 会话状态
 
-### P1 自动启动（fork 前端 + GameManager 按钮）
+### P2 统一 Agent（执行面落地）
+1. feature 分支 launcher 加 HTTP 监听 + token 鉴权 + `/health /launch /stop /status`（复用差分盘挂载/清理逻辑）
+2. Agent 开机自启注册；Atlas 事件接口（started/stopped 幂等入库）
+3. "运行中"状态位统一（D9）；本地启动模式接入（D8）
+4. Sunshine 双模式集成（D7）：桌面先行 / app 直启（app 命令 = Agent client 模式）
 
-1. fork moonlight-web-stream：加 URL 参数 `?host=&app=&autostart=1`、流结束 `parent.postMessage('stream-end')`、可选 `?no-auth-session=1` 直通（若实现成本低）
-2. GameManager 设置页：Moonlight 主机地址 + 游戏→app 名映射 + 手动配对入口指引
-3. 游戏详情"开始游戏"加第二选项"Moonlight 远程游玩"→ 后端校验配置 → 打开全屏 iframe（`/stream/?host=..&app=..&autostart=1`）
-4. 监听 `stream-end` → 关 iframe 回详情；丢失兜底：轮询 Sunshine 会话状态（可选）
+### P3 深集成（可选）
+- 自研浏览器客户端（B 路线，蓝本 royka1）替换借壳，配对凭据入 Atlas DB
+- Direct Sockets 试点（去桥直连）；登录态透传；断线 `/resume` 自动重连
+- Agent 自更新、多主机、公网（Tailscale）评估
 
-### P2 完整闭环（会话与脚本打通）
-
-1. bat 生成时同时产出 Sunshine app 配置片段（app name = GameManager 游戏 ID，命令 = 远程路径 bat），设置页展示导入步骤
-2. Sunshine "运行前/后"命令：`curl POST NAS/api/stream-session/start|end`（携带 app 名）→ GameManager 记录开始/结束/时长，游戏详情展示远程游玩历史
-3. "运行中"状态位统一：本地 bat 与远程互斥（D8）
-4. 测试矩阵落地（§7）
-
-### P3 加分项（可选）
-
-- GameManager 后端按需拉起/保活 moonlight-web（Docker API 或 systemd），免用户手动起服务
-- 登录态透传（moonlight-web 会话复用）；多主机选择；断线自动 resume（利用 `/resume`）
-
-## 6. 未闭合的门（诚实标注）
-
-1. **moonlight-web 前端源码未核**：`?app=` 自动启动、退出 postMessage 的改动成本是 P1 的前提，P0 第 4 步必须确认；若改动成本高，退路是 P1 改为"打开新标签页 + 手动点击"（体验降级但可用）
-2. 浏览器端 UDP 直连 NAS 的 NAT/防火墙未知数：局域网默认可通；若不通，退 WebSocket 兜底（同端口 80/443，WebSocket 传输）
-3. moonlight-web 与最新版 Sunshine 的兼容漂移（历史 issue：`sessionUrl0`、H265 启动失败）——锁 moonlight-web v2.6+ 并实测；上游修复节奏需持续跟进
-4. 延迟实测数据缺失：P0 建立主观基线（局域网 1080p60）；若不可接受，只能回归原生 Moonlight 客户端（功能保留但选项无意义）
-5. moonlight-web 自带账号体系（admin 用户 + 主机列表在 data.json）与 GameManager 用户体系隔离——多用户场景需 P3 处理或接受"家庭共享一个入口"
-6. fork 的上游合并成本：fork 分支需定期 rebase 上游 release（或锁版本放弃更新）
-7. 手柄支持依赖浏览器 Gamepad API 与 moonlight-web 的映射质量——P0 实测，不达标则标注"仅键鼠游玩"
-8. Sunshine app 配置是手动导入（无 API），批量游戏迁移脚本的成本未评估（P2 提供片段复制已是最小成本路径）
-
-## 7. 测试矩阵（P2 终点证据）
+## 9. 测试矩阵（P2 终点证据）
 
 | 类别 | 覆盖项 | 终点证据 |
 |---|---|---|
-| 启动链 | 按钮 → iframe → autostart → 画面出现 | 全流程无人工点击；失败路径（未配对/主机离线/app 名错）有明确错误提示 |
-| 会话 | 游戏退出 → Sunshine 后钩子 → GameManager 时长入库 | app 退出必然产生一条 session 记录；前端关闭/断网不丢（钩子兜底） |
-| 回跳 | `stream-end` → iframe 关闭回详情 | 正常退出回跳成功；异常（浏览器被杀）由会话钩子补 |
-| 并发 | 本地 bat + 远程互斥 | 运行中状态位阻止双开；释放后恢复 |
-| 传输 | WebRTC 直连 / WebSocket 兜底 | 两种模式均可串流；WebSocket 下延迟标为"可用"非"最佳" |
-| 配置 | 主机映射缺失 / app 名不存在 / 未配对 | 每个错误有可执行的修复指引 |
-| 兼容 | 最新 Sunshine 版本、HEVC、AV1、1080p60 | P0 实测基线逐项过 |
+| 启动链 | 按钮 → WOL(未开机) → 探活 → Agent launch → 画面 | 全流程无人为点击；各失败点（未配 MAC/主机离线/agent 未装）有明确提示与修复指引 |
+| Agent | launch/stop/status、差分盘挂载与清理、进程退出检测、异常退出残留回收 | 状态机各态迁移正确；清理幂等；残留可诊断 |
+| 会话 | Agent 上报 started/stopped → Atlas 入库 | 幂等；前端关页/断网不丢时长 |
+| 并发 | 本地与远程互斥、重复 launch 拒绝 | 差分盘锁生效；状态位统一 |
+| 传输 | WebRTC / WebSocket 兜底 | 双模式可串流；WS 延迟标注"可用"非"最佳" |
+| WOL | 关机→唤醒→探活时序、开机慢机器 | 轮询超时可配；失败路径清晰 |
+| 降级 | 无 feature 环境走 bat | 现状回归不受影响 |
 
-## 8. 参考
+## 10. 未闭合的门（诚实标注）
 
-- moonlight-web-stream：`MrCreativ3001/moonlight-web-stream`（v2.6+，Docker: `mrcreativ3001/moonlight-web-stream`）
-- 官方 FAQ 无纯 Web 客户端：`moonlight-stream/moonlight-docs` wiki
-- Sunshine：`LizardByte/Sunshine`；NVHTTP `/launch /resume /cancel` 认证语义见 DeepWiki 章节
-- 相关 fork 佐证可改造性：`royka1/moonlight-webclient`（WASM 方案，成本更高，备选）、`Argon2000/moonlight-web-stream-tsla`（特斯拉浏览器适配 fork，佐证前端可深度改）
-- 本地游玩 bat 生成链路：GameManager 现有"开始游戏 → 下载 bat"逻辑（复用脚本，见 D7）
+1. **moonlight-web-stream 前端源码未核**（`?app=`/postMessage 改动成本）——P0 第 2 步必须确认；成本高则 P1 改"新标签页 + 手动点击"降级
+2. **royka1/moonlight-webclient 自研蓝本的实测细节未验证**（AVCC 拼接、MSTG、键鼠手感）——需 P0 后单独 spike 评估 B 路线
+3. Agent 与 Sunshine 同机的进程环境耦合（桌面会话/服务会话的显示环境差异）——Windows 服务与交互式会话问题，P2 实测
+4. 浏览器 UDP 直连 NAS 的 NAT/防火墙未知数——局域网默认可通，兜底 WebSocket
+5. moonlight-web/Sunshine 上游兼容漂移（`sessionUrl0` 等历史 issue）——锁版本实测，持续跟进
+6. WOL 依赖目标机主板/网卡设置（BIOS + 网卡属性），非软件可控——文档化前置条件
+7. Agent 开机自启与 Windows 登录/锁屏时序竞态（登录前无桌面会话）——探活超时 + 状态机兜底
+8. 自研 B 路线的手柄/多设备兼容矩阵未建立（Gamepad API 差异）
+9. feature 分支与主线合入策略未定（Agent 是 feature 的收割点之一）
+10. 下载管理（D8）在大文件场景的体验（进度/断点/校验）沿用现有实现的成熟度待确认
+
+## 11. 参考
+
+- 自研蓝本：`royka1/moonlight-webclient`（moonlight-common-c → WASM + WebCodecs + 键鼠）
+- 借壳对象：`MrCreativ3001/moonlight-web-stream`（v2.6+，Docker: `mrcreativ3001/moonlight-web-stream`）
+- 主机端：`LizardByte/Sunshine`；NVHTTP `/launch /resume /cancel` 认证语义见 DeepWiki
+- 执行面现状：`backend/internal/services/windows_launch.go`；feature/gamevhd-runtime-sandbox（launcher、差分盘、gvhook）；`docs/GameVHD_DXVK集成设计.md`
+- 官方 FAQ（无纯 Web 客户端原因）：`moonlight-stream/moonlight-docs` wiki
