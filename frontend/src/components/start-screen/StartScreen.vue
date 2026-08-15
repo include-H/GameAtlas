@@ -82,7 +82,7 @@
                 :class="{ 'is-column-insertion': isColumnInsertionBefore(groupIndex) }"
                 :style="{
                   '--start-group-cols': groupCols(group),
-                  '--start-group-rows': START_SCREEN_GROUP_MAX_ROWS,
+                  '--start-group-rows': Math.min(Math.max(groupMaxRow(group), 1), START_SCREEN_GROUP_MAX_ROWS),
                 }"
                 :data-start-screen-cell="true"
                 :data-column-index="group.columnIndex"
@@ -188,12 +188,12 @@
                   <div
                     v-if="isEditing"
                     class="start-screen__group-append-col"
-                    :class="{ 'start-screen__group-append--target': isDropTarget(group.columnIndex, 0, groupAppendCol()) }"
+                    :class="{ 'start-screen__group-append--target': isDropTarget(group.columnIndex, 0, groupCols(group)) }"
                     :data-start-screen-cell="true"
                     :data-column-index="group.columnIndex"
                     data-row="0"
-                    :data-col="groupAppendCol()"
-                    :title="`追加列 ${groupAppendCol() + 1}`"
+                    :data-col="groupCols(group)"
+                    :title="`追加列 ${groupCols(group) + 1}`"
                   >
                     <icon-plus />
                   </div>
@@ -202,10 +202,10 @@
                 <div
                   v-if="isEditing"
                   class="start-screen__group-append"
-                  :class="{ 'start-screen__group-append--target': isDropTarget(group.columnIndex, groupAppendRow(group), 0) }"
+                  :class="{ 'start-screen__group-append--target': isDropTarget(group.columnIndex, groupMaxRow(group), 0) }"
                   :data-start-screen-cell="true"
                   :data-column-index="group.columnIndex"
-                  :data-row="groupAppendRow(group)"
+                  :data-row="groupMaxRow(group)"
                   data-col="0"
                 >
                   <icon-plus />
@@ -517,20 +517,19 @@ const groupMaxRow = (group: PackedStartScreenGroup) =>
     (max, slot) => Math.max(max, slot.row + tileSpan(slot.tile.tile_size).rows),
     0,
   )
-// 组是固定的 12×12 网格；空位也必须可见、可作为拖拽落点。
-const groupCols = (_group: PackedStartScreenGroup) => START_SCREEN_FREE_COLS
-const groupAppendRow = (group: PackedStartScreenGroup) => {
-  const tile = draggedTile.value
-  return tile
-    ? START_SCREEN_GROUP_MAX_ROWS - tileSpan(tile.tile_size).rows
-    : groupMaxRow(group)
-}
-const groupAppendCol = () => {
-  const tile = draggedTile.value
-  return tile ? START_SCREEN_FREE_COLS - tileSpan(tile.tile_size).cols : START_SCREEN_FREE_COLS
+// 组宽按磁贴实际占用收缩（上限 12 列）：磁贴少时网格紧凑，不撑满一屏空白；
+// 至少留 2 列兜底（编辑模式空组也有可拖入的区域）。
+const groupCols = (group: PackedStartScreenGroup) => {
+  const needed = group.slots.reduce(
+    (max, slot) => Math.max(max, slot.col + tileSpan(slot.tile.tile_size).cols),
+    0,
+  )
+  return Math.min(START_SCREEN_FREE_COLS, Math.max(needed, 2))
 }
 const groupCells = (group: PackedStartScreenGroup) => {
-  const rows = START_SCREEN_GROUP_MAX_ROWS
+  // 网格只精确覆盖磁贴占用的行列（封顶 12×12），不向下/向右延伸虚空格；
+  // 组尾由追加条承接拖放。
+  const rows = Math.min(groupMaxRow(group), START_SCREEN_GROUP_MAX_ROWS)
   const cols = groupCols(group)
   const cells: Array<{ row: number; col: number }> = []
   for (let row = 0; row < rows; row += 1) {
@@ -1097,13 +1096,17 @@ const pointInRect = (x: number, y: number, rect: DOMRect) =>
   x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
 
 // 网格单元换算步长：--start-cell 是 clamp() 表达式，getComputedStyle 只会返回未求值的
-// token 串（parseFloat 得 NaN），不能作为单元尺寸来源；改为从网格实际像素宽度反推
-// （组固定 12 列：width = 12×cell + 11×gap）。gap 取已解析的标准 gap 属性。
+// token 串（parseFloat 得 NaN），不能作为单元尺寸来源；组宽随磁贴占用收缩，
+// 列数从内联的 --start-group-cols（纯数字）读取，按 像素宽 = cols×cell + (cols-1)×gap 反推。
+// gap 取已解析的标准 gap 属性。
 const readGridStep = (grid: HTMLElement, rect: DOMRect): number | null => {
   if (rect.width <= 0 || rect.height <= 0) return null
-  const gapValue = parseFloat(getComputedStyle(grid).gap)
+  const computed = getComputedStyle(grid)
+  const gapValue = parseFloat(computed.gap)
   const gap = Number.isFinite(gapValue) && gapValue > 0 ? gapValue : 0
-  const cell = (rect.width - gap * (START_SCREEN_FREE_COLS - 1)) / START_SCREEN_FREE_COLS
+  const colsValue = parseFloat(computed.getPropertyValue('--start-group-cols'))
+  const cols = Number.isFinite(colsValue) && colsValue > 0 ? colsValue : START_SCREEN_FREE_COLS
+  const cell = (rect.width - gap * (cols - 1)) / cols
   if (!Number.isFinite(cell) || cell <= 0) return null
   return cell + gap
 }
