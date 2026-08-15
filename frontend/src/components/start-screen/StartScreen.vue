@@ -9,7 +9,7 @@
         tabindex="-1"
         @keydown.esc="handleClose"
       >
-        <shared-ambient-background force-enabled source-mode="global" />
+        <shared-ambient-background force-enabled source-mode="global" sharp />
         <div class="start-screen-scrim" @click="handleClose" />
 
         <div class="start-screen" @wheel.passive="handleWheel" @click.self="handleClose">

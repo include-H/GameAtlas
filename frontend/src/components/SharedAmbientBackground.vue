@@ -1,7 +1,7 @@
 <template>
   <div
     class="shared-ambient-bg"
-    :class="{ 'is-enabled': isEnabled }"
+    :class="{ 'is-enabled': isEnabled, 'shared-ambient-bg--sharp': sharp }"
     aria-hidden="true"
   >
     <div
@@ -11,7 +11,7 @@
       :class="{ 'is-active': activeLayerIndex === index }"
       :style="{
         ...style,
-        opacity: isEnabled ? (activeLayerIndex === index ? 0.58 : 0) : 0,
+        opacity: isEnabled ? (activeLayerIndex === index ? layerOpacity : 0) : 0,
       }"
     >
       <div class="shared-ambient-bg__overlay" />
@@ -43,9 +43,12 @@ const props = withDefaults(defineProps<{
   forceEnabled?: boolean
   /** 背景源：'page' 吃页面设置的专属池（详情页等）；'global' 只吃自定义背景/全局池 */
   sourceMode?: 'page' | 'global'
+  /** 清晰模式：去掉磨砂 blur，提高图层不透明度（浮层类场景用，避免"玻璃"感） */
+  sharp?: boolean
 }>(), {
   forceEnabled: false,
   sourceMode: 'page',
+  sharp: false,
 })
 
 const SUPPORTED_ROUTE_NAMES = new Set([
@@ -100,6 +103,9 @@ const buildLayerStyle = (url: string) => {
 }
 
 const layerStyles = computed(() => layerUrls.value.map((url) => buildLayerStyle(url)))
+
+// 清晰模式：不透明度拉高到 0.92（默认磨砂 0.58），配合 CSS 去掉 blur。
+const layerOpacity = computed(() => (props.sharp ? 0.92 : 0.58))
 
 const shuffleArray = <T,>(items: T[]) => {
   const copy = [...items]
@@ -311,6 +317,12 @@ watch(
   transition:
     opacity 0.85s ease,
     visibility 0s linear 0.85s;
+}
+
+/* 清晰模式（浮层类场景）：去掉磨砂 blur，只保留轻微增亮 */
+.shared-ambient-bg--sharp .shared-ambient-bg__layer {
+  filter: saturate(1.02) brightness(1.06);
+  transform: scale(1.01);
 }
 
 .shared-ambient-bg__layer.is-active {
