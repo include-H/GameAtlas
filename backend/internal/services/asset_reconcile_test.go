@@ -172,6 +172,68 @@ func TestCleanOrphanedAssetFilesKeepsVideoPosterReferencedViaPosterPath(t *testi
 	assertFileMissing(t, filepath.Join(assetsDir, "poster-ref", "stale.jpg"))
 }
 
+func TestCleanOrphanedAssetFilesKeepsStartScreenTileImagePath(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	assetsDir := filepath.Join(t.TempDir(), "assets")
+	gameID := insertServicesTestGame(t, db, "tile-ref", "Tile Ref", domain.GameVisibilityPublic)
+
+	if _, err := db.Exec(`
+		INSERT INTO start_screen_tiles (game_id, tile_size, image_path, sort_order, column_index, grid_row, grid_col)
+		VALUES (?, 'small', '/assets/tile-ref/original-cover.jpg', 0, 0, 0, 0)
+	`, gameID); err != nil {
+		t.Fatalf("insert start screen tile with image_path: %v", err)
+	}
+
+	writeServicesAssetFile(t, assetsDir, "tile-ref", "original-cover.jpg", []byte("cover"))
+	writeServicesAssetFile(t, assetsDir, "tile-ref", "stale.jpg", []byte("orphan"))
+
+	service := NewAssetReconcileService(config.Config{AssetsDir: assetsDir}, db)
+	deleted, err := service.CleanOrphanedAssetFiles()
+	if err != nil {
+		t.Fatalf("CleanOrphanedAssetFiles returned error: %v", err)
+	}
+	if deleted != 1 {
+		t.Fatalf("deleted = %d, want 1 (only the stale file)", deleted)
+	}
+
+	assertFileExists(t, filepath.Join(assetsDir, "tile-ref", "original-cover.jpg"))
+	assertFileMissing(t, filepath.Join(assetsDir, "tile-ref", "stale.jpg"))
+}
+
+func TestCleanOrphanedAssetFilesTiesVariantsToBaseReference(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
+	assetsDir := filepath.Join(t.TempDir(), "assets")
+	gameID := insertServicesTestGame(t, db, "variant-ref", "Variant Ref", domain.GameVisibilityPublic)
+	if _, err := db.Exec(`UPDATE games SET cover_image = ? WHERE id = ?`, "/assets/variant-ref/cover.jpg", gameID); err != nil {
+		t.Fatalf("set cover: %v", err)
+	}
+
+	// 被引用的原图：原图与变体都应保留。
+	writeServicesAssetFile(t, assetsDir, "variant-ref", "cover.jpg", []byte("cover"))
+	writeServicesAssetFile(t, assetsDir, "variant-ref", "cover.w480.webp", []byte("variant"))
+	// 无引用的原图：原图与变体应一起被隔离。
+	writeServicesAssetFile(t, assetsDir, "variant-ref", "stale.jpg", []byte("orphan"))
+	writeServicesAssetFile(t, assetsDir, "variant-ref", "stale.w480.webp", []byte("variant"))
+
+	service := NewAssetReconcileService(config.Config{AssetsDir: assetsDir}, db)
+	deleted, err := service.CleanOrphanedAssetFiles()
+	if err != nil {
+		t.Fatalf("CleanOrphanedAssetFiles returned error: %v", err)
+	}
+	if deleted != 2 {
+		t.Fatalf("deleted = %d, want 2 (orphan base + its variant)", deleted)
+	}
+
+	assertFileExists(t, filepath.Join(assetsDir, "variant-ref", "cover.jpg"))
+	assertFileExists(t, filepath.Join(assetsDir, "variant-ref", "cover.w480.webp"))
+	assertFileMissing(t, filepath.Join(assetsDir, "variant-ref", "stale.jpg"))
+	assertFileMissing(t, filepath.Join(assetsDir, "variant-ref", "stale.w480.webp"))
+}
+
 func TestCleanOrphanedAssetFilesQuarantinesUnreferencedFilesByDefault(t *testing.T) {
 	db := openServicesTestDB(t)
 	defer func() { _ = db.Close() }()

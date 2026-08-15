@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -238,6 +239,11 @@ func (s *AssetReconcileService) loadAllReferencedAssetPaths() (map[string]struct
 			UNION
 			SELECT poster_path AS path FROM game_assets WHERE COALESCE(TRIM(poster_path), '') != ''
 			UNION
+			SELECT image_path AS path FROM start_screen_tiles WHERE COALESCE(TRIM(image_path), '') != ''
+			UNION
+			SELECT value AS path FROM start_screen_tiles, json_each(start_screen_tiles.flip_images)
+			WHERE COALESCE(TRIM(value), '') != ''
+			UNION
 			SELECT image_small_path AS path FROM start_screen_tiles WHERE COALESCE(TRIM(image_small_path), '') != ''
 			UNION
 			SELECT image_wide_path AS path FROM start_screen_tiles WHERE COALESCE(TRIM(image_wide_path), '') != ''
@@ -264,6 +270,31 @@ func isKnownAssetFile(name string) bool {
 	ext := strings.ToLower(filepath.Ext(name))
 	_, ok := knownAssetExtensions[ext]
 	return ok
+}
+
+// 变体缓存文件名形如 {uuid}.w480.webp（EnsureVariant 按需生成）。它们不是用户数据，
+// 也不在任何 DB 引用表里。清扫规则：变体跟随原图——原图仍被引用则变体保留（按需再生成
+// 的缓存）；原图已无人引用则变体与原图一起移入隔离区，不残留死缓存。
+var variantAssetFilePattern = regexp.MustCompile(`(?i)^(.+)\.w\d+\.(jpe?g|png|webp|gif)$`)
+
+// variantBaseCandidates 还原变体可能的原图路径。变体名丢弃了原图扩展名
+// （cover.jpg → cover.w480.webp），因此按已知图片扩展名逐一生成候选，
+// 与 DB 引用表比对时命中任意一个即视为原图仍被引用。
+func variantBaseCandidates(assetPath string) []string {
+	match := variantAssetFilePattern.FindStringSubmatch(filepath.Base(assetPath))
+	if match == nil {
+		return nil
+	}
+	stem := match[1]
+	if ext := filepath.Ext(stem); ext != "" {
+		stem = strings.TrimSuffix(stem, ext)
+	}
+	baseDir := filepath.ToSlash(filepath.Dir(assetPath))
+	candidates := make([]string, 0, len(knownAssetExtensions))
+	for ext := range knownAssetExtensions {
+		candidates = append(candidates, baseDir+"/"+stem+ext)
+	}
+	return candidates
 }
 
 func (s *AssetReconcileService) deleteUnreferencedFiles(referenced map[string]struct{}) (int, error) {
@@ -300,6 +331,20 @@ func (s *AssetReconcileService) deleteUnreferencedFiles(referenced map[string]st
 		assetPath, pathErr := fsPathToAssetPath(baseDir, path)
 		if pathErr != nil {
 			return nil
+		}
+
+		// 变体跟随原图：原图仍被引用则保留缓存，否则与原图一起被隔离。
+		if bases := variantBaseCandidates(assetPath); bases != nil {
+			kept := false
+			for _, basePath := range bases {
+				if _, ok := referenced[basePath]; ok {
+					kept = true
+					break
+				}
+			}
+			if kept {
+				return nil
+			}
 		}
 
 		if _, ok := referenced[assetPath]; ok {
