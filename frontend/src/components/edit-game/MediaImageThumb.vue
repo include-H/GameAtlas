@@ -9,6 +9,7 @@
     <slot />
     <div v-if="badge" class="media-thumb__badge">{{ badge }}</div>
     <div class="media-thumb__actions">
+      <slot name="extra-actions" />
       <a-button
         class="app-text-action-btn media-action-button media-drag-handle"
         type="text"
@@ -147,16 +148,17 @@ const confirmRemove = () => {
   z-index: 1;
 }
 
+/* 右上角操作簇（无全遮罩）：拖动/删除等按钮以深色小圆钮常驻右上角，
+   桌面悬停浮现、触屏常显；图片内容始终可见，不再被遮罩盖住。 */
 .media-thumb__actions {
   position: absolute;
-  inset: 0;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
+  gap: 2px;
   padding: 0;
-  border-radius: 0;
-  background: var(--app-scrim);
   opacity: 0;
   transition: opacity 0.18s ease;
 }
@@ -166,11 +168,29 @@ const confirmRemove = () => {
   height: 26px;
   min-width: 26px;
   font-size: 12px;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(0, 0, 0, 0.42);
+  border-radius: 50%;
+}
+
+.media-thumb__actions .media-action-button:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.media-thumb__actions .media-action-button--danger:hover {
+  color: rgb(var(--danger-6));
 }
 
 .media-thumb:hover .media-thumb__actions,
 .media-thumb:focus-within .media-thumb__actions {
   opacity: 1;
+}
+
+/* 触屏：无悬停，按钮常显 */
+@media (hover: none) {
+  .media-thumb__actions {
+    opacity: 1;
+  }
 }
 
 .media-drag-handle {
@@ -192,17 +212,5 @@ const confirmRemove = () => {
   height: 100%;
   object-fit: contain;
   object-position: center;
-}
-
-@media (hover: none) {
-  .media-thumb__actions {
-    opacity: 1;
-    inset: auto 0 0;
-    min-height: 40px;
-    align-items: flex-end;
-    padding: 6px;
-    box-sizing: border-box;
-    background: linear-gradient(180deg, transparent 0%, var(--app-scrim) 60%);
-  }
 }
 </style>

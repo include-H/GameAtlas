@@ -17,16 +17,6 @@
       </div>
       <div class="game-media-page__actions">
         <a-button
-          class="app-text-action-btn"
-          type="text"
-          html-type="button"
-          :disabled="isSubmitting"
-          @click="handleSave"
-        >
-          <template #icon><icon-save /></template>
-          保存
-        </a-button>
-        <a-button
           type="primary"
           html-type="button"
           :loading="isSubmitting"
@@ -488,11 +478,6 @@ const {
   activeTab,
   autoPersistAssets: true,
 })
-
-const handleSave = () => {
-  pendingSaveMode.value = 'stay'
-  void handleSubmit()
-}
 
 const handleSaveAndExit = () => {
   pendingSaveMode.value = 'exit'

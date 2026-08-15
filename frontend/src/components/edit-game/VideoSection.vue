@@ -83,14 +83,16 @@
         <div v-else class="media-thumb--video__placeholder">
           <icon-video-camera />
         </div>
-        <button
-          type="button"
-          class="media-thumb--video__poster-action app-text-action-btn"
-          :title="video.poster_path ? '重选封面帧' : '选择封面帧'"
-          @click.stop="emit('select-poster', video)"
-        >
-          <icon-image />
-        </button>
+        <template #extra-actions>
+          <button
+            type="button"
+            class="media-thumb--video__poster-action app-text-action-btn"
+            :title="video.poster_path ? '重选封面帧' : '选择封面帧'"
+            @click.stop="emit('select-poster', video)"
+          >
+            <icon-image />
+          </button>
+        </template>
       </media-image-thumb>
     </div>
   </media-card-frame>
@@ -239,23 +241,21 @@ const openVideoFilePicker = () => {
 }
 
 .media-thumb--video__poster-action {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 26px;
   height: 26px;
+  min-width: 26px;
   padding: 0;
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(0, 0, 0, 0.42);
 }
 
 .media-thumb--video__poster-action:hover {
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.7);
 }
 </style>
