@@ -1535,7 +1535,7 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 40px 56px 28px;
+  padding: 120px;
   color: #fff;
   /* 12 列网格 + Win10 磁贴比例（2x2/2x4/4x4）：单元约 4vw，
      2x2 小磁贴 ≈ Win8 的 125px 量级；组间横向滚动翻屏 */
