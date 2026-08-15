@@ -1272,9 +1272,9 @@ onUnmounted(() => {
 .start-screen-scrim {
   position: absolute;
   inset: 0;
-  /* 极透暗色玻璃：背景清晰直出但压暗（20% 遮罩），避免抢眼；
+  /* 暗色玻璃：60% 遮罩，背景清晰直出但明显压暗，不抢眼；
      文字可读性由磁贴自身阴影/暗色渐变兜底 */
-  background: rgba(4, 7, 12, 0.2);
+  background: rgba(4, 7, 12, 0.6);
 }
 
 .start-screen {

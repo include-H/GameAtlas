@@ -313,7 +313,8 @@ onUnmounted(() => {
   cursor: pointer;
   background: var(--metro-tile-color, #2980b9);
   color: #fff;
-  font-family: 'LXGW WenKai GB Screen', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  /* 跟随全局自定义字体（--font-family-base），不硬编码字体栈 */
+  font-family: var(--font-family-base);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
   transition: transform 150ms ease, box-shadow 150ms ease;
 }

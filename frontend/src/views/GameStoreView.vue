@@ -204,7 +204,8 @@ onUnmounted(() => {
   background: #17110d;
   user-select: none;
   -webkit-user-select: none;
-  font-family: 'LXGW WenKai GB Screen', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  /* 跟随全局自定义字体（--font-family-base），不硬编码字体栈 */
+  font-family: var(--font-family-base);
 }
 
 /* ---------- 场景透视 ---------- */
