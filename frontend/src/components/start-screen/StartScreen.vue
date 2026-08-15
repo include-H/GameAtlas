@@ -421,6 +421,34 @@ let pendingDrag: { gameId: number; fromIndex: number } | null = null
 let dragStart: { x: number; y: number } | null = null
 let edgeScrollFrame: number | null = null
 
+// 长按进入拖拽：按住不动超过该时长即"拿起"磁贴（无需先移动 6px）。
+const PRESS_DRAG_DELAY = 500
+let pressTimer: number | null = null
+// 长按进入后松手会冒泡 click（MetroTile 的 select 等），需要一次性拦截。
+let suppressClick = false
+
+const beginTileDrag = () => {
+  if (!pendingDrag) return
+  if (dragState.value) return
+  const fromTile = props.tiles[pendingDrag.fromIndex]
+  dragState.value = {
+    gameId: pendingDrag.gameId,
+    fromIndex: pendingDrag.fromIndex,
+    targetColumnIndex: fromTile?.column_index ?? 0,
+    targetRow: fromTile?.grid_row ?? 0,
+    targetCol: fromTile?.grid_col ?? 0,
+  }
+  dragPointer.value = dragStart ? { x: dragStart.x, y: dragStart.y } : null
+  suppressClick = true
+}
+
+const clearPressTimer = () => {
+  if (pressTimer !== null) {
+    clearTimeout(pressTimer)
+    pressTimer = null
+  }
+}
+
 // 列落点：targetIndex 为指针所在列（换位目标），length 表示末尾区。
 const isColumnInsertionBefore = (groupIndex: number) =>
   columnDrag.value !== null && columnDrag.value.targetIndex === groupIndex
@@ -913,6 +941,10 @@ const onTilePointerDown = (index: number, event: PointerEvent) => {
   if ((event.target as HTMLElement).closest('.metro-tile__action')) return
   pendingDrag = { gameId: tile.game_id, fromIndex: index }
   dragStart = { x: event.clientX, y: event.clientY }
+  pressTimer = window.setTimeout(() => {
+    pressTimer = null
+    beginTileDrag()
+  }, PRESS_DRAG_DELAY)
   window.addEventListener('pointermove', onWindowPointerMove)
   window.addEventListener('pointerup', onWindowPointerUp)
   window.addEventListener('pointercancel', onWindowPointerCancel)
@@ -949,15 +981,9 @@ const onWindowPointerMove = (event: PointerEvent) => {
   if (!dragState.value && Math.hypot(event.clientX - dragStart.x, event.clientY - dragStart.y) < 6) {
     return
   }
+  clearPressTimer()
   if (!dragState.value) {
-    const fromTile = props.tiles[pendingDrag.fromIndex]
-    dragState.value = {
-      gameId: pendingDrag.gameId,
-      fromIndex: pendingDrag.fromIndex,
-      targetColumnIndex: fromTile?.column_index ?? 0,
-      targetRow: fromTile?.grid_row ?? 0,
-      targetCol: fromTile?.grid_col ?? 0,
-    }
+    beginTileDrag()
   }
   dragPointer.value = { x: event.clientX, y: event.clientY }
   updateDragTarget(event.clientX, event.clientY)
@@ -1043,6 +1069,19 @@ const updateEdgeScroll = (x: number) => {
 }
 
 const onWindowPointerUp = () => {
+  clearPressTimer()
+  if (suppressClick) {
+    suppressClick = false
+    // 长按拿起后松手，原磁贴上的 click（MetroTile select 等）不应触发
+    window.addEventListener(
+      'click',
+      (event) => {
+        event.stopPropagation()
+        event.preventDefault()
+      },
+      { capture: true, once: true },
+    )
+  }
   if (columnDrag.value) {
     const from = columnDrag.value.fromIndex
     // 换位语义：目标索引 = 指针所在列；末尾空白区 = 与最后一列换位。
@@ -1070,6 +1109,8 @@ const onWindowPointerCancel = () => {
 }
 
 const endDrag = () => {
+  clearPressTimer()
+  suppressClick = false
   dragState.value = null
   dragPointer.value = null
   columnDrag.value = null
