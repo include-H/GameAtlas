@@ -37,6 +37,7 @@
       @logo-drop="(key) => emit('logo-drop', key)"
       @logo-drag-end="emit('logo-drag-end')"
       @video-file-change="emit('video-file-change', $event)"
+      @select-poster="emit('select-poster', $event)"
       @video-drag-start="emit('video-drag-start', $event)"
       @video-drag-enter="emit('video-drag-enter', $event)"
       @video-drop="emit('video-drop', $event)"
@@ -349,6 +350,7 @@ const emit = defineEmits<{
   'logo-drop': [key: string]
   'logo-drag-end': []
   'video-file-change': [event: Event]
+  'select-poster': [video: unknown]
   'video-drag-start': [key: string]
   'video-drag-enter': [key: string]
   'video-drop': [key: string]

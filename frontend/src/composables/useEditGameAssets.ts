@@ -1,4 +1,4 @@
-import { type Ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import type {
   EditGameEditableBanner,
   EditGameEditableCover,
@@ -223,6 +223,42 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     options.isUploadingVideo.value = false
   }
 
+  // ---------- 预告片封面帧重选 ----------
+  const showVideoPosterPicker = ref(false)
+  const videoPosterTarget = ref<EditGameEditableVideo | null>(null)
+
+  const openVideoPosterPicker = (video: EditGameEditableVideo) => {
+    videoPosterTarget.value = video
+    showVideoPosterPicker.value = true
+  }
+
+  const closeVideoPosterPicker = () => {
+    showVideoPosterPicker.value = false
+    videoPosterTarget.value = null
+  }
+
+  const handleVideoPosterConfirm = async (blob: Blob) => {
+    const video = videoPosterTarget.value
+    const gameId = options.gameId.value
+    if (!video || !gameId) return
+    try {
+      const poster = await uploadAsset(
+        'poster',
+        gameId,
+        new File([blob], `poster-${Date.now()}.jpg`, { type: 'image/jpeg' }),
+      )
+      video.poster_path = poster.path
+      // 已有视频（有 id）重选封面后随 new_assets 重新提交，后端按同 path UPSERT poster。
+      video.poster_dirty = true
+      options.addAlert('封面帧已更新', 'success')
+      await options.onAssetPersisted?.()
+    } catch (error) {
+      options.addAlert('封面帧更新失败：' + getHttpErrorMessage(error), 'error')
+    } finally {
+      closeVideoPosterPicker()
+    }
+  }
+
   return {
     handleCoverUploadSuccess,
     handleCoverUploadError,
@@ -240,5 +276,10 @@ export const useEditGameAssets = (options: UseEditGameAssetsOptions) => {
     removePreviewVideo,
     handleLogoPositionChange,
     resetVideoUploadState,
+    showVideoPosterPicker,
+    videoPosterTarget,
+    openVideoPosterPicker,
+    closeVideoPosterPicker,
+    handleVideoPosterConfirm,
   }
 }

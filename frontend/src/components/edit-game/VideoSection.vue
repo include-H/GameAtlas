@@ -83,6 +83,14 @@
         <div v-else class="media-thumb--video__placeholder">
           <icon-video-camera />
         </div>
+        <button
+          type="button"
+          class="media-thumb--video__poster-action app-text-action-btn"
+          :title="video.poster_path ? '重选封面帧' : '选择封面帧'"
+          @click.stop="emit('select-poster', video)"
+        >
+          <icon-image />
+        </button>
       </media-image-thumb>
     </div>
   </media-card-frame>
@@ -90,7 +98,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { IconUpload, IconVideoCamera } from '@arco-design/web-vue/es/icon'
+import { IconImage, IconUpload, IconVideoCamera } from '@arco-design/web-vue/es/icon'
 import { useGridAutoScroll } from '@/composables/useGridAutoScroll'
 import MediaCardFrame from './MediaCardFrame.vue'
 import MediaEmptyState from './MediaEmptyState.vue'
@@ -118,6 +126,7 @@ const emit = defineEmits<{
   'video-drop': [key: string]
   'video-drag-end': []
   'remove-video': [assetUid?: string]
+  'select-poster': [video: EditableVideo]
 }>()
 
 const countText = props.previewVideos.length > 0 ? `${props.previewVideos.length} 个` : ''
@@ -227,5 +236,26 @@ const openVideoFilePicker = () => {
   color: var(--color-text-3);
   background: color-mix(in srgb, var(--app-card-surface) 90%, transparent);
   font-size: 22px;
+}
+
+.media-thumb--video__poster-action {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.media-thumb--video__poster-action:hover {
+  background: rgba(0, 0, 0, 0.8);
 }
 </style>

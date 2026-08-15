@@ -101,6 +101,7 @@ declare module 'vue' {
     StoreStage: typeof import('./components/game-store/StoreStage.vue')['default']
     SummaryImportModal: typeof import('./components/edit-game/import-modals/SummaryImportModal.vue')['default']
     TileImageSelector: typeof import('./components/start-screen/TileImageSelector.vue')['default']
+    VideoPosterPicker: typeof import('./components/edit-game/VideoPosterPicker.vue')['default']
     VideoSection: typeof import('./components/edit-game/VideoSection.vue')['default']
     WikiEditor: typeof import('./components/WikiEditor.vue')['default']
     WikiToc: typeof import('./components/WikiToc.vue')['default']

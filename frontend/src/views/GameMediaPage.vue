@@ -153,6 +153,7 @@
           @logo-drop="handleLogoDrop"
           @logo-drag-end="handleLogoDragEnd"
           @video-file-change="handleVideoFileChange"
+          @select-poster="openVideoPosterPicker"
           @video-drag-start="handleVideoDragStart"
           @video-drag-enter="handleVideoDragEnter"
           @video-drop="handleVideoDrop"
@@ -244,6 +245,12 @@
       </template>
     </main>
 
+    <video-poster-picker
+      :visible="showVideoPosterPicker"
+      :video="videoPosterTarget"
+      @confirm="handleVideoPosterConfirm"
+      @cancel="closeVideoPosterPicker"
+    />
   </div>
 </template>
 
@@ -256,6 +263,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { useEditGameModal } from '@/composables/useEditGameModal'
 import MediaManagementPanel from '@/components/edit-game/MediaManagementPanel.vue'
+import VideoPosterPicker from '@/components/edit-game/VideoPosterPicker.vue'
 import type { AdminGameDetail } from '@/services/types'
 import {
   getAmbientBackgroundPoolFromGameDetail,
@@ -375,6 +383,11 @@ const {
   handleSubmit,
   handleSummarySearchClear,
   handleVideoFileChange,
+  showVideoPosterPicker,
+  videoPosterTarget,
+  openVideoPosterPicker,
+  closeVideoPosterPicker,
+  handleVideoPosterConfirm,
   invertSelectionBanners,
   invertSelectionCovers,
   invertSelectionLogos,

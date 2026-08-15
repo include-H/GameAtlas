@@ -273,6 +273,7 @@
       :dragged-video-key="draggedVideoKey"
       :drag-over-video-key="dragOverVideoKey"
       @video-file-change="(event) => emit('video-file-change', event)"
+      @select-poster="(video) => emit('select-poster', video)"
       @video-drag-start="(key) => emit('video-drag-start', key)"
       @video-drag-enter="(key) => emit('video-drag-enter', key)"
       @video-drop="(key) => emit('video-drop', key)"
@@ -342,6 +343,7 @@ const emit = defineEmits<{
   'logo-drop': [key: string]
   'logo-drag-end': []
   'video-file-change': [event: Event]
+  'select-poster': [video: unknown]
   'video-drag-start': [key: string]
   'video-drag-enter': [key: string]
   'video-drop': [key: string]
