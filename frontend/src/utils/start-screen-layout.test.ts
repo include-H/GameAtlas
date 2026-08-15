@@ -116,6 +116,23 @@ describe('packStartScreenTiles', () => {
     expect(normalized[1]).toMatchObject({ column_index: 0, grid_row: 0, grid_col: 4 })
   })
 
+  it('compresses empty rows: 1 2 空 3 4 空空 5 重映射为连续行带', () => {
+    // row0:1,2  row2:3,4  row5:5（row4 空带被压缩；2x2 磁贴行带间距保留）
+    const normalized = normalizeStartScreenTiles([
+      makeTile(1, 'small', { column_index: 0, grid_row: 0, grid_col: 0 }),
+      makeTile(2, 'small', { column_index: 0, grid_row: 0, grid_col: 2 }),
+      makeTile(3, 'small', { column_index: 0, grid_row: 2, grid_col: 0 }),
+      makeTile(4, 'small', { column_index: 0, grid_row: 2, grid_col: 2 }),
+      makeTile(5, 'small', { column_index: 0, grid_row: 5, grid_col: 0 }),
+    ])
+
+    expect(normalized.find((t) => t.game_id === 1)).toMatchObject({ grid_row: 0, grid_col: 0 })
+    expect(normalized.find((t) => t.game_id === 2)).toMatchObject({ grid_row: 0, grid_col: 2 })
+    expect(normalized.find((t) => t.game_id === 3)).toMatchObject({ grid_row: 2, grid_col: 0 })
+    expect(normalized.find((t) => t.game_id === 4)).toMatchObject({ grid_row: 2, grid_col: 2 })
+    expect(normalized.find((t) => t.game_id === 5)).toMatchObject({ grid_row: 4, grid_col: 0 })
+  })
+
   it('keeps explicit empty groups in the layout', () => {
     const groups = layoutStartScreenTiles([
       makeTile(1, 'small', { column_index: 2, grid_row: 1, grid_col: 1 }),
@@ -125,7 +142,7 @@ describe('packStartScreenTiles', () => {
     expect(groups[0]?.slots).toEqual([])
     expect(groups[1]?.slots).toEqual([])
     expect(groups[2]?.slots[0]).toMatchObject({
-      row: 1,
+      row: 0, // 空行压缩：组内单磁贴 row1 → row0
       col: 1,
       tile: expect.objectContaining({ game_id: 1 }),
     })

@@ -345,7 +345,8 @@ describe('useStartScreen', () => {
     await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
     await screen.startEdit()
     screen.applyTilePlacement(1, 2, 3, 0)
-    expect(screen.tiles.value[0]).toMatchObject({ column_index: 2, grid_row: 3, grid_col: 0 })
+    // 空行压缩：空列唯一磁贴的 row3 被压缩到 row0
+    expect(screen.tiles.value[0]).toMatchObject({ column_index: 2, grid_row: 0, grid_col: 0 })
     await screen.saveEdit()
 
     expect(saveTiles).toHaveBeenCalledWith({
@@ -358,7 +359,7 @@ describe('useStartScreen', () => {
         focus_y: 50,
         flip_images: null,
         column_index: 2,
-        grid_row: 3,
+        grid_row: 0,
         grid_col: 0,
       }],
     })

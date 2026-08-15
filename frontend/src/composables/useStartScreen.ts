@@ -273,7 +273,10 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
   }
 
   const removeTile = (gameId: number) => {
-    tiles.value = tiles.value.filter((tile) => tile.game_id !== gameId)
+    // normalize 同时压缩空行：删除后中间不留洞
+    tiles.value = normalizeStartScreenTiles(
+      tiles.value.filter((tile) => tile.game_id !== gameId),
+    )
   }
 
   // 选择器确认：主图 + 焦点 + 宽磁贴轮播追加帧（首帧即主图，追加帧 ≤ 3）。

@@ -158,6 +158,7 @@ export function packStartScreenTiles(tiles: StartScreenTile[]): PackedStartScree
 /**
  * 显式坐标纠正为不重叠、不越界（组高 12 行）的布局：组内就近找空位；
  * 组内放不下（含被顶出底部）的磁贴迁移到右侧组顶部继续放置（链式）。
+ * 同时压缩空行：组内磁贴按行号重映射（跳过完全空的行），布局无洞。
  */
 export function normalizeStartScreenTiles(tiles: StartScreenTile[]): StartScreenTile[] {
   const normalized = tiles.map((tile) => ({
@@ -188,6 +189,21 @@ export function normalizeStartScreenTiles(tiles: StartScreenTile[]): StartScreen
         a.sort_order - b.sort_order ||
         a.game_id - b.game_id,
     )
+    // 空行压缩：按"占用行集合"（含磁贴内部行）重映射为连续行带——
+    // 2x2 磁贴占 2 行，按起始行压缩会让相邻磁贴重叠；按占用行压缩
+    // 保留磁贴间的最小行距，只去掉完全空的行。
+    const occupiedRows = new Set<number>()
+    for (const tile of groupTiles) {
+      const span = START_SCREEN_TILE_SPANS[tile.tile_size]
+      for (let r = tile.grid_row; r < tile.grid_row + span.rows; r += 1) {
+        occupiedRows.add(r)
+      }
+    }
+    const sortedRows = [...occupiedRows].sort((a, b) => a - b)
+    const rowMap = new Map(sortedRows.map((row, index) => [row, index]))
+    for (const tile of groupTiles) {
+      tile.grid_row = rowMap.get(tile.grid_row) ?? 0
+    }
     const occupied = createOccupancy()
     const overflow: StartScreenTile[] = []
     for (const tile of groupTiles) {
