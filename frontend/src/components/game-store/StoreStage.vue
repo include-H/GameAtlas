@@ -7,7 +7,7 @@
       <img
         v-if="posters[0]"
         class="store-poster__img"
-        :src="posters[0]"
+        :src="posterSrc(0)"
         alt="新到货"
       >
     </div>
@@ -15,7 +15,7 @@
       <img
         v-if="posters[1]"
         class="store-poster__img"
-        :src="posters[1]"
+        :src="posterSrc(1)"
         alt="畅销榜"
       >
     </div>
@@ -47,9 +47,14 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+import { withAssetWidth } from '@/utils/asset-url'
+
+const props = defineProps<{
   posters: string[]
 }>()
+
+// 舞台海报按 1280 设计宽展示：请求 1280 宽 WebP 变体，避免 1920×1080 原图全量传输。
+const posterSrc = (index: number) => withAssetWidth(props.posters[index], 1280)
 </script>
 
 <style scoped>

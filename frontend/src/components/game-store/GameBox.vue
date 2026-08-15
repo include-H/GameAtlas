@@ -14,7 +14,7 @@
   >
     <img
       class="game-box__cover"
-      :src="cell.game.coverUrl"
+      :src="boxCoverSrc"
       :alt="cell.game.title"
       draggable="false"
     >
@@ -24,6 +24,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { withAssetWidth } from '@/utils/asset-url'
 import { boxStyle, type ShelfCell } from '@/composables/useShelfLayout'
 
 const props = defineProps<{
@@ -39,6 +40,10 @@ const emit = defineEmits<{
 }>()
 
 const style = computed(() => boxStyle(props.cell))
+
+// 货架盒子显示尺寸很小：请求 320 宽 WebP 变体，避免 20 张 600×900 原图
+// 在低带宽下逐张传输卡顿；开盒大图仍用原图（GameInspect 直接用 coverUrl）。
+const boxCoverSrc = computed(() => withAssetWidth(props.cell.game.coverUrl, 320))
 
 const onClick = (event: MouseEvent) => {
   emit('pick', props.cell.game, event)
