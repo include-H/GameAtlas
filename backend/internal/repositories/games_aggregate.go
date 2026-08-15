@@ -354,7 +354,9 @@ func (r *GamesRepository) diffAndDeleteAssetsTx(tx *sqlx.Tx, gameID int64, asset
 }
 
 // ensureAssetsExistTx inserts DB rows for new assets that don't exist yet.
-// It matches by asset_uid — if a row with that UID already exists for this game, it's skipped.
+// It matches by (game_id, asset_type, path) — existing rows are skipped, except
+// videos: a re-submitted video row with a new poster_path updates the poster
+// (预告片封面重选：同 path 的已有视频行在聚合更新中刷新封面帧)。
 func (r *GamesRepository) ensureAssetsExistTx(tx *sqlx.Tx, gameID int64, newAssets []domain.NewAssetEntry) error {
 	for _, asset := range newAssets {
 		trimmedUID := strings.TrimSpace(asset.AssetUID)
@@ -372,8 +374,11 @@ func (r *GamesRepository) ensureAssetsExistTx(tx *sqlx.Tx, gameID int64, newAsse
 			}
 		}
 		if _, err := tx.Exec(`
-			INSERT OR IGNORE INTO game_assets (game_id, asset_uid, asset_type, path, poster_path, sort_order)
+			INSERT INTO game_assets (game_id, asset_uid, asset_type, path, poster_path, sort_order)
 			VALUES (?, ?, ?, ?, ?, 0)
+			ON CONFLICT(game_id, asset_type, path) DO UPDATE SET
+				poster_path = excluded.poster_path
+			WHERE game_assets.asset_type = 'video' AND excluded.poster_path IS NOT NULL
 		`, gameID, trimmedUID, trimmedType, trimmedPath, posterPath); err != nil {
 			return fmt.Errorf("insert new %s asset %s: %w", trimmedType, trimmedUID, err)
 		}

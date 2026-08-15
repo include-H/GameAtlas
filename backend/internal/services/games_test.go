@@ -1045,6 +1045,39 @@ func TestGamesServiceUpdateAggregatePersistsVideoPosterPath(t *testing.T) {
 	if len(videos) != 1 || videos[0].PosterPath == nil || *videos[0].PosterPath != posterPath {
 		t.Fatalf("PosterPath after second update = %v, want %q unchanged", videos[0].PosterPath, posterPath)
 	}
+
+	// 第三次更新：同 path 的视频带新 poster_path 重选封面，应更新已有行。
+	newPosterPath := "/assets/aggregate-video-poster/poster-2.jpg"
+	newStagingPoster := filepath.Join(assetsDir, "_staging", "aggregate-video-poster", "poster-2.jpg")
+	if err := os.WriteFile(newStagingPoster, []byte("poster-2"), 0o644); err != nil {
+		t.Fatalf("WriteFile new staging poster returned error: %v", err)
+	}
+	_, _, err = service.Update(gameID, domain.GameAggregateUpdateInput{
+		Game: domain.GameAggregateCoreUpdateInput{
+			GameCoreInput: domain.GameCoreInput{Title: "Video Poster", Visibility: domain.GameVisibilityPublic},
+		},
+		Assets: domain.GameAggregateAssetsInput{
+			VideoOrderAssetUIDs: []string{"video-1"},
+			NewAssets: []domain.NewAssetEntry{
+				{
+					AssetUID:   "video-1",
+					AssetType:  "video",
+					Path:       "/assets/aggregate-video-poster/video.mp4",
+					PosterPath: &newPosterPath,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("third UpdateAggregate returned error: %v", err)
+	}
+	videos = listServicesVideos(t, db, gameID)
+	if len(videos) != 1 || videos[0].PosterPath == nil || *videos[0].PosterPath != newPosterPath {
+		t.Fatalf("PosterPath after re-select = %v, want %q", videos[0].PosterPath, newPosterPath)
+	}
+	if _, err := os.Stat(filepath.Join(assetsDir, "aggregate-video-poster", "poster-2.jpg")); err != nil {
+		t.Fatalf("re-selected poster should exist in permanent dir, got err=%v", err)
+	}
 }
 
 func TestGamesServiceUpdateAggregateCleansMovedAssetsWhenDatabaseUpdateFails(t *testing.T) {
