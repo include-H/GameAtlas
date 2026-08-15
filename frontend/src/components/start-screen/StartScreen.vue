@@ -1074,11 +1074,10 @@ const setDragTarget = (columnIndex: number, row: number, col: number) => {
 const pointInRect = (x: number, y: number, rect: DOMRect) =>
   x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
 
-// 网格单元换算步长：--start-cell 是 clamp() 表达式，getComputedStyle 只会返回未求值的
+// 网格单元换算步长与间隙：--start-cell 是 clamp() 表达式，getComputedStyle 只会返回未求值的
 // token 串（parseFloat 得 NaN），不能作为单元尺寸来源；组宽随磁贴占用收缩，
 // 列数从内联的 --start-group-cols（纯数字）读取，按 像素宽 = cols×cell + (cols-1)×gap 反推。
-// gap 取已解析的标准 gap 属性。
-const readGridStep = (grid: HTMLElement, rect: DOMRect): number | null => {
+const readGridMetrics = (grid: HTMLElement, rect: DOMRect): { step: number; gap: number } | null => {
   if (rect.width <= 0 || rect.height <= 0) return null
   const computed = getComputedStyle(grid)
   const gapValue = parseFloat(computed.gap)
@@ -1087,7 +1086,20 @@ const readGridStep = (grid: HTMLElement, rect: DOMRect): number | null => {
   const cols = Number.isFinite(colsValue) && colsValue > 0 ? colsValue : START_SCREEN_FREE_COLS
   const cell = (rect.width - gap * (cols - 1)) / cols
   if (!Number.isFinite(cell) || cell <= 0) return null
-  return cell + gap
+  return { step: cell + gap, gap }
+}
+
+// ghost 以指针为中心悬浮（CSS translate(-50%,-50%)），落点换算必须以磁贴顶左为准：
+// 指针坐标减去磁贴像素半宽/半高（磁贴宽 = span.cols×step - gap），松手后磁贴中心
+// 落在指针所在格附近，所见即所得——否则大磁贴会比 ghost 偏右下半个磁贴。
+const adjustForDragCenter = (x: number, y: number, step: number, gap: number): { x: number; y: number } => {
+  const tile = draggedTile.value
+  if (!tile) return { x, y }
+  const span = TILE_SPANS[tile.tile_size]
+  return {
+    x: x - (span.cols * step - gap) / 2,
+    y: y - (span.rows * step - gap) / 2,
+  }
 }
 
 // 落点 = 网格几何换算：指针坐标 → (row, col)，不依赖 DOM 元素命中——
@@ -1106,10 +1118,14 @@ const updateDragTarget = (x: number, y: number) => {
     const rawColumn = group?.dataset.columnIndex
     const columnIndex = Number(rawColumn)
     if (!Number.isInteger(columnIndex) || columnIndex < 0) continue
-    const step = readGridStep(grid, rect)
-    if (step === null) continue
-    const col = Math.min(START_SCREEN_FREE_COLS - 1, Math.max(0, Math.floor((x - rect.left) / step)))
-    const row = Math.max(0, Math.floor((y - rect.top) / step))
+    const metrics = readGridMetrics(grid, rect)
+    if (metrics === null) continue
+    const aim = adjustForDragCenter(x, y, metrics.step, metrics.gap)
+    // 磁贴顶左钳在网格范围内（靠近边界时贴边放置，不落到网格外）
+    const aimX = Math.min(rect.right, Math.max(rect.left, aim.x))
+    const aimY = Math.min(rect.bottom, Math.max(rect.top, aim.y))
+    const col = Math.min(START_SCREEN_FREE_COLS - 1, Math.max(0, Math.floor((aimX - rect.left) / metrics.step)))
+    const row = Math.max(0, Math.floor((aimY - rect.top) / metrics.step))
     setDragTarget(columnIndex, row, col)
     return
   }
@@ -1143,15 +1159,16 @@ const updateDragTarget = (x: number, y: number) => {
     }
   }
   if (!nearest) return
-  const clampedX = Math.min(nearest.rect.right, Math.max(nearest.rect.left, x))
-  const clampedY = Math.min(nearest.rect.bottom, Math.max(nearest.rect.top, y))
-  const step = readGridStep(nearest.grid, nearest.rect)
-  if (step === null) return
+  const metrics = readGridMetrics(nearest.grid, nearest.rect)
+  if (metrics === null) return
+  const aim = adjustForDragCenter(x, y, metrics.step, metrics.gap)
+  const clampedX = Math.min(nearest.rect.right, Math.max(nearest.rect.left, aim.x))
+  const clampedY = Math.min(nearest.rect.bottom, Math.max(nearest.rect.top, aim.y))
   const group = nearest.grid.closest<HTMLElement>('.start-screen__group')
   const columnIndex = Number(group?.dataset.columnIndex)
   if (!Number.isInteger(columnIndex) || columnIndex < 0) return
-  const col = Math.min(START_SCREEN_FREE_COLS - 1, Math.max(0, Math.floor((clampedX - nearest.rect.left) / step)))
-  const row = Math.max(0, Math.floor((clampedY - nearest.rect.top) / step))
+  const col = Math.min(START_SCREEN_FREE_COLS - 1, Math.max(0, Math.floor((clampedX - nearest.rect.left) / metrics.step)))
+  const row = Math.max(0, Math.floor((clampedY - nearest.rect.top) / metrics.step))
   setDragTarget(columnIndex, row, col)
 }
 
