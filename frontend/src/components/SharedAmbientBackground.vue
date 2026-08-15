@@ -38,10 +38,15 @@ const route = useRoute()
 const uiStore = useUiStore()
 const { ambientBackgroundSource, sharedBackgroundAvailability } = storeToRefs(uiStore)
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   /** 浮层场景（如开始屏幕）需要背景时强制启用，不受路由白名单限制 */
   forceEnabled?: boolean
-}>()
+  /** 背景源：'page' 吃页面设置的专属池（详情页等）；'global' 只吃自定义背景/全局池 */
+  sourceMode?: 'page' | 'global'
+}>(), {
+  forceEnabled: false,
+  sourceMode: 'page',
+})
 
 const SUPPORTED_ROUTE_NAMES = new Set([
   'login',
@@ -194,7 +199,9 @@ const pickFromAmbientBackgroundPool = async (pool: AmbientBackgroundPool, curren
 const loadBackground = async () => {
   const currentUrl = layerUrls.value[activeLayerIndex.value] || ''
   const sourcePool = ambientBackgroundSource.value?.pool
-  if (sourcePool && hasAmbientBackgroundPoolImages(sourcePool)) {
+  // 浮层（开始屏幕）用 sourceMode='global'：忽略页面专属背景池，
+  // 只吃自定义背景或全局池，避免从详情页打开时继承该游戏的背景。
+  if (props.sourceMode === 'page' && sourcePool && hasAmbientBackgroundPoolImages(sourcePool)) {
     const sourceUrl = await pickFromAmbientBackgroundPool(sourcePool, currentUrl)
     if (sourceUrl) {
       return sourceUrl
@@ -265,6 +272,7 @@ const applyBackground = async () => {
 watch(
   [
     isEnabled,
+    () => props.sourceMode,
     () => route.name,
     () => ambientBackgroundSource.value?.key || '',
     () => [

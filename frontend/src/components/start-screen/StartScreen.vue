@@ -9,7 +9,7 @@
         tabindex="-1"
         @keydown.esc="handleClose"
       >
-        <shared-ambient-background force-enabled />
+        <shared-ambient-background force-enabled source-mode="global" />
         <div class="start-screen-scrim" @click="handleClose" />
 
         <div class="start-screen" @wheel.passive="handleWheel" @click.self="handleClose">
@@ -1272,9 +1272,9 @@ onUnmounted(() => {
 .start-screen-scrim {
   position: absolute;
   inset: 0;
-  /* 半透明遮罩：让开始屏幕透出当前全局背景（自定义 bg / 环境背景池），同时保证文字可读。
-     背景本身已模糊（SharedAmbientBackground 静态 blur），无需 backdrop-filter */
-  background: rgba(8, 10, 16, 0.46);
+  /* 极透暗色玻璃：全局背景几乎完全透出（10%），文字可读性由磁贴自身
+     阴影/暗色渐变兜底；背景本身已模糊（SharedAmbientBackground 静态 blur） */
+  background: rgba(5, 8, 14, 0.1);
 }
 
 .start-screen {
