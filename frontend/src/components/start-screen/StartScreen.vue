@@ -407,23 +407,18 @@ const visibleGroups = computed(() => {
   return groups
 })
 const tileSpan = (size: StartScreenTileSize) => TILE_SPANS[size]
-// EntranceThemeTransition 复刻：磁贴从其最终位置右下方约 10px 处上浮 + 淡入到原位，
-// 位移克制（10px 量级，无大滑入无缩放）。错峰：组间重叠启动（下一组在第一组播到
-// 约 1/3 时开始），组内磁贴轻微级联（40ms），整体呈现"一组一块逐组收拢"的层次。
-const groupEnterDelay = (groupIndex: number) => `${groupIndex * 110}ms`
-const tileEnterDelay = (groupIndex: number, slotIndex: number) => {
-  const delay = groupIndex * 110 + slotIndex * 40
-  return `${delay}ms`
-}
+// EntranceThemeTransition 复刻（Win8 按列入场）：磁贴从其最终位置右下方约 10px 处
+// 上浮 + 淡入到原位，位移克制（10px 量级，无大滑入无缩放）。同一列的磁贴整块
+// 同时启动，列与列从左到右错峰（120ms），列标题随本列一起进。
+const groupEnterDelay = (groupIndex: number) => `${groupIndex * 120}ms`
+const tileEnterDelay = (groupIndex: number, _slotIndex: number) => groupEnterDelay(groupIndex)
 const totalTiles = computed(() =>
   visibleGroups.value.reduce((count, group) => count + group.slots.length, 0),
 )
-// 退场波浪反向收拢：后进先出的磁贴先飞出。
-const tileLeaveDelay = (groupIndex: number, slotIndex: number) => {
+// 退场反向收拢：列从右到左整列飞出，同列同时退。
+const tileLeaveDelay = (groupIndex: number, _slotIndex: number) => {
   const maxGroup = visibleGroups.value.length - 1
-  const maxSlot = (visibleGroups.value[groupIndex]?.slots.length ?? 1) - 1
-  const delay = (maxGroup - groupIndex) * 110 + Math.max(maxSlot - slotIndex, 0) * 40
-  return `${delay}ms`
+  return `${(maxGroup - groupIndex) * 120}ms`
 }
 const groupMaxRow = (group: PackedStartScreenGroup) =>
   group.slots.reduce(
@@ -1020,7 +1015,8 @@ const scheduleEntrance = () => {
   })
 }
 
-// 入场动画（WAAPI）：Win8 克制上浮 + 淡入，磁贴/标题按各自 --start-tile-enter-delay 错峰
+// 入场动画（WAAPI）：Win8 克制上浮 + 淡入，整列同时动、列与列按
+// --start-tile-enter-delay 错峰（同列磁贴与列标题共享同一延迟）
 const playEntrance = () => {
   const wrapper = wrapperRef.value
   if (!wrapper || prefersReducedMotion()) return
