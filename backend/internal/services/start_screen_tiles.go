@@ -1,9 +1,6 @@
 package services
 
 import (
-	"errors"
-	"mime/multipart"
-	"os"
 	"strings"
 
 	"github.com/hao/game/internal/domain"
@@ -57,48 +54,10 @@ func (s *StartScreenTilesService) Update(
 		return nil, err
 	}
 	normalizedColumns = ensureStartScreenColumns(normalizedColumns, normalized)
-	movedPaths := make([]string, 0)
-	for i := range normalized {
-		moved, err := s.moveTileImagesToPermanent(&normalized[i])
-		movedPaths = append(movedPaths, moved...)
-		if err != nil {
-			return nil, errors.Join(err, s.cleanupMovedTileImages(movedPaths))
-		}
-	}
 	if err := s.tilesRepo.ReplaceLayout(normalizedColumns, normalized); err != nil {
-		return nil, errors.Join(err, s.cleanupMovedTileImages(movedPaths))
+		return nil, err
 	}
 	return s.List(true)
-}
-
-// moveTileImagesToPermanent 与游戏素材编辑一致：上传只进 staging，保存布局时才把
-// 本次引用的裁剪图转正到 assets/start-screen/，未保存的裁剪图留在 staging 由启动清理兜底。
-func (s *StartScreenTilesService) moveTileImagesToPermanent(tile *domain.StartScreenTileWrite) ([]string, error) {
-	movedPaths := make([]string, 0, 3)
-	for _, path := range []*string{tile.ImageSmallPath, tile.ImageWidePath, tile.ImageLargePath} {
-		if path == nil || strings.TrimSpace(*path) == "" {
-			continue
-		}
-		permanentPath, moved, err := s.store.MoveToPermanentWithStatus(*path, "start-screen")
-		if err != nil {
-			return movedPaths, err
-		}
-		*path = permanentPath
-		if moved {
-			movedPaths = append(movedPaths, permanentPath)
-		}
-	}
-	return movedPaths, nil
-}
-
-func (s *StartScreenTilesService) cleanupMovedTileImages(paths []string) error {
-	var cleanupErr error
-	for _, path := range paths {
-		if err := s.store.DeleteAsset(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-			cleanupErr = errors.Join(cleanupErr, err)
-		}
-	}
-	return cleanupErr
 }
 
 // AddTile 从游戏库卡片入口追加一个磁贴到当前布局的第一个空位；已在开始屏幕时幂等返回当前布局。
@@ -126,6 +85,26 @@ func (s *StartScreenTilesService) AddTile(tile domain.StartScreenTileWrite) (*do
 	normalized[0].ColumnIndex = position.columnIndex
 	normalized[0].GridRow = position.gridRow
 	normalized[0].GridCol = position.gridCol
+	// 未指定图片时默认用游戏首张截图（高分辨率内容图），没有截图则用封面，
+	// 两者都没有则保持空图（显示首字母色块）。
+	if normalized[0].ImagePath == nil {
+		game, err := s.gamesRepo.GetByID(normalized[0].GameID)
+		if err != nil {
+			return nil, normalizeRepoError(err)
+		}
+		screenshot, err := s.gamesRepo.FirstScreenshotPath(normalized[0].GameID)
+		if err != nil {
+			return nil, err
+		}
+		if trimmed := strings.TrimSpace(screenshot); trimmed != "" {
+			normalized[0].ImagePath = &trimmed
+		} else if game.CoverImage != nil {
+			cover := strings.TrimSpace(*game.CoverImage)
+			if cover != "" {
+				normalized[0].ImagePath = &cover
+			}
+		}
+	}
 	if _, err := s.tilesRepo.Append(normalized[0]); err != nil {
 		return nil, err
 	}
@@ -181,32 +160,34 @@ func (s *StartScreenTilesService) validateTiles(tiles []domain.StartScreenTileWr
 		}
 		seen[tile.GameID] = struct{}{}
 
-		if _, err := s.gamesRepo.GetByID(tile.GameID); err != nil {
+		game, err := s.gamesRepo.GetByID(tile.GameID)
+		if err != nil {
 			return nil, normalizeRepoError(err)
 		}
 
-		imageSmallPath, err := s.validateTileImagePath(tile.ImageSmallPath)
+		imagePath, err := s.validateTileImagePath(game, tile.ImagePath)
 		if err != nil {
 			return nil, err
 		}
-		imageWidePath, err := s.validateTileImagePath(tile.ImageWidePath)
-		if err != nil {
-			return nil, err
+		if tile.FocusX < 0 || tile.FocusX > 100 || tile.FocusY < 0 || tile.FocusY > 100 {
+			return nil, domain.ErrValidation
 		}
-		imageLargePath, err := s.validateTileImagePath(tile.ImageLargePath)
+
+		flipImages, err := s.validateFlipImages(game, imagePath, tile.FlipImages)
 		if err != nil {
 			return nil, err
 		}
 
 		normalized = append(normalized, domain.StartScreenTileWrite{
-			GameID:         tile.GameID,
-			TileSize:       tileSize,
-			ImageSmallPath: imageSmallPath,
-			ImageWidePath:  imageWidePath,
-			ImageLargePath: imageLargePath,
-			ColumnIndex:    tile.ColumnIndex,
-			GridRow:        tile.GridRow,
-			GridCol:        tile.GridCol,
+			GameID:      tile.GameID,
+			TileSize:    tileSize,
+			ImagePath:   imagePath,
+			FocusX:      tile.FocusX,
+			FocusY:      tile.FocusY,
+			FlipImages:  flipImages,
+			ColumnIndex: tile.ColumnIndex,
+			GridRow:     tile.GridRow,
+			GridCol:     tile.GridCol,
 		})
 	}
 	return normalized, nil
@@ -344,7 +325,9 @@ func findStartScreenFreePosition(
 	}
 }
 
-func (s *StartScreenTilesService) validateTileImagePath(path *string) (*string, error) {
+// validateTileImagePath 校验磁贴图片必须是该游戏自己的本地素材（/assets/{publicId}/…）且文件存在。
+// 只允许原图直接引用，不再上传派生裁剪图。
+func (s *StartScreenTilesService) validateTileImagePath(game *domain.Game, path *string) (*string, error) {
 	if path == nil {
 		return nil, nil
 	}
@@ -352,32 +335,55 @@ func (s *StartScreenTilesService) validateTileImagePath(path *string) (*string, 
 	if trimmed == "" {
 		return nil, nil
 	}
-	if !strings.HasPrefix(trimmed, "/assets/") {
-		return nil, domain.ErrValidation
-	}
-	if s.store == nil || !s.store.AssetExists(trimmed) {
-		return nil, domain.ErrValidation
+	if err := s.validateGameAssetPath(game, trimmed); err != nil {
+		return nil, err
 	}
 	return &trimmed, nil
 }
 
-// UploadTileImage 保存磁贴裁剪图到 staging，返回 /assets/start-screen/{uid}.{ext} 路径；
-// 文件在布局保存（Update）时才转正到 assets/start-screen/。
-func (s *StartScreenTilesService) UploadTileImage(header *multipart.FileHeader) (string, error) {
-	if s.store == nil {
-		return "", domain.ErrMissingConfig
+// validateFlipImages 校验宽磁贴轮播帧：必须是本游戏素材、去重、不与首帧重复、
+// 数量不超过 StartScreenMaxFlipImages，且依赖首帧 image_path（首帧即轮播第 0 帧）。
+func (s *StartScreenTilesService) validateFlipImages(
+	game *domain.Game,
+	imagePath *string,
+	flipImages []string,
+) ([]string, error) {
+	if len(flipImages) == 0 {
+		return nil, nil
 	}
-	src, err := header.Open()
-	if err != nil {
-		return "", err
+	if imagePath == nil {
+		return nil, domain.ErrValidation
 	}
-	defer src.Close()
+	if len(flipImages) > domain.StartScreenMaxFlipImages {
+		return nil, domain.ErrValidation
+	}
+	seen := make(map[string]struct{}, len(flipImages)+1)
+	seen[*imagePath] = struct{}{}
+	normalized := make([]string, 0, len(flipImages))
+	for _, path := range flipImages {
+		trimmed := strings.TrimSpace(path)
+		if trimmed == "" {
+			return nil, domain.ErrValidation
+		}
+		if _, dup := seen[trimmed]; dup {
+			return nil, domain.ErrValidation
+		}
+		if err := s.validateGameAssetPath(game, trimmed); err != nil {
+			return nil, err
+		}
+		seen[trimmed] = struct{}{}
+		normalized = append(normalized, trimmed)
+	}
+	return normalized, nil
+}
 
-	contentType := header.Header.Get("Content-Type")
-	assetUID := newAssetUID()
-	stagingPath, err := s.store.SaveToStaging("start-screen", "cover", assetUID, src, contentType)
-	if err != nil {
-		return "", normalizeAssetError(err)
+func (s *StartScreenTilesService) validateGameAssetPath(game *domain.Game, path string) error {
+	expectedPrefix := "/assets/" + game.PublicID + "/"
+	if !strings.HasPrefix(path, expectedPrefix) {
+		return domain.ErrValidation
 	}
-	return stagingPath, nil
+	if s.store == nil || !s.store.AssetExists(path) {
+		return domain.ErrValidation
+	}
+	return nil
 }

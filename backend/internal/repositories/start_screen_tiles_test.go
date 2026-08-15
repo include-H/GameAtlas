@@ -15,12 +15,12 @@ func TestStartScreenTilesRepositoryGetGameVisibilityByImagePath(t *testing.T) {
 
 	if _, err := db.Exec(`
 		INSERT INTO start_screen_tiles (
-			game_id, tile_size, image_small_path, image_wide_path, image_large_path,
+			game_id, tile_size, image_path, image_wide_path,
 			sort_order, column_index, grid_row, grid_col
 		)
 		VALUES
-			(?, 'small', '/assets/start-screen/public-small.png', '/assets/start-screen/public-wide.png', '/assets/start-screen/public-large.png', 0, 0, 0, 0),
-			(?, 'small', '/assets/start-screen/private-small.png', NULL, NULL, 1, 0, 0, 0)
+			(?, 'small', '/assets/start-screen/public-small.png', '/assets/start-screen/public-wide.png', 0, 0, 0, 0),
+			(?, 'small', '/assets/start-screen/private-small.png', NULL, 1, 0, 0, 0)
 	`, publicID, privateID); err != nil {
 		t.Fatalf("insert start screen tiles: %v", err)
 	}
@@ -32,7 +32,6 @@ func TestStartScreenTilesRepositoryGetGameVisibilityByImagePath(t *testing.T) {
 	}{
 		{path: "/assets/start-screen/public-small.png", want: domain.GameVisibilityPublic},
 		{path: "/assets/start-screen/public-wide.png", want: domain.GameVisibilityPublic},
-		{path: "/assets/start-screen/public-large.png", want: domain.GameVisibilityPublic},
 		{path: "/assets/start-screen/private-small.png", want: domain.GameVisibilityPrivate},
 	} {
 		got, err := repo.GetGameVisibilityByImagePath(tc.path)

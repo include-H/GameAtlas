@@ -145,7 +145,6 @@ func New(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	api.POST("/start-screen/tiles", startScreenTilesHandler.AddTile)
 	api.DELETE("/start-screen/tiles/:gameId", startScreenTilesHandler.RemoveTile)
 	api.PUT("/start-screen/tiles", startScreenTilesHandler.Update)
-	api.POST("/start-screen/tiles/image", startScreenTilesHandler.UploadImage)
 	api.GET("/steam/search", steamHandler.Search)
 	api.GET("/steam/:appId/assets", steamHandler.Preview)
 	api.GET("/steam/proxy", steamHandler.Proxy)

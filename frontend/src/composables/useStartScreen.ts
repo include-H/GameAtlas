@@ -15,7 +15,6 @@ interface UseStartScreenOptions {
   fetchTiles: () => Promise<StartScreenLayout>
   fetchFavorites: () => Promise<GameListItem[]>
   saveTiles: (input: StartScreenLayoutInput) => Promise<StartScreenLayout>
-  uploadTileImage: (file: File) => Promise<string>
   addAlert: (message: string, type: 'success' | 'warning' | 'error') => void
 }
 
@@ -24,6 +23,9 @@ const NEXT_TILE_SIZE: Record<StartScreenTileSize, StartScreenTileSize> = {
   wide: 'large',
   large: 'small',
 }
+
+// 与后端 domain.StartScreenMaxFlipImages 保持一致：轮播总帧数 = 首帧 + 追加帧 ≤ 4。
+export const START_SCREEN_MAX_FLIP_IMAGES = 3
 
 const describeSaveError = (error: unknown): string => {
   const status = getHttpStatus(error)
@@ -69,12 +71,11 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
           game_id: game.id,
           public_id: game.public_id,
           title: game.title,
-          cover_image: game.cover_image,
-          banner_image: game.banner_image,
           tile_size: 'small' as const,
-          image_small_path: null,
-          image_wide_path: null,
-          image_large_path: null,
+          image_path: game.primary_screenshot || game.cover_image,
+          focus_x: 50,
+          focus_y: 50,
+          flip_images: null,
           sort_order: index,
           column_index: 0,
           grid_row: 0,
@@ -180,9 +181,10 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
         tiles: tiles.value.map((tile) => ({
           game_id: tile.game_id,
           tile_size: tile.tile_size,
-          image_small_path: tile.image_small_path,
-          image_wide_path: tile.image_wide_path,
-          image_large_path: tile.image_large_path,
+          image_path: tile.image_path,
+          focus_x: tile.focus_x,
+          focus_y: tile.focus_y,
+          flip_images: tile.flip_images,
           column_index: tile.column_index,
           grid_row: tile.grid_row,
           grid_col: tile.grid_col,
@@ -211,22 +213,23 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     tiles.value = tiles.value.filter((tile) => tile.game_id !== gameId)
   }
 
-  const applyTileCrop = async (gameId: number, blobs: Record<StartScreenTileSize, Blob>) => {
+  // 选择器确认：主图 + 焦点 + 宽磁贴轮播追加帧（首帧即主图，追加帧 ≤ 3）。
+  const applyTileImage = (
+    gameId: number,
+    imagePath: string,
+    focusX: number,
+    focusY: number,
+    flipImages: string[] = [],
+  ) => {
     const tile = tiles.value.find((item) => item.game_id === gameId)
     if (!tile) return
-    try {
-      const [smallPath, widePath, largePath] = await Promise.all([
-        options.uploadTileImage(new File([blobs.small], 'tile-small.png', { type: 'image/png' })),
-        options.uploadTileImage(new File([blobs.wide], 'tile-wide.png', { type: 'image/png' })),
-        options.uploadTileImage(new File([blobs.large], 'tile-large.png', { type: 'image/png' })),
-      ])
-      tile.image_small_path = smallPath
-      tile.image_wide_path = widePath
-      tile.image_large_path = largePath
-      options.addAlert('磁贴图片已更新', 'success')
-    } catch (error) {
-      options.addAlert(`磁贴图片更新失败：${getHttpErrorMessage(error, '未知错误')}`, 'error')
-    }
+    tile.image_path = imagePath
+    tile.focus_x = Math.max(0, Math.min(100, Math.round(focusX)))
+    tile.focus_y = Math.max(0, Math.min(100, Math.round(focusY)))
+    tile.flip_images = Array.from(
+      new Set(flipImages.filter((path) => path !== imagePath)),
+    ).slice(0, START_SCREEN_MAX_FLIP_IMAGES)
+    options.addAlert('磁贴图片已更新', 'success')
   }
 
   return {
@@ -251,6 +254,6 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     applyTilePlacement,
     resizeTile,
     removeTile,
-    applyTileCrop,
+    applyTileImage,
   }
 }

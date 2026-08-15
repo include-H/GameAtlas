@@ -411,12 +411,11 @@ export interface StartScreenTile {
   game_id: number
   public_id: string
   title: string
-  cover_image: string | null
-  banner_image: string | null
   tile_size: StartScreenTileSize
-  image_small_path: string | null
-  image_wide_path: string | null
-  image_large_path: string | null
+  image_path: string | null
+  focus_x: number
+  focus_y: number
+  flip_images: string[] | null
   sort_order: number
   column_index: number
   grid_row: number
@@ -426,9 +425,10 @@ export interface StartScreenTile {
 export interface StartScreenTileWrite {
   game_id: number
   tile_size: StartScreenTileSize
-  image_small_path: string | null
-  image_wide_path: string | null
-  image_large_path: string | null
+  image_path: string | null
+  focus_x: number
+  focus_y: number
+  flip_images: string[] | null
   column_index: number
   grid_row: number
   grid_col: number

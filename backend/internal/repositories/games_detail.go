@@ -155,6 +155,28 @@ func (r *GamesRepository) ListVideosByPublicIDs(publicIDs []string) ([]videoAsse
 
 	return rows, nil
 }
+// FirstScreenshotPath 返回游戏按 sort_order 排序的首张截图路径；没有截图时返回空串。
+// 供开始屏幕磁贴等场景取"默认内容图"。
+func (r *GamesRepository) FirstScreenshotPath(gameID int64) (string, error) {
+	var path sql.NullString
+	if err := r.db.Get(&path, `
+		SELECT path
+		FROM game_assets
+		WHERE game_id = ? AND asset_type = 'screenshot' AND COALESCE(TRIM(path), '') != ''
+		ORDER BY sort_order ASC, id ASC
+		LIMIT 1
+	`, gameID); err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", fmt.Errorf("query first screenshot: %w", err)
+	}
+	if !path.Valid {
+		return "", nil
+	}
+	return path.String, nil
+}
+
 func (r *GamesRepository) GetSeriesMetadata(gameID int64) (*domain.MetadataItem, error) {
 	const query = `
 		SELECT s.id, s.name, s.slug, s.sort_order, s.created_at

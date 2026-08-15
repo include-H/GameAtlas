@@ -1,12 +1,7 @@
 package services
 
 import (
-	"bytes"
 	"errors"
-	"image"
-	"image/png"
-	"mime/multipart"
-	"net/textproto"
 	"os"
 	"path/filepath"
 	"strings"
@@ -159,8 +154,8 @@ func TestStartScreenTilesUpdateValidatesTileImages(t *testing.T) {
 	assetsDir := t.TempDir()
 	gameID := insertServicesTestGame(t, db, "tile-image", "Tile Image", domain.GameVisibilityPublic)
 
-	imagePath := "/assets/start-screen/11111111-1111-4111-8111-111111111111.jpg"
-	imageFile := filepath.Join(assetsDir, "start-screen", "11111111-1111-4111-8111-111111111111.jpg")
+	imagePath := "/assets/tile-image/11111111-1111-4111-8111-111111111111.jpg"
+	imageFile := filepath.Join(assetsDir, "tile-image", "11111111-1111-4111-8111-111111111111.jpg")
 	if err := os.MkdirAll(filepath.Dir(imageFile), 0o755); err != nil {
 		t.Fatalf("create tile image dir: %v", err)
 	}
@@ -175,77 +170,83 @@ func TestStartScreenTilesUpdateValidatesTileImages(t *testing.T) {
 		files.NewAssetStore(assetsDir),
 	)
 
-	invalidPath := "/assets/start-screen/missing.jpg"
+	invalidPath := "/assets/tile-image/missing.jpg"
 	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{
-		GameID:         gameID,
-		TileSize:       "small",
-		ImageSmallPath: &invalidPath,
+		GameID:    gameID,
+		TileSize:  "small",
+		ImagePath: &invalidPath,
 	}}); !errors.Is(err, domain.ErrValidation) {
 		t.Fatalf("missing image error = %v, want ErrValidation", err)
 	}
 
 	badPrefix := "/etc/passwd"
 	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{
-		GameID:         gameID,
-		TileSize:       "small",
-		ImageSmallPath: &badPrefix,
+		GameID:    gameID,
+		TileSize:  "small",
+		ImagePath: &badPrefix,
 	}}); !errors.Is(err, domain.ErrValidation) {
 		t.Fatalf("bad prefix error = %v, want ErrValidation", err)
 	}
 
+	// 引用其他游戏的素材：不属于本游戏，拒绝。
+	otherImage := "/assets/tile-other/99999999-9999-4999-8999-999999999999.jpg"
+	otherFile := filepath.Join(assetsDir, "tile-other", "99999999-9999-4999-8999-999999999999.jpg")
+	if err := os.MkdirAll(filepath.Dir(otherFile), 0o755); err != nil {
+		t.Fatalf("create other image dir: %v", err)
+	}
+	if err := os.WriteFile(otherFile, []byte("fake-image"), 0o644); err != nil {
+		t.Fatalf("write other image: %v", err)
+	}
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{
+		GameID:    gameID,
+		TileSize:  "small",
+		ImagePath: &otherImage,
+	}}); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("foreign image error = %v, want ErrValidation", err)
+	}
+
+	// 旧版裁剪图路径（/assets/start-screen/…）不是本游戏素材，必须拒绝。
+	legacyPath := "/assets/start-screen/55555555-5555-4555-8555-555555555555.jpg"
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{
+		GameID:    gameID,
+		TileSize:  "small",
+		ImagePath: &legacyPath,
+	}}); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("legacy crop path error = %v, want ErrValidation", err)
+	}
+
 	layout, err := service.Update(nil, []domain.StartScreenTileWrite{{
-		GameID:         gameID,
-		TileSize:       "small",
-		ImageSmallPath: &imagePath,
+		GameID:    gameID,
+		TileSize:  "small",
+		ImagePath: &imagePath,
+		FocusX:    35,
+		FocusY:    62,
 	}})
 	if err != nil {
 		t.Fatalf("valid image update returned error: %v", err)
 	}
-	if len(layout.Tiles) != 1 || layout.Tiles[0].ImageSmallPath == nil || *layout.Tiles[0].ImageSmallPath != imagePath {
+	if len(layout.Tiles) != 1 || layout.Tiles[0].ImagePath == nil || *layout.Tiles[0].ImagePath != imagePath {
 		t.Fatalf("tiles = %+v, want image path %q", layout.Tiles, imagePath)
 	}
-}
-
-func TestStartScreenTilesUpdateMovesStagedImagesToPermanent(t *testing.T) {
-	db := openServicesTestDB(t)
-	defer func() { _ = db.Close() }()
-
-	assetsDir := t.TempDir()
-	gameID := insertServicesTestGame(t, db, "tile-stage-move", "Tile Stage Move", domain.GameVisibilityPublic)
-
-	filename := "22222222-2222-4222-8222-222222222222.jpg"
-	stagingFile := filepath.Join(assetsDir, "_staging", "start-screen", filename)
-	if err := os.MkdirAll(filepath.Dir(stagingFile), 0o755); err != nil {
-		t.Fatalf("create staging dir: %v", err)
-	}
-	if err := os.WriteFile(stagingFile, []byte("fake-image"), 0o644); err != nil {
-		t.Fatalf("write staged image: %v", err)
+	if layout.Tiles[0].FocusX != 35 || layout.Tiles[0].FocusY != 62 {
+		t.Fatalf("focus = %d/%d, want 35/62", layout.Tiles[0].FocusX, layout.Tiles[0].FocusY)
 	}
 
-	service := NewStartScreenTilesService(
-		repositories.NewStartScreenTilesRepository(db),
-		repositories.NewStartScreenColumnsRepository(db),
-		repositories.NewGamesRepository(db),
-		files.NewAssetStore(assetsDir),
-	)
-
-	imagePath := "/assets/start-screen/" + filename
-	layout, err := service.Update(nil, []domain.StartScreenTileWrite{{
-		GameID:         gameID,
-		TileSize:       "small",
-		ImageSmallPath: &imagePath,
-	}})
-	if err != nil {
-		t.Fatalf("Update returned error: %v", err)
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{
+		GameID:    gameID,
+		TileSize:  "small",
+		ImagePath: &imagePath,
+		FocusX:    101,
+	}}); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("focus out of range error = %v, want ErrValidation", err)
 	}
-	if len(layout.Tiles) != 1 || layout.Tiles[0].ImageSmallPath == nil || *layout.Tiles[0].ImageSmallPath != imagePath {
-		t.Fatalf("tiles = %+v, want image path %q", layout.Tiles, imagePath)
-	}
-	if _, err := os.Stat(filepath.Join(assetsDir, "start-screen", filename)); err != nil {
-		t.Fatalf("permanent image missing after save: %v", err)
-	}
-	if _, err := os.Stat(stagingFile); !os.IsNotExist(err) {
-		t.Fatalf("staging image still present after save, want moved to permanent")
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{
+		GameID:    gameID,
+		TileSize:  "small",
+		ImagePath: &imagePath,
+		FocusY:    -1,
+	}}); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("focus out of range error = %v, want ErrValidation", err)
 	}
 }
 
@@ -255,12 +256,11 @@ func TestStartScreenTilesUpdateRollsBackColumnsWhenTileWriteFails(t *testing.T) 
 
 	firstID := insertServicesTestGame(t, db, "tile-atomic-a", "Tile Atomic A", domain.GameVisibilityPublic)
 	secondID := insertServicesTestGame(t, db, "tile-atomic-b", "Tile Atomic B", domain.GameVisibilityPublic)
-	assetsDir := t.TempDir()
 	service := NewStartScreenTilesService(
 		repositories.NewStartScreenTilesRepository(db),
 		repositories.NewStartScreenColumnsRepository(db),
 		repositories.NewGamesRepository(db),
-		files.NewAssetStore(assetsDir),
+		files.NewAssetStore(t.TempDir()),
 	)
 
 	if _, err := service.Update(
@@ -280,24 +280,11 @@ func TestStartScreenTilesUpdateRollsBackColumnsWhenTileWriteFails(t *testing.T) 
 	}
 	defer func() { _, _ = db.Exec(`DROP TRIGGER fail_start_screen_tile_insert`) }()
 
-	filename := "33333333-3333-4333-8333-333333333333.png"
-	stagingFile := filepath.Join(assetsDir, "_staging", "start-screen", filename)
-	if err := os.MkdirAll(filepath.Dir(stagingFile), 0o755); err != nil {
-		t.Fatalf("create staging directory: %v", err)
-	}
-	if err := os.WriteFile(stagingFile, []byte("staged-image"), 0o644); err != nil {
-		t.Fatalf("write staged image: %v", err)
-	}
-	imagePath := "/assets/start-screen/" + filename
-
 	if _, err := service.Update(
 		[]domain.StartScreenColumnWrite{{Name: "新列"}},
-		[]domain.StartScreenTileWrite{{GameID: secondID, TileSize: "wide", ImageSmallPath: &imagePath}},
+		[]domain.StartScreenTileWrite{{GameID: secondID, TileSize: "wide"}},
 	); err == nil {
 		t.Fatal("Update returned nil error with forced tile insert failure")
-	}
-	if _, err := os.Stat(filepath.Join(assetsDir, "start-screen", filename)); !os.IsNotExist(err) {
-		t.Fatalf("permanent image after failed update has err=%v, want it removed", err)
 	}
 
 	layout, err := service.List(true)
@@ -312,65 +299,118 @@ func TestStartScreenTilesUpdateRollsBackColumnsWhenTileWriteFails(t *testing.T) 
 	}
 }
 
-func TestStartScreenTilesUploadTileImageStagesOnly(t *testing.T) {
+func TestStartScreenTilesUpdateValidatesFlipImages(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
+
 	assetsDir := t.TempDir()
+	gameID := insertServicesTestGame(t, db, "tile-flip", "Tile Flip", domain.GameVisibilityPublic)
+	writeServicesAssetFile(t, assetsDir, "tile-flip", "first.jpg", []byte("first"))
+	writeServicesAssetFile(t, assetsDir, "tile-flip", "flip-a.jpg", []byte("a"))
+	writeServicesAssetFile(t, assetsDir, "tile-flip", "flip-b.jpg", []byte("b"))
+
 	service := NewStartScreenTilesService(
-		nil,
-		nil,
-		nil,
+		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewStartScreenColumnsRepository(db),
+		repositories.NewGamesRepository(db),
 		files.NewAssetStore(assetsDir),
 	)
 
-	path, err := service.UploadTileImage(buildTileImageUploadHeader(t, "tile.png"))
-	if err != nil {
-		t.Fatalf("UploadTileImage returned error: %v", err)
-	}
-	if !strings.HasPrefix(path, "/assets/start-screen/") {
-		t.Fatalf("path = %q, want /assets/start-screen/ prefix", path)
+	first := "/assets/tile-flip/first.jpg"
+	flipA := "/assets/tile-flip/flip-a.jpg"
+	flipB := "/assets/tile-flip/flip-b.jpg"
+
+	// 轮播帧依赖首帧 image_path。
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{
+		GameID:     gameID,
+		TileSize:   "wide",
+		FlipImages: []string{flipA},
+	}}); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("flip without image_path error = %v, want ErrValidation", err)
 	}
 
-	filename := filepath.Base(path)
-	if _, err := os.Stat(filepath.Join(assetsDir, "_staging", "start-screen", filename)); err != nil {
-		t.Fatalf("staged image missing after upload: %v", err)
+	// 超过上限（3 张追加帧）。
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{
+		GameID:      gameID,
+		TileSize:    "wide",
+		ImagePath:   &first,
+		FlipImages:  []string{flipA, flipB, flipA, flipB},
+	}}); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("too many flip images error = %v, want ErrValidation", err)
 	}
-	if _, err := os.Stat(filepath.Join(assetsDir, "start-screen", filename)); !os.IsNotExist(err) {
-		t.Fatalf("permanent image exists before layout save, want staged only")
+
+	// 与首帧重复。
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{
+		GameID:      gameID,
+		TileSize:    "wide",
+		ImagePath:   &first,
+		FlipImages:  []string{first},
+	}}); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("duplicate with image_path error = %v, want ErrValidation", err)
+	}
+
+	// 非本游戏素材。
+	foreignPath := "/assets/tile-other/flip.jpg"
+	writeServicesAssetFile(t, assetsDir, "tile-other", "flip.jpg", []byte("other"))
+	if _, err := service.Update(nil, []domain.StartScreenTileWrite{{
+		GameID:      gameID,
+		TileSize:    "wide",
+		ImagePath:   &first,
+		FlipImages:  []string{foreignPath},
+	}}); !errors.Is(err, domain.ErrValidation) {
+		t.Fatalf("foreign flip image error = %v, want ErrValidation", err)
+	}
+
+	// 合法轮播帧保存后按序返回。
+	layout, err := service.Update(nil, []domain.StartScreenTileWrite{{
+		GameID:      gameID,
+		TileSize:    "wide",
+		ImagePath:   &first,
+		FlipImages:  []string{flipA, flipB},
+	}})
+	if err != nil {
+		t.Fatalf("valid flip update returned error: %v", err)
+	}
+	if len(layout.Tiles) != 1 {
+		t.Fatalf("tiles = %d, want 1", len(layout.Tiles))
+	}
+	got := layout.Tiles[0]
+	if got.ImagePath == nil || *got.ImagePath != first {
+		t.Fatalf("image_path = %v, want %q", got.ImagePath, first)
+	}
+	if len(got.FlipImages) != 2 || got.FlipImages[0] != flipA || got.FlipImages[1] != flipB {
+		t.Fatalf("flip_images = %v, want [%q %q]", got.FlipImages, flipA, flipB)
 	}
 }
 
-func buildTileImageUploadHeader(t *testing.T, filename string) *multipart.FileHeader {
-	t.Helper()
+func TestStartScreenTilesAddTileDefaultsToFirstScreenshot(t *testing.T) {
+	db := openServicesTestDB(t)
+	defer func() { _ = db.Close() }()
 
-	imageData := &bytes.Buffer{}
-	if err := png.Encode(imageData, image.NewRGBA(image.Rect(0, 0, 8, 8))); err != nil {
-		t.Fatalf("encode image: %v", err)
-	}
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	partHeader := textproto.MIMEHeader{}
-	partHeader.Set("Content-Disposition", `form-data; name="file"; filename="`+filename+`"`)
-	partHeader.Set("Content-Type", "image/png")
-	part, err := writer.CreatePart(partHeader)
-	if err != nil {
-		t.Fatalf("CreatePart returned error: %v", err)
-	}
-	if _, err := part.Write(imageData.Bytes()); err != nil {
-		t.Fatalf("Write file part returned error: %v", err)
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatalf("writer.Close returned error: %v", err)
+	gameID := insertServicesTestGame(t, db, "tile-default-shot", "Tile Default Shot", domain.GameVisibilityPublic)
+	insertServicesGameAsset(t, db, gameID, "shot-1", "screenshot", "/assets/tile-default-shot/first.jpg", 1)
+	insertServicesGameAsset(t, db, gameID, "shot-2", "screenshot", "/assets/tile-default-shot/second.jpg", 2)
+	if _, err := db.Exec(`UPDATE games SET cover_image = ? WHERE id = ?`, "/assets/tile-default-shot/cover.jpg", gameID); err != nil {
+		t.Fatalf("set cover: %v", err)
 	}
 
-	form, err := multipart.NewReader(body, writer.Boundary()).ReadForm(1 << 20)
+	service := NewStartScreenTilesService(
+		repositories.NewStartScreenTilesRepository(db),
+		repositories.NewStartScreenColumnsRepository(db),
+		repositories.NewGamesRepository(db),
+		files.NewAssetStore(t.TempDir()),
+	)
+
+	layout, err := service.AddTile(domain.StartScreenTileWrite{GameID: gameID, TileSize: "small"})
 	if err != nil {
-		t.Fatalf("ReadForm returned error: %v", err)
+		t.Fatalf("AddTile returned error: %v", err)
 	}
-	t.Cleanup(func() { _ = form.RemoveAll() })
-	files := form.File["file"]
-	if len(files) != 1 {
-		t.Fatalf("form file count = %d, want 1", len(files))
+	if len(layout.Tiles) != 1 || layout.Tiles[0].ImagePath == nil {
+		t.Fatalf("tiles = %+v, want one tile with default image", layout.Tiles)
 	}
-	return files[0]
+	if *layout.Tiles[0].ImagePath != "/assets/tile-default-shot/first.jpg" {
+		t.Fatalf("default image = %q, want first screenshot", *layout.Tiles[0].ImagePath)
+	}
 }
 
 func TestStartScreenTilesAddTileAppendsAtEnd(t *testing.T) {

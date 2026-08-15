@@ -153,7 +153,7 @@
     @apply-placement="applyStartScreenPlacement"
     @add-column="addStartScreenColumn"
     @remove-column="removeStartScreenColumn"
-    @apply-crop="applyStartScreenCrop"
+    @apply-image="applyStartScreenImage"
     @rename-column="renameStartScreenColumn"
   />
 </template>
@@ -165,6 +165,7 @@ import { useRoute, useRouter } from 'vue-router'
 import useMenu from '@/hooks/useMenu'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
+import { useGlobalOverlay } from '@/composables/useGlobalOverlay'
 import gamesService from '@/services/games.service'
 import startScreenService from '@/services/start-screen.service'
 import type { GameListItem, StartScreenLayoutInput } from '@/services/types'
@@ -225,11 +226,10 @@ const {
   applyTilePlacement: applyStartScreenPlacement,
   addColumn: addStartScreenColumn,
   removeColumn: removeStartScreenColumn,
-  applyTileCrop: applyStartScreenCrop,
+  applyTileImage: applyStartScreenImage,
   renameColumn: renameStartScreenColumn,
 } = useStartScreen({
   fetchTiles: () => startScreenService.getTiles(),
-  uploadTileImage: (file) => startScreenService.uploadTileImage(file),
   fetchFavorites: async () => {
     const favorites: GameListItem[] = []
     let page = 1
@@ -249,6 +249,12 @@ const {
   addAlert: (message, type) => {
     uiStore.addAlert(message, type)
   },
+})
+
+// 开始屏幕是全局全屏覆盖层：打开时通知底层媒体（详情页轮播视频、游戏店 CRT）暂停。
+const { setOverlayOpen } = useGlobalOverlay()
+watch(startScreenVisible, (value) => {
+  setOverlayOpen(value)
 })
 
 const appName = 'GameAtlas'

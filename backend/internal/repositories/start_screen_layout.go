@@ -34,11 +34,12 @@ func replaceStartScreenTiles(exec startScreenLayoutExecutor, tiles []domain.Star
 	for index, tile := range tiles {
 		if _, err := exec.Exec(`
 			INSERT INTO start_screen_tiles (
-				game_id, tile_size, image_small_path, image_wide_path, image_large_path,
+				game_id, tile_size, image_path, focus_x, focus_y, flip_images,
 				sort_order, column_index, grid_row, grid_col
 			)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, tile.GameID, tile.TileSize, tile.ImageSmallPath, tile.ImageWidePath, tile.ImageLargePath,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, tile.GameID, tile.TileSize, tile.ImagePath, tile.FocusX, tile.FocusY,
+			domain.AssetPathList(tile.FlipImages),
 			index, tile.ColumnIndex, tile.GridRow, tile.GridCol); err != nil {
 			return err
 		}

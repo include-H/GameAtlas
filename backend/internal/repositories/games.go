@@ -73,9 +73,11 @@ func (r *GamesRepository) IsAssetPathReferenced(assetPath string) (bool, error) 
 			SELECT 1 FROM game_assets WHERE path = ?
 			UNION ALL
 			SELECT 1 FROM start_screen_tiles
-			WHERE image_small_path = ? OR image_wide_path = ? OR image_large_path = ?
+			WHERE image_path = ?
+			   OR image_small_path = ? OR image_wide_path = ? OR image_large_path = ?
+			   OR EXISTS (SELECT 1 FROM json_each(flip_images) WHERE json_each.value = ?)
 		) refs
-	`, trimmed, trimmed, trimmed, trimmed, trimmed, trimmed); err != nil {
+	`, trimmed, trimmed, trimmed, trimmed, trimmed, trimmed, trimmed, trimmed); err != nil {
 		return false, fmt.Errorf("check asset path references: %w", err)
 	}
 

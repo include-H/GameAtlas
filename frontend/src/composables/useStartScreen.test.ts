@@ -38,12 +38,11 @@ const makeTile = (
     game_id: gameId,
     public_id: publicId,
     title: publicId,
-    cover_image: null,
-    banner_image: null,
     tile_size: tileSize,
-    image_small_path: null,
-    image_wide_path: null,
-    image_large_path: null,
+    image_path: null,
+    focus_x: 50,
+    focus_y: 50,
+    flip_images: null,
     sort_order: 0,
     column_index: 0,
     grid_row: 0,
@@ -67,22 +66,19 @@ const createScreen = (overrides: Partial<{
   fetchTiles: () => Promise<StartScreenLayout>
   fetchFavorites: () => Promise<GameListItem[]>
   saveTiles: () => Promise<StartScreenLayout>
-  uploadTileImage: () => Promise<string>
   addAlert: () => void
 }> = {}) => {
   const fetchTiles = overrides.fetchTiles ?? vi.fn().mockResolvedValue(makeLayout([]))
   const fetchFavorites = overrides.fetchFavorites ?? vi.fn().mockResolvedValue([])
   const saveTiles = overrides.saveTiles ?? vi.fn().mockResolvedValue(makeLayout([]))
-  const uploadTileImage = overrides.uploadTileImage ?? vi.fn().mockResolvedValue('/assets/start-screen/tile.png')
   const addAlert = overrides.addAlert ?? vi.fn()
   const screen = useStartScreen({
     fetchTiles,
     fetchFavorites,
     saveTiles,
-    uploadTileImage,
     addAlert,
   })
-  return { screen, fetchTiles, fetchFavorites, saveTiles, uploadTileImage, addAlert }
+  return { screen, fetchTiles, fetchFavorites, saveTiles, addAlert }
 }
 
 describe('useStartScreen', () => {
@@ -191,9 +187,10 @@ describe('useStartScreen', () => {
       tiles: [{
         game_id: 1,
         tile_size: 'wide',
-        image_small_path: null,
-        image_wide_path: null,
-        image_large_path: null,
+        image_path: null,
+        focus_x: 50,
+        focus_y: 50,
+        flip_images: null,
         column_index: 0,
         grid_row: 0,
         grid_col: 0,
@@ -258,30 +255,52 @@ describe('useStartScreen', () => {
     expect(addAlert).toHaveBeenCalledWith('保存失败：需要管理员登录', 'error')
   })
 
-  it('applies cropped images for all three tile sizes', async () => {
-    const uploadTileImage = vi.fn().mockResolvedValueOnce('/assets/start-screen/small.png')
-      .mockResolvedValueOnce('/assets/start-screen/wide.png')
-      .mockResolvedValueOnce('/assets/start-screen/large.png')
+  it('applies a selected original image with focus point', async () => {
     const addAlert = vi.fn()
     const { screen } = createScreen({
       fetchTiles: vi.fn().mockResolvedValue(makeLayout([makeTile(1, 'a')])),
-      uploadTileImage,
       addAlert,
     })
 
     screen.open()
     await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
-    await screen.applyTileCrop(1, {
-      small: new Blob(['s'], { type: 'image/png' }),
-      wide: new Blob(['w'], { type: 'image/png' }),
-      large: new Blob(['l'], { type: 'image/png' }),
+    screen.applyTileImage(1, '/assets/a/covers/cover.jpg', 42, 73)
+
+    expect(screen.tiles.value[0]?.image_path).toBe('/assets/a/covers/cover.jpg')
+    expect(screen.tiles.value[0]?.focus_x).toBe(42)
+    expect(screen.tiles.value[0]?.focus_y).toBe(73)
+    expect(addAlert).toHaveBeenCalledWith('磁贴图片已更新', 'success')
+  })
+
+  it('applies flip frames for live wide tiles, capped and deduped', async () => {
+    const addAlert = vi.fn()
+    const { screen } = createScreen({
+      fetchTiles: vi.fn().mockResolvedValue(makeLayout([makeTile(1, 'a', 'wide')])),
+      addAlert,
     })
 
-    expect(uploadTileImage).toHaveBeenCalledTimes(3)
-    expect(screen.tiles.value[0]?.image_small_path).toBe('/assets/start-screen/small.png')
-    expect(screen.tiles.value[0]?.image_wide_path).toBe('/assets/start-screen/wide.png')
-    expect(screen.tiles.value[0]?.image_large_path).toBe('/assets/start-screen/large.png')
-    expect(addAlert).toHaveBeenCalledWith('磁贴图片已更新', 'success')
+    screen.open()
+    await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
+    screen.applyTileImage(
+      1,
+      '/assets/a/first.jpg',
+      50,
+      50,
+      [
+        '/assets/a/flip-1.jpg',
+        '/assets/a/first.jpg',
+        '/assets/a/flip-2.jpg',
+        '/assets/a/flip-3.jpg',
+        '/assets/a/flip-4.jpg',
+      ],
+    )
+
+    // 首帧去重 + 上限 3 张追加帧。
+    expect(screen.tiles.value[0]?.flip_images).toEqual([
+      '/assets/a/flip-1.jpg',
+      '/assets/a/flip-2.jpg',
+      '/assets/a/flip-3.jpg',
+    ])
   })
 
   it('adds and removes empty columns without moving occupied tiles', async () => {
@@ -322,9 +341,10 @@ describe('useStartScreen', () => {
       tiles: [{
         game_id: 1,
         tile_size: 'small',
-        image_small_path: null,
-        image_wide_path: null,
-        image_large_path: null,
+        image_path: null,
+        focus_x: 50,
+        focus_y: 50,
+        flip_images: null,
         column_index: 2,
         grid_row: 3,
         grid_col: 0,

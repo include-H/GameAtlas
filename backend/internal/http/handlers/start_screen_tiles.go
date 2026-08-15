@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/hao/game/internal/domain"
-	"github.com/hao/game/internal/files"
 	"github.com/hao/game/internal/services"
 )
 
@@ -38,14 +37,15 @@ func (h *StartScreenTilesHandler) Update(c *gin.Context) {
 			Name string `json:"name"`
 		} `json:"columns"`
 		Tiles []struct {
-			GameID         int64   `json:"game_id"`
-			TileSize       string  `json:"tile_size"`
-			ImageSmallPath *string `json:"image_small_path"`
-			ImageWidePath  *string `json:"image_wide_path"`
-			ImageLargePath *string `json:"image_large_path"`
-			ColumnIndex    *int    `json:"column_index"`
-			GridRow        *int    `json:"grid_row"`
-			GridCol        *int    `json:"grid_col"`
+			GameID      int64    `json:"game_id"`
+			TileSize    string   `json:"tile_size"`
+			ImagePath   *string  `json:"image_path"`
+			FocusX      *int     `json:"focus_x"`
+			FocusY      *int     `json:"focus_y"`
+			FlipImages  []string `json:"flip_images"`
+			ColumnIndex *int     `json:"column_index"`
+			GridRow     *int     `json:"grid_row"`
+			GridCol     *int     `json:"grid_col"`
 		} `json:"tiles"`
 	}
 	if err := decodeJSONStrict(c, &request); err != nil {
@@ -61,14 +61,15 @@ func (h *StartScreenTilesHandler) Update(c *gin.Context) {
 	tiles := make([]domain.StartScreenTileWrite, 0, len(request.Tiles))
 	for _, item := range request.Tiles {
 		tiles = append(tiles, domain.StartScreenTileWrite{
-			GameID:         item.GameID,
-			TileSize:       item.TileSize,
-			ImageSmallPath: item.ImageSmallPath,
-			ImageWidePath:  item.ImageWidePath,
-			ImageLargePath: item.ImageLargePath,
-			ColumnIndex:    intValueOrZero(item.ColumnIndex),
-			GridRow:        intValueOrZero(item.GridRow),
-			GridCol:        intValueOrZero(item.GridCol),
+			GameID:      item.GameID,
+			TileSize:    item.TileSize,
+			ImagePath:   item.ImagePath,
+			FocusX:      intValueOrZero(item.FocusX),
+			FocusY:      intValueOrZero(item.FocusY),
+			FlipImages:  item.FlipImages,
+			ColumnIndex: intValueOrZero(item.ColumnIndex),
+			GridRow:     intValueOrZero(item.GridRow),
+			GridCol:     intValueOrZero(item.GridCol),
 		})
 	}
 
@@ -86,14 +87,15 @@ func (h *StartScreenTilesHandler) AddTile(c *gin.Context) {
 	}
 
 	var request struct {
-		GameID         int64   `json:"game_id"`
-		TileSize       string  `json:"tile_size"`
-		ImageSmallPath *string `json:"image_small_path"`
-		ImageWidePath  *string `json:"image_wide_path"`
-		ImageLargePath *string `json:"image_large_path"`
-		ColumnIndex    *int    `json:"column_index"`
-		GridRow        *int    `json:"grid_row"`
-		GridCol        *int    `json:"grid_col"`
+		GameID      int64    `json:"game_id"`
+		TileSize    string   `json:"tile_size"`
+		ImagePath   *string  `json:"image_path"`
+		FocusX      *int     `json:"focus_x"`
+		FocusY      *int     `json:"focus_y"`
+		FlipImages  []string `json:"flip_images"`
+		ColumnIndex *int     `json:"column_index"`
+		GridRow     *int     `json:"grid_row"`
+		GridCol     *int     `json:"grid_col"`
 	}
 	if err := decodeJSONStrict(c, &request); err != nil {
 		writeJSONError(c, http.StatusBadRequest, "无效的开始屏幕磁贴数据")
@@ -101,14 +103,15 @@ func (h *StartScreenTilesHandler) AddTile(c *gin.Context) {
 	}
 
 	result, err := h.service.AddTile(domain.StartScreenTileWrite{
-		GameID:         request.GameID,
-		TileSize:       request.TileSize,
-		ImageSmallPath: request.ImageSmallPath,
-		ImageWidePath:  request.ImageWidePath,
-		ImageLargePath: request.ImageLargePath,
-		ColumnIndex:    intValueOrZero(request.ColumnIndex),
-		GridRow:        intValueOrZero(request.GridRow),
-		GridCol:        intValueOrZero(request.GridCol),
+		GameID:      request.GameID,
+		TileSize:    request.TileSize,
+		ImagePath:   request.ImagePath,
+		FocusX:      intValueOrZero(request.FocusX),
+		FocusY:      intValueOrZero(request.FocusY),
+		FlipImages:  request.FlipImages,
+		ColumnIndex: intValueOrZero(request.ColumnIndex),
+		GridRow:     intValueOrZero(request.GridRow),
+		GridCol:     intValueOrZero(request.GridCol),
 	})
 	if err != nil {
 		writeServiceError(c, err, "添加到开始屏幕失败")
@@ -143,33 +146,6 @@ func (h *StartScreenTilesHandler) RemoveTile(c *gin.Context) {
 	writeJSONSuccess(c, http.StatusOK, toStartScreenLayoutResponse(result))
 }
 
-func (h *StartScreenTilesHandler) UploadImage(c *gin.Context) {
-	if !requireAdmin(c) {
-		return
-	}
-	limitMultipartBody(c, files.MaxImageUploadBytes)
-	if err := parseMultipartForm(c); err != nil {
-		writeMultipartParseError(c, err, "需要上传图片文件")
-		return
-	}
-
-	file, err := c.FormFile("file")
-	if err != nil {
-		writeMultipartParseError(c, err, "需要上传图片文件")
-		return
-	}
-
-	path, err := h.service.UploadTileImage(file)
-	if err != nil {
-		writeServiceError(c, err, "磁贴图片上传失败")
-		return
-	}
-
-	writeJSONSuccess(c, http.StatusCreated, gin.H{
-		"path": path,
-	})
-}
-
 func toStartScreenLayoutResponse(layout *domain.StartScreenLayout) startScreenLayoutResponse {
 	return startScreenLayoutResponse{
 		Columns: toStartScreenColumnResponses(layout.Columns),
@@ -192,20 +168,23 @@ func toStartScreenColumnResponses(columns []domain.StartScreenColumn) []startScr
 func toStartScreenTileResponses(tiles []domain.StartScreenTile) []startScreenTileResponse {
 	result := make([]startScreenTileResponse, 0, len(tiles))
 	for _, tile := range tiles {
+		flipImages := tile.FlipImages
+		if flipImages == nil {
+			flipImages = []string{}
+		}
 		result = append(result, startScreenTileResponse{
-			GameID:         tile.GameID,
-			PublicID:       tile.PublicID,
-			Title:          tile.Title,
-			CoverImage:     tile.CoverImage,
-			BannerImage:    tile.BannerImage,
-			TileSize:       tile.TileSize,
-			ImageSmallPath: tile.ImageSmallPath,
-			ImageWidePath:  tile.ImageWidePath,
-			ImageLargePath: tile.ImageLargePath,
-			SortOrder:      tile.SortOrder,
-			ColumnIndex:    tile.ColumnIndex,
-			GridRow:        tile.GridRow,
-			GridCol:        tile.GridCol,
+			GameID:      tile.GameID,
+			PublicID:    tile.PublicID,
+			Title:       tile.Title,
+			TileSize:    tile.TileSize,
+			ImagePath:   tile.ImagePath,
+			FocusX:      tile.FocusX,
+			FocusY:      tile.FocusY,
+			FlipImages:  flipImages,
+			SortOrder:   tile.SortOrder,
+			ColumnIndex: tile.ColumnIndex,
+			GridRow:     tile.GridRow,
+			GridCol:     tile.GridCol,
 		})
 	}
 	return result
@@ -223,17 +202,16 @@ type startScreenColumnResponse struct {
 }
 
 type startScreenTileResponse struct {
-	GameID         int64   `json:"game_id"`
-	PublicID       string  `json:"public_id"`
-	Title          string  `json:"title"`
-	CoverImage     *string `json:"cover_image"`
-	BannerImage    *string `json:"banner_image"`
-	TileSize       string  `json:"tile_size"`
-	ImageSmallPath *string `json:"image_small_path"`
-	ImageWidePath  *string `json:"image_wide_path"`
-	ImageLargePath *string `json:"image_large_path"`
-	SortOrder      int     `json:"sort_order"`
-	ColumnIndex    int     `json:"column_index"`
-	GridRow        int     `json:"grid_row"`
-	GridCol        int     `json:"grid_col"`
+	GameID      int64    `json:"game_id"`
+	PublicID    string   `json:"public_id"`
+	Title       string   `json:"title"`
+	TileSize    string   `json:"tile_size"`
+	ImagePath   *string  `json:"image_path"`
+	FocusX      int      `json:"focus_x"`
+	FocusY      int      `json:"focus_y"`
+	FlipImages  []string `json:"flip_images"`
+	SortOrder   int      `json:"sort_order"`
+	ColumnIndex int      `json:"column_index"`
+	GridRow     int      `json:"grid_row"`
+	GridCol     int      `json:"grid_col"`
 }

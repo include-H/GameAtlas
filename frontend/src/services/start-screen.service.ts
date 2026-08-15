@@ -41,15 +41,6 @@ const startScreenService = {
       tiles: response.data?.tiles ?? [],
     }
   },
-
-  async uploadTileImage(file: File): Promise<string> {
-    const form = new FormData()
-    form.append('file', file)
-    const response = await post<ApiEnvelope<{ path: string }>>('/start-screen/tiles/image', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    return response.data.path
-  },
 }
 
 export default startScreenService

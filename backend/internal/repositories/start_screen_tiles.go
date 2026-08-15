@@ -25,8 +25,8 @@ func (r *StartScreenTilesRepository) List(includeAll bool) ([]domain.StartScreen
 	var tiles []domain.StartScreenTile
 	err := r.db.Select(&tiles, `
 		SELECT
-			t.id, t.game_id, g.public_id, g.title, g.cover_image, g.banner_image,
-			t.tile_size, t.image_small_path, t.image_wide_path, t.image_large_path,
+			t.id, t.game_id, g.public_id, g.title,
+			t.tile_size, t.image_path, t.focus_x, t.focus_y, t.flip_images,
 			t.sort_order, t.column_index, t.grid_row, t.grid_col,
 			t.created_at, t.updated_at
 		FROM start_screen_tiles t
@@ -43,18 +43,20 @@ func (r *StartScreenTilesRepository) List(includeAll bool) ([]domain.StartScreen
 	return tiles, nil
 }
 
-// GetGameVisibilityByImagePath 通过磁贴裁剪图反查所属游戏的可见性，供 /assets 路由复用同一规则。
+// GetGameVisibilityByImagePath 通过磁贴图片反查所属游戏的可见性，供 /assets 路由复用同一规则。
+// image_path 是新单图字段；旧三档裁剪图路径保留查询，兼容迁移前的存量文件。
 func (r *StartScreenTilesRepository) GetGameVisibilityByImagePath(imagePath string) (string, error) {
 	var visibility string
 	err := r.db.Get(&visibility, `
 		SELECT g.visibility
 		FROM start_screen_tiles t
 		INNER JOIN games g ON g.id = t.game_id
-		WHERE t.image_small_path = ?
+		WHERE t.image_path = ?
+		   OR t.image_small_path = ?
 		   OR t.image_wide_path = ?
 		   OR t.image_large_path = ?
 		LIMIT 1
-	`, imagePath, imagePath, imagePath)
+	`, imagePath, imagePath, imagePath, imagePath)
 	if err != nil {
 		return "", err
 	}
@@ -130,12 +132,12 @@ func (r *StartScreenTilesRepository) Append(tile domain.StartScreenTileWrite) (b
 
 	result, err := r.db.Exec(`
 		INSERT OR IGNORE INTO start_screen_tiles (
-			game_id, tile_size, image_small_path, image_wide_path, image_large_path,
+			game_id, tile_size, image_path, focus_x, focus_y, flip_images,
 			sort_order, column_index, grid_row, grid_col
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, tile.GameID, tile.TileSize, tile.ImageSmallPath, tile.ImageWidePath, tile.ImageLargePath,
-		nextOrder, tile.ColumnIndex, tile.GridRow, tile.GridCol)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, tile.GameID, tile.TileSize, tile.ImagePath, tile.FocusX, tile.FocusY,
+		domain.AssetPathList(tile.FlipImages), nextOrder, tile.ColumnIndex, tile.GridRow, tile.GridCol)
 	if err != nil {
 		return false, fmt.Errorf("append start screen tile: %w", err)
 	}

@@ -160,8 +160,9 @@
                           :tile="slot.tile"
                           :color-index="slot.globalIndex"
                           :editing="isEditing"
+                          :animate="animatedTileIds.has(slot.tile.game_id)"
                           @select="handleTileSelect"
-                          @crop="handleCrop"
+                          @select-image="handleSelectImage"
                           @resize="emit('resize', $event)"
                           @remove="emit('remove', $event)"
                         />
@@ -219,7 +220,7 @@
               :class="`start-screen__drag-ghost--${draggedTile.tile_size}`"
               :style="{ left: `${dragPointer.x}px`, top: `${dragPointer.y}px` }"
             >
-              <MetroTile :tile="draggedTile" :color-index="dragState.fromIndex" :editing="false" />
+              <MetroTile :tile="draggedTile" :color-index="dragState.fromIndex" :editing="false" :animate="false" />
             </div>
           </div>
 
@@ -232,12 +233,16 @@
     </Transition>
   </Teleport>
 
-  <tile-crop-modal
-    :visible="cropVisible"
-    :image-src="cropSource"
-    :banners="cropBanners"
-    @confirm="handleCropConfirm"
-    @cancel="cropVisible = false"
+  <tile-image-selector
+    :visible="imageSelectorVisible"
+    :image="selectorImage"
+    :focus-x="selectorFocusX"
+    :focus-y="selectorFocusY"
+    :flip-images="selectorFlipImages"
+    :max-flip-images="SELECTOR_MAX_FLIP_IMAGES"
+    :candidates="selectorCandidates"
+    @confirm="handleImageConfirm"
+    @cancel="imageSelectorVisible = false"
   />
 
   <div v-if="expand" class="start-screen-expand-host">
@@ -250,6 +255,7 @@
           <img
             v-if="expand.frontImage"
             :src="expand.frontImage"
+            :style="expandFocusStyle"
             :alt="expand.title"
             class="start-screen-expand__cover"
           >
@@ -258,7 +264,7 @@
           <div
             v-if="expand.backImage"
             class="start-screen-expand__bg"
-            :style="{ backgroundImage: `url(${expand.backImage})` }"
+            :style="[expandBackStyle, expandFocusStyle]"
           />
           <div class="start-screen-expand__shade" />
         </div>
@@ -286,7 +292,7 @@ import {
   IconStar,
 } from '@arco-design/web-vue/es/icon'
 import MetroTile from './MetroTile.vue'
-import TileCropModal from './TileCropModal.vue'
+import TileImageSelector, { type TileImageCandidateGroup } from './TileImageSelector.vue'
 import SharedAmbientBackground from '@/components/SharedAmbientBackground.vue'
 import type { StartScreenColumn, StartScreenTile, StartScreenTileSize } from '@/services/types'
 import {
@@ -330,18 +336,46 @@ const emit = defineEmits<{
   applyPlacement: [gameId: number, columnIndex: number, row: number, col: number]
   addColumn: []
   removeColumn: [index: number]
-  applyCrop: [gameId: number, blobs: Record<StartScreenTileSize, Blob>]
+  applyImage: [gameId: number, imagePath: string, focusX: number, focusY: number, flipImages: string[]]
   renameColumn: [index: number, name: string]
 }>()
 
 const router = useRouter()
 const wrapperRef = ref<HTMLElement | null>(null)
 const metroAreaRef = ref<HTMLElement | null>(null)
-const cropVisible = ref(false)
-const cropGameId = ref<number | null>(null)
-const cropBanners = ref<string[]>([])
-const tileDetailRequests = createRequestGeneration()
-const cropDetailRequests = createRequestGeneration()
+const imageSelectorVisible = ref(false)
+const selectorGameId = ref<number | null>(null)
+const selectorImage = ref('')
+const selectorFocusX = ref(50)
+const selectorFocusY = ref(50)
+const selectorFlipImages = ref<string[]>([])
+const selectorCandidates = ref<TileImageCandidateGroup[]>([])
+const selectorDetailRequests = createRequestGeneration()
+
+// 轮播帧选择对所有尺寸开放（方形磁贴预留，切到宽磁贴后生效），上限与后端一致。
+const SELECTOR_MAX_FLIP_IMAGES = 3
+
+// 活磁贴限流：全屏下磁贴可能很多，每次进入只随机抽一部分宽磁贴运行动画，
+// 控制合成层与换图开销；下一次进入重新抽。
+const ANIMATED_TILE_CAP = 6
+const animatedTileIds = ref<Set<number>>(new Set())
+let animatedTilesRolled = false
+
+watch(() => props.visible, (value) => {
+  if (!value) {
+    animatedTilesRolled = false
+  }
+})
+
+watch(() => props.tiles, (tiles) => {
+  if (!props.visible || animatedTilesRolled || tiles.length === 0) return
+  animatedTilesRolled = true
+  const candidates = tiles.filter(
+    (tile) => tile.tile_size === 'wide' && tile.image_path && (tile.flip_images?.length ?? 0) > 0,
+  )
+  const shuffled = [...candidates].sort(() => Math.random() - 0.5)
+  animatedTileIds.value = new Set(shuffled.slice(0, ANIMATED_TILE_CAP).map((tile) => tile.game_id))
+}, { deep: true })
 
 interface TileDragState {
   gameId: number
@@ -356,11 +390,6 @@ const dragPointer = ref<{ x: number; y: number } | null>(null)
 let pendingDrag: { gameId: number; fromIndex: number } | null = null
 let dragStart: { x: number; y: number } | null = null
 let edgeScrollFrame: number | null = null
-
-const cropSource = computed(() => {
-  const tile = props.tiles.find((item) => item.game_id === cropGameId.value)
-  return tile?.banner_image || tile?.cover_image || ''
-})
 
 const draggedTile = computed(() => props.tiles.find((tile) => tile.game_id === dragState.value?.gameId) ?? null)
 
@@ -477,9 +506,11 @@ interface ExpandState {
   title: string
   /** 起始面：必须和点击时的磁贴图片一致，保证首帧没有换图闪烁。 */
   frontImage: string
-  /** 展开面：翻转后显示的游戏 banner/截图。 */
+  /** 展开面：翻转后显示的同一个原图（焦点一致，无小图拉伸糊）。 */
   backImage: string
   size: StartScreenTileSize
+  focusX: number
+  focusY: number
   rect: { x: number; y: number; width: number; height: number }
 }
 
@@ -492,6 +523,14 @@ const expandMetaEl = ref<HTMLElement | null>(null)
 let expandAnim: Animation | null = null
 let expandRotAnim: Animation | null = null
 let expandHideTilesTimer: number | null = null
+
+const expandFocusStyle = computed(() => ({
+  objectPosition: `${expand.value?.focusX ?? 50}% ${expand.value?.focusY ?? 50}%`,
+  backgroundPosition: `${expand.value?.focusX ?? 50}% ${expand.value?.focusY ?? 50}%`,
+}))
+const expandBackStyle = computed(() =>
+  expand.value?.backImage ? { backgroundImage: `url(${expand.value.backImage})` } : undefined,
+)
 
 const EXPAND_DELAY_MS = 120
 const EXPAND_DURATION_MS = 1500
@@ -695,10 +734,10 @@ const openExpand = (publicId: string, rect: DOMRect) => {
     expandHideTilesTimer = null
   }
   expandHideTiles.value = false
-  const frontImage = tile[`image_${tile.tile_size}_path`] || tile.cover_image || tile.banner_image || ''
-  // 背面全屏展开：优先大图。裁剪产物只有 220/440px，全屏拉伸必糊，不参与背面兜底。
-  const backImage = tile.banner_image || tile.cover_image || frontImage
-  // 预加载两面：起始面要和磁贴无缝衔接，展开面要在翻正前准备好。
+  // 磁贴只用选定的原图：正反两面同图，翻转即放大揭示，无小图拉伸糊。
+  const frontImage = tile.image_path || ''
+  const backImage = frontImage
+  // 预加载：起始面要和磁贴无缝衔接，展开面要在翻正前准备好。
   for (const image of new Set([frontImage, backImage])) {
     if (image) {
       const preload = new Image()
@@ -711,6 +750,8 @@ const openExpand = (publicId: string, rect: DOMRect) => {
     frontImage,
     backImage,
     size: tile.tile_size,
+    focusX: tile.focus_x,
+    focusY: tile.focus_y,
     rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
   }
   // 保留 200ms 的磁贴原位画面，让展开层和被点击磁贴先完成无缝接管。
@@ -767,31 +808,12 @@ const waitForExpand = () =>
     window.setTimeout(resolve, EXPAND_DELAY_MS + EXPAND_DURATION_MS + 40)
   })
 
-// 点击磁贴 = 进入应用：展开动画（翻转放大当前图）期间后台预取详情页数据，
-// 动画播完直接切到游戏详情页（详情页自带启动入口，无弹窗打断）。
+// 点击磁贴 = 进入应用：展开动画（翻转放大原图）期间等待动画播完直接切到游戏详情页。
 const handleTileSelect = async (publicId: string, rect?: DOMRect) => {
-  const request = tileDetailRequests.begin()
   if (rect) {
     openExpand(publicId, rect)
   }
-  const detailPromise = gamesService.getGameDetail(publicId).catch(() => null)
   await waitForExpand()
-  if (!request.isCurrent()) return
-  const detail = await detailPromise
-  if (!request.isCurrent()) return
-  // 详情返回后把正面图升级为全分辨率内容图（翻转完成前替换，转正即显示内容图）。
-  // 截图是 1920×1080 全分辨率，优先于常为 460×215 的 Steam 小 banner，避免全屏拉伸发糊。
-  if (detail && expand.value) {
-    const frontImage =
-      (detail.screenshots && detail.screenshots.length > 0 ? detail.screenshots[0].path : '') ||
-      detail.banner_image ||
-      expand.value.frontImage
-    if (frontImage && frontImage !== expand.value.backImage) {
-      const preload = new Image()
-      preload.src = frontImage
-      expand.value.backImage = frontImage
-    }
-  }
   // 点击磁贴的关闭跳过退场动画：展开动画已演出，直接切详情页
   skipOverlayLeave = true
   emit('close')
@@ -811,29 +833,38 @@ const handleBrowseGames = () => {
   router.push({ name: 'games' })
 }
 
-const handleCrop = async (gameId: number) => {
-  const request = cropDetailRequests.begin()
-  cropGameId.value = gameId
-  cropBanners.value = []
+const handleSelectImage = async (gameId: number) => {
+  const request = selectorDetailRequests.begin()
   const tile = props.tiles.find((item) => item.game_id === gameId)
-  if (tile?.public_id) {
-    try {
-      const detail = await gamesService.getGameDetail(tile.public_id)
-      if (!request.isCurrent()) return
-      cropBanners.value = detail.banners.map((banner) => banner.path).filter((path): path is string => Boolean(path))
-    } catch {
-      // 拉取 banner 列表失败时仍可用磁贴默认 banner / 封面裁剪。
-    }
+  if (!tile) return
+  selectorGameId.value = gameId
+  selectorImage.value = tile.image_path || ''
+  selectorFocusX.value = tile.focus_x
+  selectorFocusY.value = tile.focus_y
+  selectorFlipImages.value = tile.flip_images ?? []
+  selectorCandidates.value = []
+  imageSelectorVisible.value = true
+  if (!tile.public_id) return
+  try {
+    const detail = await gamesService.getGameDetail(tile.public_id)
+    if (!request.isCurrent()) return
+    const unique = (items: Array<{ path: string }>) =>
+      Array.from(new Set(items.map((item) => item.path).filter(Boolean)))
+    // 竖版封面（3:4）在方形/宽磁贴上裁切过狠，不作为磁贴候选；横幅与截图（16:9）才适合。
+    selectorCandidates.value = [
+      { type: 'banner', label: '横幅', items: unique(detail.banners) },
+      { type: 'screenshot', label: '截图', items: unique(detail.screenshots) },
+    ]
+  } catch {
+    // 拉取素材失败时仍可保留当前磁贴图，弹窗已打开。
   }
-  if (!request.isCurrent()) return
-  cropVisible.value = true
 }
 
-const handleCropConfirm = (blobs: Record<StartScreenTileSize, Blob>) => {
-  if (cropGameId.value === null) return
-  emit('applyCrop', cropGameId.value, blobs)
-  cropVisible.value = false
-  cropGameId.value = null
+const handleImageConfirm = (imagePath: string, focusX: number, focusY: number, flipImages: string[]) => {
+  if (selectorGameId.value === null) return
+  emit('applyImage', selectorGameId.value, imagePath, focusX, focusY, flipImages)
+  imageSelectorVisible.value = false
+  selectorGameId.value = null
 }
 
 /* Win8 组横排：滚轮横向翻组 */
@@ -1113,8 +1144,7 @@ watch(
 )
 
 onUnmounted(() => {
-  tileDetailRequests.invalidate()
-  cropDetailRequests.invalidate()
+  selectorDetailRequests.invalidate()
   endDrag()
   if (entranceTimer !== null) {
     clearTimeout(entranceTimer)

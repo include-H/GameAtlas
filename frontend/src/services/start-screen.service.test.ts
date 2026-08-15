@@ -81,22 +81,4 @@ describe('start screen service', () => {
     })
     expect(delMock).toHaveBeenCalledWith('/start-screen/tiles/7')
   })
-
-  it('uploads tile image as multipart form data', async () => {
-    postMock.mockResolvedValue({
-      data: {
-        path: '/assets/start-screen/tile.png',
-      },
-    })
-    const file = new File(['tile'], 'tile.png', { type: 'image/png' })
-
-    await expect(startScreenService.uploadTileImage(file)).resolves.toBe(
-      '/assets/start-screen/tile.png',
-    )
-    expect(postMock).toHaveBeenCalledWith('/start-screen/tiles/image', expect.any(FormData), {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    const form = postMock.mock.calls[0]?.[1] as FormData | undefined
-    expect(form?.get('file')).toBe(file)
-  })
 })

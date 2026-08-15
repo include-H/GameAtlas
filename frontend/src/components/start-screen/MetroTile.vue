@@ -12,13 +12,23 @@
     @pointerdown="onPointerDown"
     @click="handleClick"
   >
-    <img
-      v-if="imageSrc"
-      :src="imageSrc"
-      :alt="tile.title"
-      class="metro-tile__cover"
-      draggable="false"
-    >
+  <img
+    v-if="canAnimate"
+    ref="frontImgEl"
+    :src="frontSrc"
+    :style="focusStyle"
+    :alt="tile.title"
+    class="metro-tile__cover"
+    draggable="false"
+  >
+  <img
+    v-else-if="imageSrc"
+    :src="imageSrc"
+    :style="focusStyle"
+    :alt="tile.title"
+    class="metro-tile__cover"
+    draggable="false"
+  >
     <span v-else class="metro-tile__fallback">{{ initial }}</span>
     <span class="metro-tile__shade" />
     <span class="metro-tile__label">{{ tile.title }}</span>
@@ -28,8 +38,8 @@
         class="metro-tile__action metro-tile__crop"
         role="button"
         tabindex="-1"
-        title="选择 banner 裁剪磁贴图片"
-        @click.stop="emit('crop', tile.game_id)"
+        title="选择磁贴图片"
+        @click.stop="emit('select-image', tile.game_id)"
       >
         <icon-image />
       </span>
@@ -56,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { IconClose, IconExpand, IconImage } from '@arco-design/web-vue/es/icon'
 import type { StartScreenTile, StartScreenTileSize } from '@/services/types'
 
@@ -64,15 +74,19 @@ import type { StartScreenTile, StartScreenTileSize } from '@/services/types'
 // 小角度单轴组合旋转，按下侧位移最大、对角几乎不动。仅按压期间生效。
 type PressDirection = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   tile: StartScreenTile
   colorIndex: number
   editing: boolean
-}>()
+  /** 是否允许活磁贴动画（开始屏幕按进入次数随机抽取限流）。 */
+  animate?: boolean
+}>(), {
+  animate: true,
+})
 
 const emit = defineEmits<{
   select: [publicId: string, rect: DOMRect]
-  crop: [gameId: number]
+  'select-image': [gameId: number]
   resize: [gameId: number]
   remove: [gameId: number]
 }>()
@@ -137,10 +151,11 @@ const SIZE_HINTS: Record<StartScreenTileSize, string> = {
   large: '当前：大磁贴',
 }
 
-const imageSrc = computed(() => {
-  const custom = props.tile[`image_${props.tile.tile_size}_path`]
-  return custom || props.tile.cover_image || ''
-})
+// 磁贴只用选定的原图 + 焦点（object-position），不再有封面/banner 兜底链。
+const imageSrc = computed(() => props.tile.image_path || '')
+const focusStyle = computed(() => ({
+  objectPosition: `${props.tile.focus_x}% ${props.tile.focus_y}%`,
+}))
 const initial = computed(() => props.tile.title.trim().charAt(0).toUpperCase() || '?')
 const resizeHint = computed(() => `${SIZE_HINTS[props.tile.tile_size]}，点击切换`)
 const tileStyle = computed(() => ({
@@ -152,6 +167,132 @@ const handleClick = (event: MouseEvent) => {
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
   emit('select', props.tile.public_id, rect)
 }
+
+// ---------- 活磁贴（仅 2x4 宽磁贴）----------
+// 轮播帧 = image_path（首帧）+ flip_images（追加帧）；每轮随机选择翻面或交叉淡入淡出，
+// Win8 宽磁贴节奏：间隔停顿后再动。系统要求减少动效时保持静态。
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+const liveFrames = computed(() => {
+  const frames = [props.tile.image_path, ...(props.tile.flip_images ?? [])].filter(Boolean) as string[]
+  return frames
+})
+const canAnimate = computed(() =>
+  props.tile.tile_size === 'wide'
+    && props.animate
+    && liveFrames.value.length >= 2
+    && !prefersReducedMotion()
+    && !props.editing
+    && typeof window !== 'undefined',
+)
+
+const frontSrc = ref('')
+let liveIndex = 0
+let liveTimer: number | null = null
+let liveAnim: Animation | null = null
+let liveFadeAnim: Animation | null = null
+const frontImgEl = ref<HTMLImageElement | null>(null)
+
+const LIVE_INTERVAL_MS = 5000
+const FLIP_DURATION_MS = 900
+const FADE_DURATION_MS = 260
+
+const stopLiveAnimation = () => {
+  if (liveTimer !== null) {
+    clearInterval(liveTimer)
+    liveTimer = null
+  }
+  liveAnim?.cancel()
+  liveAnim = null
+  liveFadeAnim?.cancel()
+  liveFadeAnim = null
+}
+
+const startLiveAnimation = () => {
+  if (!canAnimate.value || liveTimer !== null) return
+  liveIndex = 0
+  frontSrc.value = liveFrames.value[0] ?? ''
+  liveTimer = window.setInterval(() => {
+    if (document.hidden || !canAnimate.value) return
+    const next = (liveIndex + 1) % liveFrames.value.length
+    const nextPath = liveFrames.value[next]
+    if (Math.random() < 0.5) {
+      runFlip(nextPath)
+    } else {
+      runFade(nextPath)
+    }
+    liveIndex = next
+  }, LIVE_INTERVAL_MS)
+}
+
+// 压扁式翻面：scaleX 收到 0（侧面）时换图再展开，无镜像、不依赖 3D 上下文
+// （磁贴 overflow:hidden 会压平 preserve-3d，双面结构会两面同显）。
+const runFlip = (nextPath: string) => {
+  const img = frontImgEl.value
+  if (!img || frontSrc.value === nextPath) return
+  liveFadeAnim?.cancel()
+  liveAnim?.cancel()
+  const half = FLIP_DURATION_MS / 2
+  liveAnim = img.animate(
+    [
+      { transform: 'scaleX(1)' },
+      { transform: 'scaleX(0)' },
+    ],
+    { duration: half, easing: 'cubic-bezier(0.4, 0, 1, 1)' },
+  )
+  liveAnim.onfinish = () => {
+    frontSrc.value = nextPath
+    liveAnim = img.animate(
+      [
+        { transform: 'scaleX(0)' },
+        { transform: 'scaleX(1)' },
+      ],
+      { duration: half, easing: 'cubic-bezier(0, 0, 0.2, 1)' },
+    )
+  }
+}
+
+const runFade = (nextPath: string) => {
+  const img = frontImgEl.value
+  if (!img || frontSrc.value === nextPath) return
+  liveAnim?.cancel()
+  liveFadeAnim?.cancel()
+  const out = img.animate(
+    [{ opacity: 1 }, { opacity: 0 }],
+    { duration: FADE_DURATION_MS, easing: 'ease-in' },
+  )
+  out.onfinish = () => {
+    frontSrc.value = nextPath
+    liveFadeAnim = img.animate(
+      [{ opacity: 0 }, { opacity: 1 }],
+      { duration: FADE_DURATION_MS, easing: 'ease-out' },
+    )
+  }
+}
+
+watch(liveFrames, () => {
+  stopLiveAnimation()
+  if (canAnimate.value) {
+    startLiveAnimation()
+  }
+}, { deep: true })
+
+watch(() => props.editing, (editing) => {
+  if (editing) {
+    stopLiveAnimation()
+    return
+  }
+  startLiveAnimation()
+})
+
+onMounted(() => {
+  startLiveAnimation()
+})
+
+onUnmounted(() => {
+  stopLiveAnimation()
+})
 </script>
 
 <style scoped>

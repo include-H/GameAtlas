@@ -149,7 +149,6 @@ func TestNewAPIRouteAuthMatrix(t *testing.T) {
 		{name: "start screen update", method: http.MethodPut, path: "/api/start-screen/tiles", body: `{}`, requiresAdmin: true},
 		{name: "start screen add", method: http.MethodPost, path: "/api/start-screen/tiles", body: `{}`, requiresAdmin: true},
 		{name: "start screen remove", method: http.MethodDelete, path: "/api/start-screen/tiles/1", requiresAdmin: true},
-		{name: "start screen image", method: http.MethodPost, path: "/api/start-screen/tiles/image", requiresAdmin: true},
 		{name: "steam search", method: http.MethodGet, path: "/api/steam/search", requiresAdmin: true},
 		{name: "steam preview", method: http.MethodGet, path: "/api/steam/0/assets", requiresAdmin: true},
 		{name: "steam proxy", method: http.MethodGet, path: "/api/steam/proxy", requiresAdmin: true},

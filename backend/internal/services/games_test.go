@@ -947,7 +947,7 @@ func TestGamesServiceUpdateAggregateKeepsAssetFileReferencedByStartScreenTile(t 
 	insertServicesGameAsset(t, db, gameID, "tile-cover", "cover", assetPath, 0)
 	writeServicesAssetFile(t, assetsDir, "tile-game", "cover.png", []byte("cover"))
 	if _, err := db.Exec(`
-		INSERT INTO start_screen_tiles (game_id, tile_size, image_small_path)
+		INSERT INTO start_screen_tiles (game_id, tile_size, image_path)
 		VALUES (?, 'small', ?)
 	`, gameID, assetPath); err != nil {
 		t.Fatalf("insert start screen tile: %v", err)
