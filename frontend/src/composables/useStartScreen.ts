@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { getHttpErrorMessage, getHttpStatus } from '@/utils/http-error'
-import { normalizeStartScreenTiles } from '@/utils/start-screen-layout'
+import { normalizeStartScreenTiles, planStartScreenInsertion } from '@/utils/start-screen-layout'
 import type {
   StartScreenColumn,
   StartScreenLayout,
@@ -171,10 +171,81 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     while (columns.value.length <= columnIndex) {
       columns.value.push({ id: 0, name: '', sort_order: columns.value.length })
     }
-    tile.column_index = columnIndex
-    tile.grid_row = row
-    tile.grid_col = col
+    // 避让插入：落点固定为用户拖的位置，被覆盖磁贴链式让位
+    const plan = planStartScreenInsertion(
+      tiles.value,
+      gameId,
+      columnIndex,
+      row,
+      col,
+      tile.tile_size,
+    )
+    if (!plan) return
+    tile.column_index = plan.target.columnIndex
+    tile.grid_row = plan.target.row
+    tile.grid_col = plan.target.col
+    for (const move of plan.moves) {
+      const moved = tiles.value.find((item) => item.game_id === move.gameId)
+      if (!moved) continue
+      moved.column_index = move.columnIndex
+      moved.grid_row = move.row
+      moved.grid_col = move.col
+    }
     tiles.value = normalizeStartScreenTiles(tiles.value)
+  }
+
+  // 浏览态直接落位：位置有变化才全量持久化（编辑态走 saveEdit 统一保存）。
+  const persistTilePlacement = async (
+    gameId: number,
+    columnIndex: number,
+    row: number,
+    col: number,
+  ) => {
+    const tile = tiles.value.find((item) => item.game_id === gameId)
+    if (!tile) return
+    if (
+      tile.column_index === columnIndex &&
+      tile.grid_row === row &&
+      tile.grid_col === col
+    ) {
+      return
+    }
+    applyTilePlacement(gameId, columnIndex, row, col)
+    try {
+      await persistLayout()
+    } catch {
+      options.addAlert('磁贴位置保存失败', 'error')
+    }
+  }
+
+  // 全量布局载荷：列名 + 磁贴坐标，保存的唯一事实源
+  const buildLayoutPayload = () => {
+    const columnCount = Math.max(
+      1,
+      columns.value.length,
+      ...tiles.value.map((tile) => tile.column_index + 1),
+    )
+    return {
+      columns: Array.from({ length: columnCount }, (_, index) => ({
+        name: columns.value[index]?.name ?? '',
+      })),
+      tiles: tiles.value.map((tile) => ({
+        game_id: tile.game_id,
+        tile_size: tile.tile_size,
+        image_path: tile.image_path,
+        focus_x: tile.focus_x,
+        focus_y: tile.focus_y,
+        flip_images: tile.flip_images,
+        column_index: tile.column_index,
+        grid_row: tile.grid_row,
+        grid_col: tile.grid_col,
+      })),
+    }
+  }
+
+  const persistLayout = async () => {
+    const saved = await options.saveTiles(buildLayoutPayload())
+    applyLayout(saved)
   }
 
   const saveEdit = async () => {
@@ -182,27 +253,7 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     isSaving.value = true
     saveError.value = null
     try {
-      const columnCount = Math.max(
-        1,
-        columns.value.length,
-        ...tiles.value.map((tile) => tile.column_index + 1),
-      )
-      const columnNames = Array.from({ length: columnCount }, (_, index) => columns.value[index]?.name ?? '')
-      const saved = await options.saveTiles({
-        columns: columnNames.map((name) => ({ name })),
-        tiles: tiles.value.map((tile) => ({
-          game_id: tile.game_id,
-          tile_size: tile.tile_size,
-          image_path: tile.image_path,
-          focus_x: tile.focus_x,
-          focus_y: tile.focus_y,
-          flip_images: tile.flip_images,
-          column_index: tile.column_index,
-          grid_row: tile.grid_row,
-          grid_col: tile.grid_col,
-        })),
-      })
-      applyLayout(saved)
+      await persistLayout()
       isEditing.value = false
       options.addAlert('开始屏幕已保存', 'success')
     } catch (error) {
@@ -265,6 +316,7 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     removeColumn,
     moveColumn,
     applyTilePlacement,
+    persistTilePlacement,
     resizeTile,
     removeTile,
     applyTileImage,

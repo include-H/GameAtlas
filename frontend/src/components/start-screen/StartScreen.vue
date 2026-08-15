@@ -935,12 +935,12 @@ const handleWheel = (event: WheelEvent) => {
 }
 
 const onTilePointerDown = (index: number, event: PointerEvent) => {
-  if (!props.isEditing) return
   const tile = props.tiles[index]
   if (!tile) return
   if ((event.target as HTMLElement).closest('.metro-tile__action')) return
   pendingDrag = { gameId: tile.game_id, fromIndex: index }
   dragStart = { x: event.clientX, y: event.clientY }
+  // 编辑态与浏览态都支持长按拿起；编辑态另有 6px 拖动通道。
   pressTimer = window.setTimeout(() => {
     pressTimer = null
     beginTileDrag()
@@ -983,6 +983,8 @@ const onWindowPointerMove = (event: PointerEvent) => {
   }
   clearPressTimer()
   if (!dragState.value) {
+    // 浏览态只有长按能拿起磁贴：移动只是取消长按，避免误拖（短按=打开游戏）。
+    if (!props.isEditing) return
     beginTileDrag()
   }
   dragPointer.value = { x: event.clientX, y: event.clientY }

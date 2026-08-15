@@ -4,6 +4,7 @@ import {
   layoutStartScreenTiles,
   normalizeStartScreenTiles,
   packStartScreenTiles,
+  planStartScreenInsertion,
   START_SCREEN_FREE_COLS,
 } from './start-screen-layout'
 import type { StartScreenTile } from '@/services/types'
@@ -130,20 +131,26 @@ describe('packStartScreenTiles', () => {
     })
   })
 
-  it('finds the nearest free cell in the same group, row-boundary free', () => {
+  it('keeps the requested target when the spot is occupied (displacement applied on drop)', () => {
     const tiles = [
       makeTile(1, 'small', { column_index: 0, grid_row: 0, grid_col: 0 }),
     ]
 
     expect(findStartScreenDropTarget(tiles, 99, 0, 0, 0, 'small'))
-      .toEqual({ columnIndex: 0, row: 0, col: 2 })
+      .toEqual({ columnIndex: 0, row: 0, col: 0 })
 
-    // 6 个 2x2 占满前两行后，目标落到第 3 行，而不是另开一列
+    // 6 个 2x2 占满前两行：落点不再 first-fit 弹走，冲突保留请求坐标，
+    // 由 planStartScreenInsertion 产出避让链（推土机：被覆盖者下移一格）
     const fullRow = Array.from({ length: 6 }, (_, index) =>
       makeTile(index + 10, 'small', { column_index: 0, grid_row: 0, grid_col: index * 2 }),
     )
     expect(findStartScreenDropTarget(fullRow, 99, 0, 0, 0, 'small'))
-      .toEqual({ columnIndex: 0, row: 2, col: 0 })
+      .toEqual({ columnIndex: 0, row: 0, col: 0 })
+    const plan = planStartScreenInsertion(fullRow, 99, 0, 0, 0, 'small')
+    expect(plan?.target).toEqual({ columnIndex: 0, row: 0, col: 0 })
+    // 被覆盖的磁贴（落点 row0 col0-1 相交者）顺延一格
+    expect(plan?.moves.map((m) => m.gameId)).toEqual([10])
+    expect(plan?.moves.find((m) => m.gameId === 10)).toMatchObject({ columnIndex: 0, row: 2, col: 0 })
   })
 
   // 吸附：指针附近"空闲矩形恰好等于磁贴尺寸"的精确空位，拖到区域内任意处即吸附
@@ -199,7 +206,76 @@ describe('packStartScreenTiles', () => {
       makeTile(12, 'small', { column_index: 0, grid_row: 2, grid_col: 10 }),
     ]
     const target = findStartScreenDropTarget(fullTop, 99, 0, 0, 2, 'wide')
-    // row0/1 全满 → first-fit 从 row2 起找 → row2 也被占满 → row4 起
-    expect(target).toEqual({ columnIndex: 0, row: 4, col: 0 })
+    // 冲突不再 first-fit 弹走：保留请求坐标（clamp 后 col2），避让由落位层处理
+    expect(target).toEqual({ columnIndex: 0, row: 0, col: 2 })
+  })
+
+  it('plans insertion between two tiles: the dragged tile lands, others dodge', () => {
+    // 狙击手 (0,0)、最终幻想 (0,2) 相邻，黑手党 2x2 拖到"中间"（col1 row0）
+    const tiles = [
+      makeTile(1, 'small', { column_index: 0, grid_row: 0, grid_col: 0 }),
+      makeTile(2, 'small', { column_index: 0, grid_row: 0, grid_col: 2 }),
+    ]
+
+    const plan = planStartScreenInsertion(tiles, 99, 0, 0, 1, 'small')
+    // 落点 = 用户拖的位置（不被弹走）
+    expect(plan?.target).toEqual({ columnIndex: 0, row: 0, col: 1 })
+    // 推土机：两个被覆盖磁贴各下移一格（保持列对齐），不再向右借位
+    expect(plan?.moves).toEqual([
+      { gameId: 1, columnIndex: 0, row: 2, col: 0 },
+      { gameId: 2, columnIndex: 0, row: 2, col: 2 },
+    ])
+  })
+
+  it('plans chained displacement when a moved tile covers another', () => {
+    // row0: 3 个 2x2 占 col0/2/4；row2: 2 个 2x2 占 col0/2
+    // 把 col4 磁贴拖到 col0（覆盖 col0 磁贴），col0 磁贴被推后覆盖 row2 col0
+    const tiles = [
+      makeTile(1, 'small', { column_index: 0, grid_row: 0, grid_col: 0 }),
+      makeTile(2, 'small', { column_index: 0, grid_row: 0, grid_col: 2 }),
+      makeTile(3, 'small', { column_index: 0, grid_row: 0, grid_col: 4 }),
+      makeTile(4, 'small', { column_index: 0, grid_row: 2, grid_col: 0 }),
+      makeTile(5, 'small', { column_index: 0, grid_row: 2, grid_col: 2 }),
+    ]
+
+    // 磁贴3（col4）拖到 row0 col0
+    const plan = planStartScreenInsertion(tiles, 3, 0, 0, 0, 'small')
+    expect(plan?.target).toEqual({ columnIndex: 0, row: 0, col: 0 })
+    // 磁贴1 被覆盖 → 下移一格 (2,0)；磁贴4（row2 col0）被磁贴1 新位置顶住 → 链式下移 (4,0)
+    const moved = plan?.moves ?? []
+    expect(moved.map((m) => m.gameId)).toEqual([4, 1])
+    expect(moved.find((m) => m.gameId === 4)).toMatchObject({ columnIndex: 0, row: 4, col: 0 })
+    expect(moved.find((m) => m.gameId === 1)).toMatchObject({ columnIndex: 0, row: 2, col: 0 })
+    // 所有磁贴最终互不重叠
+    const final = [
+      { id: 3, row: 0, col: 0 },
+      ...moved,
+    ]
+    for (let i = 0; i < final.length; i += 1) {
+      for (let j = i + 1; j < final.length; j += 1) {
+        const a = final[i]
+        const b = final[j]
+        expect(a.row + 2 <= b.row || b.row + 2 <= a.row || a.col + 2 <= b.col || b.col + 2 <= a.col)
+          .toBe(true)
+      }
+    }
+  })
+
+  it('spills past the group bottom into the right column top (chain)', () => {
+    // 组高 12 行：row10 有两个 2x2（col0/col2），row12 的 4x4 已溢出到组1 顶部 (0,0)
+    // 落点 row10 col0 覆盖 row10 col0 的磁贴 → 下移一格到 row12 → 越界 → 溢到组1 顶部 (0,0)，
+    // 顶到已溢出的 4x4 → 4x4 继续下移
+    const tiles = [
+      makeTile(1, 'small', { column_index: 0, grid_row: 10, grid_col: 0 }),
+      makeTile(2, 'small', { column_index: 0, grid_row: 10, grid_col: 2 }),
+      makeTile(3, 'large', { column_index: 1, grid_row: 0, grid_col: 0 }),
+    ]
+
+    const plan = planStartScreenInsertion(tiles, 99, 0, 10, 0, 'small')
+    expect(plan?.target).toEqual({ columnIndex: 0, row: 10, col: 0 })
+    const moved = plan?.moves ?? []
+    // 磁贴1 被顶：组0 放不下 → 溢到组1 顶部，顶到磁贴3 → 磁贴3 下移一格 (4,0)
+    expect(moved.find((m) => m.gameId === 1)).toMatchObject({ columnIndex: 1, row: 0, col: 0 })
+    expect(moved.find((m) => m.gameId === 3)).toMatchObject({ columnIndex: 1, row: 4, col: 0 })
   })
 })
