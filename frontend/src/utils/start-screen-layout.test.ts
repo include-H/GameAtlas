@@ -256,7 +256,7 @@ describe('packStartScreenTiles', () => {
     expect(plan.moves.find((move) => move.gameId === 1)).toMatchObject({ row: 2, col: 0 })
   })
 
-  it('spills a pushed tile into the next group after the 12-row limit', () => {
+  it('spills a pushed tile into the next group after the 10-row limit', () => {
     const tiles = Array.from({ length: 36 }, (_, index) =>
       makeTile(index + 1, 'small', {
         column_index: 0,
@@ -266,9 +266,10 @@ describe('packStartScreenTiles', () => {
     )
     tiles.push(makeTile(100, 'large', { column_index: 1, grid_row: 0, grid_col: 0 }))
 
+    // 请求 row10 被钳到 row8（组高 10 - 磁贴高 2）；row8-9 被占 → 顶开到组底外
     const plan = planStartScreenInsertion(tiles, 99, 0, 10, 0, 'small')
-    expect(plan.target).toEqual({ columnIndex: 0, row: 10, col: 0 })
-    expect(plan.moves.find((move) => move.gameId === 31)).toMatchObject({
+    expect(plan.target).toEqual({ columnIndex: 0, row: 8, col: 0 })
+    expect(plan.moves.find((move) => move.gameId === 25)).toMatchObject({
       columnIndex: 1,
       row: 0,
       col: 0,

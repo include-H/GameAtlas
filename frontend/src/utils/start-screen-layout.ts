@@ -2,8 +2,9 @@ import type { StartScreenTile, StartScreenTileSize } from '@/services/types'
 
 export const START_SCREEN_FREE_COLS = 12
 
-// 组高上限：12 行（3 个 4x4 竖排），放不下溢出到右侧组顶部（复刻 Win8 组高度）。
-export const START_SCREEN_GROUP_MAX_ROWS = 12
+// 组高上限：10 行（1080p 可视高度约 2 个 4x4 + 1 个 2x4 竖排），
+// 放不下溢出到右侧组顶部（复刻 Win8 组高度）。
+export const START_SCREEN_GROUP_MAX_ROWS = 10
 
 // Win10 磁贴比例体系：没有 1x1 那么小的资源，最小单元从 2x2 起，
 // 2x2（小）→ 2x4（宽）→ 4x4（大）。
@@ -132,7 +133,7 @@ const buildOccupancy = (tiles: StartScreenTile[], excludedGameId: number): Map<n
 }
 
 /**
- * 全屏自定义网格：组（列）宽 12 列、高 12 行，行优先 first-fit 自动摆放，
+ * 全屏自定义网格：组（列）宽 12 列、高 10 行，行优先 first-fit 自动摆放，
  * 组内放满后开新组（column_index + 1），任意尺寸组合自然铺开（复刻 Win8 组高）。
  */
 export function packStartScreenTiles(tiles: StartScreenTile[]): PackedStartScreenGroup[] {
@@ -179,7 +180,7 @@ export function packStartScreenTiles(tiles: StartScreenTile[]): PackedStartScree
 }
 
 /**
- * 显式坐标纠正为不重叠、不越界（组高 12 行）的布局：组内就近找空位；
+ * 显式坐标纠正为不重叠、不越界（组高 10 行）的布局：组内就近找空位；
  * 组内放不下（含被顶出底部）的磁贴迁移到右侧组顶部继续放置（链式）。
  * 默认压缩空行；拖拽/持久化链路可关闭压缩以保留用户的显式行坐标。
  */
@@ -319,7 +320,7 @@ export function findStartScreenDropTarget(
     START_SCREEN_FREE_COLS - span.cols,
     Math.max(0, Math.trunc(col || 0)),
   )
-  // 落点不越组底（组高 12 行上限）
+  // 落点不越组底（组高 10 行上限）
   const clampedRow = Math.min(requestedRow, START_SCREEN_GROUP_MAX_ROWS - span.rows)
   return { columnIndex: requestedColumnIndex, row: clampedRow, col: requestedCol }
 }

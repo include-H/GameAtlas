@@ -82,7 +82,7 @@
                 :class="{ 'is-column-insertion': isColumnInsertionBefore(groupIndex) }"
                 :style="{
                   '--start-group-cols': groupCols(group),
-                  '--start-group-rows': Math.min(Math.max(groupMaxRow(group), 1), START_SCREEN_GROUP_MAX_ROWS),
+                  '--start-group-rows': START_SCREEN_GROUP_MAX_ROWS,
                 }"
                 :data-start-screen-cell="true"
                 :data-column-index="group.columnIndex"
@@ -197,19 +197,6 @@
                   >
                     <icon-plus />
                   </div>
-                </div>
-
-                <div
-                  v-if="isEditing"
-                  class="start-screen__group-append"
-                  :class="{ 'start-screen__group-append--target': isDropTarget(group.columnIndex, groupMaxRow(group), 0) }"
-                  :data-start-screen-cell="true"
-                  :data-column-index="group.columnIndex"
-                  :data-row="groupMaxRow(group)"
-                  data-col="0"
-                >
-                  <icon-plus />
-                  <span>拖到此处追加</span>
                 </div>
               </section>
 
@@ -430,8 +417,6 @@ let capturedPointerId: number | null = null
 // 长按进入拖拽：按住不动超过该时长即"拿起"磁贴（无需先移动 6px）。
 const PRESS_DRAG_DELAY = 500
 let pressTimer: number | null = null
-// 长按进入后松手会冒泡 click（MetroTile 的 select 等），需要一次性拦截。
-let suppressClick = false
 
 const beginTileDrag = () => {
   if (!pendingDrag) return
@@ -445,7 +430,6 @@ const beginTileDrag = () => {
     targetCol: fromTile?.grid_col ?? 0,
   }
   dragPointer.value = dragStart ? { x: dragStart.x, y: dragStart.y } : null
-  suppressClick = true
 }
 
 const clearPressTimer = () => {
@@ -512,11 +496,6 @@ const tileLeaveDelay = (groupIndex: number, _slotIndex: number) => {
   const maxGroup = visibleGroups.value.length - 1
   return `${(maxGroup - groupIndex) * 120}ms`
 }
-const groupMaxRow = (group: PackedStartScreenGroup) =>
-  group.slots.reduce(
-    (max, slot) => Math.max(max, slot.row + tileSpan(slot.tile.tile_size).rows),
-    0,
-  )
 // 组宽按磁贴实际占用收缩（上限 12 列）：磁贴少时网格紧凑，不撑满一屏空白；
 // 至少留 2 列兜底（编辑模式空组也有可拖入的区域）。
 const groupCols = (group: PackedStartScreenGroup) => {
@@ -527,9 +506,9 @@ const groupCols = (group: PackedStartScreenGroup) => {
   return Math.min(START_SCREEN_FREE_COLS, Math.max(needed, 2))
 }
 const groupCells = (group: PackedStartScreenGroup) => {
-  // 网格只精确覆盖磁贴占用的行列（封顶 12×12），不向下/向右延伸虚空格；
-  // 组尾由追加条承接拖放。
-  const rows = Math.min(groupMaxRow(group), START_SCREEN_GROUP_MAX_ROWS)
+  // 编辑态固定 START_SCREEN_GROUP_MAX_ROWS 行 × 实际占用列（下限 2 列）：
+  // 1080p 下整组高度即屏幕可视高度，无需底部追加条，行数也不再增长。
+  const rows = START_SCREEN_GROUP_MAX_ROWS
   const cols = groupCols(group)
   const cells: Array<{ row: number; col: number }> = []
   for (let row = 0; row < rows; row += 1) {
@@ -1135,9 +1114,9 @@ const updateDragTarget = (x: number, y: number) => {
     return
   }
 
-  // 网格之外的追加区也必须更新目标，否则拖到组底/组间空隙时会冻结上一次落点。
+  // 网格之外的追加区也必须更新目标，否则拖到组间空隙时会冻结上一次落点。
   const appendZones = area.querySelectorAll<HTMLElement>(
-    '.start-screen__group-append, .start-screen__group-append-col, .start-screen__new-column',
+    '.start-screen__group-append-col, .start-screen__new-column',
   )
   for (const zone of appendZones) {
     if (!pointInRect(x, y, zone.getBoundingClientRect())) continue
@@ -1204,18 +1183,6 @@ const updateEdgeScroll = (x: number) => {
 
 const onWindowPointerUp = () => {
   clearPressTimer()
-  if (suppressClick) {
-    suppressClick = false
-    // 长按拿起后松手，原磁贴上的 click（MetroTile select 等）不应触发
-    window.addEventListener(
-      'click',
-      (event) => {
-        event.stopPropagation()
-        event.preventDefault()
-      },
-      { capture: true, once: true },
-    )
-  }
   if (columnDrag.value) {
     const from = columnDrag.value.fromIndex
     // 换位语义：目标索引 = 指针所在列；末尾空白区 = 与最后一列换位。
@@ -1245,7 +1212,6 @@ const onWindowPointerCancel = () => {
 const endDrag = () => {
   clearPressTimer()
   releaseDragPointer()
-  suppressClick = false
   dragState.value = null
   dragPointer.value = null
   columnDrag.value = null
@@ -1783,29 +1749,6 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
-/* 组尾追加条：承接网格之外（磁贴下方新行）的拖放，替代向下延伸的虚空格 */
-.start-screen__group-append {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: calc(var(--start-cell) * var(--start-group-cols, 2) + var(--start-gap) * (var(--start-group-cols, 2) - 1));
-  height: var(--start-cell);
-  box-sizing: border-box;
-  border: 2px dashed rgba(255, 255, 255, 0.22);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.42);
-  font-size: 12px;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
-}
-
-.start-screen__group-append--target {
-  border-color: rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
-}
-
 /* 组尾横向追加条：承接网格右侧（新列）的拖放，拖入后组宽自动扩展 */
 .start-screen__group-append-col {
   display: flex;
@@ -1825,6 +1768,12 @@ onUnmounted(() => {
 .start-screen__group-append-col:hover {
   border-color: rgba(255, 255, 255, 0.6);
   color: rgba(255, 255, 255, 0.85);
+}
+
+.start-screen__group-append-col.start-screen__group-append--target {
+  border-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
 }
 
 .start-screen__new-column {
