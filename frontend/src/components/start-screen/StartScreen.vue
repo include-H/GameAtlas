@@ -82,7 +82,7 @@
                 :class="{ 'is-column-insertion': isColumnInsertionBefore(groupIndex) }"
                 :style="{
                   '--start-group-cols': groupCols(group),
-                  '--start-group-rows': Math.max(groupMaxRow(group), 1),
+                  '--start-group-rows': START_SCREEN_GROUP_MAX_ROWS,
                 }"
                 :data-start-screen-cell="true"
                 :data-column-index="group.columnIndex"
@@ -128,12 +128,16 @@
                         v-for="cell in groupCells(group)"
                         :key="`cell-${cell.row}-${cell.col}`"
                         class="start-screen__drop-cell"
-                        :class="{ 'start-screen__drop-cell--target': isDropTarget(group.columnIndex, cell.row, cell.col) }"
                         :data-start-screen-cell="true"
                         :data-column-index="group.columnIndex"
                         :data-row="cell.row"
                         :data-col="cell.col"
                         :style="{ gridColumnStart: cell.col + 1, gridRowStart: cell.row + 1 }"
+                      />
+                      <div
+                        v-if="dropTargetRect(group.columnIndex)"
+                        class="start-screen__drop-target"
+                        :style="dropTargetStyle(group.columnIndex)"
                       />
                     </template>
                     <TransitionGroup
@@ -184,12 +188,12 @@
                   <div
                     v-if="isEditing"
                     class="start-screen__group-append-col"
-                    :class="{ 'start-screen__group-append--target': isDropTarget(group.columnIndex, 0, groupCols(group)) }"
+                    :class="{ 'start-screen__group-append--target': isDropTarget(group.columnIndex, 0, groupAppendCol()) }"
                     :data-start-screen-cell="true"
                     :data-column-index="group.columnIndex"
                     data-row="0"
-                    :data-col="groupCols(group)"
-                    :title="`追加列 ${groupCols(group) + 1}`"
+                    :data-col="groupAppendCol()"
+                    :title="`追加列 ${groupAppendCol() + 1}`"
                   >
                     <icon-plus />
                   </div>
@@ -198,10 +202,10 @@
                 <div
                   v-if="isEditing"
                   class="start-screen__group-append"
-                  :class="{ 'start-screen__group-append--target': isDropTarget(group.columnIndex, groupMaxRow(group), 0) }"
+                  :class="{ 'start-screen__group-append--target': isDropTarget(group.columnIndex, groupAppendRow(group), 0) }"
                   :data-start-screen-cell="true"
                   :data-column-index="group.columnIndex"
-                  :data-row="groupMaxRow(group)"
+                  :data-row="groupAppendRow(group)"
                   data-col="0"
                 >
                   <icon-plus />
@@ -319,6 +323,7 @@ import {
   findStartScreenDropTarget,
   layoutStartScreenTiles,
   START_SCREEN_FREE_COLS,
+  START_SCREEN_GROUP_MAX_ROWS,
 } from '@/utils/start-screen-layout'
 import type { PackedStartScreenGroup } from '@/utils/start-screen-layout'
 import gamesService from '@/services/games.service'
@@ -420,6 +425,7 @@ let pendingColumnDrag: number | null = null
 let pendingDrag: { gameId: number; fromIndex: number } | null = null
 let dragStart: { x: number; y: number } | null = null
 let edgeScrollFrame: number | null = null
+let capturedPointerId: number | null = null
 
 // 长按进入拖拽：按住不动超过该时长即"拿起"磁贴（无需先移动 6px）。
 const PRESS_DRAG_DELAY = 500
@@ -449,6 +455,25 @@ const clearPressTimer = () => {
   }
 }
 
+const captureDragPointer = (event: PointerEvent) => {
+  const area = metroAreaRef.value
+  if (!area) return
+  try {
+    area.setPointerCapture(event.pointerId)
+    capturedPointerId = event.pointerId
+  } catch {
+    // Pointer capture is an enhancement; window listeners remain the fallback.
+  }
+}
+
+const releaseDragPointer = () => {
+  const area = metroAreaRef.value
+  if (area && capturedPointerId !== null && area.hasPointerCapture(capturedPointerId)) {
+    area.releasePointerCapture(capturedPointerId)
+  }
+  capturedPointerId = null
+}
+
 // 列落点：targetIndex 为指针所在列（换位目标），length 表示末尾区。
 const isColumnInsertionBefore = (groupIndex: number) =>
   columnDrag.value !== null && columnDrag.value.targetIndex === groupIndex
@@ -464,7 +489,9 @@ const displayTiles = computed(() => {
   return props.tiles.filter((tile) => tile.game_id !== dragState.value?.gameId)
 })
 
-const layoutGroups = computed(() => layoutStartScreenTiles(displayTiles.value, props.columns.length))
+const layoutGroups = computed(() =>
+  layoutStartScreenTiles(displayTiles.value, props.columns.length, false),
+)
 const visibleGroups = computed(() => {
   const groups = layoutGroups.value
   if (!props.isEditing) return groups.filter((group) => group.slots.length > 0)
@@ -490,18 +517,20 @@ const groupMaxRow = (group: PackedStartScreenGroup) =>
     (max, slot) => Math.max(max, slot.row + tileSpan(slot.tile.tile_size).rows),
     0,
   )
-// 组宽按磁贴实际占用收缩（上限 12 列）：磁贴少时网格紧凑，不撑满一屏空白；
-// 至少留 2 列兜底（编辑模式空组也有可拖入的区域）。
-const groupCols = (group: PackedStartScreenGroup) => {
-  const needed = group.slots.reduce(
-    (max, slot) => Math.max(max, slot.col + tileSpan(slot.tile.tile_size).cols),
-    0,
-  )
-  return Math.min(START_SCREEN_FREE_COLS, Math.max(needed, 2))
+// 组是固定的 12×12 网格；空位也必须可见、可作为拖拽落点。
+const groupCols = (_group: PackedStartScreenGroup) => START_SCREEN_FREE_COLS
+const groupAppendRow = (group: PackedStartScreenGroup) => {
+  const tile = draggedTile.value
+  return tile
+    ? START_SCREEN_GROUP_MAX_ROWS - tileSpan(tile.tile_size).rows
+    : groupMaxRow(group)
+}
+const groupAppendCol = () => {
+  const tile = draggedTile.value
+  return tile ? START_SCREEN_FREE_COLS - tileSpan(tile.tile_size).cols : START_SCREEN_FREE_COLS
 }
 const groupCells = (group: PackedStartScreenGroup) => {
-  // 网格只精确覆盖磁贴占用的行，不向下延伸虚空格；组尾由追加条承接拖放。
-  const rows = groupMaxRow(group)
+  const rows = START_SCREEN_GROUP_MAX_ROWS
   const cols = groupCols(group)
   const cells: Array<{ row: number; col: number }> = []
   for (let row = 0; row < rows; row += 1) {
@@ -524,6 +553,30 @@ const isNewColumnTarget = computed(() =>
 )
 
 const isDraggedTile = (tile: StartScreenTile) => dragState.value?.gameId === tile.game_id
+
+const dropTargetRect = (columnIndex: number) => {
+  const state = dragState.value
+  const tile = draggedTile.value
+  if (!state || !tile || state.targetColumnIndex !== columnIndex) return null
+  const span = tileSpan(tile.tile_size)
+  return {
+    row: state.targetRow,
+    col: state.targetCol,
+    rows: span.rows,
+    cols: span.cols,
+  }
+}
+
+const dropTargetStyle = (columnIndex: number) => {
+  const target = dropTargetRect(columnIndex)
+  if (!target) return undefined
+  return {
+    gridColumnStart: target.col + 1,
+    gridColumnEnd: target.col + 1 + target.cols,
+    gridRowStart: target.row + 1,
+    gridRowEnd: target.row + 1 + target.rows,
+  }
+}
 
 const isDropTarget = (columnIndex: number, row: number, col: number) =>
   Boolean(
@@ -939,6 +992,7 @@ const onTilePointerDown = (index: number, event: PointerEvent) => {
   const tile = props.tiles[index]
   if (!tile) return
   if ((event.target as HTMLElement).closest('.metro-tile__action')) return
+  captureDragPointer(event)
   pendingDrag = { gameId: tile.game_id, fromIndex: index }
   dragStart = { x: event.clientX, y: event.clientY }
   // 编辑态双通道：长按拿起（PRESS_DRAG_DELAY）或移动超 6px。
@@ -954,6 +1008,7 @@ const onTilePointerDown = (index: number, event: PointerEvent) => {
 const onColumnHeaderPointerDown = (columnIndex: number, event: PointerEvent) => {
   if (!props.isEditing) return
   if ((event.target as HTMLElement).closest('.start-screen__group-name-input, .start-screen__group-remove')) return
+  captureDragPointer(event)
   pendingColumnDrag = columnIndex
   dragStart = { x: event.clientX, y: event.clientY }
   window.addEventListener('pointermove', onWindowPointerMove)
@@ -1010,44 +1065,112 @@ const updateColumnDragTarget = (x: number) => {
   columnDrag.value.targetIndex = target
 }
 
+const setDragTarget = (columnIndex: number, row: number, col: number) => {
+  const state = dragState.value
+  const dragged = draggedTile.value
+  if (!state || !dragged) return
+  const target = findStartScreenDropTarget(
+    props.tiles,
+    state.gameId,
+    columnIndex,
+    row,
+    col,
+    dragged.tile_size,
+  )
+  if (
+    state.targetColumnIndex === target.columnIndex &&
+    state.targetRow === target.row &&
+    state.targetCol === target.col
+  ) {
+    return
+  }
+  // 用新对象替换状态，确保预览框和松手落位读取同一个最新快照。
+  dragState.value = {
+    ...state,
+    targetColumnIndex: target.columnIndex,
+    targetRow: target.row,
+    targetCol: target.col,
+  }
+}
+
+const pointInRect = (x: number, y: number, rect: DOMRect) =>
+  x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+
+// 网格单元换算步长：--start-cell 是 clamp() 表达式，getComputedStyle 只会返回未求值的
+// token 串（parseFloat 得 NaN），不能作为单元尺寸来源；改为从网格实际像素宽度反推
+// （组固定 12 列：width = 12×cell + 11×gap）。gap 取已解析的标准 gap 属性。
+const readGridStep = (grid: HTMLElement, rect: DOMRect): number | null => {
+  if (rect.width <= 0 || rect.height <= 0) return null
+  const gapValue = parseFloat(getComputedStyle(grid).gap)
+  const gap = Number.isFinite(gapValue) && gapValue > 0 ? gapValue : 0
+  const cell = (rect.width - gap * (START_SCREEN_FREE_COLS - 1)) / START_SCREEN_FREE_COLS
+  if (!Number.isFinite(cell) || cell <= 0) return null
+  return cell + gap
+}
+
 // 落点 = 网格几何换算：指针坐标 → (row, col)，不依赖 DOM 元素命中——
 // 磁贴 slot 之外的空位没有 cell 元素，elementFromPoint 会在空位冻结落点
 // （框停在上一个扫过的磁贴上）。读取组网格 rect + 单元尺寸 + gap 数学换算，
 // 空位同样可命中。
 const updateDragTarget = (x: number, y: number) => {
-  if (!dragState.value) return
+  if (!dragState.value || !draggedTile.value) return
   const area = metroAreaRef.value
   if (!area) return
   const grids = area.querySelectorAll<HTMLElement>('.start-screen__group-grid')
   for (const grid of grids) {
     const rect = grid.getBoundingClientRect()
-    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue
-    const group = grid.parentElement
+    if (!pointInRect(x, y, rect)) continue
+    const group = grid.closest<HTMLElement>('.start-screen__group')
     const rawColumn = group?.dataset.columnIndex
     const columnIndex = Number(rawColumn)
     if (!Number.isInteger(columnIndex) || columnIndex < 0) continue
-    const style = getComputedStyle(grid)
-    const cell = parseFloat(style.getPropertyValue('--start-cell'))
-    const gap = parseFloat(style.getPropertyValue('--start-gap'))
-    if (!Number.isFinite(cell) || cell <= 0) continue
-    const step = cell + (Number.isFinite(gap) ? gap : 0)
+    const step = readGridStep(grid, rect)
+    if (step === null) continue
     const col = Math.min(START_SCREEN_FREE_COLS - 1, Math.max(0, Math.floor((x - rect.left) / step)))
     const row = Math.max(0, Math.floor((y - rect.top) / step))
-    const dragged = draggedTile.value
-    if (!dragged) return
-    const target = findStartScreenDropTarget(
-      props.tiles,
-      dragState.value.gameId,
-      columnIndex,
-      row,
-      col,
-      dragged.tile_size,
-    )
-    dragState.value.targetColumnIndex = target.columnIndex
-    dragState.value.targetRow = target.row
-    dragState.value.targetCol = target.col
+    setDragTarget(columnIndex, row, col)
     return
   }
+
+  // 网格之外的追加区也必须更新目标，否则拖到组底/组间空隙时会冻结上一次落点。
+  const appendZones = area.querySelectorAll<HTMLElement>(
+    '.start-screen__group-append, .start-screen__group-append-col, .start-screen__new-column',
+  )
+  for (const zone of appendZones) {
+    if (!pointInRect(x, y, zone.getBoundingClientRect())) continue
+    const columnIndex = Number(zone.dataset.columnIndex)
+    const row = Number(zone.dataset.row)
+    const col = Number(zone.dataset.col)
+    if (Number.isInteger(columnIndex) && Number.isInteger(row) && Number.isInteger(col)) {
+      setDragTarget(columnIndex, row, col)
+    }
+    return
+  }
+
+  // 组间距、标题区和追加区之间的窄缝没有网格元素：取距离指针最近的网格，
+  // 将指针钳到网格边界后继续解析，避免落点停在旧位置或生成越界坐标。
+  let nearest: { grid: HTMLElement; rect: DOMRect; distance: number } | null = null
+  for (const grid of grids) {
+    const rect = grid.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0) continue
+    const dx = x < rect.left ? rect.left - x : x > rect.right ? x - rect.right : 0
+    const dy = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0
+    const distance = Math.hypot(dx, dy)
+    if (!nearest || distance < nearest.distance) {
+      nearest = { grid, rect, distance }
+    }
+  }
+  if (!nearest) return
+  const clampedX = Math.min(nearest.rect.right, Math.max(nearest.rect.left, x))
+  const clampedY = Math.min(nearest.rect.bottom, Math.max(nearest.rect.top, y))
+  const step = readGridStep(nearest.grid, nearest.rect)
+  if (step === null) return
+  const group = nearest.grid.closest<HTMLElement>('.start-screen__group')
+  const columnIndex = Number(group?.dataset.columnIndex)
+  if (!Number.isInteger(columnIndex) || columnIndex < 0) return
+  const col = Math.min(START_SCREEN_FREE_COLS - 1, Math.max(0, Math.floor((clampedX - nearest.rect.left) / step)))
+  const row = Math.max(0, Math.floor((clampedY - nearest.rect.top) / step))
+  setDragTarget(columnIndex, row, col)
 }
 
 const updateEdgeScroll = (x: number) => {
@@ -1068,6 +1191,9 @@ const updateEdgeScroll = (x: number) => {
     }
     if (nearLeft) area.scrollLeft -= 14
     if (nearRight) area.scrollLeft += 14
+    if (dragState.value && dragPointer.value) {
+      updateDragTarget(dragPointer.value.x, dragPointer.value.y)
+    }
     edgeScrollFrame = requestAnimationFrame(step)
   }
   edgeScrollFrame = requestAnimationFrame(step)
@@ -1115,6 +1241,7 @@ const onWindowPointerCancel = () => {
 
 const endDrag = () => {
   clearPressTimer()
+  releaseDragPointer()
   suppressClick = false
   dragState.value = null
   dragPointer.value = null
@@ -1640,10 +1767,17 @@ onUnmounted(() => {
   transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 
-.start-screen__drop-cell--target {
-  border-color: rgba(255, 255, 255, 0.8);
-  background: rgba(255, 255, 255, 0.16);
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45);
+.start-screen__drop-target {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  border: 3px solid rgba(255, 255, 255, 0.82);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35), 0 0 12px rgba(255, 255, 255, 0.22);
+  pointer-events: none;
 }
 
 /* 组尾追加条：承接网格之外（磁贴下方新行）的拖放，替代向下延伸的虚空格 */

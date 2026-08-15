@@ -31,6 +31,10 @@ export interface StartScreenDropTarget {
   col: number
 }
 
+export interface NormalizeStartScreenOptions {
+  compressRows?: boolean
+}
+
 // 组内 12 列 × 行数不限的稀疏占用表：row -> 已占用的列位
 type Occupancy = Map<number, boolean[]>
 
@@ -47,6 +51,21 @@ const fits = (occupied: Occupancy, row: number, col: number, rows: number, cols:
   return true
 }
 
+const rectOverlaps = (
+  aRow: number,
+  aCol: number,
+  aRows: number,
+  aCols: number,
+  bRow: number,
+  bCol: number,
+  bRows: number,
+  bCols: number,
+): boolean =>
+  aRow < bRow + bRows &&
+  aRow + aRows > bRow &&
+  aCol < bCol + bCols &&
+  aCol + aCols > bCol
+
 // 行优先找空位；超出 maxRow（磁贴底部越界）返回 null，由调用方决定溢出迁移。
 const findFirstFit = (
   occupied: Occupancy,
@@ -54,11 +73,15 @@ const findFirstFit = (
   cols: number,
   fromRow = 0,
   maxRow = Number.POSITIVE_INFINITY,
+  avoid?: { row: number; col: number; rows: number; cols: number },
 ): { row: number; col: number } | null => {
   let row = fromRow
   for (;;) {
     if (row + rows > maxRow) return null
     for (let col = 0; col <= START_SCREEN_FREE_COLS - cols; col += 1) {
+      if (avoid && rectOverlaps(row, col, rows, cols, avoid.row, avoid.col, avoid.rows, avoid.cols)) {
+        continue
+      }
       if (fits(occupied, row, col, rows, cols)) {
         return { row, col }
       }
@@ -158,9 +181,13 @@ export function packStartScreenTiles(tiles: StartScreenTile[]): PackedStartScree
 /**
  * 显式坐标纠正为不重叠、不越界（组高 12 行）的布局：组内就近找空位；
  * 组内放不下（含被顶出底部）的磁贴迁移到右侧组顶部继续放置（链式）。
- * 同时压缩空行：组内磁贴按行号重映射（跳过完全空的行），布局无洞。
+ * 默认压缩空行；拖拽/持久化链路可关闭压缩以保留用户的显式行坐标。
  */
-export function normalizeStartScreenTiles(tiles: StartScreenTile[]): StartScreenTile[] {
+export function normalizeStartScreenTiles(
+  tiles: StartScreenTile[],
+  options: NormalizeStartScreenOptions = {},
+): StartScreenTile[] {
+  const compressRows = options.compressRows ?? true
   const normalized = tiles.map((tile) => ({
     ...tile,
     column_index: normalizedPosition(tile.column_index, 0),
@@ -189,20 +216,22 @@ export function normalizeStartScreenTiles(tiles: StartScreenTile[]): StartScreen
         a.sort_order - b.sort_order ||
         a.game_id - b.game_id,
     )
-    // 空行压缩：按"占用行集合"（含磁贴内部行）重映射为连续行带——
-    // 2x2 磁贴占 2 行，按起始行压缩会让相邻磁贴重叠；按占用行压缩
-    // 保留磁贴间的最小行距，只去掉完全空的行。
-    const occupiedRows = new Set<number>()
-    for (const tile of groupTiles) {
-      const span = START_SCREEN_TILE_SPANS[tile.tile_size]
-      for (let r = tile.grid_row; r < tile.grid_row + span.rows; r += 1) {
-        occupiedRows.add(r)
+    if (compressRows) {
+      // 空行压缩：按"占用行集合"（含磁贴内部行）重映射为连续行带——
+      // 2x2 磁贴占 2 行，按起始行压缩会让相邻磁贴重叠；按占用行压缩
+      // 保留磁贴间的最小行距，只去掉完全空的行。
+      const occupiedRows = new Set<number>()
+      for (const tile of groupTiles) {
+        const span = START_SCREEN_TILE_SPANS[tile.tile_size]
+        for (let r = tile.grid_row; r < tile.grid_row + span.rows; r += 1) {
+          occupiedRows.add(r)
+        }
       }
-    }
-    const sortedRows = [...occupiedRows].sort((a, b) => a - b)
-    const rowMap = new Map(sortedRows.map((row, index) => [row, index]))
-    for (const tile of groupTiles) {
-      tile.grid_row = rowMap.get(tile.grid_row) ?? 0
+      const sortedRows = [...occupiedRows].sort((a, b) => a - b)
+      const rowMap = new Map(sortedRows.map((row, index) => [row, index]))
+      for (const tile of groupTiles) {
+        tile.grid_row = rowMap.get(tile.grid_row) ?? 0
+      }
     }
     const occupied = createOccupancy()
     const overflow: StartScreenTile[] = []
@@ -241,8 +270,16 @@ export function normalizeStartScreenTiles(tiles: StartScreenTile[]): StartScreen
 export function layoutStartScreenTiles(
   tiles: StartScreenTile[],
   columnCount = 0,
+  normalize = true,
 ): PackedStartScreenGroup[] {
-  const normalized = normalizeStartScreenTiles(tiles)
+  const normalized = normalize
+    ? normalizeStartScreenTiles(tiles)
+    : tiles.map((tile) => ({
+      ...tile,
+      column_index: normalizedPosition(tile.column_index, 0),
+      grid_row: normalizedPosition(tile.grid_row, 0),
+      grid_col: normalizedPosition(tile.grid_col, 0),
+    }))
   const originalIndices = new Map<number, number>()
   tiles.forEach((tile, index) => originalIndices.set(tile.game_id, index))
 
@@ -264,67 +301,7 @@ export function layoutStartScreenTiles(
   return groups
 }
 
-// 从 (row, col) 起向右下的最大连续空闲矩形宽度（每行连续空闲列的最小宽度）
-const freeRectExtent = (
-  occupied: Occupancy,
-  row: number,
-  col: number,
-  minCols: number,
-): { rows: number; cols: number } => {
-  let width = START_SCREEN_FREE_COLS - col
-  let rows = 0
-  for (;;) {
-    const line = occupied.get(row + rows)
-    if (!line) break
-    let w = 0
-    for (let c = col; c < START_SCREEN_FREE_COLS && !line[c]; c += 1) w += 1
-    if (w < minCols) break
-    width = Math.min(width, w)
-    rows += 1
-  }
-  return { rows, cols: width }
-}
-
-// 指针格子到矩形（含内部）的切比雪夫距离
-const rectChebyshevDistance = (
-  pointerRow: number,
-  pointerCol: number,
-  row: number,
-  col: number,
-  rows: number,
-  cols: number,
-): number => {
-  const dx = Math.max(0, col - pointerCol, pointerCol - (col + cols - 1))
-  const dy = Math.max(0, row - pointerRow, pointerRow - (row + rows - 1))
-  return Math.max(dx, dy)
-}
-
-// 吸附：指针附近"空闲矩形恰好等于磁贴尺寸"的精确空位，指针落在空位内或
-// 边缘 1 格即吸附到其左上角——宽磁贴不必精确拖到第一个格子。
-const findSnapFit = (
-  occupied: Occupancy,
-  rows: number,
-  cols: number,
-  pointerRow: number,
-  pointerCol: number,
-): { row: number; col: number } | null => {
-  let best: { row: number; col: number; distance: number } | null = null
-  for (let r = Math.max(0, pointerRow - 1); r <= pointerRow + 1; r += 1) {
-    for (let c = 0; c <= START_SCREEN_FREE_COLS - cols; c += 1) {
-      if (!fits(occupied, r, c, rows, cols)) continue
-      const extent = freeRectExtent(occupied, r, c, cols)
-      if (extent.rows !== rows || extent.cols !== cols) continue
-      const distance = rectChebyshevDistance(pointerRow, pointerCol, r, c, rows, cols)
-      if (distance <= 1 && (!best || distance < best.distance)) {
-        best = { row: r, col: c, distance }
-      }
-    }
-  }
-  return best ? { row: best.row, col: best.col } : null
-}
-
-// 落点解析：请求坐标可放 → 直落；否则精确空位吸附；否则组内 12 行
-// first-fit；再无空位返回请求坐标，由 normalize 迁移兜底。
+// 落点只做边界归一化，不读取占用表，也不自动吸附。
 export function findStartScreenDropTarget(
   tiles: StartScreenTile[],
   excludedGameId: number,
@@ -334,8 +311,9 @@ export function findStartScreenDropTarget(
   tileSize: StartScreenTileSize,
 ): StartScreenDropTarget {
   const span = START_SCREEN_TILE_SPANS[tileSize]
+  void tiles
+  void excludedGameId
   const requestedColumnIndex = Math.max(0, Math.trunc(columnIndex || 0))
-  const occupied = buildOccupancy(tiles, excludedGameId).get(requestedColumnIndex)
   const requestedRow = Math.max(0, Math.trunc(row || 0))
   const requestedCol = Math.min(
     START_SCREEN_FREE_COLS - span.cols,
@@ -343,17 +321,184 @@ export function findStartScreenDropTarget(
   )
   // 落点不越组底（组高 12 行上限）
   const clampedRow = Math.min(requestedRow, START_SCREEN_GROUP_MAX_ROWS - span.rows)
-
-  if (!occupied || fits(occupied, clampedRow, requestedCol, span.rows, span.cols)) {
-    return { columnIndex: requestedColumnIndex, row: clampedRow, col: requestedCol }
-  }
-  const snap = findSnapFit(occupied, span.rows, span.cols, clampedRow, requestedCol)
-  if (snap) {
-    return { columnIndex: requestedColumnIndex, row: snap.row, col: snap.col }
-  }
-  const first = findFirstFit(occupied, span.rows, span.cols, clampedRow, START_SCREEN_GROUP_MAX_ROWS)
-  if (first) {
-    return { columnIndex: requestedColumnIndex, row: first.row, col: first.col }
-  }
   return { columnIndex: requestedColumnIndex, row: clampedRow, col: requestedCol }
+}
+
+export interface StartScreenInsertionMove {
+  gameId: number
+  columnIndex: number
+  row: number
+  col: number
+}
+
+export interface StartScreenInsertionPlan {
+  target: StartScreenDropTarget
+  moves: StartScreenInsertionMove[]
+}
+
+// 找出与目标矩形相交的磁贴。placed 保存已经被链式顶开后的临时坐标。
+const findBlockers = (
+  tiles: StartScreenTile[],
+  excludedGameId: number,
+  columnIndex: number,
+  row: number,
+  col: number,
+  rows: number,
+  cols: number,
+  placed: Map<number, { columnIndex: number; row: number; col: number }>,
+): StartScreenTile[] => {
+  const blockers: StartScreenTile[] = []
+  for (const tile of tiles) {
+    if (tile.game_id === excludedGameId) continue
+    const span = START_SCREEN_TILE_SPANS[tile.tile_size]
+    const position = placed.get(tile.game_id)
+    const tileColumn = position?.columnIndex ?? normalizedPosition(tile.column_index, 0)
+    if (tileColumn !== columnIndex) continue
+    const tilePosition = position ?? {
+      columnIndex: tileColumn,
+      row: normalizedPosition(tile.grid_row, 0),
+      col: normalizedPosition(tile.grid_col, 0),
+    }
+    if (rectOverlaps(tilePosition.row, tilePosition.col, span.rows, span.cols, row, col, rows, cols)) {
+      blockers.push(tile)
+    }
+  }
+  return blockers.sort(
+    (a, b) =>
+      (placed.get(a.game_id)?.row ?? normalizedPosition(a.grid_row, 0)) -
+        (placed.get(b.game_id)?.row ?? normalizedPosition(b.grid_row, 0)) ||
+      (placed.get(a.game_id)?.col ?? normalizedPosition(a.grid_col, 0)) -
+        (placed.get(b.game_id)?.col ?? normalizedPosition(b.grid_col, 0)),
+  )
+}
+
+const unoccupy = (occupied: Occupancy, row: number, col: number, rows: number, cols: number) => {
+  for (let r = row; r < row + rows; r += 1) {
+    const line = occupied.get(r)
+    if (!line) continue
+    for (let c = col; c < col + cols; c += 1) {
+      line[c] = false
+    }
+  }
+}
+
+// 插入式落位：目标磁贴固定在请求格，冲突磁贴沿原列向下顶开；
+// 组底无空间时，在当前组寻找其他空位，仍放不下才迁移右侧组并继续链式处理。
+const planDisplacement = (
+  tiles: StartScreenTile[],
+  excludedGameId: number,
+  columns: Map<number, Occupancy>,
+  columnIndex: number,
+  row: number,
+  col: number,
+  rows: number,
+  cols: number,
+): StartScreenInsertionMove[] => {
+  const moves: StartScreenInsertionMove[] = []
+  const placed = new Map<number, { columnIndex: number; row: number; col: number }>()
+  const reserve = { row, col, rows, cols }
+
+  const placeWithShift = (
+    gameId: number,
+    span: { rows: number; cols: number },
+    targetColumn: number,
+    targetRow: number,
+    targetCol: number,
+  ) => {
+    const blockers = findBlockers(
+      tiles,
+      excludedGameId,
+      targetColumn,
+      targetRow,
+      targetCol,
+      span.rows,
+      span.cols,
+      placed,
+    )
+    for (const blocker of blockers) {
+      const blockerSpan = START_SCREEN_TILE_SPANS[blocker.tile_size]
+      const placedBlocker = placed.get(blocker.game_id)
+      const blockerPos = placedBlocker ?? {
+        columnIndex: normalizedPosition(blocker.column_index, 0),
+        row: normalizedPosition(blocker.grid_row, 0),
+        col: normalizedPosition(blocker.grid_col, 0),
+      }
+      const blockerColumn = blockerPos.columnIndex
+      const blockerOcc = columns.get(blockerColumn)
+      if (blockerOcc) {
+        unoccupy(blockerOcc, blockerPos.row, blockerPos.col, blockerSpan.rows, blockerSpan.cols)
+      }
+      const nextRow = blockerPos.row + blockerSpan.rows
+      if (nextRow + blockerSpan.rows <= START_SCREEN_GROUP_MAX_ROWS) {
+        placeWithShift(blocker.game_id, blockerSpan, blockerColumn, nextRow, blockerPos.col)
+        continue
+      }
+      const sameColumnOcc = columns.get(blockerColumn) ?? createOccupancy()
+      columns.set(blockerColumn, sameColumnOcc)
+      const inGroup = findFirstFit(
+        sameColumnOcc,
+        blockerSpan.rows,
+        blockerSpan.cols,
+        0,
+        START_SCREEN_GROUP_MAX_ROWS,
+        reserve,
+      )
+      if (inGroup) {
+        placeWithShift(blocker.game_id, blockerSpan, blockerColumn, inGroup.row, inGroup.col)
+      } else {
+        placeWithShift(blocker.game_id, blockerSpan, blockerColumn + 1, 0, blockerPos.col)
+      }
+    }
+    const occupied = columns.get(targetColumn) ?? createOccupancy()
+    columns.set(targetColumn, occupied)
+    occupy(occupied, targetRow, targetCol, span.rows, span.cols)
+    placed.set(gameId, { columnIndex: targetColumn, row: targetRow, col: targetCol })
+    if (gameId !== excludedGameId) {
+      moves.push({ gameId, columnIndex: targetColumn, row: targetRow, col: targetCol })
+    }
+  }
+
+  placeWithShift(excludedGameId, { rows, cols }, columnIndex, row, col)
+  return moves
+}
+
+/**
+ * 计算一次拖放的最终变更：空矩形直落，冲突矩形执行链式顶开。
+ * 这里不做吸附；target 永远是用户请求的网格坐标。
+ */
+export function planStartScreenInsertion(
+  tiles: StartScreenTile[],
+  excludedGameId: number,
+  columnIndex: number,
+  row: number,
+  col: number,
+  tileSize: StartScreenTileSize,
+): StartScreenInsertionPlan {
+  const span = START_SCREEN_TILE_SPANS[tileSize]
+  const target = findStartScreenDropTarget(
+    tiles,
+    excludedGameId,
+    columnIndex,
+    row,
+    col,
+    tileSize,
+  )
+  const columns = buildOccupancy(tiles, excludedGameId)
+  const occupied = columns.get(target.columnIndex)
+  if (!occupied || fits(occupied, target.row, target.col, span.rows, span.cols)) {
+    return { target, moves: [] }
+  }
+  return {
+    target,
+    moves: planDisplacement(
+      tiles,
+      excludedGameId,
+      columns,
+      target.columnIndex,
+      target.row,
+      target.col,
+      span.rows,
+      span.cols,
+    ),
+  }
 }

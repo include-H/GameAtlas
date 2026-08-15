@@ -4,6 +4,7 @@ import {
   layoutStartScreenTiles,
   normalizeStartScreenTiles,
   packStartScreenTiles,
+  planStartScreenInsertion,
   START_SCREEN_FREE_COLS,
 } from './start-screen-layout'
 import type { StartScreenTile } from '@/services/types'
@@ -105,6 +106,14 @@ describe('packStartScreenTiles', () => {
     expect(groups[0]?.slots.map((s) => s.globalIndex)).toEqual([0, 1, 2])
   })
 
+  it('preserves explicit positions for the drag preview', () => {
+    const groups = layoutStartScreenTiles([
+      makeTile(1, 'wide', { column_index: 0, grid_row: 4, grid_col: 6 }),
+    ], 1, false)
+
+    expect(groups[0]?.slots[0]).toMatchObject({ row: 4, col: 6 })
+  })
+
   it('normalizes overlapping explicit placements within a group', () => {
     const normalized = normalizeStartScreenTiles([
       makeTile(1, 'large', { column_index: 0, grid_row: 0, grid_col: 0 }),
@@ -147,7 +156,7 @@ describe('packStartScreenTiles', () => {
     })
   })
 
-  it('keeps the requested target when the spot is occupied (first-fit fallback)', () => {
+  it('keeps the requested target when the spot is occupied', () => {
     const tiles = [
       makeTile(1, 'small', { column_index: 0, grid_row: 0, grid_col: 0 }),
     ]
@@ -156,16 +165,15 @@ describe('packStartScreenTiles', () => {
     expect(findStartScreenDropTarget(tiles, 99, 0, 0, 2, 'small'))
       .toEqual({ columnIndex: 0, row: 0, col: 2 })
 
-    // 6 个 2x2 占满前两行：请求坐标冲突 → 组内 12 行 first-fit → 第 3 行
+    // 6 个 2x2 占满前两行：请求坐标冲突、附近没有精确空位 → 保留请求坐标
     const fullRow = Array.from({ length: 6 }, (_, index) =>
       makeTile(index + 10, 'small', { column_index: 0, grid_row: 0, grid_col: index * 2 }),
     )
     expect(findStartScreenDropTarget(fullRow, 99, 0, 0, 0, 'small'))
-      .toEqual({ columnIndex: 0, row: 2, col: 0 })
+      .toEqual({ columnIndex: 0, row: 0, col: 0 })
   })
 
-  // 吸附：指针附近"空闲矩形恰好等于磁贴尺寸"的精确空位，拖到区域内任意处即吸附
-  it('snaps a wide tile into an exact 2x4 gap when the pointer is inside it', () => {
+  it('does not auto-place a conflicted drop into a nearby gap', () => {
     // row0-1 占满 12 列 → row2-3 只留 col4-7（2x4 精确空位）
     const tiles = [
       makeTile(1, 'small', { column_index: 0, grid_row: 0, grid_col: 0 }),
@@ -180,19 +188,17 @@ describe('packStartScreenTiles', () => {
       makeTile(10, 'small', { column_index: 0, grid_row: 2, grid_col: 10 }),
     ]
 
-    // 指针在空位右下角格子（row3 col7），请求坐标放不下 2x4 → 吸附到左上角
+    // 请求坐标冲突，但附近存在精确 2x4 空位 → 仍保留请求坐标
     expect(findStartScreenDropTarget(tiles, 99, 0, 3, 7, 'wide'))
-      .toEqual({ columnIndex: 0, row: 2, col: 4 })
-    // 指针在空位内任意格子（row2 col6）同样吸附
+      .toEqual({ columnIndex: 0, row: 3, col: 7 })
     expect(findStartScreenDropTarget(tiles, 99, 0, 2, 6, 'wide'))
-      .toEqual({ columnIndex: 0, row: 2, col: 4 })
-    // 指针在空位上方 1 格也吸附
+      .toEqual({ columnIndex: 0, row: 2, col: 6 })
     expect(findStartScreenDropTarget(tiles, 99, 0, 1, 5, 'wide'))
-      .toEqual({ columnIndex: 0, row: 2, col: 4 })
+      .toEqual({ columnIndex: 0, row: 1, col: 5 })
   })
 
-  it('does not snap into a gap larger than the dragged tile', () => {
-    // row0-1 满，row2-3 只留 col4-11（2x8 空位，大于 2x4）→ 不吸附，走 first-fit
+  it('keeps an occupied request for insertion planning', () => {
+    // row0-1 满，row2-3 只留 col4-11（2x8 空位，大于 2x4）→ 不吸附
     const tiles = [
       makeTile(1, 'small', { column_index: 0, grid_row: 0, grid_col: 0 }),
       makeTile(2, 'small', { column_index: 0, grid_row: 0, grid_col: 2 }),
@@ -207,8 +213,7 @@ describe('packStartScreenTiles', () => {
     // 指针在空位内（row2 col10，clamp 到 col8），2x4 放得下 → 直接落点
     expect(findStartScreenDropTarget(tiles, 99, 0, 2, 10, 'wide'))
       .toEqual({ columnIndex: 0, row: 2, col: 8 })
-    // 指针在空位边缘外 2 格（row2 col0 上方区域被占时）不吸附：走 first-fit
-    // 构造：row0-1 全满、row2-3 只留 col4-11，指针在 row0 col2（被占）→ first-fit
+    // 构造：row0-1 全满、row2-3 只留 col4-11，指针在 row0 col2（被占）
     const fullTop = [
       ...tiles,
       makeTile(9, 'small', { column_index: 0, grid_row: 2, grid_col: 4 }),
@@ -217,7 +222,57 @@ describe('packStartScreenTiles', () => {
       makeTile(12, 'small', { column_index: 0, grid_row: 2, grid_col: 10 }),
     ]
     const target = findStartScreenDropTarget(fullTop, 99, 0, 0, 2, 'wide')
-    // 请求坐标冲突 → 组内 first-fit：row0-3 全满 → 落到 row4
-    expect(target).toEqual({ columnIndex: 0, row: 4, col: 0 })
+    // 请求坐标冲突 → 仍保留请求坐标，由插入规划处理
+    expect(target).toEqual({ columnIndex: 0, row: 0, col: 2 })
+  })
+
+  it('plans insertion between two tiles by pushing both down', () => {
+    const tiles = [
+      makeTile(1, 'small', { column_index: 0, grid_row: 0, grid_col: 0 }),
+      makeTile(2, 'small', { column_index: 0, grid_row: 0, grid_col: 2 }),
+    ]
+
+    const plan = planStartScreenInsertion(tiles, 99, 0, 0, 1, 'small')
+    expect(plan.target).toEqual({ columnIndex: 0, row: 0, col: 1 })
+    expect(plan.moves).toEqual([
+      { gameId: 1, columnIndex: 0, row: 2, col: 0 },
+      { gameId: 2, columnIndex: 0, row: 2, col: 2 },
+    ])
+  })
+
+  it('plans chained displacement when a pushed tile meets another tile', () => {
+    const tiles = [
+      makeTile(1, 'small', { column_index: 0, grid_row: 0, grid_col: 0 }),
+      makeTile(2, 'small', { column_index: 0, grid_row: 0, grid_col: 2 }),
+      makeTile(3, 'small', { column_index: 0, grid_row: 0, grid_col: 4 }),
+      makeTile(4, 'small', { column_index: 0, grid_row: 2, grid_col: 0 }),
+      makeTile(5, 'small', { column_index: 0, grid_row: 2, grid_col: 2 }),
+    ]
+
+    const plan = planStartScreenInsertion(tiles, 3, 0, 0, 0, 'small')
+    expect(plan.target).toEqual({ columnIndex: 0, row: 0, col: 0 })
+    expect(plan.moves.map((move) => move.gameId)).toEqual([4, 1])
+    expect(plan.moves.find((move) => move.gameId === 4)).toMatchObject({ row: 4, col: 0 })
+    expect(plan.moves.find((move) => move.gameId === 1)).toMatchObject({ row: 2, col: 0 })
+  })
+
+  it('spills a pushed tile into the next group after the 12-row limit', () => {
+    const tiles = Array.from({ length: 36 }, (_, index) =>
+      makeTile(index + 1, 'small', {
+        column_index: 0,
+        grid_row: Math.floor(index / 6) * 2,
+        grid_col: (index % 6) * 2,
+      }),
+    )
+    tiles.push(makeTile(100, 'large', { column_index: 1, grid_row: 0, grid_col: 0 }))
+
+    const plan = planStartScreenInsertion(tiles, 99, 0, 10, 0, 'small')
+    expect(plan.target).toEqual({ columnIndex: 0, row: 10, col: 0 })
+    expect(plan.moves.find((move) => move.gameId === 31)).toMatchObject({
+      columnIndex: 1,
+      row: 0,
+      col: 0,
+    })
+    expect(plan.moves.find((move) => move.gameId === 100)).toMatchObject({ row: 4, col: 0 })
   })
 })

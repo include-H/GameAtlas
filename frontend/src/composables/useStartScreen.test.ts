@@ -345,8 +345,8 @@ describe('useStartScreen', () => {
     await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
     await screen.startEdit()
     screen.applyTilePlacement(1, 2, 3, 0)
-    // 空行压缩：空列唯一磁贴的 row3 被压缩到 row0
-    expect(screen.tiles.value[0]).toMatchObject({ column_index: 2, grid_row: 0, grid_col: 0 })
+    // 移动语义保留用户请求的显式网格坐标。
+    expect(screen.tiles.value[0]).toMatchObject({ column_index: 2, grid_row: 3, grid_col: 0 })
     await screen.saveEdit()
 
     expect(saveTiles).toHaveBeenCalledWith({
@@ -359,9 +359,29 @@ describe('useStartScreen', () => {
         focus_y: 50,
         flip_images: null,
         column_index: 2,
-        grid_row: 0,
+        grid_row: 3,
         grid_col: 0,
       }],
     })
+  })
+
+  it('inserts a tile at the requested coordinate and pushes blockers', async () => {
+    const { screen } = createScreen({
+      fetchTiles: vi.fn().mockResolvedValue(makeLayout([
+        makeTile(1, 'a', { column_index: 0, grid_row: 0, grid_col: 0 }),
+        makeTile(2, 'b', { column_index: 0, grid_row: 0, grid_col: 2 }),
+        makeTile(3, 'c', { column_index: 0, grid_row: 4, grid_col: 0 }),
+      ])),
+    })
+
+    screen.open()
+    await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
+    await screen.startEdit()
+    screen.applyTilePlacement(3, 0, 0, 1)
+
+    const tileOf = (gameId: number) => screen.tiles.value.find((tile) => tile.game_id === gameId)
+    expect(tileOf(3)).toMatchObject({ column_index: 0, grid_row: 0, grid_col: 1 })
+    expect(tileOf(1)).toMatchObject({ column_index: 0, grid_row: 2, grid_col: 0 })
+    expect(tileOf(2)).toMatchObject({ column_index: 0, grid_row: 2, grid_col: 2 })
   })
 })

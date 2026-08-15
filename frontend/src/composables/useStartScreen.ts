@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { getHttpErrorMessage, getHttpStatus } from '@/utils/http-error'
-import { findStartScreenDropTarget, normalizeStartScreenTiles } from '@/utils/start-screen-layout'
+import { normalizeStartScreenTiles, planStartScreenInsertion } from '@/utils/start-screen-layout'
 import type {
   StartScreenColumn,
   StartScreenLayout,
@@ -46,7 +46,7 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
   const refreshRequests = createRequestGeneration()
 
   const applyLayout = (layout: StartScreenLayout) => {
-    tiles.value = normalizeStartScreenTiles(layout.tiles)
+    tiles.value = normalizeStartScreenTiles(layout.tiles, { compressRows: false })
     columns.value = layout.columns
   }
 
@@ -162,6 +162,7 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
         }
         return tile
       }),
+      { compressRows: false },
     )
   }
 
@@ -171,9 +172,8 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     while (columns.value.length <= columnIndex) {
       columns.value.push({ id: 0, name: '', sort_order: columns.value.length })
     }
-    // 自定义拖拽：精确落点（直落 → 精确空位吸附 → 组内 first-fit），
-    // 冲突由 normalize 纠正/迁移，不做推土机避让
-    const target = findStartScreenDropTarget(
+    // 空位直落；冲突时以请求坐标为插入点，链式顶开占用磁贴。
+    const plan = planStartScreenInsertion(
       tiles.value,
       gameId,
       columnIndex,
@@ -181,10 +181,17 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
       col,
       tile.tile_size,
     )
-    tile.column_index = target.columnIndex
-    tile.grid_row = target.row
-    tile.grid_col = target.col
-    tiles.value = normalizeStartScreenTiles(tiles.value)
+    tile.column_index = plan.target.columnIndex
+    tile.grid_row = plan.target.row
+    tile.grid_col = plan.target.col
+    for (const move of plan.moves) {
+      const moved = tiles.value.find((item) => item.game_id === move.gameId)
+      if (!moved) continue
+      moved.column_index = move.columnIndex
+      moved.grid_row = move.row
+      moved.grid_col = move.col
+    }
+    tiles.value = normalizeStartScreenTiles(tiles.value, { compressRows: false })
   }
 
   // 全量布局载荷：列名 + 磁贴坐标，保存的唯一事实源
