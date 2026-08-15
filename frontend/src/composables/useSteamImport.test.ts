@@ -415,6 +415,71 @@ describe('useSteamImport', () => {
     expect(steamImport.steamCoverImages.value).toEqual(['https://cdn.example.com/grid-1.jpg'])
   })
 
+  it('switching cover source to SGDB after steam reuse searches by alias, not the Steam appid', async () => {
+    searchGamesMock.mockResolvedValue([{ id: '303390', name: 'James Bond 007: Nightfire' }])
+    getGameDetailsMock.mockResolvedValue({
+      name: 'James Bond 007: Nightfire',
+      description: '测试简介',
+      releaseDate: '2002',
+      developers: [],
+      publishers: [],
+      screenshots: [],
+      coverImage: 'https://cdn.example.com/cover.jpg',
+      bannerImage: 'https://cdn.example.com/banner.jpg',
+    })
+    searchSteamGridDBMock.mockResolvedValue([
+      { id: 555, name: '007 Nightfire', release_date: 1_035_369_600 },
+    ])
+    getGridsByGameIdMock.mockResolvedValue([
+      { url: 'https://cdn.example.com/grid-1.jpg', thumb: 'https://cdn.example.com/grid-1-thumb.jpg' },
+    ])
+    getHeroesByGameIdMock.mockResolvedValue([
+      { url: 'https://cdn.example.com/banner-1.jpg', thumb: '' },
+    ])
+
+    const form = buildForm()
+    form.value.title_alt = '007 初露锋芒'
+    const steamImport = useSteamImport({
+      form,
+      gameId: ref(42),
+      getWikiContent: () => '',
+      uploadAssetFromUrl: vi.fn(),
+      createEditableCover: vi.fn(),
+      createEditableBanner: vi.fn(),
+      createEditableLogo: vi.fn(),
+      createEditableScreenshot: vi.fn(),
+      ensureDeveloperNames: vi.fn().mockResolvedValue([]),
+      ensurePublisherNames: vi.fn().mockResolvedValue([]),
+      addAlert: vi.fn(),
+    })
+
+    steamImport.showSummarySelector.value = true
+    await flushPromises()
+    await steamImport.selectSteamSummaryGame(steamImport.steamSummarySearchResults.value[0]!)
+
+    steamImport.showCoverSelector.value = true
+    await flushPromises()
+    expect(steamImport.selectedSteamGame.value?.id).toBe('303390')
+
+    searchSteamGridDBMock.mockClear()
+    steamImport.coverSource.value = 'steamgriddb'
+    await flushPromises()
+    expect(searchSteamGridDBMock).toHaveBeenCalledTimes(1)
+    expect(searchSteamGridDBMock).toHaveBeenCalledWith('007 初露锋芒')
+    expect(steamImport.steamCoverSearchQuery.value).toBe('007 初露锋芒')
+    expect(steamImport.selectedSteamGame.value).toBeNull()
+
+    await steamImport.selectSteamCoverGame(steamImport.coverSearchResults.value[0]!)
+    expect(steamImport.steamCoverImages.value).toEqual(['https://cdn.example.com/grid-1.jpg'])
+
+    steamImport.bannerSource.value = 'steamgriddb'
+    steamImport.showBannerSelector.value = true
+    await flushPromises()
+    expect(searchSteamGridDBMock).toHaveBeenCalledTimes(1)
+    expect(getHeroesByGameIdMock).toHaveBeenCalledWith(555)
+    expect(steamImport.steamBannerImages.value).toEqual(['https://cdn.example.com/banner-1.jpg'])
+  })
+
   it('uses the title when switching screenshot source without SGDB memory', async () => {
     searchGamesMock.mockResolvedValue([{ id: '5310669', name: 'Steam Game' }])
     getGameDetailsMock.mockResolvedValue({
