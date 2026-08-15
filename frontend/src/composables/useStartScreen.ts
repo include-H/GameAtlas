@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { getHttpErrorMessage, getHttpStatus } from '@/utils/http-error'
-import { normalizeStartScreenTiles, planStartScreenInsertion } from '@/utils/start-screen-layout'
+import { findStartScreenDropTarget, normalizeStartScreenTiles } from '@/utils/start-screen-layout'
 import type {
   StartScreenColumn,
   StartScreenLayout,
@@ -171,8 +171,9 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     while (columns.value.length <= columnIndex) {
       columns.value.push({ id: 0, name: '', sort_order: columns.value.length })
     }
-    // 避让插入：落点固定为用户拖的位置，被覆盖磁贴链式让位
-    const plan = planStartScreenInsertion(
+    // 自定义拖拽：精确落点（直落 → 精确空位吸附 → 组内 first-fit），
+    // 冲突由 normalize 纠正/迁移，不做推土机避让
+    const target = findStartScreenDropTarget(
       tiles.value,
       gameId,
       columnIndex,
@@ -180,42 +181,10 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
       col,
       tile.tile_size,
     )
-    if (!plan) return
-    tile.column_index = plan.target.columnIndex
-    tile.grid_row = plan.target.row
-    tile.grid_col = plan.target.col
-    for (const move of plan.moves) {
-      const moved = tiles.value.find((item) => item.game_id === move.gameId)
-      if (!moved) continue
-      moved.column_index = move.columnIndex
-      moved.grid_row = move.row
-      moved.grid_col = move.col
-    }
+    tile.column_index = target.columnIndex
+    tile.grid_row = target.row
+    tile.grid_col = target.col
     tiles.value = normalizeStartScreenTiles(tiles.value)
-  }
-
-  // 浏览态直接落位：位置有变化才全量持久化（编辑态走 saveEdit 统一保存）。
-  const persistTilePlacement = async (
-    gameId: number,
-    columnIndex: number,
-    row: number,
-    col: number,
-  ) => {
-    const tile = tiles.value.find((item) => item.game_id === gameId)
-    if (!tile) return
-    if (
-      tile.column_index === columnIndex &&
-      tile.grid_row === row &&
-      tile.grid_col === col
-    ) {
-      return
-    }
-    applyTilePlacement(gameId, columnIndex, row, col)
-    try {
-      await persistLayout()
-    } catch {
-      options.addAlert('磁贴位置保存失败', 'error')
-    }
   }
 
   // 全量布局载荷：列名 + 磁贴坐标，保存的唯一事实源
@@ -319,7 +288,6 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     removeColumn,
     moveColumn,
     applyTilePlacement,
-    persistTilePlacement,
     resizeTile,
     removeTile,
     applyTileImage,

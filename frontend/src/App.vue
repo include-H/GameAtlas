@@ -150,7 +150,7 @@
     @save-edit="saveStartScreenEdit"
     @resize="resizeStartScreenTile"
     @remove="removeStartScreenTile"
-    @apply-placement="handleStartScreenPlacement"
+    @apply-placement="applyStartScreenPlacement"
     @add-column="addStartScreenColumn"
     @remove-column="removeStartScreenColumn"
     @move-column="moveStartScreenColumn"
@@ -224,7 +224,6 @@ const {
   resizeTile: resizeStartScreenTile,
   removeTile: removeStartScreenTile,
   applyTilePlacement: applyStartScreenPlacement,
-  persistTilePlacement: persistStartScreenPlacement,
   addColumn: addStartScreenColumn,
   removeColumn: removeStartScreenColumn,
   moveColumn: moveStartScreenColumn,
@@ -237,21 +236,6 @@ const {
     uiStore.addAlert(message, type)
   },
 })
-
-// 磁贴落位分派：编辑态只改内存（保存按钮统一持久化）；
-// 浏览态长按拖拽落位直接持久化。
-const handleStartScreenPlacement = (
-  gameId: number,
-  columnIndex: number,
-  row: number,
-  col: number,
-) => {
-  if (startScreenEditing.value) {
-    applyStartScreenPlacement(gameId, columnIndex, row, col)
-  } else {
-    persistStartScreenPlacement(gameId, columnIndex, row, col)
-  }
-}
 
 
 

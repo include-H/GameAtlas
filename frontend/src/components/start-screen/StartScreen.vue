@@ -935,12 +935,13 @@ const handleWheel = (event: WheelEvent) => {
 }
 
 const onTilePointerDown = (index: number, event: PointerEvent) => {
+  if (!props.isEditing) return
   const tile = props.tiles[index]
   if (!tile) return
   if ((event.target as HTMLElement).closest('.metro-tile__action')) return
   pendingDrag = { gameId: tile.game_id, fromIndex: index }
   dragStart = { x: event.clientX, y: event.clientY }
-  // 编辑态与浏览态都支持长按拿起；编辑态另有 6px 拖动通道。
+  // 编辑态双通道：长按拿起（PRESS_DRAG_DELAY）或移动超 6px。
   pressTimer = window.setTimeout(() => {
     pressTimer = null
     beginTileDrag()
@@ -983,8 +984,6 @@ const onWindowPointerMove = (event: PointerEvent) => {
   }
   clearPressTimer()
   if (!dragState.value) {
-    // 浏览态只有长按能拿起磁贴：移动只是取消长按，避免误拖（短按=打开游戏）。
-    if (!props.isEditing) return
     beginTileDrag()
   }
   dragPointer.value = { x: event.clientX, y: event.clientY }
@@ -1011,40 +1010,44 @@ const updateColumnDragTarget = (x: number) => {
   columnDrag.value.targetIndex = target
 }
 
+// 落点 = 网格几何换算：指针坐标 → (row, col)，不依赖 DOM 元素命中——
+// 磁贴 slot 之外的空位没有 cell 元素，elementFromPoint 会在空位冻结落点
+// （框停在上一个扫过的磁贴上）。读取组网格 rect + 单元尺寸 + gap 数学换算，
+// 空位同样可命中。
 const updateDragTarget = (x: number, y: number) => {
   if (!dragState.value) return
-  const hit = document.elementFromPoint(x, y)
-  const cell = hit?.closest?.('[data-start-screen-cell]') as HTMLElement | null
-  if (!cell) return
-  const rawColumn = cell.dataset.columnIndex
-  const rawRow = cell.dataset.row
-  const rawCol = cell.dataset.col
-  const columnIndex = Number(rawColumn)
-  const row = Number(rawRow)
-  const col = Number(rawCol)
-  const dragged = draggedTile.value
-  if (
-    !dragged ||
-    !Number.isInteger(columnIndex) ||
-    !Number.isInteger(row) ||
-    !Number.isInteger(col) ||
-    columnIndex < 0 ||
-    row < 0 ||
-    col < 0
-  ) {
+  const area = metroAreaRef.value
+  if (!area) return
+  const grids = area.querySelectorAll<HTMLElement>('.start-screen__group-grid')
+  for (const grid of grids) {
+    const rect = grid.getBoundingClientRect()
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue
+    const group = grid.parentElement
+    const rawColumn = group?.dataset.columnIndex
+    const columnIndex = Number(rawColumn)
+    if (!Number.isInteger(columnIndex) || columnIndex < 0) continue
+    const style = getComputedStyle(grid)
+    const cell = parseFloat(style.getPropertyValue('--start-cell'))
+    const gap = parseFloat(style.getPropertyValue('--start-gap'))
+    if (!Number.isFinite(cell) || cell <= 0) continue
+    const step = cell + (Number.isFinite(gap) ? gap : 0)
+    const col = Math.min(START_SCREEN_FREE_COLS - 1, Math.max(0, Math.floor((x - rect.left) / step)))
+    const row = Math.max(0, Math.floor((y - rect.top) / step))
+    const dragged = draggedTile.value
+    if (!dragged) return
+    const target = findStartScreenDropTarget(
+      props.tiles,
+      dragState.value.gameId,
+      columnIndex,
+      row,
+      col,
+      dragged.tile_size,
+    )
+    dragState.value.targetColumnIndex = target.columnIndex
+    dragState.value.targetRow = target.row
+    dragState.value.targetCol = target.col
     return
   }
-  const target = findStartScreenDropTarget(
-    props.tiles,
-    dragState.value.gameId,
-    columnIndex,
-    row,
-    col,
-    dragged.tile_size,
-  )
-  dragState.value.targetColumnIndex = target.columnIndex
-  dragState.value.targetRow = target.row
-  dragState.value.targetCol = target.col
 }
 
 const updateEdgeScroll = (x: number) => {
