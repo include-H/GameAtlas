@@ -319,9 +319,9 @@ watch(
     visibility 0s linear 0.85s;
 }
 
-/* 清晰模式（浮层类场景）：去掉磨砂 blur，只保留轻微增亮 */
+/* 清晰模式（浮层类场景）：去掉磨砂 blur，亮度压低避免背景抢眼 */
 .shared-ambient-bg--sharp .shared-ambient-bg__layer {
-  filter: saturate(1.02) brightness(1.06);
+  filter: saturate(1.02) brightness(0.82);
   transform: scale(1.01);
 }
 

@@ -1272,9 +1272,9 @@ onUnmounted(() => {
 .start-screen-scrim {
   position: absolute;
   inset: 0;
-  /* 极透暗色玻璃：全局背景几乎完全透出（10%），文字可读性由磁贴自身
-     阴影/暗色渐变兜底；背景本身已模糊（SharedAmbientBackground 静态 blur） */
-  background: rgba(5, 8, 14, 0.1);
+  /* 极透暗色玻璃：背景清晰直出但压暗（20% 遮罩），避免抢眼；
+     文字可读性由磁贴自身阴影/暗色渐变兜底 */
+  background: rgba(4, 7, 12, 0.2);
 }
 
 .start-screen {
