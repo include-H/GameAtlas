@@ -241,13 +241,6 @@ func replaceRelationRows(tx *sqlx.Tx, typ domain.MetadataType, gameID int64, ids
 	return nil
 }
 
-func boolToInt(value bool) int {
-	if value {
-		return 1
-	}
-	return 0
-}
-
 func newGamePublicID() string {
 	buf := make([]byte, 16)
 	if _, err := rand.Read(buf); err != nil {

@@ -14,7 +14,6 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jmoiron/sqlx"
 
 	"github.com/hao/game/internal/config"
 	"github.com/hao/game/internal/domain"
@@ -206,14 +205,4 @@ func TestAssetsHandlerUploadReturnsNotFoundWhenGameMissing(t *testing.T) {
 	if !strings.Contains(recorder.Body.String(), `"error":"资源不存在"`) {
 		t.Fatalf("body = %s, want 资源不存在", recorder.Body.String())
 	}
-}
-
-func mustLoadHandlerGame(t *testing.T, db *sqlx.DB, gameID int64) *domain.Game {
-	t.Helper()
-
-	game, err := repositories.NewGamesRepository(db).GetByID(gameID)
-	if err != nil {
-		t.Fatalf("GetByID returned error: %v", err)
-	}
-	return game
 }

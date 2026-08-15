@@ -82,7 +82,6 @@ func (s *DirectoryService) List(path string) (*domain.DirectoryListResponse, err
 }
 
 const maxSearchResults = 100
-const fuzzyThreshold = 0.8
 
 type SearchResult struct {
 	Name        string `json:"name"`

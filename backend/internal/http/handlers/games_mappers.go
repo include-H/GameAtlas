@@ -299,14 +299,6 @@ func toGameFileResponses(items []domain.GameFile, includePaths bool) []gameFileR
 	return result
 }
 
-func toReviewIssueOverrideResponses(items []domain.ReviewIssueOverride) []reviewIssueOverrideResponse {
-	result := make([]reviewIssueOverrideResponse, 0, len(items))
-	for _, item := range items {
-		result = append(result, toReviewIssueOverrideResponse(item))
-	}
-	return result
-}
-
 func toReviewIssueOverrideResponse(item domain.ReviewIssueOverride) reviewIssueOverrideResponse {
 	return reviewIssueOverrideResponse{
 		ID:        item.ID,

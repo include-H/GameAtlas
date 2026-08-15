@@ -517,10 +517,6 @@ func TestGamesRepositoryUpdateAggregateRemoveCoverSetsNull(t *testing.T) {
 	}
 }
 
-func strPtr(s string) *string {
-	return &s
-}
-
 func TestGamesRepositoryUpdateAggregatePersistsLogoPositionsForMultipleLogos(t *testing.T) {
 	db := openRepositoryTestDB(t)
 	defer func() { _ = db.Close() }()
