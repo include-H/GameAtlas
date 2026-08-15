@@ -34,6 +34,9 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      - name: Check for dead code
+        run: npx knip --no-progress
+
   backend:
     name: Backend Checks
     runs-on: ubuntu-latest
