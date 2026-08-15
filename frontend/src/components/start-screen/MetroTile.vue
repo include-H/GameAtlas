@@ -68,6 +68,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { IconClose, IconExpand, IconImage } from '@arco-design/web-vue/es/icon'
+import { withAssetWidth } from '@/utils/asset-url'
 import type { StartScreenTile, StartScreenTileSize } from '@/services/types'
 
 // Win8 磁贴按压：按哪里哪里微微下沉——transform-origin 移到按下位置的对角，
@@ -152,7 +153,10 @@ const SIZE_HINTS: Record<StartScreenTileSize, string> = {
 }
 
 // 磁贴只用选定的原图 + 焦点（object-position），不再有封面/banner 兜底链。
-const imageSrc = computed(() => props.tile.image_path || '')
+// 磁贴显示尺寸远小于原图：请求 640 宽 WebP 变体（懒生成+永久缓存），
+// 避免几十张 1080P 原图同时解码卡顿；全屏展开动画才用原图（StartScreen 侧）。
+const TILE_IMAGE_WIDTH = 640
+const imageSrc = computed(() => withAssetWidth(props.tile.image_path, TILE_IMAGE_WIDTH))
 const focusStyle = computed(() => ({
   objectPosition: `${props.tile.focus_x}% ${props.tile.focus_y}%`,
 }))
@@ -176,7 +180,7 @@ const prefersReducedMotion = () =>
 
 const liveFrames = computed(() => {
   const frames = [props.tile.image_path, ...(props.tile.flip_images ?? [])].filter(Boolean) as string[]
-  return frames
+  return frames.map((path) => withAssetWidth(path, TILE_IMAGE_WIDTH))
 })
 const canAnimate = computed(() =>
   props.tile.tile_size === 'wide'

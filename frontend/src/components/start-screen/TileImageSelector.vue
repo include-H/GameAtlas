@@ -18,7 +18,7 @@
           >
             <img
               v-if="activeImage"
-              :src="activeImage"
+              :src="canvasSrc"
               :style="imageStyle"
               class="tile-image-selector__image"
               draggable="false"
@@ -34,14 +34,14 @@
             <div class="tile-image-selector__preview">
               <span class="tile-image-selector__preview-label">大磁贴 4x4</span>
               <div class="tile-image-selector__preview-box tile-image-selector__preview-box--square">
-                <img v-if="activeImage" :src="activeImage" :style="imageStyle" alt="大磁贴预览" />
+                <img v-if="activeImage" :src="previewSrc" :style="imageStyle" alt="大磁贴预览" />
                 <span v-else class="tile-image-selector__preview-empty">—</span>
               </div>
             </div>
             <div class="tile-image-selector__preview">
               <span class="tile-image-selector__preview-label">宽磁贴 2x4</span>
               <div class="tile-image-selector__preview-box tile-image-selector__preview-box--wide">
-                <img v-if="activeImage" :src="activeImage" :style="imageStyle" alt="宽磁贴预览" />
+                <img v-if="activeImage" :src="previewSrc" :style="imageStyle" alt="宽磁贴预览" />
                 <span v-else class="tile-image-selector__preview-empty">—</span>
               </div>
             </div>
@@ -55,7 +55,7 @@
             <div class="tile-image-selector__flip-list">
               <div v-for="(path, index) in flipSelection" :key="path" class="tile-image-selector__flip-item">
                 <span class="tile-image-selector__flip-index">{{ index + 2 }}</span>
-                <img :src="path" alt="" />
+                <img :src="withAssetWidth(path, 320)" alt="" />
                 <button
                   type="button"
                   class="tile-image-selector__flip-remove"
@@ -91,7 +91,7 @@
                   :title="item"
                   @click="selectImage(item)"
                 >
-                  <img :src="item" alt="" />
+                  <img :src="withAssetWidth(item, 320)" alt="" />
                   <span
                     v-if="maxFlipImages > 0 && item !== activeImage"
                     role="button"
@@ -122,6 +122,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { IconCheck, IconClose, IconPlus } from '@arco-design/web-vue/es/icon'
+import { withAssetWidth } from '@/utils/asset-url'
 
 export interface TileImageCandidateGroup {
   type: 'cover' | 'banner' | 'screenshot'
@@ -174,6 +175,9 @@ const candidateCount = computed(() =>
   props.candidates.reduce((count, group) => count + group.items.length, 0),
 )
 
+// 候选与预览按显示尺寸请求 WebP 变体，避免一次拉满 1080P 原图。
+const canvasSrc = computed(() => withAssetWidth(activeImage.value, 720))
+const previewSrc = computed(() => withAssetWidth(activeImage.value, 640))
 const imageStyle = computed(() => ({
   objectPosition: `${focusX.value}% ${focusY.value}%`,
 }))
