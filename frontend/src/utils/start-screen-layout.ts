@@ -169,6 +169,65 @@ export function layoutStartScreenTiles(
   return groups
 }
 
+// 从 (row, col) 起向右下的最大连续空闲矩形宽度（每行连续空闲列的最小宽度）
+const freeRectExtent = (
+  occupied: Occupancy,
+  row: number,
+  col: number,
+  minCols: number,
+): { rows: number; cols: number } => {
+  let width = START_SCREEN_FREE_COLS - col
+  let rows = 0
+  for (;;) {
+    const line = occupied.get(row + rows)
+    if (!line) break
+    let w = 0
+    for (let c = col; c < START_SCREEN_FREE_COLS && !line[c]; c += 1) w += 1
+    if (w < minCols) break
+    width = Math.min(width, w)
+    rows += 1
+  }
+  return { rows, cols: width }
+}
+
+// 指针格子到矩形（含内部）的切比雪夫距离
+const rectChebyshevDistance = (
+  pointerRow: number,
+  pointerCol: number,
+  row: number,
+  col: number,
+  rows: number,
+  cols: number,
+): number => {
+  const dx = Math.max(0, col - pointerCol, pointerCol - (col + cols - 1))
+  const dy = Math.max(0, row - pointerRow, pointerRow - (row + rows - 1))
+  return Math.max(dx, dy)
+}
+
+// 吸附：指针附近"空闲矩形恰好等于磁贴尺寸"的精确空位，指针落在空位内或
+// 边缘 1 格即吸附到其左上角——宽磁贴不必精确拖到第一个格子。
+const findSnapFit = (
+  occupied: Occupancy,
+  rows: number,
+  cols: number,
+  pointerRow: number,
+  pointerCol: number,
+): { row: number; col: number } | null => {
+  let best: { row: number; col: number; distance: number } | null = null
+  for (let r = Math.max(0, pointerRow - 1); r <= pointerRow + 1; r += 1) {
+    for (let c = 0; c <= START_SCREEN_FREE_COLS - cols; c += 1) {
+      if (!fits(occupied, r, c, rows, cols)) continue
+      const extent = freeRectExtent(occupied, r, c, cols)
+      if (extent.rows !== rows || extent.cols !== cols) continue
+      const distance = rectChebyshevDistance(pointerRow, pointerCol, r, c, rows, cols)
+      if (distance <= 1 && (!best || distance < best.distance)) {
+        best = { row: r, col: c, distance }
+      }
+    }
+  }
+  return best ? { row: best.row, col: best.col } : null
+}
+
 export function findStartScreenDropTarget(
   tiles: StartScreenTile[],
   excludedGameId: number,
@@ -211,6 +270,12 @@ export function findStartScreenDropTarget(
 
   if (fits(targetColumn, requestedRow, requestedCol, span.rows, span.cols)) {
     return { columnIndex: requestedColumnIndex, row: requestedRow, col: requestedCol }
+  }
+
+  // 请求坐标放不下 → 先试精确空位吸附，再退 first-fit
+  const snap = findSnapFit(targetColumn, span.rows, span.cols, requestedRow, requestedCol)
+  if (snap) {
+    return { columnIndex: requestedColumnIndex, row: snap.row, col: snap.col }
   }
 
   const position = findFirstFit(targetColumn, span.rows, span.cols, requestedRow)

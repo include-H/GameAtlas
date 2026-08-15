@@ -145,4 +145,61 @@ describe('packStartScreenTiles', () => {
     expect(findStartScreenDropTarget(fullRow, 99, 0, 0, 0, 'small'))
       .toEqual({ columnIndex: 0, row: 2, col: 0 })
   })
+
+  // 吸附：指针附近"空闲矩形恰好等于磁贴尺寸"的精确空位，拖到区域内任意处即吸附
+  it('snaps a wide tile into an exact 2x4 gap when the pointer is inside it', () => {
+    // row0-1 占满 12 列 → row2-3 只留 col4-7（2x4 精确空位）
+    const tiles = [
+      makeTile(1, 'small', { column_index: 0, grid_row: 0, grid_col: 0 }),
+      makeTile(2, 'small', { column_index: 0, grid_row: 0, grid_col: 2 }),
+      makeTile(3, 'small', { column_index: 0, grid_row: 0, grid_col: 4 }),
+      makeTile(4, 'small', { column_index: 0, grid_row: 0, grid_col: 6 }),
+      makeTile(5, 'small', { column_index: 0, grid_row: 0, grid_col: 8 }),
+      makeTile(6, 'small', { column_index: 0, grid_row: 0, grid_col: 10 }),
+      makeTile(7, 'small', { column_index: 0, grid_row: 2, grid_col: 0 }),
+      makeTile(8, 'small', { column_index: 0, grid_row: 2, grid_col: 2 }),
+      makeTile(9, 'small', { column_index: 0, grid_row: 2, grid_col: 8 }),
+      makeTile(10, 'small', { column_index: 0, grid_row: 2, grid_col: 10 }),
+    ]
+
+    // 指针在空位右下角格子（row3 col7），请求坐标放不下 2x4 → 吸附到左上角
+    expect(findStartScreenDropTarget(tiles, 99, 0, 3, 7, 'wide'))
+      .toEqual({ columnIndex: 0, row: 2, col: 4 })
+    // 指针在空位内任意格子（row2 col6）同样吸附
+    expect(findStartScreenDropTarget(tiles, 99, 0, 2, 6, 'wide'))
+      .toEqual({ columnIndex: 0, row: 2, col: 4 })
+    // 指针在空位上方 1 格也吸附
+    expect(findStartScreenDropTarget(tiles, 99, 0, 1, 5, 'wide'))
+      .toEqual({ columnIndex: 0, row: 2, col: 4 })
+  })
+
+  it('does not snap into a gap larger than the dragged tile', () => {
+    // row0-1 满，row2-3 只留 col4-11（2x8 空位，大于 2x4）→ 不吸附，走 first-fit
+    const tiles = [
+      makeTile(1, 'small', { column_index: 0, grid_row: 0, grid_col: 0 }),
+      makeTile(2, 'small', { column_index: 0, grid_row: 0, grid_col: 2 }),
+      makeTile(3, 'small', { column_index: 0, grid_row: 0, grid_col: 4 }),
+      makeTile(4, 'small', { column_index: 0, grid_row: 0, grid_col: 6 }),
+      makeTile(5, 'small', { column_index: 0, grid_row: 0, grid_col: 8 }),
+      makeTile(6, 'small', { column_index: 0, grid_row: 0, grid_col: 10 }),
+      makeTile(7, 'small', { column_index: 0, grid_row: 2, grid_col: 0 }),
+      makeTile(8, 'small', { column_index: 0, grid_row: 2, grid_col: 2 }),
+    ]
+
+    // 指针在空位内（row2 col10，clamp 到 col8），2x4 放得下 → 直接落点
+    expect(findStartScreenDropTarget(tiles, 99, 0, 2, 10, 'wide'))
+      .toEqual({ columnIndex: 0, row: 2, col: 8 })
+    // 指针在空位边缘外 2 格（row2 col0 上方区域被占时）不吸附：走 first-fit
+    // 构造：row0-1 全满、row2-3 只留 col4-11，指针在 row0 col2（被占）→ first-fit
+    const fullTop = [
+      ...tiles,
+      makeTile(9, 'small', { column_index: 0, grid_row: 2, grid_col: 4 }),
+      makeTile(10, 'small', { column_index: 0, grid_row: 2, grid_col: 6 }),
+      makeTile(11, 'small', { column_index: 0, grid_row: 2, grid_col: 8 }),
+      makeTile(12, 'small', { column_index: 0, grid_row: 2, grid_col: 10 }),
+    ]
+    const target = findStartScreenDropTarget(fullTop, 99, 0, 0, 2, 'wide')
+    // row0/1 全满 → first-fit 从 row2 起找 → row2 也被占满 → row4 起
+    expect(target).toEqual({ columnIndex: 0, row: 4, col: 0 })
+  })
 })
