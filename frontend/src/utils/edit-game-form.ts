@@ -20,6 +20,8 @@ export interface EditGameEditableVideo {
   asset_uid?: string
   path: string
   poster_path?: string | null
+  /** 本会话重选过封面帧：保存时即使已有 id 也随 new_assets 提交刷新 poster */
+  poster_dirty?: boolean
 }
 
 export interface EditGameEditableCover {

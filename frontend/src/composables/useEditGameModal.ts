@@ -37,6 +37,8 @@ interface UseEditGameModalOptions {
   formRef: Ref<{ validate?: () => Promise<unknown> } | undefined>
   isSubmitting: Ref<boolean>
   activeTab: Ref<string>
+  /** 素材页专用：下载/上传素材落库后自动静默保存一次，防止环境波动丢失已下载素材 */
+  autoPersistAssets?: boolean
 }
 
 export const useEditGameModal = ({
@@ -46,6 +48,7 @@ export const useEditGameModal = ({
   formRef,
   isSubmitting,
   activeTab,
+  autoPersistAssets = false,
 }: UseEditGameModalOptions) => {
   const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1280)
   const isUploadingVideo = ref(false)
@@ -137,6 +140,25 @@ export const useEditGameModal = ({
       emit('sync')
     }, 600)
   }
+
+  // 素材页自动保存：素材下载/上传完成后防抖触发一次静默保存（落库但不关弹窗、
+  // 不跳转）。重复提交已入库的 new_assets 由后端幂等处理（INSERT OR IGNORE 语义），
+  // 环境波动（断网/误关页）前下载的素材已持久化。
+  let assetAutoSaveTimer: ReturnType<typeof setTimeout> | undefined
+  const autoSaveAssetsSilently = () => {
+    if (typeof window === 'undefined') return
+    if (assetAutoSaveTimer) clearTimeout(assetAutoSaveTimer)
+    assetAutoSaveTimer = setTimeout(() => {
+      assetAutoSaveTimer = undefined
+      void handleSubmit({ silent: true })
+    }, 900)
+  }
+  const onAssetPersisted = autoPersistAssets
+    ? () => {
+        emitAssetSync()
+        autoSaveAssetsSilently()
+      }
+    : emitAssetSync
 
   const syncViewportWidth = () => {
     viewportWidth.value = window.innerWidth
@@ -388,7 +410,7 @@ export const useEditGameModal = ({
     ensureDeveloperNames: developerPicker.ensureNames,
     ensurePublisherNames: publisherPicker.ensureNames,
     addAlert,
-    onAssetPersisted: emitAssetSync,
+    onAssetPersisted,
   })
 
   const handleCoverError = (event: Event) => {
@@ -428,7 +450,7 @@ export const useEditGameModal = ({
     createEditableScreenshot,
     createEditableVideo,
     addAlert,
-    onAssetPersisted: emitAssetSync,
+    onAssetPersisted,
   })
 
   const resetTransientState = () => {

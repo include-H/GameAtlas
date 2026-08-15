@@ -473,6 +473,7 @@ const {
   formRef,
   isSubmitting,
   activeTab,
+  autoPersistAssets: true,
 })
 
 const handleSave = () => {

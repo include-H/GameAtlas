@@ -207,6 +207,48 @@ describe('useEditGameWorkflow', () => {
     expect(closeModal).toHaveBeenCalledTimes(1)
   })
 
+  it('silent save persists without closing the editor or emitting success', async () => {
+    const { options, addAlert, emitSuccess, closeModal } = buildOptions()
+
+    const workflow = useEditGameWorkflow(options)
+    await workflow.handleSubmit({ silent: true })
+
+    expect(updateGameAggregateMock).toHaveBeenCalledTimes(1)
+    expect(addAlert).toHaveBeenCalledWith('素材已自动保存', 'success')
+    expect(emitSuccess).not.toHaveBeenCalled()
+    expect(closeModal).not.toHaveBeenCalled()
+    expect(options.isSubmitting.value).toBe(false)
+  })
+
+  it('re-submits a video whose poster was re-selected in this session', async () => {
+    const { options } = buildOptions()
+    options.form.value.preview_videos = [
+      {
+        id: 401,
+        asset_uid: 'video-existing',
+        path: '/assets/game-1/video-existing.mp4',
+        poster_path: '/assets/game-1/poster-2.jpg',
+        poster_dirty: true,
+      },
+    ]
+
+    const workflow = useEditGameWorkflow(options)
+    await workflow.handleSubmit()
+
+    expect(updateGameAggregateMock).toHaveBeenCalledWith('game-1', expect.objectContaining({
+      assets: expect.objectContaining({
+        new_assets: [
+          {
+            asset_uid: 'video-existing',
+            asset_type: 'video',
+            path: '/assets/game-1/video-existing.mp4',
+            poster_path: '/assets/game-1/poster-2.jpg',
+          },
+        ],
+      }),
+    }))
+  })
+
   it('does not close the editor when the save is invalidated during a game switch', async () => {
     let resolveSave: (result: { game: { id: number; public_id: string }; warnings: string[] }) => void = () => {}
     updateGameAggregateMock.mockImplementationOnce(() => new Promise((resolve) => {

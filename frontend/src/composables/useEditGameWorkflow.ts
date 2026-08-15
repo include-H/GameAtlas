@@ -23,6 +23,11 @@ interface UseEditGameWorkflowOptions {
   onGameSaved?: (game: GameListItem) => void
 }
 
+interface SubmitOptions {
+  /** 静默保存：落库但不触发成功事件、不关闭弹窗/不跳转（素材下载后的自动保存用） */
+  silent?: boolean
+}
+
 const toNullableFormText = (value: string | null | undefined) => {
   if (typeof value !== 'string') {
     return value ?? null
@@ -58,7 +63,8 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
     options.isSubmitting.value = false
   }
 
-  const handleSubmit = async (): Promise<boolean> => {
+  const handleSubmit = async (submitOptions: SubmitOptions = {}): Promise<boolean> => {
+    const { silent = false } = submitOptions
     const game = options.game.value
     if (!game) return false
     if (options.isSubmitting.value) return false
@@ -112,7 +118,9 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
         }
       }
       for (const v of options.form.value.preview_videos) {
-        if (!v.id && v.asset_uid && v.path) {
+        // 重选过封面帧的已有视频也提交（后端按同 path UPSERT poster_path）；
+        // 未动过的已有视频由顺序数组维护，避免重复提交。
+        if ((!v.id || v.poster_dirty) && v.asset_uid && v.path) {
           newAssets.push({
             asset_uid: v.asset_uid,
             asset_type: 'video',
@@ -172,6 +180,10 @@ export const useEditGameWorkflow = (options: UseEditGameWorkflowOptions) => {
       if (!request.isCurrent()) return false
       if (aggregateResult.warnings.length > 0) {
         options.addAlert('部分素材文件未能物理删除，系统稍后可重试', 'warning')
+      }
+      if (silent) {
+        options.addAlert('素材已自动保存', 'success')
+        return true
       }
       options.addAlert('保存成功', 'success')
       options.emitSuccess()
