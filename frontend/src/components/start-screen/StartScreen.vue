@@ -696,7 +696,8 @@ const openExpand = (publicId: string, rect: DOMRect) => {
   }
   expandHideTiles.value = false
   const frontImage = tile[`image_${tile.tile_size}_path`] || tile.cover_image || tile.banner_image || ''
-  const backImage = tile.image_wide_path || tile.banner_image || tile.cover_image || frontImage
+  // 背面全屏展开：优先大图。裁剪产物只有 220/440px，全屏拉伸必糊，不参与背面兜底。
+  const backImage = tile.banner_image || tile.cover_image || frontImage
   // 预加载两面：起始面要和磁贴无缝衔接，展开面要在翻正前准备好。
   for (const image of new Set([frontImage, backImage])) {
     if (image) {
@@ -778,11 +779,12 @@ const handleTileSelect = async (publicId: string, rect?: DOMRect) => {
   if (!request.isCurrent()) return
   const detail = await detailPromise
   if (!request.isCurrent()) return
-  // 详情返回后把正面图升级为游戏 banner/截图（翻转完成前替换，转正即显示内容图）
+  // 详情返回后把正面图升级为全分辨率内容图（翻转完成前替换，转正即显示内容图）。
+  // 截图是 1920×1080 全分辨率，优先于常为 460×215 的 Steam 小 banner，避免全屏拉伸发糊。
   if (detail && expand.value) {
     const frontImage =
-      detail.banner_image ||
       (detail.screenshots && detail.screenshots.length > 0 ? detail.screenshots[0].path : '') ||
+      detail.banner_image ||
       expand.value.frontImage
     if (frontImage && frontImage !== expand.value.backImage) {
       const preload = new Image()
