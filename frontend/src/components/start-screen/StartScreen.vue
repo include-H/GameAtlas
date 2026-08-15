@@ -406,8 +406,8 @@ interface TileDragState {
   targetCol: number
 }
 
-// 整列重排：拖动手柄进入列拖拽，targetIndex 为"插入到第 targetIndex 列之前"
-// （0..columns.length，指原数组语义；落位时换算为最终索引）。
+// 整列重排：拖动手柄进入列拖拽。换位语义——targetIndex 为指针所在列索引
+// （0..columns.length，length 表示末尾空白区，落位时与最后一列换位）。
 interface ColumnDragState {
   fromIndex: number
   targetIndex: number
@@ -421,7 +421,7 @@ let pendingDrag: { gameId: number; fromIndex: number } | null = null
 let dragStart: { x: number; y: number } | null = null
 let edgeScrollFrame: number | null = null
 
-// 列插入点：targetIndex 指"插入到第 targetIndex 列之前"（0..columns.length）。
+// 列落点：targetIndex 为指针所在列（换位目标），length 表示末尾区。
 const isColumnInsertionBefore = (groupIndex: number) =>
   columnDrag.value !== null && columnDrag.value.targetIndex === groupIndex
 const isColumnInsertionAtEnd = computed(() =>
@@ -964,7 +964,9 @@ const onWindowPointerMove = (event: PointerEvent) => {
   updateEdgeScroll(event.clientX)
 }
 
-// 列插入点：按指针 x 与各列中点的相对位置，得出"插入到第 targetIndex 列之前"。
+// 列落点：换位语义——指针所在列即目标列（拖到哪列 = 与哪列换位）。
+// 中点分割会有右移相邻死区：插到"下一列之前"换算后等于原位，导致
+// 组1 拖到组2 无反应。改用 rect 包含判定，任意相邻/隔位方向都成立。
 const updateColumnDragTarget = (x: number) => {
   if (columnDrag.value === null) return
   const area = metroAreaRef.value
@@ -973,7 +975,7 @@ const updateColumnDragTarget = (x: number) => {
   let target = groups.length
   for (let i = 0; i < groups.length; i += 1) {
     const rect = groups[i].getBoundingClientRect()
-    if (x < rect.left + rect.width / 2) {
+    if (x <= rect.right) {
       target = i
       break
     }
@@ -1043,9 +1045,8 @@ const updateEdgeScroll = (x: number) => {
 const onWindowPointerUp = () => {
   if (columnDrag.value) {
     const from = columnDrag.value.fromIndex
-    const target = columnDrag.value.targetIndex
-    // 插入语义换算为最终索引：插在自身右侧时目标位 -1。
-    const to = target > from ? target - 1 : target
+    // 换位语义：目标索引 = 指针所在列；末尾空白区 = 与最后一列换位。
+    const to = Math.min(columnDrag.value.targetIndex, visibleGroups.value.length - 1)
     if (to !== from) {
       emit('moveColumn', from, to)
     }
