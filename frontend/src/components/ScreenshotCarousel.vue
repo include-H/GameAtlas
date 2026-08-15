@@ -148,6 +148,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { IconLeft, IconRight } from '@arco-design/web-vue/es/icon'
 import { resolveAssetUrl, withAssetWidth } from '@/utils/asset-url'
 import { shouldResetVideoPlaybackState } from '@/utils/video-playback'
+import { useGlobalOverlay } from '@/composables/useGlobalOverlay'
 
 interface Props {
   screenshots?: string[]
@@ -472,6 +473,40 @@ const tryPlayVideo = () => {
     video.load()
   }
 }
+
+// 开始屏幕等全局覆盖层打开时暂停正在播放/等待播放的视频，关闭后恢复播放前状态。
+const { overlayOpen } = useGlobalOverlay()
+let wasPlayingBeforeOverlay = false
+
+watch(overlayOpen, (open) => {
+  const video = videoRef.value
+  if (!video) return
+  if (open) {
+    wasPlayingBeforeOverlay = !video.paused
+    video.pause()
+    if (playTimer !== undefined) {
+      window.clearTimeout(playTimer)
+      playTimer = undefined
+    }
+    playScheduled = false
+    return
+  }
+  if (wasPlayingBeforeOverlay) {
+    const playPromise = video.play()
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(() => {
+        video.muted = true
+        const retry = video.play()
+        if (retry && typeof retry.catch === 'function') {
+          retry.catch(() => {
+            // 恢复播放被拒绝时保持暂停，不打扰用户。
+          })
+        }
+      })
+    }
+  }
+  wasPlayingBeforeOverlay = false
+})
 
 const stopImageAutoplay = () => {
   if (imageAutoplayTimer !== null) {

@@ -41,6 +41,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useGlobalOverlay } from '@/composables/useGlobalOverlay'
 
 const props = defineProps<{
   playlist: string[]
@@ -94,6 +95,24 @@ const toggleCrtPause = () => {
     void video.play().catch(() => {})
   }
 }
+
+// 开始屏幕等全局覆盖层打开时暂停 CRT 播放，关闭后按原状态恢复。
+const { overlayOpen } = useGlobalOverlay()
+let crtPausedByOverlay = false
+
+watch(overlayOpen, (open) => {
+  const video = crtVideoRef.value
+  if (!video) return
+  if (open) {
+    crtPausedByOverlay = !video.paused
+    video.pause()
+    return
+  }
+  if (crtPausedByOverlay && crtPowered.value && !crtPaused.value) {
+    void video.play().catch(() => {})
+  }
+  crtPausedByOverlay = false
+})
 </script>
 
 <style scoped>
