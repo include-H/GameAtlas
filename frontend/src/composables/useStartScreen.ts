@@ -134,6 +134,37 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     )
   }
 
+  // 整列重排：from 为原索引，to 为重排后的目标索引（0 起）。
+  // 移动列整体平移，中间列反向补位，最后按列重排磁贴网格。
+  const moveColumn = (from: number, to: number) => {
+    if (from === to) return
+    if (
+      from < 0 ||
+      to < 0 ||
+      from >= columns.value.length ||
+      to >= columns.value.length
+    ) {
+      return
+    }
+    const [moved] = columns.value.splice(from, 1)
+    columns.value.splice(to, 0, moved)
+    const direction = to > from ? 1 : -1
+    tiles.value = normalizeStartScreenTiles(
+      tiles.value.map((tile) => {
+        if (tile.column_index === from) {
+          return { ...tile, column_index: to }
+        }
+        if (direction > 0 && tile.column_index > from && tile.column_index <= to) {
+          return { ...tile, column_index: tile.column_index - 1 }
+        }
+        if (direction < 0 && tile.column_index >= to && tile.column_index < from) {
+          return { ...tile, column_index: tile.column_index + 1 }
+        }
+        return tile
+      }),
+    )
+  }
+
   const applyTilePlacement = (gameId: number, columnIndex: number, row: number, col: number) => {
     const tile = tiles.value.find((item) => item.game_id === gameId)
     if (!tile) return
@@ -232,6 +263,7 @@ export const useStartScreen = (options: UseStartScreenOptions) => {
     renameColumn,
     addColumn,
     removeColumn,
+    moveColumn,
     applyTilePlacement,
     resizeTile,
     removeTile,

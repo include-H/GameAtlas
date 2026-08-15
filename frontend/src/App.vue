@@ -153,6 +153,7 @@
     @apply-placement="applyStartScreenPlacement"
     @add-column="addStartScreenColumn"
     @remove-column="removeStartScreenColumn"
+    @move-column="moveStartScreenColumn"
     @apply-image="applyStartScreenImage"
     @rename-column="renameStartScreenColumn"
   />
@@ -225,6 +226,7 @@ const {
   applyTilePlacement: applyStartScreenPlacement,
   addColumn: addStartScreenColumn,
   removeColumn: removeStartScreenColumn,
+  moveColumn: moveStartScreenColumn,
   applyTileImage: applyStartScreenImage,
   renameColumn: renameStartScreenColumn,
 } = useStartScreen({

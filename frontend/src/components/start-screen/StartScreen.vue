@@ -79,6 +79,7 @@
                 v-for="(group, groupIndex) in visibleGroups"
                 :key="group.columnIndex"
                 class="start-screen__group"
+                :class="{ 'is-column-insertion': isColumnInsertionBefore(groupIndex) }"
                 :style="{
                   '--start-group-cols': groupCols(group),
                   '--start-group-rows': Math.max(groupMaxRow(group), 1),
@@ -92,6 +93,16 @@
                   class="start-screen__group-header"
                   :style="{ '--start-tile-enter-delay': groupEnterDelay(groupIndex) }"
                 >
+                  <button
+                    v-if="isEditing"
+                    class="start-screen__group-drag"
+                    type="button"
+                    :aria-label="`拖动整列 ${group.columnIndex + 1}`"
+                    title="拖动整列排序"
+                    @pointerdown="onColumnHeaderPointerDown(group.columnIndex, $event)"
+                  >
+                    <icon-drag-arrow />
+                  </button>
                   <input
                     v-if="isEditing"
                     class="start-screen__group-name-input"
@@ -202,7 +213,7 @@
                 v-if="isEditing"
                 type="button"
                 class="start-screen__new-column"
-                :class="{ 'start-screen__new-column--target': isNewColumnTarget }"
+                :class="{ 'start-screen__new-column--target': isNewColumnTarget || isColumnInsertionAtEnd }"
                 :data-start-screen-cell="true"
                 :data-column-index="newColumnIndex"
                 data-row="0"
@@ -221,6 +232,14 @@
               :style="{ left: `${dragPointer.x}px`, top: `${dragPointer.y}px` }"
             >
               <MetroTile :tile="draggedTile" :color-index="dragState.fromIndex" :editing="false" :animate="false" />
+            </div>
+            <div
+              v-if="columnDrag"
+              class="start-screen__column-ghost"
+              :style="{ left: `${dragPointer?.x ?? 0}px`, top: `${dragPointer?.y ?? 0}px` }"
+            >
+              <icon-drag-arrow />
+              {{ columnNameOf(columnDrag.fromIndex) }}
             </div>
           </div>
 
@@ -286,6 +305,7 @@ import { useRouter } from 'vue-router'
 import {
   IconClose,
   IconDesktop,
+  IconDragArrow,
   IconEdit,
   IconExclamationCircle,
   IconPlus,
@@ -336,6 +356,7 @@ const emit = defineEmits<{
   applyPlacement: [gameId: number, columnIndex: number, row: number, col: number]
   addColumn: []
   removeColumn: [index: number]
+  moveColumn: [from: number, to: number]
   applyImage: [gameId: number, imagePath: string, focusX: number, focusY: number, flipImages: string[]]
   renameColumn: [index: number, name: string]
 }>()
@@ -385,11 +406,27 @@ interface TileDragState {
   targetCol: number
 }
 
+// 整列重排：拖动手柄进入列拖拽，targetIndex 为"插入到第 targetIndex 列之前"
+// （0..columns.length，指原数组语义；落位时换算为最终索引）。
+interface ColumnDragState {
+  fromIndex: number
+  targetIndex: number
+}
+
 const dragState = ref<TileDragState | null>(null)
 const dragPointer = ref<{ x: number; y: number } | null>(null)
+const columnDrag = ref<ColumnDragState | null>(null)
+let pendingColumnDrag: number | null = null
 let pendingDrag: { gameId: number; fromIndex: number } | null = null
 let dragStart: { x: number; y: number } | null = null
 let edgeScrollFrame: number | null = null
+
+// 列插入点：targetIndex 指"插入到第 targetIndex 列之前"（0..columns.length）。
+const isColumnInsertionBefore = (groupIndex: number) =>
+  columnDrag.value !== null && columnDrag.value.targetIndex === groupIndex
+const isColumnInsertionAtEnd = computed(() =>
+  columnDrag.value !== null && columnDrag.value.targetIndex === visibleGroups.value.length,
+)
 
 const draggedTile = computed(() => props.tiles.find((tile) => tile.game_id === dragState.value?.gameId) ?? null)
 
@@ -486,7 +523,7 @@ const handleAddColumn = () => {
 }
 
 const handleClose = () => {
-  if (dragState.value) {
+  if (dragState.value || columnDrag.value) {
     endDrag()
     return
   }
@@ -881,8 +918,34 @@ const onTilePointerDown = (index: number, event: PointerEvent) => {
   window.addEventListener('pointercancel', onWindowPointerCancel)
 }
 
+const onColumnHeaderPointerDown = (columnIndex: number, event: PointerEvent) => {
+  if (!props.isEditing) return
+  if ((event.target as HTMLElement).closest('.start-screen__group-name-input, .start-screen__group-remove')) return
+  pendingColumnDrag = columnIndex
+  dragStart = { x: event.clientX, y: event.clientY }
+  window.addEventListener('pointermove', onWindowPointerMove)
+  window.addEventListener('pointerup', onWindowPointerUp)
+  window.addEventListener('pointercancel', onWindowPointerCancel)
+}
+
 const onWindowPointerMove = (event: PointerEvent) => {
-  if (!pendingDrag || !dragStart) return
+  if (!dragStart) return
+  if (pendingColumnDrag !== null) {
+    if (!columnDrag.value && Math.hypot(event.clientX - dragStart.x, event.clientY - dragStart.y) < 6) {
+      return
+    }
+    if (!columnDrag.value) {
+      columnDrag.value = {
+        fromIndex: pendingColumnDrag,
+        targetIndex: pendingColumnDrag,
+      }
+    }
+    dragPointer.value = { x: event.clientX, y: event.clientY }
+    updateColumnDragTarget(event.clientX)
+    updateEdgeScroll(event.clientX)
+    return
+  }
+  if (!pendingDrag) return
   if (!dragState.value && Math.hypot(event.clientX - dragStart.x, event.clientY - dragStart.y) < 6) {
     return
   }
@@ -899,6 +962,23 @@ const onWindowPointerMove = (event: PointerEvent) => {
   dragPointer.value = { x: event.clientX, y: event.clientY }
   updateDragTarget(event.clientX, event.clientY)
   updateEdgeScroll(event.clientX)
+}
+
+// 列插入点：按指针 x 与各列中点的相对位置，得出"插入到第 targetIndex 列之前"。
+const updateColumnDragTarget = (x: number) => {
+  if (columnDrag.value === null) return
+  const area = metroAreaRef.value
+  if (!area) return
+  const groups = Array.from(area.querySelectorAll<HTMLElement>('.start-screen__group'))
+  let target = groups.length
+  for (let i = 0; i < groups.length; i += 1) {
+    const rect = groups[i].getBoundingClientRect()
+    if (x < rect.left + rect.width / 2) {
+      target = i
+      break
+    }
+  }
+  columnDrag.value.targetIndex = target
 }
 
 const updateDragTarget = (x: number, y: number) => {
@@ -949,7 +1029,7 @@ const updateEdgeScroll = (x: number) => {
   }
   if (!nearLeft && !nearRight) return
   const step = () => {
-    if (!dragState.value) {
+    if (!dragState.value && !columnDrag.value) {
       edgeScrollFrame = null
       return
     }
@@ -961,6 +1041,17 @@ const updateEdgeScroll = (x: number) => {
 }
 
 const onWindowPointerUp = () => {
+  if (columnDrag.value) {
+    const from = columnDrag.value.fromIndex
+    const target = columnDrag.value.targetIndex
+    // 插入语义换算为最终索引：插在自身右侧时目标位 -1。
+    const to = target > from ? target - 1 : target
+    if (to !== from) {
+      emit('moveColumn', from, to)
+    }
+    endDrag()
+    return
+  }
   if (dragState.value) {
     emit(
       'applyPlacement',
@@ -980,7 +1071,9 @@ const onWindowPointerCancel = () => {
 const endDrag = () => {
   dragState.value = null
   dragPointer.value = null
+  columnDrag.value = null
   pendingDrag = null
+  pendingColumnDrag = null
   dragStart = null
   if (edgeScrollFrame !== null) {
     cancelAnimationFrame(edgeScrollFrame)
@@ -1363,6 +1456,63 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  position: relative;
+}
+
+/* 整列重排插入位：高亮"插入到该列之前" */
+.start-screen__group.is-column-insertion::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: -7px;
+  width: 3px;
+  border-radius: 2px;
+  background: rgb(var(--primary-6));
+  box-shadow: 0 0 8px rgba(var(--primary-6), 0.7);
+}
+
+/* 列拖拽手柄：深色小圆钮，位于列名左侧 */
+.start-screen__group-drag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: grab;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.start-screen__group-drag:active {
+  cursor: grabbing;
+}
+
+.start-screen__group-drag:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* 列拖拽 ghost：跟手小标签 */
+.start-screen__column-ghost {
+  position: fixed;
+  z-index: 1700;
+  transform: translate(-50%, -120%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.72);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 .start-screen__group-grid-row {

@@ -275,6 +275,46 @@ describe('useStartScreen', () => {
     ])
   })
 
+  it('moves a whole column and shifts tile column indexes', async () => {
+    const { screen } = createScreen({
+      fetchTiles: vi.fn().mockResolvedValue(makeLayout(
+        [
+          makeTile(1, 'a', { column_index: 0 }),
+          makeTile(2, 'b', { column_index: 1 }),
+          makeTile(3, 'c', { column_index: 2 }),
+        ],
+        [makeColumn('一'), makeColumn('二'), makeColumn('三')],
+      )),
+    })
+
+    screen.open()
+    await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
+    screen.moveColumn(0, 2)
+
+    expect(screen.columns.value.map((column) => column.name)).toEqual(['二', '三', '一'])
+    const tileOf = (gameId: number) => screen.tiles.value.find((tile) => tile.game_id === gameId)
+    expect(tileOf(1)?.column_index).toBe(2)
+    expect(tileOf(2)?.column_index).toBe(0)
+    expect(tileOf(3)?.column_index).toBe(1)
+  })
+
+  it('ignores no-op and out-of-range column moves', async () => {
+    const { screen } = createScreen({
+      fetchTiles: vi.fn().mockResolvedValue(makeLayout(
+        [makeTile(1, 'a', { column_index: 0 }), makeTile(2, 'b', { column_index: 1 })],
+        [makeColumn('一'), makeColumn('二')],
+      )),
+    })
+
+    screen.open()
+    await vi.waitFor(() => expect(screen.isLoading.value).toBe(false))
+    screen.moveColumn(1, 1)
+    screen.moveColumn(0, 5)
+
+    expect(screen.columns.value.map((column) => column.name)).toEqual(['一', '二'])
+    expect(screen.tiles.value.find((tile) => tile.game_id === 1)?.column_index).toBe(0)
+  })
+
   it('adds and removes empty columns without moving occupied tiles', async () => {
     const { screen } = createScreen({
       fetchTiles: vi.fn().mockResolvedValue(makeLayout(
