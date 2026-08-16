@@ -13,12 +13,14 @@ import (
 	"github.com/hao/game/internal/http/routes"
 	"github.com/hao/game/internal/repositories"
 	"github.com/hao/game/internal/services"
+	"github.com/hao/game/internal/streaming"
 )
 
 type App struct {
 	config       config.Config
 	db           *sqlx.DB
 	server       *http.Server
+	streamServer *streaming.Server
 	backupCancel context.CancelFunc
 }
 
@@ -124,6 +126,14 @@ func New(cfg config.Config) (*App, error) {
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 	}
 
+	var streamServer *streaming.Server
+	if cfg.StreamEnabled {
+		streamServer, err = newStreamServer(cfg)
+		if err != nil {
+			log.Printf("streaming proxy init failed (continuing without it): %v", err)
+		}
+	}
+
 	backupCtx, backupCancel := context.WithCancel(context.Background())
 	backupService.StartPeriodic(backupCtx)
 
@@ -131,17 +141,50 @@ func New(cfg config.Config) (*App, error) {
 		config:       cfg,
 		db:           sqliteDB,
 		server:       server,
+		streamServer: streamServer,
 		backupCancel: backupCancel,
 	}, nil
 }
 
+// newStreamServer 初始化串流代理并尝试监听。失败降级（不阻塞主站启动）。
+func newStreamServer(cfg config.Config) (*streaming.Server, error) {
+	srv, err := streaming.New(streaming.Options{
+		Bind:        cfg.StreamHost,
+		Port:        cfg.StreamPort,
+		DataDir:     cfg.StreamDataDir,
+		WWWRoot:     cfg.StreamWWWRoot,
+		MaxChannels: 64,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("streaming init: %w", err)
+	}
+	if err := srv.Start(); err != nil {
+		return nil, fmt.Errorf("streaming start: %w", err)
+	}
+	log.Printf("browser streaming enabled: https://%s:%d (data dir: %s)",
+		cfg.StreamHost, cfg.StreamPort, cfg.StreamDataDir)
+	return srv, nil
+}
+
 func (a *App) Run() error {
+	if a.streamServer != nil {
+		go func() {
+			if err := a.streamServer.Run(); err != nil {
+				log.Printf("streaming proxy stopped unexpectedly: %v", err)
+			}
+		}()
+	}
 	return a.server.ListenAndServe()
 }
 
 func (a *App) Shutdown(ctx context.Context) error {
 	if a.backupCancel != nil {
 		a.backupCancel()
+	}
+	if a.streamServer != nil {
+		if err := a.streamServer.Shutdown(ctx); err != nil {
+			log.Printf("streaming proxy shutdown failed: %v", err)
+		}
 	}
 	return a.server.Shutdown(ctx)
 }

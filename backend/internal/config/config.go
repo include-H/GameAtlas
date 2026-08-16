@@ -39,6 +39,11 @@ type Config struct {
 	SteamGridDBAPIKey      string
 	ReadHeaderTimeout      time.Duration
 	ShutdownTimeout        time.Duration
+	StreamEnabled          bool
+	StreamHost             string
+	StreamPort             int
+	StreamDataDir          string
+	StreamWWWRoot          string
 	runtimeBaseDir         string
 	pathSettings           map[string]string
 }
@@ -56,6 +61,8 @@ func Load() (Config, error) {
 	assetsDirSetting := getEnv("ASSETS_DIR", "data/gamelist")
 	primaryROMRootSetting := getEnv("PRIMARY_ROM_ROOT", "/mnt")
 	backupDirSetting := getEnv("DB_BACKUP_DIR", "data/backups")
+	streamDataDirSetting := getEnv("STREAM_DATA_DIR", "data/streaming")
+	streamWWWRootSetting := getEnv("STREAM_WWW_ROOT", "")
 
 	cfg := Config{
 		AppEnv:           getEnv("APP_ENV", "production"),
@@ -78,12 +85,16 @@ func Load() (Config, error) {
 		AdminPassword:     getEnv("ADMIN_PASSWORD", "1234"),
 		SteamGridDBAPIKey: getEnv("STEAMGRIDDB_API_KEY", ""),
 		AuthTrackBy:       getEnv("AUTH_TRACK_BY", "ip"),
+		StreamHost:        getEnv("STREAM_HOST", "0.0.0.0"),
+		StreamDataDir:     resolveRuntimePath(pathBaseDir, streamDataDirSetting),
+		StreamWWWRoot:     streamWWWRootSetting,
 		runtimeBaseDir:    pathBaseDir,
 		pathSettings: map[string]string{
 			"STATIC_DIR":       staticDirSetting,
 			"ASSETS_DIR":       assetsDirSetting,
 			"PRIMARY_ROM_ROOT": primaryROMRootSetting,
 			"DB_BACKUP_DIR":    backupDirSetting,
+			"STREAM_DATA_DIR":  streamDataDirSetting,
 		},
 	}
 
@@ -100,6 +111,8 @@ func Load() (Config, error) {
 	cfg.AuthStateTTL, errs = appendParsedDuration(errs, "AUTH_STATE_TTL", 24*time.Hour, &cfg.AuthStateTTL)
 	cfg.ReadHeaderTimeout, errs = appendParsedDuration(errs, "READ_HEADER_TIMEOUT", 5*time.Second, &cfg.ReadHeaderTimeout)
 	cfg.ShutdownTimeout, errs = appendParsedDuration(errs, "SHUTDOWN_TIMEOUT", 10*time.Second, &cfg.ShutdownTimeout)
+	cfg.StreamEnabled, errs = appendParsedBool(errs, "STREAM_ENABLED", true, &cfg.StreamEnabled)
+	cfg.StreamPort, errs = appendParsedInt(errs, "STREAM_PORT", 47999, &cfg.StreamPort)
 
 	if err := errors.Join(errs...); err != nil {
 		return Config{}, err
@@ -191,6 +204,9 @@ func (c Config) Validate() error {
 	}
 	if c.ShutdownTimeout <= 0 {
 		return fmt.Errorf("SHUTDOWN_TIMEOUT must be positive")
+	}
+	if c.StreamPort < 0 || c.StreamPort > 65535 {
+		return fmt.Errorf("STREAM_PORT must be between 0 and 65535")
 	}
 	if _, err := parseProxyURL(c.Proxy); err != nil {
 		return err

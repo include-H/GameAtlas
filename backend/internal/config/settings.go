@@ -43,6 +43,11 @@ var runtimeSettingDefinitions = []SettingDefinition{
 	{Key: "STEAMGRIDDB_API_KEY", Label: "SteamGridDB API Key", Group: "network", Sensitive: true},
 	{Key: "READ_HEADER_TIMEOUT", Label: "HTTP 请求头超时", Group: "runtime"},
 	{Key: "SHUTDOWN_TIMEOUT", Label: "服务关闭超时", Group: "runtime"},
+	{Key: "STREAM_ENABLED", Label: "启用浏览器串流", Group: "stream"},
+	{Key: "STREAM_HOST", Label: "串流监听地址", Group: "stream"},
+	{Key: "STREAM_PORT", Label: "串流监听端口", Group: "stream"},
+	{Key: "STREAM_DATA_DIR", Label: "串流数据目录", Group: "stream"},
+	{Key: "STREAM_WWW_ROOT", Label: "串流前端目录", Group: "stream"},
 }
 
 func RuntimeSettingDefinitions() []SettingDefinition {
@@ -87,6 +92,11 @@ func (c Config) RuntimeSettings() map[string]string {
 		"STEAMGRIDDB_API_KEY":       c.SteamGridDBAPIKey,
 		"READ_HEADER_TIMEOUT":       c.ReadHeaderTimeout.String(),
 		"SHUTDOWN_TIMEOUT":          c.ShutdownTimeout.String(),
+		"STREAM_ENABLED":            strconv.FormatBool(c.StreamEnabled),
+		"STREAM_HOST":               c.StreamHost,
+		"STREAM_PORT":               strconv.Itoa(c.StreamPort),
+		"STREAM_DATA_DIR":           c.runtimePathSetting("STREAM_DATA_DIR", c.StreamDataDir),
+		"STREAM_WWW_ROOT":           c.StreamWWWRoot,
 	}
 }
 
@@ -194,6 +204,24 @@ func (c Config) ApplyRuntimeSettings(values map[string]string) (Config, error) {
 				return c, fmt.Errorf("invalid app setting SHUTDOWN_TIMEOUT=%q: expected duration", value)
 			}
 			c.ShutdownTimeout = parsed
+		case "STREAM_ENABLED":
+			parsed, err := strconv.ParseBool(value)
+			if err != nil {
+				return c, fmt.Errorf("invalid app setting STREAM_ENABLED=%q: expected boolean", value)
+			}
+			c.StreamEnabled = parsed
+		case "STREAM_HOST":
+			c.StreamHost = value
+		case "STREAM_PORT":
+			parsed, err := strconv.Atoi(value)
+			if err != nil {
+				return c, fmt.Errorf("invalid app setting STREAM_PORT=%q: expected integer", value)
+			}
+			c.StreamPort = parsed
+		case "STREAM_DATA_DIR":
+			c.StreamDataDir = c.applyRuntimePathSetting(key, value)
+		case "STREAM_WWW_ROOT":
+			c.StreamWWWRoot = value
 		}
 	}
 	return c, nil
@@ -214,8 +242,9 @@ func (c Config) RuntimeRelativePath(path string) string {
 
 func (c *Config) NormalizeStoredRuntimePaths() map[string]string {
 	pathValues := map[string]string{
-		"ASSETS_DIR":    c.AssetsDir,
-		"DB_BACKUP_DIR": c.DBBackupDir,
+		"ASSETS_DIR":      c.AssetsDir,
+		"DB_BACKUP_DIR":   c.DBBackupDir,
+		"STREAM_DATA_DIR": c.StreamDataDir,
 	}
 	normalized := make(map[string]string)
 	for key, path := range pathValues {

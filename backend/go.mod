@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	github.com/chai2010/webp v1.4.0
 	github.com/gin-gonic/gin v1.12.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.24
 	golang.org/x/image v0.44.0
