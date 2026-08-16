@@ -1,0 +1,312 @@
+/* 云串流页独立样式（自建暗色玻璃风，与主站视觉统一但不复用主站 CSS）。 */
+
+:root {
+  color-scheme: dark;
+  --stream-bg: #0b0e14;
+  --stream-bg-glow: rgba(64, 108, 255, 0.07);
+  --stream-surface: rgba(255, 255, 255, 0.055);
+  --stream-surface-hover: rgba(255, 255, 255, 0.09);
+  --stream-border: rgba(255, 255, 255, 0.09);
+  --stream-text: rgba(255, 255, 255, 0.92);
+  --stream-text-dim: rgba(255, 255, 255, 0.55);
+  --stream-accent: #4c8dff;
+  --stream-danger: #f76965;
+  --stream-ok: #3fc687;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--stream-bg);
+  color: var(--stream-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- 布局 ---------- */
+
+.streaming-root {
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, var(--stream-bg-glow), transparent 60%),
+    radial-gradient(1000px 500px at 90% 110%, rgba(124, 77, 255, 0.05), transparent 60%),
+    var(--stream-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.streaming-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--stream-border);
+}
+
+.streaming-header .title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.streaming-header .subtitle {
+  font-size: 13px;
+  color: var(--stream-text-dim);
+}
+
+.streaming-body {
+  flex: 1;
+  padding: 24px 28px;
+  max-width: 1080px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* ---------- 玻璃容器 ---------- */
+
+.glass-surface {
+  background: var(--stream-surface);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--stream-border);
+  border-radius: 16px;
+}
+
+.glass-surface--interactive {
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
+}
+
+.glass-surface--interactive:hover {
+  background: var(--stream-surface-hover);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+/* ---------- 主机卡片 ---------- */
+
+.host-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.host-card {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.host-card .host-name {
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.host-card .host-name .host-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.host-card .host-address {
+  font-size: 13px;
+  color: var(--stream-text-dim);
+  font-family: 'SF Mono', Consolas, monospace;
+}
+
+.host-card .host-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--stream-text-dim);
+}
+
+.host-card .host-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.host-card .host-actions .spacer {
+  flex: 1;
+}
+
+/* ---------- 添加主机 ---------- */
+
+.add-host-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 18px;
+  padding: 16px 20px;
+}
+
+.add-host-row .hint {
+  font-size: 12px;
+  color: var(--stream-text-dim);
+  margin-top: 4px;
+}
+
+/* ---------- 警告条 ---------- */
+
+.capability-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-top: 14px;
+  font-size: 13px;
+  background: rgba(247, 165, 70, 0.1);
+  border: 1px solid rgba(247, 165, 70, 0.3);
+  color: #f7c98a;
+}
+
+/* ---------- 配对 PIN ---------- */
+
+.pin-display {
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: 14px;
+  text-align: center;
+  font-family: 'SF Mono', Consolas, monospace;
+  color: var(--stream-accent);
+  padding: 8px 0;
+}
+
+.pin-hint {
+  font-size: 13px;
+  color: var(--stream-text-dim);
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+/* ---------- 播放视图 ---------- */
+
+.stream-player {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+}
+
+.stream-player .video-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.stream-player .video-container video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  outline: none;
+}
+
+.stream-overlay {
+  position: absolute;
+  inset: auto auto 16px 50%;
+  transform: translateX(-50%);
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-family: 'SF Mono', Consolas, monospace;
+  color: var(--stream-text);
+  background: rgba(10, 12, 18, 0.75);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--stream-border);
+  white-space: nowrap;
+  max-width: 90vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.stream-overlay.hidden {
+  opacity: 0;
+}
+
+.stream-exit-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+}
+
+.stream-exit-hint {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+  font-size: 12px;
+  color: var(--stream-text-dim);
+  background: rgba(10, 12, 18, 0.6);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--stream-border);
+  pointer-events: none;
+}
+
+/* ---------- 应用列表 ---------- */
+
+.app-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.app-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.app-picker-item .app-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 通用 ---------- */
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 18px 0 10px;
+}
+
+.empty-hint {
+  text-align: center;
+  color: var(--stream-text-dim);
+  padding: 40px 0;
+  font-size: 14px;
+}
+
+.footer-note {
+  margin-top: 28px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--stream-text-dim);
+  opacity: 0.7;
+}

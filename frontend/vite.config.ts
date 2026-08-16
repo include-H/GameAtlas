@@ -3,6 +3,43 @@ import vue from '@vitejs/plugin-vue'
 import Components from 'unplugin-vue-components/vite'
 import { ArcoResolver } from 'unplugin-vue-components/resolvers'
 import path from 'node:path'
+import type { Plugin } from 'vite'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+
+// SharedArrayBuffer + Emscripten pthreads 需要跨源隔离。
+// 只在串流页（/streaming.html，独立文档）的响应上加头：COOP/COEP 由顶层
+// 文档决定，子资源同源加载不受影响；主站（index.html）不加头，避免影响
+// 主站加载的跨源图片等资源。
+const crossOriginIsolationHeaders: Record<string, string> = {
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Embedder-Policy': 'require-corp',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+}
+
+/** dev/preview 下给 /streaming* 响应注入 COOP/COEP/CORP 头。 */
+function streamingIsolationPlugin(): Plugin {
+  const middleware = (
+    req: IncomingMessage,
+    res: ServerResponse,
+    next: () => void,
+  ) => {
+    if (req.url?.startsWith('/streaming')) {
+      for (const [k, v] of Object.entries(crossOriginIsolationHeaders)) {
+        res.setHeader(k, v)
+      }
+    }
+    next()
+  }
+  return {
+    name: 'streaming-cross-origin-isolation',
+    configureServer(server) {
+      server.middlewares.use(middleware)
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(middleware)
+    },
+  }
+}
 
 export default defineConfig({
   plugins: [
@@ -16,10 +53,22 @@ export default defineConfig({
         }),
       ],
     }),
+    streamingIsolationPlugin(),
   ],
   envDir: path.resolve(__dirname, '../backend'),
+  worker: {
+    // 串流 wasm worker 是 ES module worker（new Worker(url, {type:'module'})）
+    format: 'es',
+  },
   build: {
     assetsDir: 'ui',
+    // 多页：主站 + 云串流独立文档（输出 dist/streaming.html）
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        streaming: path.resolve(__dirname, 'streaming.html'),
+      },
+    },
   },
   resolve: {
     alias: {

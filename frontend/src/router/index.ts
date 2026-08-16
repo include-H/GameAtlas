@@ -10,6 +10,7 @@ import games, { gameDetailRoute, gameMediaRoute, pendingCenterRoute, timelineRou
 import series, { seriesDetailRoute } from './modules/series'
 import publishers, { publisherDetailRoute } from './modules/publishers'
 import settings from './modules/settings'
+import streaming from './modules/streaming'
 import notFound from './modules/not-found'
 
 /**
@@ -30,6 +31,7 @@ export const appRoutes: RouteRecordRaw[] = [
   publisherDetailRoute,
   wikiEditRoute,
   settings,
+  streaming,
 ]
 
 /**
