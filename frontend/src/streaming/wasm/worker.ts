@@ -287,12 +287,15 @@ async function handleStart(host: Host, config: StreamConfig, launch: LaunchInfo)
   const VIDEO_FORMAT_H264 = 0x0001;
   const VIDEO_FORMAT_HEVC = 0x0100;
   const VIDEO_FORMAT_AV1_MAIN8 = 0x1000;
-  const VIDEO_FORMAT_AV1_MAIN10 = 0x2000;
 
-  // WebCodecs on Chrome supports H.264 everywhere, HEVC/AV1 depending on
-  // hardware. We declare all three and let RTSP negotiation pick the best.
-  const videoFormat = VIDEO_FORMAT_H264 | VIDEO_FORMAT_HEVC |
-    VIDEO_FORMAT_AV1_MAIN8 | VIDEO_FORMAT_AV1_MAIN10;
+  // 声明跟随 UI 选择的编码：全量声明会让 RTSP 协商自动选 AV1 Main 10
+  // （10bit），而 codecString 只生成 8bit 描述——解码器按 8bit 解 10bit
+  // 流会出"256 色"偏色，且切换 codec 后等 IDR 期间黑屏。默认 H.264 最稳。
+  // AV1 只声明 MAIN8：10bit 路径不做（HDR 明确不在范围内）。
+  const videoFormat =
+    config.codec === 'av1' ? VIDEO_FORMAT_AV1_MAIN8 :
+    config.codec === 'hevc' ? VIDEO_FORMAT_HEVC :
+    VIDEO_FORMAT_H264;
 
   const audioConfig =
     config.audioConfiguration === 'surround71' ? makeAudioConfig(8, 0x63f)
@@ -1014,9 +1017,29 @@ function onDecodedFrame(frame: VideoFrame) {
   if (firstFrame) videoState.firstFrameReported = true;
 
   // Hand the frame to MSTG. The writer takes ownership and will close it.
-  videoState.writer.write(frame).catch((e) => {
+  // 色彩修复：Sunshine 的 H.264 SPS 不带 VUI 色彩元数据，硬件解码器输出的
+  // VideoFrame.colorSpace 可能是默认 rgb/unknown——Chromium 会把 YUV 数据按
+  // RGB 矩阵交给 MSTG，画面偏紫 + 色带（Edge 硬解路径尤甚）。强制 BT.709。
+  // new VideoFrame(frame, init) 在同 backend 下共享底层数据（引用计数，
+  // 零拷贝），只覆盖元数据。
+  let outFrame = frame;
+  const cs = frame.colorSpace;
+  const needsFix = !cs || cs.matrix === undefined || cs.matrix === 'rgb' || cs.matrix === null;
+  if (needsFix) {
+    try {
+      // VideoFrameInit.colorSpace 是较新的 API，TS DOM lib 未收录，断言绕过。
+      const init = {
+        colorSpace: { colorSpace: 'bt709', transfer: 'bt709', matrix: 'bt709' },
+      } as unknown as VideoFrameInit;
+      outFrame = new VideoFrame(frame, init);
+      frame.close();
+    } catch {
+      outFrame = frame;
+    }
+  }
+  videoState.writer.write(outFrame).catch((e) => {
     post({ type: 'log', message: `[video] writer.write failed: ${(e as Error).message}` });
-    try { frame.close(); } catch { /* already closed */ }
+    try { outFrame.close(); } catch { /* already closed */ }
   });
 
   // Post stats periodically (~ every 60 frames ≈ 1 s at 60 fps).

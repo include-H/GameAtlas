@@ -219,9 +219,15 @@ func (c Config) ApplyRuntimeSettings(values map[string]string) (Config, error) {
 			}
 			c.StreamPort = parsed
 		case "STREAM_DATA_DIR":
-			c.StreamDataDir = c.applyRuntimePathSetting(key, value)
+			// 空值回退代码默认：空字符串会被 resolveRuntimePath 解析成
+			// 运行目录本身（filepath.Clean("") = "."），导致托管/数据目录错位。
+			if value != "" {
+				c.StreamDataDir = c.applyRuntimePathSetting(key, value)
+			}
 		case "STREAM_WWW_ROOT":
-			c.StreamWWWRoot = value
+			if value != "" {
+				c.StreamWWWRoot = c.applyRuntimePathSetting(key, value)
+			}
 		}
 	}
 	return c, nil
@@ -245,6 +251,7 @@ func (c *Config) NormalizeStoredRuntimePaths() map[string]string {
 		"ASSETS_DIR":      c.AssetsDir,
 		"DB_BACKUP_DIR":   c.DBBackupDir,
 		"STREAM_DATA_DIR": c.StreamDataDir,
+		"STREAM_WWW_ROOT": c.StreamWWWRoot,
 	}
 	normalized := make(map[string]string)
 	for key, path := range pathValues {

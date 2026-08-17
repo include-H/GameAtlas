@@ -11,6 +11,7 @@ import {
   defaultSettings,
   isCustomResolution,
   loadSettings,
+  loadSettingsFromServer,
   saveSettings,
   type StreamSettings,
 } from '../client/stream-settings'
@@ -51,8 +52,7 @@ const currentResolution = computed(() => {
   return `${settings.width}x${settings.height}`;
 });
 
-function syncFromStorage() {
-  const s = loadSettings();
+function applySettings(s: StreamSettings) {
   settings.width = s.width;
   settings.height = s.height;
   settings.fps = s.fps;
@@ -61,6 +61,19 @@ function syncFromStorage() {
   settings.audio = s.audio;
   settings.showStats = s.showStats;
   customResolution.value = isCustomResolution(s.width, s.height);
+}
+
+function syncFromStorage() {
+  applySettings(loadSettings());
+}
+
+/** 打开弹窗时异步拉后端设置合并（失败回退 localStorage，不阻塞展示）。 */
+async function refreshFromServer() {
+  try {
+    applySettings(await loadSettingsFromServer());
+  } catch (err) {
+    console.warn('[stream] 拉取后端串流设置失败:', err);
+  }
 }
 
 function onResolutionChange(value: string | number) {
@@ -91,7 +104,10 @@ function save() {
 watch(
   () => props.visible,
   (visible) => {
-    if (visible) syncFromStorage();
+    if (visible) {
+      syncFromStorage();
+      void refreshFromServer();
+    }
   },
 );
 

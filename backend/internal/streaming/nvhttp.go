@@ -3,6 +3,7 @@ package streaming
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -55,14 +56,14 @@ func mtlsClient(dataDir string, id *pairIdentity, address string) (*http.Client,
 		return nil, err
 	}
 
-	clientBlock, _ := pemDecode([]byte(id.certPEM))
-	keyBlock, _ := pemDecode([]byte(id.keyPEM))
-	serverBlock, _ := pemDecode([]byte(serverCertPEM))
+	clientBlock, _ := pem.Decode([]byte(id.certPEM))
+	keyBlock, _ := pem.Decode([]byte(id.keyPEM))
+	serverBlock, _ := pem.Decode([]byte(serverCertPEM))
 	if clientBlock == nil || keyBlock == nil || serverBlock == nil {
 		return nil, fmt.Errorf("decode pairing material for %s", address)
 	}
 
-	serverCerts, err := x509.ParseCertificates(serverBlock)
+	serverCerts, err := x509.ParseCertificates(serverBlock.Bytes)
 	if err != nil || len(serverCerts) == 0 {
 		return nil, fmt.Errorf("parse server cert for %s: %w", address, err)
 	}
@@ -89,35 +90,6 @@ func mtlsClient(dataDir string, id *pairIdentity, address string) (*http.Client,
 	}, nil
 }
 
-func pemDecode(raw []byte) ([]byte, []byte) {
-	block, rest := pemDecodeFirst(raw)
-	return block, rest
-}
-
-func pemDecodeFirst(raw []byte) ([]byte, []byte) {
-	rest := raw
-	for len(rest) > 0 {
-		start := strings.Index(string(rest), "-----BEGIN ")
-		if start < 0 {
-			return nil, nil
-		}
-		rest = rest[start:]
-		end := strings.Index(string(rest), "-----END ")
-		if end < 0 {
-			return nil, nil
-		}
-		end += len("-----END ")
-		end = strings.Index(string(rest[end:]), "-----")
-		if end < 0 {
-			return nil, nil
-		}
-		end += len("-----")
-		block := []byte(rest[:end])
-		return block, rest[end:]
-	}
-	return nil, nil
-}
-
 // fetchAppList 拉取主机应用列表。
 func fetchAppList(dataDir string, id *pairIdentity, host string) ([]appEntry, error) {
 	client, err := mtlsClient(dataDir, id, host)
@@ -136,7 +108,7 @@ func fetchAppList(dataDir string, id *pairIdentity, host string) ([]appEntry, er
 type nvXMLRoot struct {
 	StatusCode  int     `xml:"status_code,attr"`
 	StatusMsg   string  `xml:"status_message,attr"`
-	AppList     []nvApp `xml:"AppList>App"`
+	AppList     []nvApp `xml:"App"` // Sunshine 返回 <root><App>... 平铺，无 AppList 容器
 	SessionURL0 string  `xml:"sessionUrl0"`
 	GameSession string  `xml:"gamesession"`
 }
@@ -198,19 +170,23 @@ func doLaunch(dataDir string, id *pairIdentity, req *launchRequest) (*launchResp
 	}
 	url := fmt.Sprintf("https://%s:%d/%s?%s", req.Host, nvHTTPSPort, endpoint, query)
 
-	body, status, err := clientGet(client, url)
+	// GameStream 惯例：HTTP 状态恒为 200，业务状态在 XML status_code 属性里。
+	// 必须用 XML 值判断，否则 400（应用已在运行）会漏掉 resume 重试。
+	body, _, err := clientGet(client, url)
 	if err != nil {
 		return nil, err
 	}
+	status := extractStatusCode(body)
 
 	if !req.Resume && status == 400 {
 		// Sunshine 在别处拥有应用时会拒 launch；对 Apollo 等 fork 尝试 resume 加入会话。
 		log.Printf("[stream] /launch rejected (400), retrying as /resume")
 		resumeURL := strings.Replace(url, "/launch?", "/resume?", 1)
-		body, status, err = clientGet(client, resumeURL)
+		body, _, err = clientGet(client, resumeURL)
 		if err != nil {
 			return nil, err
 		}
+		status = extractStatusCode(body)
 		if status == 200 {
 			log.Printf("[stream] /resume returned 200; vanilla Sunshine may drop the RTSP connection if another client owns the session")
 		}
@@ -266,6 +242,16 @@ func clientGet(client *http.Client, url string) ([]byte, int, error) {
 		return nil, 0, err
 	}
 	return body, resp.StatusCode, nil
+}
+
+// extractStatusCode 从 GameStream XML 响应解析 status_code 属性
+// （HTTP 状态恒为 200，业务状态在 XML 里）。
+func extractStatusCode(body []byte) int {
+	var root nvXMLRoot
+	if err := xml.Unmarshal(body, &root); err != nil {
+		return 200
+	}
+	return root.StatusCode
 }
 
 func clientGetBody(client *http.Client, url string) ([]byte, error) {

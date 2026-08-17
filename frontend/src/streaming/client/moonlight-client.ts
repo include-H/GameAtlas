@@ -150,7 +150,9 @@ export class MoonlightClient {
   // ---------- internals ----------
 
   private post(msg: MainToWorker) {
-    this.worker.postMessage(msg);
+    // Vue 响应式 Proxy 对象不可结构化克隆（DataCloneError）。消息全是纯数据，
+    // JSON 深拷贝转回普通对象（上游 vanilla TS 无此问题，Vue 化后必需）。
+    this.worker.postMessage(JSON.parse(JSON.stringify(msg)));
   }
 
   private handleWorkerMessage(msg: WorkerToMain) {

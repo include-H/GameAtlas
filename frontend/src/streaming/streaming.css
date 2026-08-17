@@ -249,6 +249,19 @@ body {
   z-index: 10;
 }
 
+.stream-actions {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+}
+
+.stream-fullscreen-btn {
+  margin-right: 0;
+}
+
 .stream-exit-hint {
   position: absolute;
   top: 20px;

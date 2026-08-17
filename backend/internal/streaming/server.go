@@ -42,6 +42,9 @@ type Server struct {
 	ln         net.Listener
 	wsUpgrader websocket.Upgrader
 
+	hosts    *hostStore
+	settings *settingsStore
+
 	mu      sync.Mutex
 	started bool
 }
@@ -63,6 +66,8 @@ func New(opts Options) (*Server, error) {
 	s := &Server{
 		opts:     opts,
 		identity: identity,
+		hosts:    newHostStore(opts.DataDir),
+		settings: newSettingsStore(opts.DataDir),
 		wsUpgrader: websocket.Upgrader{
 			ReadBufferSize:  65536,
 			WriteBufferSize: 65536,
@@ -96,6 +101,8 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/pair", s.handlePair)
 	mux.HandleFunc("/api/applist", s.handleAppList)
 	mux.HandleFunc("/api/launch", s.handleLaunch)
+	mux.HandleFunc("/api/hosts", s.handleHosts)
+	mux.HandleFunc("/api/stream-settings", s.handleStreamSettings)
 	mux.HandleFunc("/proxy", s.handleProxy)
 
 	var handler http.Handler = mux

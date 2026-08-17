@@ -42,6 +42,8 @@ export class KeyboardInput {
   private downHandler = (e: KeyboardEvent) => this.onKey(e, 'down');
   private upHandler = (e: KeyboardEvent) => this.onKey(e, 'up');
   private locked = false;
+  private escapeTimer: number | undefined;
+  private escapeLongPress = false;
 
   constructor(
     private root: HTMLElement,
@@ -74,6 +76,11 @@ export class KeyboardInput {
   detach() {
     window.removeEventListener('keydown', this.downHandler, { capture: true });
     window.removeEventListener('keyup', this.upHandler, { capture: true });
+    if (this.escapeTimer !== undefined) {
+      clearTimeout(this.escapeTimer);
+      this.escapeTimer = undefined;
+    }
+    this.escapeLongPress = false;
     const kb = keyboardLockApi();
     if (this.locked && kb?.unlock) {
       kb.unlock();
@@ -82,13 +89,40 @@ export class KeyboardInput {
   }
 
   private onKey(e: KeyboardEvent, action: 'down' | 'up') {
-    // Allow the user to exit a stream with Ctrl+Alt+Shift+Q like the NaCl
-    // client. We do this BEFORE checking repeat so the chord always wins.
-    if (action === 'down' && e.code === 'KeyQ') {
+    // 退出串流：Ctrl+Alt+Shift+R（与 NaCl 客户端的 Ctrl+Alt+Shift+Q 对齐的
+    // 语义，改 R 避免与游戏内 Q 冲突）。先于 repeat 判断，和弦永远生效。
+    if (action === 'down' && e.code === 'KeyR') {
       const mods = modifiersFromEvent(e);
       if ((mods & (MODIFIER_CTRL | MODIFIER_ALT | MODIFIER_SHIFT)) === (MODIFIER_CTRL | MODIFIER_ALT | MODIFIER_SHIFT)) {
         e.preventDefault();
         this.client.disconnect();
+        return;
+      }
+    }
+
+    // Escape：长按（>500ms）释放鼠标（退出 Pointer Lock），短按作为游戏内
+    // Esc 发送给主机。仅在 Keyboard Lock 生效（全屏）时浏览器才会把 Esc
+    // 派发到页面；窗口模式下 Esc 由浏览器直接消费（退出指针锁），无法拦截。
+    if (e.code === 'Escape') {
+      if (action === 'down') {
+        e.preventDefault();
+        this.escapeTimer = window.setTimeout(() => {
+          if (document.pointerLockElement) {
+            document.exitPointerLock();
+          }
+          this.escapeLongPress = true;
+        }, 500);
+        return;
+      }
+      // keyup
+      if (this.escapeTimer !== undefined) {
+        clearTimeout(this.escapeTimer);
+        this.escapeTimer = undefined;
+      }
+      const wasLong = this.escapeLongPress;
+      this.escapeLongPress = false;
+      if (wasLong) {
+        e.preventDefault();
         return;
       }
     }

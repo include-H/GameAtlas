@@ -1,7 +1,11 @@
-// Simple localStorage-backed host registry. Pairing material (PPK, cert/key
-// pair) lives here too once we wire up pairing.
+// Backend-persisted host registry. Hosts live in the Go streaming proxy's
+// <dataDir>/hosts.json so they survive browser storage clears and device
+// switches. Pairing state (paired) is computed by the backend from the
+// cached host cert (<dataDir>/hosts/<address>.cert.pem); pairing material
+// (client cert/key, server cert) never leaves the server, so the frontend
+// no longer stores them.
 
-const STORAGE_KEY = 'moonlight.hosts.v1';
+import { streamApiUrl } from './api-base';
 
 export interface Host {
   id: string;
@@ -11,37 +15,82 @@ export interface Host {
   httpPort?: number;
   httpsPort?: number;
   paired: boolean;
-  /** Pinned server cert (PEM) returned during pairing. */
-  serverCert?: string;
-  /** Client cert/key pair (PEM) generated locally during pairing. */
-  clientCert?: string;
-  clientKey?: string;
   lastSeen: number;
   lastAppId?: number;
 }
 
-export function loadHosts(): Host[] {
+/** Backend wire shape of a host entry (paired is server-computed). */
+interface HostDTO {
+  id: string;
+  name: string;
+  address: string;
+  lastSeen: number;
+  paired: boolean;
+}
+
+function toHost(dto: HostDTO): Host {
+  return {
+    id: dto.id,
+    name: dto.name,
+    address: dto.address,
+    paired: dto.paired,
+    lastSeen: dto.lastSeen,
+  };
+}
+
+async function parseError(res: Response): Promise<string> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as Host[];
+    const data = (await res.json()) as { error?: string };
+    return data.error ?? `HTTP ${res.status}`;
   } catch {
-    return [];
+    return `HTTP ${res.status}`;
   }
 }
 
-export function saveHosts(hosts: Host[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(hosts));
+/** GET /api/hosts → full host list (paired computed by the backend). */
+export async function loadHosts(): Promise<Host[]> {
+  const res = await fetch(streamApiUrl('/api/hosts'), { headers: { Accept: 'application/json' } });
+  if (!res.ok) {
+    throw new Error(`加载主机列表失败：${await parseError(res)}`);
+  }
+  const data = (await res.json()) as { hosts: HostDTO[] };
+  return data.hosts.map(toHost);
 }
 
-export function upsertHost(host: Host): void {
-  const hosts = loadHosts();
-  const idx = hosts.findIndex((h) => h.id === host.id);
-  if (idx >= 0) hosts[idx] = host;
-  else hosts.push(host);
-  saveHosts(hosts);
+/**
+ * 逐台 POST /api/hosts（按 id upsert），返回最后一次响应里的完整列表。
+ * 新增主机可传 id: ''，由后端生成。
+ */
+export async function saveHosts(hosts: Host[]): Promise<Host[]> {
+  let fresh: Host[] = [];
+  for (const host of hosts) {
+    const res = await fetch(streamApiUrl('/api/hosts'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: host.id,
+        name: host.name,
+        address: host.address,
+        lastSeen: host.lastSeen,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`保存主机失败：${await parseError(res)}`);
+    }
+    const data = (await res.json()) as { hosts: HostDTO[] };
+    fresh = data.hosts.map(toHost);
+  }
+  return fresh;
 }
 
-export function removeHost(id: string): void {
-  saveHosts(loadHosts().filter((h) => h.id !== id));
+/** DELETE /api/hosts?id=<id> → 删除后的完整列表。 */
+export async function removeHost(id: string): Promise<Host[]> {
+  const res = await fetch(streamApiUrl('/api/hosts', new URLSearchParams({ id })), {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    throw new Error(`移除主机失败：${await parseError(res)}`);
+  }
+  const data = (await res.json()) as { hosts: HostDTO[] };
+  return data.hosts.map(toHost);
 }

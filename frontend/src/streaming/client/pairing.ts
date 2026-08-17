@@ -56,10 +56,11 @@ export async function pairHost(host: Host, pin: string, opts: PairOptions = {}):
     throw new Error(result.error ?? 'host rejected the pairing PIN');
   }
 
+  // serverCert 由后端缓存到 dataDir/hosts/<address>.cert.pem（paired 动态
+  // 判断的依据），前端无需也不应保管，只更新本地展示字段。
   return {
     ...host,
     paired: true,
-    serverCert: result.serverCert,
     lastSeen: Date.now(),
   };
 }

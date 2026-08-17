@@ -84,9 +84,9 @@ export function useStreamSession() {
     const config: StreamConfig = toStreamConfig(settings);
 
     try {
-      await root.requestFullscreen().catch(() => {
-        console.warn('[stream] fullscreen denied; continuing windowed');
-      });
+      // 默认窗口模式起步：自动全屏会把 1080p 流拉伸到屏幕尺寸，配合
+      // Sunshine 的"桌面/流分辨率"鼠标映射在异分辨率下产生加速感。
+      // 全屏由用户手动触发（StreamPlayer 的全屏按钮 / F11）。
 
       // 建 <video> + MSTG 表面；解码器在 worker 内。
       video = new VideoSurface(root, config);

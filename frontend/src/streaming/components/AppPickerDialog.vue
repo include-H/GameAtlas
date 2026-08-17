@@ -48,8 +48,11 @@ function close() {
 }
 
 function pick(app: AppEntry) {
-  close()
+  // 必须先 emit select 再 close：close 会同步触发父组件把 pickerTarget
+  // 置 null（update:visible=false），onPickApp 依赖它取主机。
+  console.log('[debug-pick]', app)
   emit('select', app)
+  close()
 }
 </script>
 

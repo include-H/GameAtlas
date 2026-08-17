@@ -1,8 +1,11 @@
 // Per-device streaming preferences (resolution / fps / codec / bitrate /
-// audio), persisted to localStorage. Matches the option set exposed by
+// audio), persisted to localStorage AND synced to the backend
+// (<dataDir>/stream-settings.json via the Go proxy) so they survive
+// browser storage clears. Matches the option set exposed by
 // moonlight-android so the defaults and ranges feel familiar.
 
 import type { StreamConfig, VideoCodec, AudioConfiguration } from './moonlight-client';
+import { streamApiUrl } from './api-base';
 
 const KEY = 'moonlight.streamSettings.v1';
 
@@ -81,24 +84,49 @@ export function defaultSettings(): StreamSettings {
   };
 }
 
+/** 把 partial 合并到默认设置（缺字段回退默认值）。 */
+function mergeSettings(partial: Partial<StreamSettings>): StreamSettings {
+  const def = defaultSettings();
+  return {
+    width: partial.width ?? def.width,
+    height: partial.height ?? def.height,
+    fps: partial.fps ?? def.fps,
+    bitrateMbps: partial.bitrateMbps ?? def.bitrateMbps,
+    codec: partial.codec ?? def.codec,
+    audio: partial.audio ?? def.audio,
+    showStats: partial.showStats ?? def.showStats,
+  };
+}
+
 export function loadSettings(): StreamSettings {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return defaultSettings();
-    const parsed = JSON.parse(raw) as Partial<StreamSettings>;
-    const def = defaultSettings();
-    return {
-      width: parsed.width ?? def.width,
-      height: parsed.height ?? def.height,
-      fps: parsed.fps ?? def.fps,
-      bitrateMbps: parsed.bitrateMbps ?? def.bitrateMbps,
-      codec: parsed.codec ?? def.codec,
-      audio: parsed.audio ?? def.audio,
-      showStats: parsed.showStats ?? def.showStats,
-    };
+    return mergeSettings(JSON.parse(raw) as Partial<StreamSettings>);
   } catch {
     return defaultSettings();
   }
+}
+
+/**
+ * 优先后端设置（GET /api/stream-settings，异步）；后端缺失/失败时回退
+ * localStorage。调用方应等它返回后再用合并后的设置。
+ */
+export async function loadSettingsFromServer(): Promise<StreamSettings> {
+  try {
+    const res = await fetch(streamApiUrl('/api/stream-settings'), {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { settings?: Partial<StreamSettings> };
+      if (data.settings && typeof data.settings === 'object' && Object.keys(data.settings).length > 0) {
+        return mergeSettings(data.settings);
+      }
+    }
+  } catch (err) {
+    console.warn('[stream] 从后端加载串流设置失败，回退 localStorage:', err);
+  }
+  return loadSettings();
 }
 
 /** True when (width, height) is not one of the named presets. */
@@ -108,6 +136,24 @@ export function isCustomResolution(width: number, height: number): boolean {
 
 export function saveSettings(s: StreamSettings): void {
   localStorage.setItem(KEY, JSON.stringify(s));
+  // 同步到后端（失败仅告警，不阻塞本地即时生效）。
+  void syncSettingsToServer(s);
+}
+
+/** PUT /api/stream-settings，全量保存。失败 console.warn 不抛错。 */
+async function syncSettingsToServer(s: StreamSettings): Promise<void> {
+  try {
+    const res = await fetch(streamApiUrl('/api/stream-settings'), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings: s }),
+    });
+    if (!res.ok) {
+      console.warn(`[stream] 保存串流设置到后端失败：HTTP ${res.status}`);
+    }
+  } catch (err) {
+    console.warn('[stream] 保存串流设置到后端失败:', err);
+  }
 }
 
 /** Convert UI settings to the StreamConfig the wasm layer expects. */

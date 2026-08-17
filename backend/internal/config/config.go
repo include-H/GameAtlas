@@ -62,7 +62,7 @@ func Load() (Config, error) {
 	primaryROMRootSetting := getEnv("PRIMARY_ROM_ROOT", "/mnt")
 	backupDirSetting := getEnv("DB_BACKUP_DIR", "data/backups")
 	streamDataDirSetting := getEnv("STREAM_DATA_DIR", "data/streaming")
-	streamWWWRootSetting := getEnv("STREAM_WWW_ROOT", "")
+	streamWWWRootSetting := getEnv("STREAM_WWW_ROOT", "../frontend/dist/streaming-www")
 
 	cfg := Config{
 		AppEnv:           getEnv("APP_ENV", "production"),
@@ -87,7 +87,7 @@ func Load() (Config, error) {
 		AuthTrackBy:       getEnv("AUTH_TRACK_BY", "ip"),
 		StreamHost:        getEnv("STREAM_HOST", "0.0.0.0"),
 		StreamDataDir:     resolveRuntimePath(pathBaseDir, streamDataDirSetting),
-		StreamWWWRoot:     streamWWWRootSetting,
+		StreamWWWRoot:     resolveRuntimePath(pathBaseDir, streamWWWRootSetting),
 		runtimeBaseDir:    pathBaseDir,
 		pathSettings: map[string]string{
 			"STATIC_DIR":       staticDirSetting,

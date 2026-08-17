@@ -2,6 +2,7 @@
 // 主机列表视图：卡片列表 + 添加主机（输入 IP）+ 配对状态徽标 +
 // 设置按钮 + 进入串流（应用选择）。
 import { computed, onMounted, ref } from 'vue'
+import { Message } from '@arco-design/web-vue'
 import { loadHosts, removeHost, saveHosts, type Host } from '../client/host-store'
 import { detectCapabilities, type Capabilities } from '../capabilities'
 import type { AppEntry } from '../client/nvhttp'
@@ -13,7 +14,7 @@ const emit = defineEmits<{
   launch: [host: Host, app: AppEntry]
 }>()
 
-const hosts = ref<Host[]>(loadHosts())
+const hosts = ref<Host[]>([])
 const newAddress = ref('')
 const adding = ref(false)
 const caps = ref<Capabilities | null>(null)
@@ -49,41 +50,51 @@ function formatLastSeen(ts: number): string {
 function addHost() {
   const address = newAddress.value.trim();
   if (!address || adding.value) return;
-  const exists = hosts.value.some((h) => h.address === address);
-  if (exists) {
+  if (hosts.value.some((h) => h.address === address)) {
     newAddress.value = '';
     return;
   }
   adding.value = true;
-  const host: Host = {
-    id: `host-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    name: address,
-    address,
-    paired: false,
-    lastSeen: 0,
-  };
-  hosts.value = [...hosts.value, host];
-  saveHosts(hosts.value);
-  newAddress.value = '';
-  adding.value = false;
+  // id 留空由后端生成；paired 由后端按证书文件判断。
+  void saveHosts([{ id: '', name: address, address, paired: false, lastSeen: 0 }])
+    .then((fresh) => {
+      hosts.value = fresh;
+      newAddress.value = '';
+    })
+    .catch((err: unknown) => {
+      Message.error(`添加主机失败：${(err as Error).message ?? String(err)}`);
+    })
+    .finally(() => {
+      adding.value = false;
+    });
 }
 
 function onPaired(host: Host) {
-  const idx = hosts.value.findIndex((h) => h.id === host.id);
-  if (idx >= 0) {
-    hosts.value[idx] = host;
-    hosts.value = [...hosts.value];
-  }
-  saveHosts(hosts.value);
-  pairTarget.value = null;
+  // 配对成功后把主机落库并刷新（paired 由后端重新计算）。
+  void saveHosts([host])
+    .then((fresh) => {
+      hosts.value = fresh;
+    })
+    .catch((err: unknown) => {
+      Message.error(`保存配对状态失败：${(err as Error).message ?? String(err)}`);
+    })
+    .finally(() => {
+      pairTarget.value = null;
+    });
 }
 
 function onRemove(host: Host) {
-  removeHost(host.id);
-  hosts.value = hosts.value.filter((h) => h.id !== host.id);
+  void removeHost(host.id)
+    .then((fresh) => {
+      hosts.value = fresh;
+    })
+    .catch((err: unknown) => {
+      Message.error(`移除主机失败：${(err as Error).message ?? String(err)}`);
+    });
 }
 
 function onPickApp(app: AppEntry) {
+  console.log('[debug-onPickApp]', pickerTarget.value, app)
   const host = pickerTarget.value;
   if (!host) return;
   pickerTarget.value = null;
@@ -92,6 +103,11 @@ function onPickApp(app: AppEntry) {
 
 onMounted(async () => {
   caps.value = await detectCapabilities();
+  try {
+    hosts.value = await loadHosts();
+  } catch (err) {
+    Message.error(`加载主机列表失败：${(err as Error).message ?? String(err)}`);
+  }
 });
 </script>
 

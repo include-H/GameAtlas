@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import Components from 'unplugin-vue-components/vite'
 import { ArcoResolver } from 'unplugin-vue-components/resolvers'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import type { Plugin } from 'vite'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
@@ -41,6 +42,24 @@ function streamingIsolationPlugin(): Plugin {
   }
 }
 
+/**
+ * 构建收尾：组装串流页 WWW 根目录（dist/streaming-www）。
+ * npm run build 默认清空 dist，streaming-www 若不在此重建，就会被
+ * start-dev.sh / build-release.sh 的每次构建抹掉（后端托管 404）。
+ */
+function assembleStreamingWwwPlugin(): Plugin {
+  return {
+    name: 'assemble-streaming-www',
+    closeBundle() {
+      const script = path.resolve(__dirname, '..', 'scripts', 'prepare-streaming-www.mjs')
+      const result = spawnSync(process.execPath, [script], { stdio: 'inherit' })
+      if (result.status !== 0) {
+        throw new Error(`prepare-streaming-www failed with status ${result.status}`)
+      }
+    },
+  }
+}
+
 export default defineConfig({
   plugins: [
     vue(),
@@ -54,6 +73,7 @@ export default defineConfig({
       ],
     }),
     streamingIsolationPlugin(),
+    assembleStreamingWwwPlugin(),
   ],
   envDir: path.resolve(__dirname, '../backend'),
   worker: {

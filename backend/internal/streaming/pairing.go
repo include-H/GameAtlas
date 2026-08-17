@@ -36,6 +36,7 @@ type pairIdentity struct {
 	certPEM   string
 	keyPEM    string
 	certBytes []byte // DER，用于取签名
+	certSig   []byte // 证书 DER 的签名域（协议 step3/step4 使用）
 }
 
 // identityDir 返回身份与主机证书缓存目录。
@@ -90,12 +91,17 @@ func loadOrCreateIdentity(dataDir string) (*pairIdentity, error) {
 	if block == nil {
 		return nil, fmt.Errorf("decode client cert: empty PEM block")
 	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse client cert: %w", err)
+	}
 
 	return &pairIdentity{
 		uniqueID:  uniqueID,
 		certPEM:   string(certPEM),
 		keyPEM:    string(keyPEM),
 		certBytes: block.Bytes,
+		certSig:   cert.Signature,
 	}, nil
 }
 
@@ -278,9 +284,11 @@ func doPair(id *pairIdentity, address, pin, deviceName string) (string, error) {
 
 	// ---- Step 3: serverchallengeresp ----
 	clientSecret := randBytes(16)
+	// clienthash = SHA256(server_challenge || 客户端证书签名 || client_secret)。
+	// 注意必须用客户端证书签名（Sunshine step 4 会用同一输入重算比对）。
 	clientResponseHash := sha256.New()
 	clientResponseHash.Write(serverChallenge)
-	clientResponseHash.Write(serverCertSig)
+	clientResponseHash.Write(id.certSig)
 	clientResponseHash.Write(clientSecret)
 	clientResponse := clientResponseHash.Sum(nil)
 

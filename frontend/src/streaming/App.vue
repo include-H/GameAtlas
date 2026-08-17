@@ -14,6 +14,7 @@ interface StreamTarget {
 const target = ref<StreamTarget | null>(null)
 
 function onLaunch(host: Host, app: AppEntry) {
+  console.log('[debug-onLaunch]', host, app)
   target.value = { host, app }
 }
 
