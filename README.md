@@ -9,6 +9,7 @@ GameAtlas 是一个面向 NAS / 局域网 / 家庭游戏库的网页游戏管理
 | 网页游戏库 | 封面、横幅、截图、视频、Wiki、系列 / 开发商 / 发行商信息一站式管理 |
 | 素材在线导入 | Steam 元数据与素材搜索，SteamGridDB 封面 / 横幅 / Logo 直搜，多选批量导入 |
 | VHD 远程启动 | 服务端只读共享基础盘，Windows 客户端自动创建本地差分盘并挂载游玩 |
+| 浏览器串流 | Moonlight Web 客户端（Go 代理 + WebCodecs），浏览器即开即玩 Sunshine 主机上的游戏，H.264 / HEVC / AV1 |
 | 数据保护 | SQLite 在线备份（`VACUUM INTO`）、孤儿素材隔离、启动资产对账 |
 | 权限体系 | 匿名可浏览公开游戏，管理员管理私有游戏与全部写操作 |
 
@@ -98,6 +99,42 @@ Dismount-VHD -Path $vhdx
 - 差分盘路径为 `<VHD_DIFF_ROOT>\<基础盘文件名>`（例如 `C:\PS2_GT4.vhdx`），同名基础盘会产生冲突，建议基础盘文件名唯一。
 
 > 安全提示：BAT 脚本中会携带 SMB 账号密码，因此本功能面向家庭 / 内网等可信环境。建议 SMB 共享使用**只读账号**；游玩结束后脚本会自动删除已保存的凭据，若选择了"仅挂载"，请在公共机器上使用清理选项。
+
+## 浏览器串流（Moonlight Web）
+
+无需安装任何客户端，浏览器直接玩 Sunshine / GameStream 主机上的游戏——NAS 局域网内任何带 Chromium 系浏览器的设备（笔记本 / 平板 / 电视）即开即玩。
+
+### 架构
+
+浏览器无法发裸 UDP，GameStream 协议需要本地代理桥接：
+
+```
+浏览器串流页 (:47999, HTTPS 自签)         NAS Go 代理（并入 server 进程）          Sunshine 主机
+  Vue 3 + Arco UI（云串流页，独立文档）  ◄── WebSocket 多路复用 ──►  UDP/TCP 转发 ──►  ATRI 等
+  WebCodecs 硬解 + Pointer/Keyboard Lock  /api/pair /api/applist /api/launch（mTLS 持证）
+```
+
+- **串流端口**：默认 `:47999`（`STREAM_PORT` 可配），自签 TLS；主站 `:3000` 保持 HTTP 不受影响
+- **配对**：5 步 NvHTTP 握手由 Go 代理代跑；配对身份（客户端证书）与主机证书缓存在 `data/streaming/`，**多浏览器共享同一设备身份**（Sunshine 里只显示一个 GameAtlas 设备）
+- **解码**：wasm 跑 moonlight-common-c 协议栈（RTSP/FEC/分帧），WebCodecs 硬件解码（H.264 默认 / HEVC / AV1 按设备能力可选），1080p60 起步
+- **主机与设置持久化**：主机列表、串流设置存 `data/streaming/hosts.json` / `stream-settings.json`，换设备不丢
+- **wasm 来源**：`frontend/public/wasm/` 为 moonlight-common-c（GPL-2.0-or-later）官方预编译产物，构建脚本 `wasm/build.sh`（需 Emscripten）保留
+
+### 使用
+
+1. 浏览器打开 `https://<NAS>:47999`（首次需信任自签证书，点"高级 → 继续"）
+2. 添加 Sunshine 主机 IP → 配对（Sunshine Web UI 输入 4 位 PIN）
+3. 选应用 → 串流。默认窗口模式（鼠标 1:1），全屏按钮可选
+
+### 快捷键与操作
+
+| 按键 | 行为 |
+|---|---|
+| 点击画面 | 获取鼠标（Pointer Lock） |
+| Esc 短按 / 长按 | 游戏内 Esc（需全屏）/ 释放鼠标 |
+| Ctrl+Alt+Shift+Q | 退出串流 |
+
+> 已知限制：远端主机建议 100% 显示缩放（否则鼠标映射比例错乱）；HEVC 解码需浏览器端插件（Windows Edge 需 HEVC 视频扩展）；窗口模式下 Esc 由浏览器消费（游戏内 Esc 需全屏）。
 
 ## 前端功能
 
@@ -266,6 +303,15 @@ git tag v1.0.0 && git push origin v1.0.0
 运行配置存储在 SQLite 的 `app_settings` 表中，首次启动写入默认值（默认管理员密码 `1234`）。登录后可在设置页修改密码、素材目录、ROM 根目录、SMB 映射、备份策略、SteamGridDB API Key 等；大部分配置保存后需重启服务生效。
 
 > 默认密码 `1234` 仅面向家庭 / 内网可信部署保留（保证未显式配置时也能开箱即用）。暴露到公网前必须先在设置页或部署环境变量（`ADMIN_PASSWORD`）中改掉默认密码。
+
+### 串流相关配置
+
+| 环境变量 | 默认 | 说明 |
+|---|---|---|
+| `STREAM_ENABLED` | `true` | 浏览器串流总开关 |
+| `STREAM_HOST` / `STREAM_PORT` | `0.0.0.0` / `47999` | 串流端口监听地址与端口 |
+| `STREAM_DATA_DIR` | `data/streaming` | 配对身份 / 主机证书 / 主机与设置 JSON 存放目录 |
+| `STREAM_WWW_ROOT` | `../frontend/dist/streaming-www` | 串流页前端产物目录（vite 构建自动组装） |
 
 旧版部署中的 `.env` 不再被自动读取、导入或删除；运行时配置请通过设置页录入。
 
