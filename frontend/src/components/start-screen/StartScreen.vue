@@ -1543,6 +1543,21 @@ onUnmounted(() => {
   --start-gap: 5px;
 }
 
+/* 大屏等比放大：2K/4K 下磁贴单元随视口高度缩放（1080p 基准 60px ≈ 5.55vh），
+   组结构（10 行×12 列）、页边距、标题与间隙全部随单元等比，
+   视觉元素构成不随分辨率变化；视口高度低于 1300px 保持原 4vw 逻辑不变。 */
+@media (min-height: 1300px) {
+  .start-screen {
+    --start-cell: clamp(32px, min(4vw, 5.55vh), 140px);
+    --start-gap: calc(var(--start-cell) / 12);
+    padding: calc(var(--start-cell) * 2);
+  }
+
+  .start-screen__heading {
+    font-size: calc(var(--start-cell) * 0.95);
+  }
+}
+
 .start-screen__header {
   display: flex;
   align-items: flex-end;
