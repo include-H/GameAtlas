@@ -243,10 +243,8 @@ body {
 }
 
 .stream-exit-btn {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 10;
+  /* 按钮由 .stream-actions 容器绝对定位，自身不再 absolute，避免重叠 */
+  margin-right: 0;
 }
 
 .stream-actions {
@@ -256,10 +254,6 @@ body {
   z-index: 10;
   display: flex;
   gap: 8px;
-}
-
-.stream-fullscreen-btn {
-  margin-right: 0;
 }
 
 .stream-exit-hint {

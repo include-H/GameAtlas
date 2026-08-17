@@ -125,7 +125,6 @@ onMounted(async () => {
   <a-modal
     :visible="visible"
     title="串流设置"
-    :footer="false"
     width="520px"
     @cancel="emit('update:visible', false)"
   >

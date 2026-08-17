@@ -43,6 +43,8 @@ export function useStreamSession() {
   const error = ref<string | null>(null);
   const stats = ref<VideoStats | null>(null);
   const audioQueuedMs = ref(0);
+  // 实际协商/解码的编码（onVideoFormat 回调更新，初始为用户选择）。
+  const activeCodec = ref('H.264');
 
   let client: MoonlightClient | null = null;
   let video: VideoSurface | null = null;
@@ -104,6 +106,7 @@ export function useStreamSession() {
         onAudioFrame: (samples) => audio?.submit(samples),
         onStatus: (msg) => { status.value = msg; },
         onTerminated: (err) => { void stop(err); },
+        onVideoFormat: (format) => { activeCodec.value = codecName(format); },
         onVideoStats: (s) => {
           stats.value = s;
           video?.updateStats(s);
@@ -157,11 +160,18 @@ export function useStreamSession() {
     const a = audio?.stats();
     audioQueuedMs.value = a?.queuedMs ?? 0;
     status.value =
-      `${v.width}x${v.height} @ ${v.fps.toFixed(0)} fps · ` +
+      `${activeCodec.value} ${v.width}x${v.height} @ ${v.fps.toFixed(0)} fps · ` +
       `decode ${v.decodeLatencyMs.toFixed(1)} ms · ` +
       `present ${v.presentLatencyMs.toFixed(1)} ms · ` +
       `dropped ${v.dropped} · ` +
       `audio ${audioQueuedMs.value.toFixed(0)} ms`;
+  }
+
+  /** 视频格式位 → 编码显示名（与 worker 的 VIDEO_FORMAT_* 常量对齐）。 */
+  function codecName(format: number): string {
+    if (format & 0xF000) return 'AV1';
+    if (format & 0x0F00) return 'H.265 / HEVC';
+    return 'H.264';
   }
 
   /** 停止会话并清理所有资源。reason 为 worker 上报的终止原因。 */

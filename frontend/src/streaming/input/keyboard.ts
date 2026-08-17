@@ -89,9 +89,9 @@ export class KeyboardInput {
   }
 
   private onKey(e: KeyboardEvent, action: 'down' | 'up') {
-    // 退出串流：Ctrl+Alt+Shift+R（与 NaCl 客户端的 Ctrl+Alt+Shift+Q 对齐的
-    // 语义，改 R 避免与游戏内 Q 冲突）。先于 repeat 判断，和弦永远生效。
-    if (action === 'down' && e.code === 'KeyR') {
+    // 退出串流：Ctrl+Alt+Shift+Q（与 NaCl 客户端同款）。先于 repeat 判断，
+    // 和弦永远生效。
+    if (action === 'down' && e.code === 'KeyQ') {
       const mods = modifiersFromEvent(e);
       if ((mods & (MODIFIER_CTRL | MODIFIER_ALT | MODIFIER_SHIFT)) === (MODIFIER_CTRL | MODIFIER_ALT | MODIFIER_SHIFT)) {
         e.preventDefault();
@@ -100,30 +100,30 @@ export class KeyboardInput {
       }
     }
 
-    // Escape：长按（>500ms）释放鼠标（退出 Pointer Lock），短按作为游戏内
-    // Esc 发送给主机。仅在 Keyboard Lock 生效（全屏）时浏览器才会把 Esc
-    // 派发到页面；窗口模式下 Esc 由浏览器直接消费（退出指针锁），无法拦截。
+    // Escape：短按作为游戏内 Esc 发给主机；长按（>1000ms）释放鼠标
+    // （退出 Pointer Lock）。keydown 始终发送，仅长按触发锁释放。
+    // 注意：窗口模式（无 Keyboard Lock）下 Chromium 直接消费 Esc 并退出
+    // 指针锁，keydown 到不了页面——那是浏览器硬限制，游戏内 Esc 需全屏。
     if (e.code === 'Escape') {
       if (action === 'down') {
         e.preventDefault();
         this.escapeTimer = window.setTimeout(() => {
+          this.escapeLongPress = true;
           if (document.pointerLockElement) {
             document.exitPointerLock();
           }
-          this.escapeLongPress = true;
-        }, 500);
-        return;
-      }
-      // keyup
-      if (this.escapeTimer !== undefined) {
-        clearTimeout(this.escapeTimer);
-        this.escapeTimer = undefined;
-      }
-      const wasLong = this.escapeLongPress;
-      this.escapeLongPress = false;
-      if (wasLong) {
-        e.preventDefault();
-        return;
+        }, 1000);
+      } else {
+        if (this.escapeTimer !== undefined) {
+          clearTimeout(this.escapeTimer);
+          this.escapeTimer = undefined;
+        }
+        const wasLong = this.escapeLongPress;
+        this.escapeLongPress = false;
+        if (wasLong) {
+          // 长按已释放鼠标：Esc 的 up 仍发给主机，解除主机侧按住状态。
+          e.preventDefault();
+        }
       }
     }
 
